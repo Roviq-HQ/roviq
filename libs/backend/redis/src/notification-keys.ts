@@ -11,6 +11,8 @@ export const NOTIFICATION_REDIS_KEYS = {
   NOTIFICATION_SENDER_THROTTLE: 'notification:sender-throttle:',
   /** A circuit breaker `{ state, failures, since, until }`: `sender:<id>` or `adapter:<channel>:<provider>`. */
   NOTIFICATION_BREAKER: 'notification:breaker:',
+  /** The registry hash the WhatsApp templates were last synced for; a new one syncs at start. */
+  NOTIFICATION_TEMPLATE_REGISTRY_HASH: 'notification:whatsapp-template-registry',
 } as const;
 
 /** The breaker of one WhatsApp sender, as the breaker class names it. */

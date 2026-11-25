@@ -168,6 +168,19 @@
         "impact": "It is late in the month and no audit event has been written, so next month's audit table may not be ready.",
         "step1": "Read the audit consumer's log in Observability.",
         "step2": "Check the audit partition workflow in Temporal."
+      },
+      "notification_template_rejected": {
+        "title": "WhatsApp template refused",
+        "impact": "The provider refused, paused or switched off a WhatsApp template on an account. Alerts that use it are not sent from that account.",
+        "step1": "Open \"WhatsApp senders\" below and open Templates on the sender: it names the template and the reason.",
+        "step2": "Fix the wording under a new name, then press Sync now.",
+        "step3": "A paused template comes back by itself when its quality improves."
+      },
+      "notification_template_changed": {
+        "title": "WhatsApp template changed by the provider",
+        "impact": "The provider approved a template under another category, or its text was edited at the provider. A recategorised template is not sent.",
+        "step1": "Open \"WhatsApp senders\" below and open Templates on the sender to see which template changed.",
+        "step2": "Reword it under a new name so it says what it is about for the reader, then press Sync now."
       }
     }
   },
@@ -269,6 +282,28 @@
     "senderStatusHint": {
       "PAUSED": "Paused by the platform: nothing is sent from this number until it is activated again.",
       "BLOCKED": "The provider blocked this number: resolve it in the provider's console, then activate the sender."
+    },
+    "templates": {
+      "toggle": "Templates",
+      "noAccount": "This sender has no provider account id, so its templates cannot be registered. Set it with adminUpdateMessagingSender.",
+      "approved": "{count, plural, one {# approved} other {# approved}}",
+      "pending": "{count, plural, one {# waiting for review} other {# waiting for review}}",
+      "rejected": "{count, plural, one {# refused} other {# refused}}",
+      "changed": "{count, plural, one {# changed by the provider} other {# changed by the provider}}",
+      "sync": "Sync now",
+      "syncTitle": "Submit the templates this account is missing and refresh what the provider decided",
+      "syncStarted": "Sync started. Results appear here as the provider answers.",
+      "none": "No template is registered for this account yet. Sync now submits them.",
+      "rejectedLine": "{status}, reason {reason}. Alerts that use it are not sent from this account; fix the wording under a new name.",
+      "noReason": "not given",
+      "outOfStepLine": "its text was changed at the provider and no longer matches the code.",
+      "categoryLine": "approved as {approved}, declared {declared}. It is not sent; it needs new wording under a new name.",
+      "errors": {
+        "MESSAGING_SENDER_ACCOUNT_MISSING": "This sender has no provider account id.",
+        "MESSAGING_SENDER_NOT_FOUND": "This sender no longer exists. Refresh the page.",
+        "FORBIDDEN": "You are not allowed to change senders.",
+        "other": "The sync could not be started. Try again."
+      }
     }
   }
 }

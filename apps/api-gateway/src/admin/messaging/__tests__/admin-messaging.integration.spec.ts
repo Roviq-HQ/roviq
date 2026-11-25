@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { AuditEmitter } from '@roviq/audit';
 import { MessagingTokenCipher } from '@roviq/crypto';
+import { EventBusService } from '@roviq/event-bus';
 import { REDIS_CLIENT } from '@roviq/redis';
 import {
   cleanupTestInstitute,
@@ -21,9 +22,20 @@ import {
 } from '@roviq/testing/integration';
 import type Redis from 'ioredis';
 import pg from 'pg';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../../app/app.module';
+import { WhatsAppAccountCheck } from '../whatsapp-account-check';
+
+/** The provider account every sender here belongs to; the provider check is a stand-in. */
+const SPEC_ACCOUNT = '900000000000335';
+
+/** Answers like the provider: a token starting `refused-` may not manage templates. */
+const accountCheck = {
+  canManageTemplates: vi.fn(async (_account: string, token: string) =>
+    token.startsWith('refused-') ? 'refused' : token.startsWith('down-') ? 'unreachable' : 'ok',
+  ),
+};
 
 const SUPERUSER_URL =
   process.env.DATABASE_URL_TEST_MIGRATE ?? 'postgresql://roviq:roviq_dev@localhost:5434/roviq_test';
@@ -73,6 +85,7 @@ interface UsageRow {
 
 describe('admin messaging senders (integration)', () => {
   let result: IntegrationAppResult;
+  let emit: ReturnType<typeof vi.spyOn<EventBusService, 'emit'>>;
   let superPool: pg.Pool;
   let releaseLock: () => Promise<void>;
   let cipher: MessagingTokenCipher;
@@ -102,7 +115,7 @@ describe('admin messaging senders (integration)', () => {
 
   const register = async (input: Record<string, unknown>, token = adminToken) => {
     const res = await gql<{ adminRegisterMessagingSender: SenderView }>(REGISTER, token, {
-      input,
+      input: { providerAccountId: SPEC_ACCOUNT, ...input },
     });
     const id = res.data?.adminRegisterMessagingSender.id;
     if (id) createdSenderIds.add(id);
@@ -157,7 +170,10 @@ describe('admin messaging senders (integration)', () => {
       );
     }
 
-    result = await createIntegrationApp({ modules: [AppModule] });
+    result = await createIntegrationApp({
+      modules: [AppModule],
+      overrides: [{ provide: WhatsAppAccountCheck, useValue: accountCheck }],
+    });
     cipher = result.app.get(MessagingTokenCipher);
     instA = await createTestInstitute(result.db);
     instB = await createTestInstitute(result.db);
@@ -459,6 +475,7 @@ describe('admin messaging senders (integration)', () => {
     const id = '00000000-0000-7000-a000-00000000dead';
     const registerInput = {
       providerNumberId: 'admin-messaging-spec-refused',
+      providerAccountId: SPEC_ACCOUNT,
       displayNumber: '+919800000020',
       accessToken: 'refused-token',
       dailyCap: 10,
@@ -1082,6 +1099,130 @@ describe('admin messaging senders (integration)', () => {
       'March',
     ])('should refuse the month %j', async (month) => {
       expect(code(await gql(SMS_USAGE, adminToken, { month }))).toBe('VALIDATION_FAILED');
+    });
+  });
+
+  describe('WhatsApp templates (ROV-333)', () => {
+    const TEMPLATES = `query ($senderId: ID!) {
+      adminMessagingTemplates(senderId: $senderId) {
+        name language status declaredCategory approvedCategory rejectedReason outOfStep sendable
+      }
+    }`;
+    const SYNC = 'mutation ($senderId: ID!) { adminSyncWhatsAppTemplates(senderId: $senderId) }';
+
+    // Mocks are restored after every test; on the prototype, every instance of the bus is seen.
+    beforeEach(() => {
+      emit = vi.spyOn(EventBusService.prototype, 'emit');
+    });
+
+    it('should refuse a token the provider will not let manage templates, and store nothing', async () => {
+      const before = await counts();
+
+      const res = await register({
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000041',
+        accessToken: `refused-${randomUUID()}`,
+        dailyCap: 10,
+      });
+
+      expect(code(res)).toBe('MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES');
+      expect(await counts()).toEqual(before);
+    });
+
+    it('should refuse to register when the provider cannot be reached to check the token', async () => {
+      const before = await counts();
+
+      const res = await register({
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000042',
+        accessToken: `down-${randomUUID()}`,
+        dailyCap: 10,
+      });
+
+      expect(code(res)).toBe('MESSAGING_PROVIDER_UNREACHABLE');
+      expect(await counts()).toEqual(before);
+    });
+
+    it('should store the account and ask for a sync once the sender is registered', async () => {
+      emit.mockClear();
+      const sender = await registerOk({
+        tenantId: instA.tenantId,
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000043',
+        accessToken: newToken(),
+        dailyCap: 10,
+      });
+
+      const { rows } = await superPool.query<{ provider_account_id: string }>(
+        'SELECT provider_account_id FROM messaging_senders WHERE id = $1',
+        [sender.id],
+      );
+      expect(rows).toEqual([{ provider_account_id: SPEC_ACCOUNT }]);
+      expect(emit).toHaveBeenCalledWith('NOTIFICATION.whatsapp_templates.sync_requested', {
+        providerAccountId: SPEC_ACCOUNT,
+        tenantId: null,
+      });
+      await removeSenders([sender.id]);
+    });
+
+    it('should list the account templates, sendable only when approved as declared', async () => {
+      const sender = await registerOk({
+        tenantId: instB.tenantId,
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000044',
+        accessToken: newToken(),
+        dailyCap: 10,
+      });
+      const names = [`spec_a_${randomUUID().slice(0, 6)}`, `spec_b_${randomUUID().slice(0, 6)}`];
+      await superPool.query(
+        `INSERT INTO messaging_templates
+           (provider_account_id, name, language, declared_category, approved_category,
+            content_hash, status, rejected_reason, created_by, updated_by)
+         VALUES ($1, $2, 'en', 'UTILITY', 'UTILITY', 'h', 'APPROVED', NULL, $4, $4),
+                ($1, $3, 'en', 'UTILITY', 'MARKETING', 'h', 'APPROVED', NULL, $4, $4)`,
+        [SPEC_ACCOUNT, names[0], names[1], SEED_IDS.USER_ADMIN],
+      );
+      try {
+        const res = await gql<{
+          adminMessagingTemplates: Array<{ name: string; sendable: boolean }>;
+        }>(TEMPLATES, adminToken, { senderId: sender.id });
+
+        expect(res.errors).toBeUndefined();
+        const mine = (res.data?.adminMessagingTemplates ?? []).filter((t) =>
+          names.includes(t.name),
+        );
+        expect(mine.map((t) => [t.name, t.sendable])).toEqual([
+          [names[0], true],
+          [names[1], false],
+        ]);
+      } finally {
+        await superPool.query('DELETE FROM messaging_templates WHERE name = ANY($1)', [names]);
+        await removeSenders([sender.id]);
+      }
+    });
+
+    it('should ask for a sync on request, and refuse a role that may only read senders', async () => {
+      const sender = await registerOk({
+        tenantId: instA.tenantId,
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000045',
+        accessToken: newToken(),
+        dailyCap: 10,
+      });
+      emit.mockClear();
+
+      const ok = await gql<{ adminSyncWhatsAppTemplates: boolean }>(SYNC, adminToken, {
+        senderId: sender.id,
+      });
+      const refused = await gql(SYNC, supportToken, { senderId: sender.id });
+
+      expect(ok.data?.adminSyncWhatsAppTemplates).toBe(true);
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(code(refused)).toBe('FORBIDDEN');
+      expect(code(await gql(SYNC, adminToken, { senderId: randomUUID() }))).toBe(
+        'MESSAGING_SENDER_NOT_FOUND',
+      );
+      await removeSenders([sender.id]);
     });
   });
 });

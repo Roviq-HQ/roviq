@@ -1,7 +1,7 @@
 # Notification delivery alerts
 
 The notification service measures its own delivery and sends a test message (the canary) every
-15 minutes (`docs/architecture.md` → "Notifications"). Eight OpenObserve alerts in
+15 minutes (`docs/architecture.md` → "Notifications"). Ten OpenObserve alerts in
 `docker/openobserve/alerts/notification_*.json` watch it; the metrics they read are listed in
 `docs/infrastructure.md` → "Observability". Each section below is what to check first when one
 fires. `page` alerts mean messages are not reaching people now; `ticket` alerts can wait for
@@ -111,6 +111,31 @@ in the last 15 minutes (labels `channel`, `reason`).
 2. `no_template`: a template is missing from `SMS_TEMPLATE_IDS` or not approved by the provider
    (`docs/deployment.md` → "SMS" and "WhatsApp alerts").
 3. Expected while a channel is being set up; the alert stops once the skips stop.
+
+## Template rejected
+
+`notification_template_rejected` (ticket): a WhatsApp template is `REJECTED`, `PAUSED` or
+`DISABLED` at the provider on some account (label `reason`). Sends of the alerts that use it
+are skipped as `no_template` on that account, before the provider is called.
+
+1. The admin Monitoring page's "WhatsApp senders": each sender lists its templates with their
+   status and the provider's rejection reason.
+2. A rejection names the rule the body broke: fix the wording under a new name (`…_v2`), never
+   by editing the provider's copy. "Sync now" submits it.
+3. A paused template recovers by itself when its quality improves; the provider's console shows
+   the quality.
+
+## Template changed
+
+`notification_template_changed` (ticket): the provider approved a template under another
+category than the one declared (`CATEGORY_CHANGED`), or its text was edited at the provider
+(`OUT_OF_STEP`). A recategorised template is not sent, so nothing goes out at the other price.
+
+1. "WhatsApp senders" on the Monitoring page shows which template and on which account.
+2. `CATEGORY_CHANGED`: the body does not say what it is about for the reader (their ward, their
+   account, their request). Reword it under a new name and sync.
+3. `OUT_OF_STEP`: someone edited it in the provider's console. Bring the code's definition and
+   the provider's copy back together under a new name.
 
 ## Checking that an alert fires
 

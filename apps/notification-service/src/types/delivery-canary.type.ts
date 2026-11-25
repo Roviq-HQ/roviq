@@ -1,6 +1,10 @@
 import { MessageTemplateCategory } from '@roviq/common-types';
 import type { SmsTemplate } from '../delivery/sms/sms-template';
-import { renderTemplate, type WhatsAppTemplate } from '../delivery/whatsapp/whatsapp-template';
+import {
+  OPEN_ROVIQ,
+  renderTemplate,
+  type WhatsAppTemplate,
+} from '../delivery/whatsapp/whatsapp-template';
 import type { Locale, PlatformNotificationType } from './notification-type';
 
 export interface DeliveryCanaryParams {
@@ -43,6 +47,8 @@ export const deliveryCanaryWhatsApp: WhatsAppTemplate<DeliveryCanaryParams> = {
   },
   variables: (p, locale) => [checkTime(p, locale)],
   buttonPath: () => 'login',
+  buttonLabel: OPEN_ROVIQ,
+  example: { requestedAt: '2026-11-24T04:45:00.000Z' },
 };
 
 /**

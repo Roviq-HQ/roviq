@@ -227,6 +227,12 @@ export const ErrorCode = {
   MESSAGING_SENDER_NOT_FOUND: 'MESSAGING_SENDER_NOT_FOUND',
   /** A live sender already exists for this institute (or the platform), or this provider number is registered */
   MESSAGING_SENDER_EXISTS: 'MESSAGING_SENDER_EXISTS',
+  /** The provider refused the token for the sender's account: not its account, or no template-management permission */
+  MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES: 'MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES',
+  /** The WhatsApp provider could not be reached to check the token; nothing was stored */
+  MESSAGING_PROVIDER_UNREACHABLE: 'MESSAGING_PROVIDER_UNREACHABLE',
+  /** The sender has no provider account id, so its templates cannot be synced */
+  MESSAGING_SENDER_ACCOUNT_MISSING: 'MESSAGING_SENDER_ACCOUNT_MISSING',
   /** Admission enquiry not found */
   ENQUIRY_NOT_FOUND: 'ENQUIRY_NOT_FOUND',
   /** Exam schedule row not found */
@@ -540,6 +546,9 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   DLQ_MESSAGE_NOT_FOUND: HttpStatus.NOT_FOUND,
   MESSAGING_SENDER_NOT_FOUND: HttpStatus.NOT_FOUND,
   MESSAGING_SENDER_EXISTS: HttpStatus.CONFLICT,
+  MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES: HttpStatus.UNPROCESSABLE_ENTITY,
+  MESSAGING_PROVIDER_UNREACHABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  MESSAGING_SENDER_ACCOUNT_MISSING: HttpStatus.UNPROCESSABLE_ENTITY,
   ENQUIRY_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXAM_SCHEDULE_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXAM_TERM_NOT_FOUND: HttpStatus.NOT_FOUND,

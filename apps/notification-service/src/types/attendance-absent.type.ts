@@ -2,6 +2,7 @@ import { MessageTemplateCategory, type NotificationChannel } from '@roviq/common
 import { buttonPathOf, nameList } from '../delivery/whatsapp/template-variables';
 import {
   cleanVariable,
+  OPEN_ROVIQ,
   renderTemplate,
   type WhatsAppTemplate,
 } from '../delivery/whatsapp/whatsapp-template';
@@ -90,6 +91,17 @@ function digestSubject(items: readonly AttendanceAbsentParams[], locale: Locale)
 
 const WARD: Record<Locale, string> = { en: 'your ward', hi: 'आपके बच्चे' };
 
+const ATTENDANCE_EXAMPLE: AttendanceAbsentParams = {
+  sessionId: 'session-1',
+  studentId: 'membership-student-1',
+  studentName: 'Aarav Sharma',
+  status: 'ABSENT',
+  markedAt: '2026-11-22T03:35:00.000Z',
+  sessionDate: '2026-11-22',
+  sectionName: 'A',
+  standardName: 'Class 5',
+};
+
 const whatsappSingle: WhatsAppTemplate<AttendanceAbsentParams> = {
   name: 'attendance_absent_v1',
   category: MessageTemplateCategory.UTILITY,
@@ -107,6 +119,8 @@ const whatsappSingle: WhatsAppTemplate<AttendanceAbsentParams> = {
     ),
   ],
   buttonPath: () => buttonPathOf(ATTENDANCE_PATH),
+  buttonLabel: OPEN_ROVIQ,
+  example: ATTENDANCE_EXAMPLE,
 };
 
 const whatsappDigest: WhatsAppTemplate<readonly AttendanceAbsentParams[]> = {
@@ -129,6 +143,11 @@ const whatsappDigest: WhatsAppTemplate<readonly AttendanceAbsentParams[]> = {
     ];
   },
   buttonPath: () => buttonPathOf(ATTENDANCE_PATH),
+  buttonLabel: OPEN_ROVIQ,
+  example: [
+    ATTENDANCE_EXAMPLE,
+    { ...ATTENDANCE_EXAMPLE, studentName: 'Diya Sharma', status: 'LATE' },
+  ],
 };
 
 export const attendanceAbsentWhatsApp: TypeTemplates<AttendanceAbsentParams> = {

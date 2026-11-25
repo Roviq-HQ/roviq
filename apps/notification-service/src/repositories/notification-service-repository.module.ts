@@ -18,6 +18,8 @@ import { MessagingInboundDrizzleRepository } from './messaging-inbound.drizzle-r
 import { MessagingInboundRepository } from './messaging-inbound.repository';
 import { MessagingSenderDrizzleRepository } from './messaging-sender.drizzle-repository';
 import { MessagingSenderRepository } from './messaging-sender.repository';
+import { MessagingTemplateDrizzleRepository } from './messaging-template.drizzle-repository';
+import { MessagingTemplateRepository } from './messaging-template.repository';
 import { NotificationConfigReadDrizzleRepository } from './notification-config-read.drizzle-repository';
 import { NotificationConfigReadRepository } from './notification-config-read.repository';
 import { NotificationWriteDrizzleRepository } from './notification-write.drizzle-repository';
@@ -37,6 +39,7 @@ const REPOSITORIES = [
   { provide: FlowArrivalRepository, useClass: FlowArrivalDrizzleRepository },
   { provide: MessagingInboundRepository, useClass: MessagingInboundDrizzleRepository },
   { provide: MessagingSenderRepository, useClass: MessagingSenderDrizzleRepository },
+  { provide: MessagingTemplateRepository, useClass: MessagingTemplateDrizzleRepository },
   { provide: NotificationWriteRepository, useClass: NotificationWriteDrizzleRepository },
 ];
 

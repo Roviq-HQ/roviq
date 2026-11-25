@@ -1,10 +1,18 @@
 import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { MessageTemplateCategory, MessagingSenderStatus } from '@roviq/common-types';
+import {
+  MessageTemplateCategory,
+  MessageTemplateStatus,
+  MessagingSenderStatus,
+} from '@roviq/common-types';
 import { DateTimeScalar } from '@roviq/nestjs-graphql';
 
 registerEnumType(MessagingSenderStatus, {
   name: 'MessagingSenderStatus',
   description: 'State of a WhatsApp sender. Only an ACTIVE sender sends.',
+});
+registerEnumType(MessageTemplateStatus, {
+  name: 'MessageTemplateStatus',
+  description: 'Where a WhatsApp template stands at the provider. Only APPROVED is sent.',
 });
 registerEnumType(MessageTemplateCategory, {
   name: 'MessageTemplateCategory',
@@ -30,6 +38,13 @@ export class AdminMessagingSender {
 
   @Field({ description: "The provider's id of the number; inbound webhooks are matched by it." })
   providerNumberId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The provider account the number belongs to; its WhatsApp templates are registered there. Null for a sender registered before accounts were recorded.',
+  })
+  providerAccountId!: string | null;
 
   @Field({ description: 'The number as people see it, E.164 with a leading +.' })
   displayNumber!: string;
@@ -97,4 +112,53 @@ export class AdminSmsUsageRow {
 
   @Field(() => Int)
   sentCount!: number;
+}
+
+@ObjectType({
+  description:
+    "One code-defined WhatsApp template in one language at a sender's provider account (ROV-333).",
+})
+export class AdminMessagingTemplate {
+  @Field({ description: 'The template name, version included (attendance_absent_v1).' })
+  name!: string;
+
+  @Field({ description: "'en' or 'hi'." })
+  language!: string;
+
+  @Field(() => MessageTemplateStatus)
+  status!: MessageTemplateStatus;
+
+  @Field({ description: 'The category the code declares.' })
+  declaredCategory!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The category the provider approved it under; null until reviewed. When it differs from declaredCategory the template is not sent.',
+  })
+  approvedCategory!: string | null;
+
+  @Field(() => String, { nullable: true, description: "The provider's reason for a rejection." })
+  rejectedReason!: string | null;
+
+  @Field(() => String, { nullable: true, description: "The provider's quality score." })
+  quality!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'A category the provider suggests on its own review; shown, never applied.',
+  })
+  suggestedCategory!: string | null;
+
+  @Field({
+    description:
+      "True when the provider's text no longer matches the code's definition (edited at the provider).",
+  })
+  outOfStep!: boolean;
+
+  @Field({ description: 'APPROVED under the declared category: messages using it are sent.' })
+  sendable!: boolean;
+
+  @Field(() => DateTimeScalar)
+  updatedAt!: Date;
 }

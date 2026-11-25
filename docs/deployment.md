@@ -324,29 +324,42 @@ sender exists.
 | Variable | App | Meaning |
 |----------|-----|---------|
 | `NOTIFICATION_WHATSAPP_PROVIDER=cloud` | notification-service | Turns the provider on. The four below are then required |
-| `WHATSAPP_API_BASE_URL` | notification-service | Address of the provider's API including its version segment; a message is posted to `<base>/<number id>/messages` |
+| `WHATSAPP_API_BASE_URL` | notification-service and api-gateway | Address of the provider's API including its version segment; a message is posted to `<base>/<number id>/messages`. The gateway uses it only to check a sender's token against its account when the sender is registered or its token replaced; unset there, both are refused |
+| `INSTITUTE_PORTAL_URL` | notification-service | Must be a public `https` address for WhatsApp: every template's button opens `<portal>/{{1}}`, and the template sync submits nothing when it is not |
 | `WHATSAPP_APP_SECRET` | notification-service | Signs the provider's webhook calls |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | notification-service | Any long random string; typed again at the provider when the webhook address is registered |
 | `MESSAGING_ENCRYPTION_KEY` | notification-service and api-gateway | 64 hex characters (`openssl rand -hex 32`), the same value in both apps. Encrypts each sender's access token in `messaging_sender_secrets`. Losing it means registering every token again. Unless `NODE_ENV` is `development` or `test`, the gateway refuses to start without it, and both apps refuse the all-zero development key |
 
 **Webhook.** Route `GET` and `POST /webhooks/whatsapp` of a public host to the notification
 service, and nothing else of that service. Register the address with the provider for the
-`messages` field. Every call is checked against `WHATSAPP_APP_SECRET` over the raw body before
+`messages` field and the template fields `message_template_status_update`,
+`template_category_update`, `message_template_quality_update`,
+`message_template_components_update` and `template_correct_category_detection`. Every call is checked against `WHATSAPP_APP_SECRET` over the raw body before
 it is parsed; a call that fails the check gets 401 and changes nothing. The proxy must pass the
 body through unchanged.
 
-**Templates.** A business may start a conversation only with a template approved in advance.
-Register every template in `apps/notification-service/src/delivery/whatsapp/whatsapp-templates.ts`
-(the definitions sit beside each type under `apps/notification-service/src/types/`) with the same
-name, the languages `en` and `hi`, the category, the body text exactly as written there, and one
-"visit website" button whose address is the institute portal address followed by `{{1}}`. A type
-without an approved template is recorded as skipped (`no_template`); a template the provider
-does not know fails as `WA_TEMPLATE_REJECTED`.
+**Templates.** A business may start a conversation only with a template approved in advance,
+on the provider account of the number that sends it. The notification service registers them
+itself: the workflow `WhatsAppTemplateSyncWorkflow` (one run per account at a time) submits every
+template of `apps/notification-service/src/delivery/whatsapp/whatsapp-templates.ts` and the
+canary's, in `en` and `hi`, that the account does not hold, and stores what the provider holds in
+`messaging_templates`. It runs when a sender is registered, its token replaced or its account set,
+when a platform admin presses "Sync now" on the Monitoring page (`adminSyncWhatsAppTemplates`),
+and at the service's start when the code's templates changed. It never deletes or edits a
+template at the provider: a changed text is a new name (`…_v2`), and a unit test holds every
+name to its approved content. The provider's template events keep each row's status; a send
+whose template is not `APPROVED` on the sender's account, or was approved under another
+category than the one declared, is skipped as `no_template` before the provider is called.
 
 **Senders.** A platform admin registers a sender with the GraphQL mutation
-`adminRegisterMessagingSender` (the provider's number id, the display number, the access token,
+`adminRegisterMessagingSender` (the provider's number id, the provider account id the number
+belongs to, the display number, the access token,
 the daily cap, and for the platform's sender the share one institute may use of it). The token
-is encrypted on arrival, and no query returns it. `adminPauseMessagingSender`,
+is encrypted on arrival, and no query returns it. Before anything is stored the gateway asks the
+provider whether the token may manage that account's message templates, and refuses it otherwise
+(`MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES`, or `MESSAGING_PROVIDER_UNREACHABLE` when the provider
+cannot be asked). The token needs the provider's template-management permission as well as the
+messaging one. `adminPauseMessagingSender`,
 `adminBlockMessagingSender` and `adminActivateMessagingSender` switch a sender off and on;
 `adminRotateMessagingSenderToken` replaces the token. `adminWhatsAppUsage(month)` counts the
 messages each institute sent in a month by template category.

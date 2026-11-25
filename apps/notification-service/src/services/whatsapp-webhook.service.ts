@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
+import type { TemplateEvent } from '../delivery/whatsapp/template-events';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import type {
   InboundBatch,
   InboundMessage,
@@ -13,6 +15,7 @@ import {
 import { Clock } from '../delivery/whatsapp/whatsapp-route';
 import { MessagingInboundRepository } from '../repositories/messaging-inbound.repository';
 import { MessagingSenderRepository } from '../repositories/messaging-sender.repository';
+import { MessagingTemplateRepository } from '../repositories/messaging-template.repository';
 import type { MessagingSenderRecord } from '../repositories/types';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { FlowArrivals } from './flow-arrivals.service';
@@ -52,7 +55,27 @@ export class WhatsAppWebhookService {
     private readonly clock: Clock,
     private readonly arrivals: FlowArrivals,
     private readonly metrics: NotificationMetrics,
+    private readonly templates: MessagingTemplateRepository,
+    private readonly sendability: TemplateSendability,
   ) {}
+
+  /**
+   * A template's state at the provider (ROV-333). An event about a template this system never
+   * registered (the provider's test button sends sample names) changes nothing.
+   */
+  async handleTemplateEvents(events: readonly TemplateEvent[]): Promise<void> {
+    for (const e of events) {
+      const applied = await this.templates.applyEvent(
+        e.providerAccountId,
+        e.name,
+        e.language,
+        e.change,
+      );
+      this.sendability.forget(e.providerAccountId, e.name, e.language);
+      if (!applied)
+        this.logger.warn(`Template event ${e.field} for a template not registered here; ignored`);
+    }
+  }
 
   async handle(batches: readonly InboundBatch[]): Promise<void> {
     for (const batch of batches) {

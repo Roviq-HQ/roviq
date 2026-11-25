@@ -5,7 +5,9 @@ import { RecipientReadRepository } from '../../repositories/recipient-read.repos
 import type { MessagingSenderRecord } from '../../repositories/types';
 import type { SenderCapacity } from '../channel-gate';
 import { quietHoursEnd } from './quiet-hours';
+import { TemplateSendability } from './template-sendability';
 import { WHATSAPP_CLOUD_PROVIDER } from './whatsapp-cloud.client';
+import type { TemplateSend } from './whatsapp-template';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long a critical message waits before the cap is looked at again. */
@@ -30,7 +32,26 @@ export class WhatsAppRoute {
     private readonly senders: MessagingSenderRepository,
     private readonly recipients: RecipientReadRepository,
     private readonly clock: Clock,
+    private readonly templates: TemplateSendability,
   ) {}
+
+  /**
+   * The template as it may go out from this sender's account, under the category the provider
+   * approved; null when the account has it unapproved, recategorised or not at all (ROV-333).
+   * A sender without a known account cannot be checked, so nothing is sent through it.
+   */
+  async approvedTemplate(
+    sender: MessagingSenderRecord,
+    template: TemplateSend,
+  ): Promise<TemplateSend | null> {
+    if (sender.providerAccountId === null) return null;
+    const state = await this.templates.check(
+      sender.providerAccountId,
+      template.name,
+      template.languageCode,
+    );
+    return state.sendable ? { ...template, category: state.approvedCategory } : null;
+  }
 
   /** The institute's own active sender, else the platform's. */
   resolveSender(tenantId: string | null): Promise<MessagingSenderRecord | null> {

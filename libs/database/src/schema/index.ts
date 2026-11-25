@@ -26,6 +26,7 @@ export * from './notification/messaging-inbound-events';
 export * from './notification/messaging-opt-outs';
 export * from './notification/messaging-sender-secrets';
 export * from './notification/messaging-senders';
+export * from './notification/messaging-templates';
 export * from './notification/notification-configs';
 export * from './notification/notification-deliveries';
 export * from './notification/notifications';

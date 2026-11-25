@@ -55,7 +55,7 @@ function anchorsOf(markdown: string): Set<string> {
 }
 
 describe('notification alert files', () => {
-  it('should hold the eight notification alerts', () => {
+  it('should hold the ten notification alerts', () => {
     expect(files.sort()).toEqual([
       'notification_breaker_opened.json',
       'notification_canary_missing.json',
@@ -65,6 +65,8 @@ describe('notification alert files', () => {
       'notification_sender_blocked.json',
       'notification_service_down.json',
       'notification_skips_rising.json',
+      'notification_template_changed.json',
+      'notification_template_rejected.json',
     ]);
   });
 
@@ -102,6 +104,8 @@ describe('notification alert files', () => {
       'notification_dead_letters.json',
       'notification_sender_blocked.json',
       'notification_skips_rising.json',
+      'notification_template_changed.json',
+      'notification_template_rejected.json',
     ]);
   });
 

@@ -11,6 +11,9 @@ export const DIGEST_WORKFLOW_TYPE = 'NotificationDigestWorkflow';
 export const DIGEST_ITEM_SIGNAL = 'digestItem';
 export const FLOW_ARRIVAL_SIGNAL = 'flowArrival';
 export const CANARY_WORKFLOW_TYPE = 'DeliveryCanaryWorkflow';
+export const TEMPLATE_SYNC_WORKFLOW_TYPE = 'WhatsAppTemplateSyncWorkflow';
+/** One run per provider account at a time. */
+export const templateSyncWorkflowId = (accountId: string) => `whatsapp-template-sync:${accountId}`;
 
 export const CHANNEL_ACTIVITY_RETRY = {
   maximumAttempts: 5,
@@ -118,6 +121,11 @@ export interface CanaryRequest {
   requestedAt: string;
 }
 
+export interface TemplateSyncInput {
+  /** The provider account whose templates are brought in line with the registry. */
+  providerAccountId: string;
+}
+
 export interface NotificationActivities {
   /**
    * One delivery row per execution (none for a deferral); throws on a provider failure so
@@ -128,6 +136,8 @@ export interface NotificationActivities {
   recordSkip(input: RecordSkipInput): Promise<void>;
   /** Publishes one canary request on the NOTIFICATION stream; the listener sends it. */
   requestCanary(input: CanaryRequest): Promise<void>;
+  /** Submits the registry's missing templates and records what the provider holds (ROV-333). */
+  syncWhatsAppTemplates(input: TemplateSyncInput): Promise<void>;
 }
 
 /** How often a channel may be deferred; the try after the last one sends or records a skip. */

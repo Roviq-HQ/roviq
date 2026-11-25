@@ -1,5 +1,6 @@
 import { ErrorCode, type MessagingSenderStatus, type PlatformContext } from '@roviq/common-types';
 import type { MessagingTokenCipher } from '@roviq/crypto';
+import type { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import type Redis from 'ioredis';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,11 +8,13 @@ import { AdminMessagingService } from '../admin-messaging.service';
 import type { RegisterMessagingSenderInput } from '../dto/messaging-sender.dto';
 import type { AdminMessagingRepository } from '../repositories/admin-messaging.repository';
 import type { MessagingSenderRecord } from '../repositories/types';
+import type { AccountCheck, WhatsAppAccountCheck } from '../whatsapp-account-check';
 
 const TOKEN = 'unit-spec-secret-token';
 const CIPHERTEXT = Buffer.from('sealed');
 const ID = '00000000-0000-7000-a000-0000000000aa';
 const TENANT = '00000000-0000-7000-a000-0000000000bb';
+const ACCOUNT = '900000000000777';
 
 const ctx: PlatformContext = {
   _scope: 'platform',
@@ -28,6 +31,7 @@ function sender(overrides: Partial<MessagingSenderRecord> = {}): MessagingSender
     scope: 'institute',
     tenantId: TENANT,
     providerNumberId: 'pn-1',
+    providerAccountId: ACCOUNT,
     displayNumber: '+919876543210',
     status: 'ACTIVE',
     dailyCap: 100,
@@ -39,16 +43,28 @@ function sender(overrides: Partial<MessagingSenderRecord> = {}): MessagingSender
   };
 }
 
-function setup(repoOverrides: Partial<AdminMessagingRepository> = {}) {
+function setup(repoOverrides: Partial<AdminMessagingRepository> = {}, check: AccountCheck = 'ok') {
   const repo = createMock<AdminMessagingRepository>(repoOverrides);
   const cipher = createMock<MessagingTokenCipher>({ encrypt: vi.fn(() => CIPHERTEXT) });
   const redis = createMock<Redis>({ del: vi.fn().mockResolvedValue(2) });
-  return { repo, cipher, redis, service: new AdminMessagingService(repo, cipher, redis) };
+  const accounts = createMock<WhatsAppAccountCheck>({
+    canManageTemplates: vi.fn().mockResolvedValue(check),
+  });
+  const eventBus = createMock<EventBusService>({ emit: vi.fn() });
+  return {
+    repo,
+    cipher,
+    redis,
+    accounts,
+    eventBus,
+    service: new AdminMessagingService(repo, cipher, redis, accounts, eventBus),
+  };
 }
 
 const input: RegisterMessagingSenderInput = {
   tenantId: TENANT,
   providerNumberId: 'pn-1',
+  providerAccountId: ACCOUNT,
   displayNumber: '+919876543210',
   accessToken: TOKEN,
   dailyCap: 100,
@@ -65,6 +81,7 @@ describe('AdminMessagingService.register', () => {
     expect(register).toHaveBeenCalledWith(ctx, {
       tenantId: TENANT,
       providerNumberId: 'pn-1',
+      providerAccountId: ACCOUNT,
       displayNumber: '+919876543210',
       accessTokenEncrypted: CIPHERTEXT,
       dailyCap: 100,
@@ -85,6 +102,7 @@ describe('AdminMessagingService.register', () => {
     expect(register).toHaveBeenCalledWith(ctx, {
       tenantId: null,
       providerNumberId: 'pn-1',
+      providerAccountId: ACCOUNT,
       displayNumber: '+919876543210',
       accessTokenEncrypted: CIPHERTEXT,
       dailyCap: 100,
@@ -165,7 +183,7 @@ describe('AdminMessagingService.update', () => {
 describe('AdminMessagingService.rotateToken', () => {
   it('should store the new ciphertext', async () => {
     const replaceToken = vi.fn(async () => sender());
-    const { service, cipher } = setup({ replaceToken });
+    const { service, cipher } = setup({ findById: vi.fn(async () => sender()), replaceToken });
 
     await service.rotateToken(ctx, ID, 'new-token');
 
@@ -174,11 +192,58 @@ describe('AdminMessagingService.rotateToken', () => {
   });
 
   it('should answer MESSAGING_SENDER_NOT_FOUND for a missing sender', async () => {
-    const { service } = setup({ replaceToken: vi.fn(async () => null) });
+    const { service } = setup({ findById: vi.fn(async () => null) });
 
     await expect(service.rotateToken(ctx, ID, 'new-token')).rejects.toMatchObject({
       code: ErrorCode.MESSAGING_SENDER_NOT_FOUND,
     });
+  });
+
+  it('should refuse a token the provider will not let manage the account, and keep the old one', async () => {
+    const replaceToken = vi.fn(async () => sender());
+    const { service } = setup({ findById: vi.fn(async () => sender()), replaceToken }, 'refused');
+
+    await expect(service.rotateToken(ctx, ID, 'new-token')).rejects.toMatchObject({
+      code: ErrorCode.MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES,
+    });
+    expect(replaceToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdminMessagingService WhatsApp templates (ROV-333)', () => {
+  it('should check the token before storing anything, and ask for a sync after', async () => {
+    const register = vi.fn(async () => ({ kind: 'ok' as const, sender: sender() }));
+    const { service, accounts, eventBus } = setup({ register });
+
+    await service.register(ctx, input);
+
+    expect(accounts.canManageTemplates).toHaveBeenCalledWith(ACCOUNT, TOKEN);
+    expect(eventBus.emit).toHaveBeenCalledWith('NOTIFICATION.whatsapp_templates.sync_requested', {
+      providerAccountId: ACCOUNT,
+      tenantId: null,
+    });
+  });
+
+  it.each([
+    ['refused' as const, ErrorCode.MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES],
+    ['unreachable' as const, ErrorCode.MESSAGING_PROVIDER_UNREACHABLE],
+  ])('should store nothing and ask for no sync when the check answers %s', async (check, code) => {
+    const { service, repo, eventBus } = setup({}, check);
+
+    await expect(service.register(ctx, input)).rejects.toMatchObject({ code });
+    expect(repo.register).not.toHaveBeenCalled();
+    expect(eventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('should refuse a sync request for a sender without an account', async () => {
+    const { service, eventBus } = setup({
+      findById: vi.fn(async () => sender({ providerAccountId: null })),
+    });
+
+    await expect(service.syncTemplates(ctx, ID)).rejects.toMatchObject({
+      code: ErrorCode.MESSAGING_SENDER_ACCOUNT_MISSING,
+    });
+    expect(eventBus.emit).not.toHaveBeenCalled();
   });
 });
 

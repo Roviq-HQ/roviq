@@ -29,6 +29,9 @@ const NOTIFICATION = {
   PUSH_ACKNOWLEDGED: 'NOTIFICATION.push.acknowledged',
   USER_CREATED: 'NOTIFICATION.user.created',
   USER_UPDATED: 'NOTIFICATION.user.updated',
+  // Emitted by the gateway when a WhatsApp sender is registered, its token rotated, or a platform
+  // admin asks: bring the sender's provider account's templates in line with the code (ROV-333).
+  WHATSAPP_TEMPLATES_SYNC_REQUESTED: 'NOTIFICATION.whatsapp_templates.sync_requested',
 } as const;
 
 export const EVENT_PATTERNS = {

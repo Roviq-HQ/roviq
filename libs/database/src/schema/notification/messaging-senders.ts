@@ -34,6 +34,11 @@ export const messagingSenders = pgTable(
     provider: text().notNull(),
     /** The provider's id of the number; an inbound webhook is mapped to a sender by it. */
     providerNumberId: text('provider_number_id').notNull(),
+    /**
+     * The provider account the number belongs to: templates are registered per account, not per
+     * number (ROV-333). Required when a sender is registered.
+     */
+    providerAccountId: text('provider_account_id'),
     /** The number as people see it, with country code. */
     displayNumber: text('display_number').notNull(),
     status: messagingSenderStatus().default('ACTIVE').notNull(),

@@ -36,6 +36,7 @@ export const NOTIFICATION_INSTRUMENTS = {
   breakerOpen: { name: 'notification.breaker.open', labels: [L.CHANNEL, L.PROVIDER] },
   senderBlocked: { name: 'notification.sender.blocked', labels: [L.CHANNEL] },
   skippedRecent: { name: 'notification.skipped.recent', labels: [L.CHANNEL, L.REASON] },
+  templateProblems: { name: 'notification.template.problems', labels: [L.REASON] },
   eventLag: { name: 'notification.event.lag', labels: [L.STREAM, L.CONSUMER] },
   canaryLastSuccess: { name: 'notification.canary.last_success', labels: [L.CHANNEL] },
   workerRunning: { name: 'notification.worker.running', labels: [] },

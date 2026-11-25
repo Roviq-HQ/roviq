@@ -19,7 +19,17 @@ export interface WhatsAppTemplate<P> {
    * (`institute/attendance`). The approved button URL is the portal address plus `{{1}}`.
    */
   buttonPath(params: P): string;
+  /** The button's label per language; at most 25 characters, no variable. */
+  buttonLabel: Record<Locale, string>;
+  /**
+   * Params the provider reviews the template with: its example values and button address are
+   * this example rendered, so a submission is the same every time.
+   */
+  example: P;
 }
+
+/** The label every template's single button carries. */
+export const OPEN_ROVIQ: Record<Locale, string> = { en: 'Open Roviq', hi: 'Roviq खोलें' };
 
 /** What the adapter sends for one message. */
 export interface TemplateSend {

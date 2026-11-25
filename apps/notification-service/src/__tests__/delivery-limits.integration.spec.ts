@@ -41,6 +41,7 @@ import { ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
 import { type BreakerOptions, ProviderBreaker } from '../delivery/rate/provider-breaker';
 import { SenderRateLimiter, type SenderRateOptions } from '../delivery/rate/sender-rate-limiter';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { WHATSAPP_CLOUD_PROVIDER } from '../delivery/whatsapp/whatsapp-cloud.client';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
@@ -48,6 +49,7 @@ import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizz
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { DeliveryStatsDrizzleRepository } from '../repositories/delivery-stats.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
@@ -56,6 +58,7 @@ import type { RegularPayload } from '../types/registry';
 import { createNotificationActivities } from '../workflows/notification.activities';
 import type { SendChannelInput } from '../workflows/notification-workflow.types';
 import { testRedis } from './delivery-limits';
+import { approveRegistryTemplates, SPEC_PROVIDER_ACCOUNT } from './template-fixtures';
 
 const CTX = 'test:delivery-limits';
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -197,7 +200,12 @@ describe('sender rate and breakers (integration)', () => {
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
       new ContactReadDrizzleRepository(db),
       new NotificationWriteDrizzleRepository(db),
-      new WhatsAppRoute(senders, new RecipientReadDrizzleRepository(db), new NoonClock()),
+      new WhatsAppRoute(
+        senders,
+        new RecipientReadDrizzleRepository(db),
+        new NoonClock(),
+        new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
+      ),
       metrics,
       limiter,
       new ProviderBreaker(connection, breaker),
@@ -290,6 +298,7 @@ describe('sender rate and breakers (integration)', () => {
           channel: 'WHATSAPP',
           provider: WHATSAPP_CLOUD_PROVIDER,
           providerNumberId: numberId,
+          providerAccountId: SPEC_PROVIDER_ACCOUNT,
           displayNumber: '+910000000000',
           status: 'ACTIVE',
           dailyCap: 10_000,
@@ -348,6 +357,7 @@ describe('sender rate and breakers (integration)', () => {
     releaseLock = await holdPlatformSenderLock(superUrl);
     pool = new pg.Pool({ connectionString: poolerUrl });
     superPool = new pg.Pool({ connectionString: superUrl });
+    await approveRegistryTemplates(superPool);
     db = createDrizzleDb(pool);
     redis = testRedis();
     senders = new MessagingSenderDrizzleRepository(db);

@@ -255,6 +255,28 @@ export const MessageTemplateCategory = Object.fromEntries(
   MESSAGE_TEMPLATE_CATEGORY_VALUES.map((v) => [v, v]),
 ) as { readonly [K in MessageTemplateCategory]: K };
 
+// ─── MessageTemplateStatus ──────────────────────────────────────────────────
+
+/** Where a WhatsApp template stands at the provider, per account, name and language (ROV-333). */
+export const MESSAGE_TEMPLATE_STATUS_VALUES = [
+  // Submitted, or known to the provider, and waiting for its review
+  'PENDING',
+  // The provider approved it; it may be sent when its approved category is the declared one
+  'APPROVED',
+  // The provider refused it; `rejected_reason` says why
+  'REJECTED',
+  // The provider paused it for low quality; sends fail until it is active again
+  'PAUSED',
+  // The provider switched it off for good
+  'DISABLED',
+] as const;
+
+export type MessageTemplateStatus = (typeof MESSAGE_TEMPLATE_STATUS_VALUES)[number];
+
+export const MessageTemplateStatus = Object.fromEntries(
+  MESSAGE_TEMPLATE_STATUS_VALUES.map((v) => [v, v]),
+) as { readonly [K in MessageTemplateStatus]: K };
+
 // ─── DevicePlatform ─────────────────────────────────────────────────────────
 
 export const DEVICE_PLATFORM_VALUES = ['WEB', 'ANDROID', 'IOS'] as const;

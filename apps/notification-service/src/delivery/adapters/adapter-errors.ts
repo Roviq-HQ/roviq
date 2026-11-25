@@ -76,6 +76,10 @@ export const ADAPTER_ERROR_KINDS = {
   WA_TEMPLATE_REJECTED: 'message_refused',
   WA_NOT_ON_WHATSAPP: 'message_refused',
   WA_REJECTED: 'message_refused',
+  // Template registration (ROV-333): never a send, so never failed over.
+  WA_TEMPLATE_INVALID: 'message_refused',
+  WA_TEMPLATE_EXISTS: 'message_refused',
+  WA_PERMISSION_MISSING: 'provider_unavailable',
 } as const satisfies Record<string, FailureKind>;
 
 export type SmtpErrorCode = keyof typeof SMTP_ERROR_KINDS;

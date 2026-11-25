@@ -12,6 +12,7 @@ import {
 } from './dto/messaging-sender.dto';
 import {
   AdminMessagingSender,
+  AdminMessagingTemplate,
   AdminSmsUsageRow,
   AdminWhatsAppUsageRow,
 } from './models/admin-messaging-sender.model';
@@ -75,6 +76,39 @@ export class AdminMessagingResolver {
   ): Promise<MessagingSenderRecord> {
     assertPlatformContext(user);
     return this.service.rotateToken(user, args.id, args.accessToken);
+  }
+
+  @Query(() => [AdminMessagingTemplate], {
+    description:
+      "The code's WhatsApp templates at the sender's provider account, with what the provider decided about each (ROV-333).",
+  })
+  @UseGuards(AbilityGuard)
+  @CheckAbility({ action: 'read', subject: 'MessagingSender' })
+  async adminMessagingTemplates(
+    @CurrentUser() user: AuthUser,
+    @Args('senderId', { type: () => ID }) senderId: string,
+  ): Promise<AdminMessagingTemplate[]> {
+    assertPlatformContext(user);
+    const rows = await this.service.templates(user, senderId);
+    return rows.map((r) => ({
+      ...r,
+      sendable: r.status === 'APPROVED' && r.approvedCategory === r.declaredCategory,
+    }));
+  }
+
+  @Mutation(() => Boolean, {
+    description:
+      "Submits the code's missing WhatsApp templates to the sender's provider account and refreshes their state, in the notification service. Returns at once; the panel shows the result as it arrives.",
+  })
+  @UseGuards(AbilityGuard)
+  @CheckAbility({ action: 'update', subject: 'MessagingSender' })
+  async adminSyncWhatsAppTemplates(
+    @CurrentUser() user: AuthUser,
+    @Args('senderId', { type: () => ID }) senderId: string,
+  ): Promise<boolean> {
+    assertPlatformContext(user);
+    await this.service.syncTemplates(user, senderId);
+    return true;
   }
 
   @Mutation(() => AdminMessagingSender, { description: 'ACTIVE → PAUSED: nothing is sent.' })

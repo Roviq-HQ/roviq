@@ -27,11 +27,13 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import {
   AdminMonitoringSendersDocument,
+  type AdminMonitoringSendersQuery,
   AdminNotificationHealthDocument,
   type AdminNotificationHealthQuery,
 } from '../_lib/notification-health.graphql.generated';
 import { SectionError } from './section-error';
 import { SenderRateDialog, type SenderRateTarget } from './sender-rate-dialog';
+import { SenderTemplates } from './sender-templates';
 
 const { adminMonitoring: ids } = testIds;
 
@@ -163,6 +165,13 @@ const SENDER_STATUS: Record<MessagingSenderStatus, string> = {
 function SendersList() {
   const t = useTranslations('adminMonitoring.notifications');
   const [editing, setEditing] = React.useState<SenderRateTarget | null>(null);
+  const [openTemplates, setOpenTemplates] = React.useState<ReadonlySet<string>>(new Set());
+  const toggleTemplates = (id: string) =>
+    setOpenTemplates((open) => {
+      const next = new Set(open);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   const { data, error, refetch } = useQuery(AdminMonitoringSendersDocument, {
     pollInterval: NOTIFICATION_HEALTH_POLL_MS,
   });
@@ -189,55 +198,95 @@ function SendersList() {
       ) : (
         <ul className="flex flex-col divide-y">
           {senders.map((sender) => (
-            <li
+            <SenderRow
               key={sender.id}
-              className="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0"
-              data-testid={ids.notificationsSender(sender.id)}
-            >
-              <span className="font-mono text-sm">{sender.displayNumber}</span>
-              <span className="text-xs text-muted-foreground">
-                {sender.tenantId === null ? t('senderPlatform') : t('senderInstitute')}
-              </span>
-              <span
-                className="ms-auto text-xs text-muted-foreground tabular-nums"
-                data-testid={ids.notificationsSenderRate(sender.id)}
-              >
-                {t('senderRate', { rate: sender.messagesPerSecond })}
-              </span>
-              <Can I="update" a="MessagingSender">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  title={t('senderRateEdit')}
-                  aria-label={t('senderRateEdit')}
-                  onClick={() => setEditing(sender)}
-                  data-testid={ids.notificationsSenderRateEdit(sender.id)}
-                >
-                  <Pencil aria-hidden="true" />
-                </Button>
-              </Can>
-              <Badge className={SENDER_STATUS[sender.status]}>
-                {sender.status === 'BLOCKED' ? (
-                  <AlertTriangle aria-hidden="true" />
-                ) : sender.status === 'PAUSED' ? (
-                  <Pause aria-hidden="true" />
-                ) : (
-                  <CheckCircle2 aria-hidden="true" />
-                )}
-                {t(`senderStatus.${sender.status}`)}
-              </Badge>
-              {sender.status === 'ACTIVE' ? null : (
-                <p className="basis-full text-xs text-muted-foreground">
-                  {t(`senderStatusHint.${sender.status}`)}
-                </p>
-              )}
-            </li>
+              sender={sender}
+              onEditRate={() => setEditing(sender)}
+              templatesOpen={openTemplates.has(sender.id)}
+              onToggleTemplates={() => toggleTemplates(sender.id)}
+            />
           ))}
         </ul>
       )}
       {editing ? <SenderRateDialog sender={editing} open onClose={() => setEditing(null)} /> : null}
     </section>
+  );
+}
+
+type Sender = NonNullable<AdminMonitoringSendersQuery['adminMessagingSenders']>[number];
+
+/** One WhatsApp sender: number, owner, rate, status and, on demand, its templates. */
+function SenderRow({
+  sender,
+  onEditRate,
+  templatesOpen,
+  onToggleTemplates,
+}: {
+  sender: Sender;
+  onEditRate: () => void;
+  templatesOpen: boolean;
+  onToggleTemplates: () => void;
+}) {
+  const t = useTranslations('adminMonitoring.notifications');
+  return (
+    <li
+      className="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0"
+      data-testid={ids.notificationsSender(sender.id)}
+    >
+      <span className="font-mono text-sm">{sender.displayNumber}</span>
+      <span className="text-xs text-muted-foreground">
+        {sender.tenantId === null ? t('senderPlatform') : t('senderInstitute')}
+      </span>
+      <span
+        className="ms-auto text-xs text-muted-foreground tabular-nums"
+        data-testid={ids.notificationsSenderRate(sender.id)}
+      >
+        {t('senderRate', { rate: sender.messagesPerSecond })}
+      </span>
+      <Can I="update" a="MessagingSender">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          title={t('senderRateEdit')}
+          aria-label={t('senderRateEdit')}
+          onClick={onEditRate}
+          data-testid={ids.notificationsSenderRateEdit(sender.id)}
+        >
+          <Pencil aria-hidden="true" />
+        </Button>
+      </Can>
+      <Badge className={SENDER_STATUS[sender.status]}>
+        {sender.status === 'BLOCKED' ? (
+          <AlertTriangle aria-hidden="true" />
+        ) : sender.status === 'PAUSED' ? (
+          <Pause aria-hidden="true" />
+        ) : (
+          <CheckCircle2 aria-hidden="true" />
+        )}
+        {t(`senderStatus.${sender.status}`)}
+      </Badge>
+      {sender.status === 'ACTIVE' ? null : (
+        <p className="basis-full text-xs text-muted-foreground">
+          {t(`senderStatusHint.${sender.status}`)}
+        </p>
+      )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={templatesOpen}
+        onClick={onToggleTemplates}
+        data-testid={ids.senderTemplatesToggle(sender.id)}
+      >
+        {t('templates.toggle')}
+      </Button>
+      {templatesOpen ? (
+        <div className="basis-full">
+          <SenderTemplates senderId={sender.id} hasAccount={sender.providerAccountId !== null} />
+        </div>
+      ) : null}
+    </li>
   );
 }

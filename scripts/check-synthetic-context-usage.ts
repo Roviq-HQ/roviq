@@ -240,6 +240,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-319: senders, their tokens, opt-outs and inbound events are platform-role tables
   'apps/notification-service/src/repositories/messaging-sender.drizzle-repository.ts',
   'apps/notification-service/src/repositories/messaging-inbound.drizzle-repository.ts',
+  // ROV-333: template rows are written by the sync and the provider's events; no caller context
+  'apps/notification-service/src/repositories/messaging-template.drizzle-repository.ts',
   // ROV-318: a provider's delivery report appends a row copied from the message's own SENT row
   'apps/notification-service/src/repositories/delivery-receipt.drizzle-repository.ts',
   // ROV-319 integration fixtures: senders with tokens and phone numbers of the recipients

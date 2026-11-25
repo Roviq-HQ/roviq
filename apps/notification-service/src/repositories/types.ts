@@ -96,6 +96,8 @@ export interface MessagingSenderRecord {
   tenantId: string | null;
   status: MessagingSenderStatus;
   providerNumberId: string;
+  /** The provider account the number belongs to; null for a sender registered before ROV-333. */
+  providerAccountId: string | null;
   dailyCap: number;
   instituteDailyCap: number | null;
   /** Messages the sender may hand the provider per second, over every instance. */

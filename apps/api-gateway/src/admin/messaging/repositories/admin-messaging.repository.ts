@@ -1,6 +1,7 @@
 import type { MessagingSenderStatus, PlatformContext } from '@roviq/common-types';
 import type {
   MessagingSenderRecord,
+  MessagingTemplateRecord,
   RegisterMessagingSenderData,
   RegisterMessagingSenderResult,
   SmsUsageRecord,
@@ -48,4 +49,10 @@ export abstract class AdminMessagingRepository {
    * delivery canary rows are not usage.
    */
   abstract smsUsage(ctx: PlatformContext, month: string): Promise<SmsUsageRecord[]>;
+
+  /** The template rows of one provider account (ROV-333), by name then language. */
+  abstract listTemplates(
+    ctx: PlatformContext,
+    providerAccountId: string,
+  ): Promise<MessagingTemplateRecord[]>;
 }

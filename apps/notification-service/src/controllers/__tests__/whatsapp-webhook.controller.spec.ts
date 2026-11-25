@@ -64,7 +64,10 @@ describe('WhatsAppWebhookController', () => {
   let controller: WhatsAppWebhookController;
 
   beforeEach(() => {
-    service = createMock<WhatsAppWebhookService>({ handle: vi.fn().mockResolvedValue(undefined) });
+    service = createMock<WhatsAppWebhookService>({
+      handle: vi.fn().mockResolvedValue(undefined),
+      handleTemplateEvents: vi.fn().mockResolvedValue(undefined),
+    });
     controller = new WhatsAppWebhookController(cloud('cloud'), service);
   });
 
@@ -135,6 +138,41 @@ describe('WhatsAppWebhookController', () => {
         UnauthorizedException,
       );
       expect(service.handle).not.toHaveBeenCalled();
+      expect(service.handleTemplateEvents).not.toHaveBeenCalled();
+    });
+
+    it("should hand a signed template status event to the service with the entry's account", async () => {
+      const body = Buffer.from(
+        JSON.stringify({
+          object: 'whatsapp_business_account',
+          entry: [
+            {
+              id: 'acct-1',
+              changes: [
+                {
+                  field: 'message_template_status_update',
+                  value: {
+                    event: 'APPROVED',
+                    message_template_name: 'attendance_absent_v1',
+                    message_template_language: 'en',
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+        'utf8',
+      );
+
+      await expect(controller.receive(request(body), sign(body))).resolves.toBe('ok');
+
+      expect(service.handleTemplateEvents).toHaveBeenCalledWith([
+        expect.objectContaining({
+          providerAccountId: 'acct-1',
+          name: 'attendance_absent_v1',
+          change: expect.objectContaining({ status: 'APPROVED' }),
+        }),
+      ]);
     });
 
     it('should ignore a correctly signed body that is not JSON', async () => {

@@ -50,6 +50,7 @@ import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { AttendanceListener } from '../listeners/attendance.listener';
 import { AuthListener } from '../listeners/auth.listener';
@@ -58,6 +59,7 @@ import { UserListener } from '../listeners/user.listener';
 import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationConfigReadDrizzleRepository } from '../repositories/notification-config-read.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
@@ -294,7 +296,12 @@ describe('notification pipeline (integration)', () => {
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
       contacts,
       writes,
-      new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
+      new WhatsAppRoute(
+        new MessagingSenderDrizzleRepository(db),
+        recipients,
+        new Clock(),
+        new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
+      ),
       new NotificationMetrics(),
       ...noDeliveryLimits(),
     );
@@ -649,6 +656,7 @@ describe('notification pipeline (integration)', () => {
           new MessagingSenderDrizzleRepository(db),
           new RecipientReadDrizzleRepository(db),
           new Clock(),
+          new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
         ),
         new NotificationMetrics(),
         ...noDeliveryLimits(),

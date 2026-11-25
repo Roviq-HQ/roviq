@@ -7,6 +7,7 @@ import { ChannelAdapters } from '../../delivery/adapters/channel-adapters';
 import type { ProviderBreaker } from '../../delivery/rate/provider-breaker';
 import type { DeliveryStatsRepository } from '../../repositories/delivery-stats.repository';
 import type { MessagingSenderRepository } from '../../repositories/messaging-sender.repository';
+import type { MessagingTemplateRepository } from '../../repositories/messaging-template.repository';
 import type { SenderStateRecord } from '../../repositories/types';
 import {
   breakerTargets,
@@ -91,12 +92,17 @@ describe('NotificationStateGauges', () => {
   const breaker = createMock<ProviderBreaker>();
   const senders = createMock<MessagingSenderRepository>();
   const stats = createMock<DeliveryStatsRepository>();
+  const templates = createMock<MessagingTemplateRepository>();
 
   beforeEach(() => {
     reader = new TestReader();
     metrics.setGlobalMeterProvider(new MeterProvider({ readers: [reader] }));
     senders.listStates.mockResolvedValue([sender('s2', 'BLOCKED')]);
     breaker.openAmong.mockResolvedValue(new Set(['adapter:SMS:http']));
+    templates.countProblems.mockResolvedValue([
+      { problem: 'REJECTED', count: 1 },
+      { problem: 'CATEGORY_CHANGED', count: 0 },
+    ]);
     stats.countSkippedSince.mockResolvedValue([
       { channel: 'WHATSAPP', reason: 'no_template', count: 1 },
     ]);
@@ -128,6 +134,7 @@ describe('NotificationStateGauges', () => {
       breaker,
       senders,
       stats,
+      templates,
     );
     gauges.onModuleInit();
     return gauges;

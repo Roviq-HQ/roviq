@@ -41,6 +41,15 @@ export abstract class MessagingSenderRepository {
     to: MessagingSenderStatus,
   ): Promise<boolean>;
 
+  /**
+   * A live sender of the provider account, with its token, to sync the account's templates
+   * with: an ACTIVE one first. Null when the account has none.
+   */
+  abstract findForAccount(providerAccountId: string): Promise<MessagingSenderRecord | null>;
+
+  /** The provider accounts of every live sender. */
+  abstract listAccounts(): Promise<string[]>;
+
   /** Every live sender's channel, provider and status, for the state gauges. */
   abstract listStates(): Promise<SenderStateRecord[]>;
 }
