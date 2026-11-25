@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useInstituteLocales, zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -30,6 +30,7 @@ import {
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
 import { instituteInfoHelp } from '@web/help/institute-settings/institute-info.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -82,6 +83,7 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
     [defaultLocale],
   );
   const t = useTranslations('instituteSettings');
+  const errorCopy = useErrorCopy();
   const ti = useTranslations('instituteSettings.info');
   const tCommon = useTranslations('common');
   const [concurrentError, setConcurrentError] = React.useState(false);
@@ -118,8 +120,7 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
         if (extractGraphQLErrorCode(err) === 'CONCURRENT_MODIFICATION') {
           setConcurrentError(true);
         } else {
-          const message = extractGraphQLError(err, t('saveFailed'));
-          toast.error(t('saveFailed'), { description: message });
+          toast.error(errorCopy(err, t('saveFailed')));
         }
       }
     },

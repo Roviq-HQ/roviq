@@ -2,7 +2,7 @@
 
 import { useAuth } from '@roviq/auth';
 import { GROUP_TYPE_VALUES } from '@roviq/common-types';
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Button,
@@ -37,6 +37,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { Building2, FolderOpen, Loader2, Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -53,6 +54,7 @@ const { resellerGroups } = testIds;
 
 export default function InstituteGroupsPage() {
   const t = useTranslations('resellerInstitutes.groups');
+  const errorCopy = useErrorCopy();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [name, setName] = React.useState('');
   const [code, setCode] = React.useState('');
@@ -121,7 +123,7 @@ export default function InstituteGroupsPage() {
       setRegistrationNumber('');
       setRegistrationState('');
     } catch (err) {
-      toast.error(t('create.error'), { description: extractGraphQLError(err, t('create.error')) });
+      toast.error(errorCopy(err, t('create.error')));
     }
   };
 

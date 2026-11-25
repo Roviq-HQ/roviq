@@ -79,8 +79,7 @@
       "phoneInvalid": "Enter a valid 10-digit Indian mobile number",
       "dateInvalid": "Use the DD/MM/YYYY date format",
       "generic": "Could not create staff member",
-      "employeeIdDuplicate": "Another current staff member already has this employee ID. Enter a different one, or leave it blank to get the next number.",
-      "duplicate": "A staff member with this email already exists"
+      "employeeIdDuplicate": "Another current staff member already has this employee ID. Enter a different one, or leave it blank to get the next number."
     }
   },
   "filters": {
@@ -191,7 +190,8 @@
       "draftFound": "Unsaved changes found",
       "draftFoundDescription": "You started editing this staff profile earlier. Restore or discard?",
       "draftRestore": "Restore",
-      "draftDiscard": "Discard"
+      "draftDiscard": "Discard",
+      "saveError": "Could not save the profile. Try again."
     },
     "qualifications": {
       "title": "Qualifications",
@@ -241,7 +241,8 @@
         "hint": "Optional. A scan or photo of the degree or certificate.",
         "view": "View certificate",
         "remove": "Remove"
-      }
+      },
+      "deleteError": "Could not delete the qualification. Try again."
     },
     "assignedSections": {
       "title": "Assigned sections",

@@ -1,7 +1,6 @@
 'use client';
 
 import { ADMISSION_TYPE_VALUES, GENDER_VALUES, SOCIAL_CATEGORY_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import {
   buildI18nTextSchema,
   dateSchema,
@@ -27,6 +26,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { studentNewHelp } from '@web/help/students/student-new.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { useFormDraft } from '@web/hooks/use-form-draft';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -101,6 +101,7 @@ export default function CreateStudentPage() {
  */
 function StudentForm({ years }: { years: readonly AcademicYearNode[] }) {
   const t = useTranslations('students');
+  const errorCopy = useErrorCopy();
   const resolveI18n = useI18nField();
   const router = useRouter();
   const [createStudent] = useCreateStudent();
@@ -155,8 +156,7 @@ function StudentForm({ years }: { years: readonly AcademicYearNode[] }) {
         const id = result.data?.createStudent.id;
         router.push(id ? `/institute/people/students/${id}` : '/institute/people/students');
       } catch (err) {
-        const message = extractGraphQLError(err, t('new.errors.generic'));
-        toast.error(t('new.errors.generic'), { description: message });
+        toast.error(errorCopy(err, t('new.errors.generic')));
       }
     },
   });

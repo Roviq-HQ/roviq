@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 import { useAbility } from '../auth/ability-provider';
@@ -21,6 +23,7 @@ export function AdminLayout({
   children: React.ReactNode;
 }) {
   const config = useAbilityFilteredConfig(rawConfig);
+  const tError = useTranslations('error');
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   return (
     <SidebarProvider>
@@ -65,7 +68,15 @@ export function AdminLayout({
                   'pb-24 [scroll-padding-bottom:5rem] md:pb-24 xl:pb-6 xl:[scroll-padding-bottom:0]',
               )}
             >
-              <PageErrorBoundary>{children}</PageErrorBoundary>
+              <PageErrorBoundary
+                labels={{
+                  title: tError('somethingWentWrong'),
+                  fallbackMessage: tError('errorDescription'),
+                  tryAgain: tError('tryAgain'),
+                }}
+              >
+                {children}
+              </PageErrorBoundary>
             </main>
           </div>
         </div>

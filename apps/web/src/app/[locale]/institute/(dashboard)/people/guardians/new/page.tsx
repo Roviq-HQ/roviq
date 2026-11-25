@@ -1,7 +1,6 @@
 'use client';
 
 import { GENDER_VALUES, GUARDIAN_EDUCATION_LEVEL_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import {
   buildI18nTextSchema,
   emptyStringToUndefined,
@@ -22,6 +21,7 @@ import {
   useBreadcrumbOverride,
 } from '@roviq/ui';
 import { guardianNewHelp } from '@web/help/students/guardian-new.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -60,6 +60,7 @@ const EMPTY_DEFAULTS: GuardianFormValues = {
 
 export default function CreateGuardianPage() {
   const t = useTranslations('guardians');
+  const errorCopy = useErrorCopy();
   const router = useRouter();
   const [createGuardian] = useCreateGuardian();
 
@@ -93,8 +94,7 @@ export default function CreateGuardianPage() {
         const id = result.data?.createGuardian.id;
         router.push(id ? `/people/guardians/${id}` : '/people/guardians');
       } catch (err) {
-        const message = extractGraphQLError(err, t('new.errors.generic'));
-        toast.error(t('new.errors.generic'), { description: message });
+        toast.error(errorCopy(err, t('new.errors.generic')));
       }
     },
   });

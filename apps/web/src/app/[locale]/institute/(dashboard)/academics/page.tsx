@@ -1,7 +1,7 @@
 'use client';
 
 import { MIN_STANDARD_NUMERIC_ORDER } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { buildI18nTextSchema, useI18nField, useInstituteLocales, zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -129,12 +129,11 @@ function applyDuplicateNameError(
   setNameError: (message: string) => void,
   duplicateMessage: string,
 ) {
-  const msg = extractGraphQLError(err, fallback);
-  if (msg.includes('duplicate') || msg.includes('STANDARD_NAME_DUPLICATE')) {
+  if (extractGraphQLErrorCode(err) === 'STANDARD_NAME_DUPLICATE') {
     setNameError(duplicateMessage);
     return;
   }
-  toast.error(msg);
+  toast.error(fallback);
 }
 
 export default function AcademicsPage() {
@@ -430,7 +429,7 @@ function CreateStandardDialog({ yearId }: { yearId: string }) {
       } catch (err) {
         applyDuplicateNameError(
           err,
-          t('errors.STANDARD_NAME_DUPLICATE'),
+          t('errors.generic'),
           (message) => {
             setServerFieldError(form, 'name.en', message);
           },
@@ -628,7 +627,7 @@ function EditStandardSheet({
       } catch (err) {
         applyDuplicateNameError(
           err,
-          t('errors.STANDARD_NAME_DUPLICATE'),
+          t('errors.generic'),
           (message) => {
             setServerFieldError(form, 'name.en', message);
           },
@@ -790,12 +789,8 @@ function DeleteStandardDialog({
       toast.success(t('deleted'));
       onOpenChange(false);
     } catch (err) {
-      const msg = extractGraphQLError(err, t('errors.HAS_ACTIVE_ENROLLMENTS'));
-      if (msg.includes('HAS_ACTIVE_ENROLLMENTS')) {
-        toast.error(t('errors.HAS_ACTIVE_ENROLLMENTS'));
-      } else {
-        toast.error(msg);
-      }
+      const code = extractGraphQLErrorCode(err);
+      toast.error(code && t.has(`errors.${code}`) ? t(`errors.${code}`) : t('errors.generic'));
     }
   };
 

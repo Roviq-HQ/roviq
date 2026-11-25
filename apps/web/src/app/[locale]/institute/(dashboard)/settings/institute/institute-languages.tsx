@@ -1,7 +1,7 @@
 'use client';
 
 import { instituteLocaleLabels } from '@roviq/common-types';
-import { extractGraphQLError, gql, useMutation } from '@roviq/graphql';
+import { gql, useMutation } from '@roviq/graphql';
 import {
   Button,
   Can,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -36,6 +37,7 @@ export function InstituteLanguages({
   institute: { id: string; supportedLocales: string[]; defaultLocale: string; version: number };
 }) {
   const t = useTranslations('instituteSettings.languages');
+  const errorCopy = useErrorCopy();
   const [supportedLocales, setSupportedLocales] = useState(institute.supportedLocales);
   const [defaultLocale, setDefaultLocale] = useState(institute.defaultLocale);
   const [save, { loading }] = useMutation(UpdateInstituteLocalesDocument);
@@ -53,7 +55,7 @@ export function InstituteLanguages({
       });
       toast.success(t('saved'));
     } catch (error) {
-      toast.error(t('saveFailed'), { description: extractGraphQLError(error, t('saveFailed')) });
+      toast.error(errorCopy(error, t('saveFailed')));
     }
   }
   return (

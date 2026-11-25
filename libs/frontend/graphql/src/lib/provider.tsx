@@ -20,6 +20,8 @@ interface GraphQLProviderProps {
   apiUrl?: string;
   /** Called to refresh the access token on auth error. Returns the new token or null. */
   onTokenRefresh?: () => Promise<string | null>;
+  /** Translated toast shown when a request cannot reach the server. */
+  networkErrorLabels: { title: string; description: string };
   children: React.ReactNode;
 }
 
@@ -33,8 +35,12 @@ export function GraphQLProvider({
   onPasswordChangeRequired,
   onTokenRefresh,
   apiUrl,
+  networkErrorLabels,
   children,
 }: GraphQLProviderProps) {
+  // The client is created once; a locale switch must still reach the toast.
+  const labelsRef = React.useRef(networkErrorLabels);
+  labelsRef.current = networkErrorLabels;
   const clientRef = React.useRef<ReturnType<typeof createApolloClient> | null>(null);
 
   if (!clientRef.current) {
@@ -48,8 +54,11 @@ export function GraphQLProvider({
       onPasswordChangeRequired,
       onTokenRefresh,
       apiUrl,
-      onNetworkError: (message) => {
-        toast.error('Network Error', { description: message });
+      onNetworkError: () => {
+        toast.error(labelsRef.current.title, {
+          id: 'network-error',
+          description: labelsRef.current.description,
+        });
       },
     });
   }

@@ -1,8 +1,8 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { buildI18nTextSchema, useInstituteLocales, useRouter, zodValidator } from '@roviq/i18n';
 import { Button, Can, FieldGroup, I18nField, useAppForm } from '@roviq/ui';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -60,6 +60,7 @@ function buildSchema(t: ReturnType<typeof useTranslations>, defaultLocale: strin
 
 export default function NewHolidayPage() {
   const t = useTranslations('holiday');
+  const errorCopy = useErrorCopy('holiday.errors');
   const router = useRouter();
   const { mutate: createHoliday } = useCreateHoliday();
 
@@ -84,7 +85,7 @@ export default function NewHolidayPage() {
         toast.success(t('actions.save'));
         router.push('/institute/holiday');
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('actions.save')));
+        toast.error(errorCopy(err));
       }
     },
   });

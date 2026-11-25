@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { Link, useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -50,6 +49,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { StandardSectionSelect } from '@web/components/pickers/standard-section-select';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { parseISO } from 'date-fns';
 import {
   Archive,
@@ -115,6 +115,7 @@ export default function ExamDetailPage() {
   const params = useParams();
   const examId = params.examId as string;
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { exam, loading } = useExam(examId);
   // Show the exam name in the breadcrumb instead of the raw UUID segment.
@@ -133,7 +134,7 @@ export default function ExamDetailPage() {
       if (data?.examDatesheetPdf)
         downloadBase64Pdf(data.examDatesheetPdf, `datesheet-${examName}.pdf`);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('datesheet.downloadFailed')));
+      toast.error(errorCopy(err, t('datesheet.downloadFailed')));
     }
   };
 
@@ -234,6 +235,7 @@ function Lifecycle({
   // Slot rendered right before the Archive/Unarchive button (Download + Edit datesheet).
   beforeArchive?: React.ReactNode;
 }) {
+  const errorCopy = useErrorCopy('examinations.errors');
   const { schedule, openMarksEntry, lock, publishResults, archive } = useExamLifecycle();
   const { unarchive } = useUnarchiveExam();
   const run = async (fn: () => Promise<unknown>, msg: string) => {
@@ -241,7 +243,7 @@ function Lifecycle({
       await fn();
       toast.success(msg);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
   const s = exam.status;
@@ -425,6 +427,7 @@ function Datesheet({
   setDesignerOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { loading } = useExamDatesheet(examId);
   const { removeSchedule } = useRemoveExamSchedule();
@@ -460,7 +463,7 @@ function Datesheet({
       await removeSchedule(id);
       toast.success(t('datesheet.removed'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -705,6 +708,7 @@ function DesignerAddDate({
   onAdd: (date: string) => void | Promise<void>;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { format } = useFormatDate();
   const [newDate, setNewDate] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -720,7 +724,7 @@ function DesignerAddDate({
       setNewDate('');
       toast.success(t('designer.dateAdded'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('designer.addDateFailed')));
+      toast.error(errorCopy(err, t('designer.addDateFailed')));
     } finally {
       setBusy(false);
     }
@@ -799,6 +803,7 @@ export function DatesheetDesigner({
   subjectName: (id: string) => string;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { format } = useFormatDate();
   const { standards } = useStandards(academicYearId);
@@ -909,7 +914,7 @@ export function DatesheetDesigner({
       setDeleteTarget(null);
       toast.success(t('designer.dateRemoved'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -1718,6 +1723,7 @@ function PaperDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { format } = useFormatDate();
   const { addSchedule, loading: adding } = useAddExamSchedule();
   const { updateSchedule, loading: updating } = useUpdateExamSchedule();
@@ -1778,7 +1784,7 @@ function PaperDialog({
         await addPaper();
       }
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -1900,6 +1906,7 @@ function ExistingPapers({
   subjectName: (id: string) => string;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { staff } = useStaff();
   const { removeSchedule, loading: removing } = useRemoveExamSchedule();
@@ -1915,7 +1922,7 @@ function ExistingPapers({
       await removeSchedule(id);
       toast.success(t('designer.removed'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -2007,6 +2014,7 @@ function MarksDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { sheet, loading } = useExamMarksSheet(examScheduleId);
   const { enterMarks, loading: saving } = useEnterExamMarks();
   const [edits, setEdits] = React.useState<Record<string, MarkEdit>>({});
@@ -2039,7 +2047,7 @@ function MarksDialog({
       toast.success(t('marks.saved'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 

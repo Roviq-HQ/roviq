@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Button,
@@ -38,6 +37,7 @@ import {
   useSelectedAcademicYear,
 } from '@web/components/pickers/academic-year-picker';
 import { StandardSectionSelect } from '@web/components/pickers/standard-section-select';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { CalendarClock, Download, FileText, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -155,6 +155,7 @@ export default function ReportCardsPage() {
 
 function ReportCardPanel({ card, academicYearId }: { card: ReportCard; academicYearId: string }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { generate, loading: generating } = useGenerateReportCards();
   const { publish, loading: publishing } = usePublishReportCards();
   const { instances, refetch } = useReportCardInstances(card.id);
@@ -170,7 +171,7 @@ function ReportCardPanel({ card, academicYearId }: { card: ReportCard; academicY
       toast.success(t('reportCards.generated', { count }));
       await refetch();
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.REPORT_CARD_GENERATION_FAILED')));
+      toast.error(errorCopy(err, t('errors.REPORT_CARD_GENERATION_FAILED')));
     }
   };
 
@@ -182,7 +183,7 @@ function ReportCardPanel({ card, academicYearId }: { card: ReportCard; academicY
       toast.success(t('reportCards.published', { count }));
       await refetch();
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -192,7 +193,7 @@ function ReportCardPanel({ card, academicYearId }: { card: ReportCard; academicY
       if (data?.reportCardPdf)
         downloadBase64Pdf(data.reportCardPdf, `report-card-${studentName}.pdf`);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('reportCards.downloadFailed')));
+      toast.error(errorCopy(err, t('reportCards.downloadFailed')));
     }
   };
 
@@ -282,6 +283,7 @@ function CreateReportCardDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { createReportCard, loading } = useCreateReportCard();
   const { terms } = useExamTerms(academicYearId);
@@ -308,7 +310,7 @@ function CreateReportCardDialog({
       toast.success(t('reportCards.created'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 

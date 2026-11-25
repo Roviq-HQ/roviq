@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import {
   Button,
   Can,
@@ -14,6 +13,7 @@ import {
   Skeleton,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { Download, FileText } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ const { instituteExaminations: ex } = testIds;
 
 export default function MyReportCardsPage() {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { instances, loading } = useMyReportCards();
   const [fetchPdf] = useReportCardPdf();
 
@@ -34,7 +35,7 @@ export default function MyReportCardsPage() {
       if (data?.reportCardPdf)
         downloadBase64Pdf(data.reportCardPdf, `report-card-${studentName}.pdf`);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('reportCards.downloadFailed')));
+      toast.error(errorCopy(err, t('reportCards.downloadFailed')));
     }
   };
 

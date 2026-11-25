@@ -1,7 +1,6 @@
 'use client';
 
 import { ATTENDANCE_TYPE_VALUES, AttendanceType } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import { zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -20,6 +19,7 @@ import {
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
 import { instituteConfigHelp } from '@web/help/institute-settings/institute-config.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -52,6 +52,7 @@ const ATTENDANCE_OPTION_VALUES = ATTENDANCE_TYPE_VALUES;
 
 export function InstituteConfigTab({ institute, loading }: InstituteConfigTabProps) {
   const t = useTranslations('instituteSettings');
+  const errorCopy = useErrorCopy();
   const tc = useTranslations('instituteSettings.config');
   const [updateConfig] = useUpdateInstituteConfig();
 
@@ -79,9 +80,7 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
         });
         toast.success(t('saved'));
       } catch (err) {
-        toast.error(t('saveFailed'), {
-          description: extractGraphQLError(err, t('saveFailed')),
-        });
+        toast.error(errorCopy(err, t('saveFailed')));
       }
     },
   });

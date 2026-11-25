@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import type { StreamObject } from '@roviq/graphql/generated';
 import {
   buildI18nTextSchema,
@@ -577,14 +577,14 @@ type SubjectMessageKey =
   | 'errors.HAS_RECORDED_ASSESSMENTS';
 
 interface SectionErrorMapping {
-  pattern: string;
+  code: string;
   field?: 'name.en' | 'streamName';
   messageKey: SectionMessageKey;
   level?: 'error' | 'warning';
 }
 
 interface SubjectErrorMapping {
-  pattern: string;
+  code: string;
   field?: 'boardCode';
   messageKey: SubjectMessageKey;
   level?: 'error' | 'warning';
@@ -595,9 +595,9 @@ function dispatchSectionError(
   t: ReturnType<typeof useTranslations<'academics'>>,
   fieldErrorSetters: Record<'name.en' | 'streamName', (message: string) => void>,
 ) {
-  const msg = extractGraphQLError(err, t('errors.SECTION_NAME_DUPLICATE'));
+  const code = extractGraphQLErrorCode(err);
   for (const mapping of SECTION_ERROR_MAPPINGS) {
-    if (!msg.includes(mapping.pattern)) continue;
+    if (code !== mapping.code) continue;
     if (mapping.field) {
       fieldErrorSetters[mapping.field](t(mapping.messageKey));
     } else if (mapping.level === 'warning') {
@@ -607,7 +607,7 @@ function dispatchSectionError(
     }
     return;
   }
-  toast.error(msg);
+  toast.error(t('errors.generic'));
 }
 
 function dispatchSubjectError(
@@ -615,9 +615,9 @@ function dispatchSubjectError(
   t: ReturnType<typeof useTranslations<'academics'>>,
   fieldErrorSetters: Record<'boardCode', (message: string) => void>,
 ) {
-  const msg = extractGraphQLError(err, t('errors.SUBJECT_CODE_DUPLICATE'));
+  const code = extractGraphQLErrorCode(err);
   for (const mapping of SUBJECT_ERROR_MAPPINGS) {
-    if (!msg.includes(mapping.pattern)) continue;
+    if (code !== mapping.code) continue;
     if (mapping.field) {
       fieldErrorSetters[mapping.field](t(mapping.messageKey));
     } else if (mapping.level === 'warning') {
@@ -627,20 +627,19 @@ function dispatchSubjectError(
     }
     return;
   }
-  toast.error(msg);
+  toast.error(t('errors.generic'));
 }
 
 const SECTION_ERROR_MAPPINGS: SectionErrorMapping[] = [
   {
-    pattern: 'SECTION_NAME_DUPLICATE',
+    code: 'SECTION_NAME_DUPLICATE',
     field: 'name.en',
     messageKey: 'errors.SECTION_NAME_DUPLICATE',
   },
-  { pattern: 'STREAM_REQUIRED', field: 'streamName', messageKey: 'errors.STREAM_REQUIRED' },
-  { pattern: 'CONCURRENT_MODIFICATION', messageKey: 'errors.CONCURRENT_MODIFICATION' },
-  { pattern: '409', messageKey: 'errors.CONCURRENT_MODIFICATION' },
+  { code: 'STREAM_REQUIRED', field: 'streamName', messageKey: 'errors.STREAM_REQUIRED' },
+  { code: 'CONCURRENT_MODIFICATION', messageKey: 'errors.CONCURRENT_MODIFICATION' },
   {
-    pattern: 'CAPACITY_EXCEEDED',
+    code: 'SECTION_CAPACITY_EXCEEDED',
     messageKey: 'errors.SECTION_CAPACITY_EXCEEDED',
     level: 'warning',
   },
@@ -648,14 +647,13 @@ const SECTION_ERROR_MAPPINGS: SectionErrorMapping[] = [
 
 const SUBJECT_ERROR_MAPPINGS: SubjectErrorMapping[] = [
   {
-    pattern: 'SUBJECT_CODE_DUPLICATE',
+    code: 'SUBJECT_CODE_DUPLICATE',
     field: 'boardCode',
     messageKey: 'errors.SUBJECT_CODE_DUPLICATE',
   },
-  { pattern: 'CONCURRENT_MODIFICATION', messageKey: 'errors.CONCURRENT_MODIFICATION' },
-  { pattern: '409', messageKey: 'errors.CONCURRENT_MODIFICATION' },
-  { pattern: 'HAS_ACTIVE_ENROLLMENTS', messageKey: 'errors.HAS_ACTIVE_ENROLLMENTS' },
-  { pattern: 'HAS_RECORDED_ASSESSMENTS', messageKey: 'errors.HAS_RECORDED_ASSESSMENTS' },
+  { code: 'CONCURRENT_MODIFICATION', messageKey: 'errors.CONCURRENT_MODIFICATION' },
+  { code: 'HAS_ACTIVE_ENROLLMENTS', messageKey: 'errors.HAS_ACTIVE_ENROLLMENTS' },
+  { code: 'HAS_RECORDED_ASSESSMENTS', messageKey: 'errors.HAS_RECORDED_ASSESSMENTS' },
 ];
 
 function buildStreamInput(

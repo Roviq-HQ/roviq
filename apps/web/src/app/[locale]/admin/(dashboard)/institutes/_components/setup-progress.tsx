@@ -11,6 +11,7 @@ import {
   CardTitle,
   Progress,
 } from '@roviq/ui';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { AlertTriangle, CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -54,6 +55,7 @@ function StepIcon({ status }: { status: StepStatus }) {
  */
 export function SetupProgressPanel({ instituteId, initialSetupStatus }: SetupProgressPanelProps) {
   const t = useTranslations('adminInstitutes.setup');
+  const errorCopy = useErrorCopy();
   const [steps, setSteps] = React.useState<StepState[]>([]);
   const [current, setCurrent] = React.useState<{ completed: number; total: number } | null>(null);
   const [retrySetup, { loading: retrying }] = useRetrySetup();
@@ -90,9 +92,7 @@ export function SetupProgressPanel({ instituteId, initialSetupStatus }: SetupPro
       setCurrent(null);
       toast.success(t('retryTriggered'));
     } catch (err) {
-      toast.error(t('retryFailed'), {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      toast.error(errorCopy(err, t('retryFailed')));
     }
   };
 

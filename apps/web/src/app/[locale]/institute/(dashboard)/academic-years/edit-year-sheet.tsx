@@ -32,6 +32,7 @@ import {
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
 import { academicYearHelp } from '@web/help/academic-years/academic-year.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { parseISO } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -101,6 +102,7 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
 export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) {
   const t = useTranslations('academicYears');
   const tCommon = useTranslations('common');
+  const errorCopy = useErrorCopy('academicYears.errors');
   const helpMode = useFormHelpMode();
   const { format } = useFormatDate();
   const [mutate, { loading }] = useMutation(UPDATE_ACADEMIC_YEAR, {
@@ -159,8 +161,7 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
         toast.success(t('saved'));
         onOpenChange(false);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.error(message);
+        toast.error(errorCopy(err));
       }
     },
   });

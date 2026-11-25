@@ -28,6 +28,7 @@ import {
   useBreadcrumbOverride,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import {
   AlertCircle,
   ArrowLeft,
@@ -84,6 +85,7 @@ const MEMBERSHIP_TYPE_CLASS: Record<GroupMembershipType, string> = {
 
 export default function GroupDetailPage() {
   const t = useTranslations('groups');
+  const errorCopy = useErrorCopy();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -110,7 +112,7 @@ export default function GroupDetailPage() {
       toast.success(t('detail.resolveSuccess'));
       refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('detail.resolveError'));
+      toast.error(errorCopy(err, t('detail.resolveError')));
     }
   };
 
@@ -274,6 +276,7 @@ function MembersPanel({
   membershipType: GroupMembershipType;
 }) {
   const t = useTranslations('groups');
+  const errorCopy = useErrorCopy();
   const isHybrid = membershipType === 'HYBRID';
 
   const { data, loading, refetch } = useGroupMembers(groupId);
@@ -293,7 +296,7 @@ function MembersPanel({
       );
       await refetch();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('detail.members.toggleError'));
+      toast.error(errorCopy(err, t('detail.members.toggleError')));
     } finally {
       setPendingId(null);
     }
@@ -394,6 +397,7 @@ function MembersPanel({
 
 function RulesPanel({ groupId, version }: { groupId: string; version: number }) {
   const t = useTranslations('groups');
+  const errorCopy = useErrorCopy();
   const [editOpen, setEditOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [ruleText, setRuleText] = React.useState('{}');
@@ -428,7 +432,7 @@ function RulesPanel({ groupId, version }: { groupId: string; version: number }) 
         setPreviewOpen(true);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('detail.rules.previewError'));
+      toast.error(errorCopy(err, t('detail.rules.previewError')));
     }
   };
 
@@ -440,7 +444,7 @@ function RulesPanel({ groupId, version }: { groupId: string; version: number }) 
       toast.success(t('detail.rules.saveSuccess'));
       setEditOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('detail.rules.saveError'));
+      toast.error(errorCopy(err, t('detail.rules.saveError')));
     }
   };
 

@@ -7,6 +7,7 @@ import { ErrorLink } from '@apollo/client/link/error';
 import { HttpLink } from '@apollo/client/link/http';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition, relayStylePagination } from '@apollo/client/utilities';
+import { OperationTypeNode } from 'graphql';
 import { createClient } from 'graphql-ws';
 import { from, type Observable, switchMap } from 'rxjs';
 
@@ -15,7 +16,8 @@ export interface ApolloClientConfig {
   wsUrl: string;
   getAccessToken: () => string | null;
   onAuthError: () => void;
-  onNetworkError: (message: string) => void;
+  /** A request failed before a GraphQL response arrived (offline, server down). */
+  onNetworkError: () => void;
   /** Called when a GraphQL error with code IMPERSONATION_ENDED is received. */
   onImpersonationEnded?: () => void;
   /** Called when a view-only impersonation session tried to change something. */
@@ -135,8 +137,9 @@ export function createApolloClient(config: ApolloClientConfig) {
         const result = processGraphQLError(err, config, operation, forward);
         if (result !== false) return result;
       }
-    } else {
-      config.onNetworkError(error instanceof Error ? error.message : String(error));
+    } else if (operation.operationType !== OperationTypeNode.MUTATION) {
+      // A failed write is reported by the screen that made it; a failed read has no other message.
+      config.onNetworkError();
     }
     return undefined;
   });

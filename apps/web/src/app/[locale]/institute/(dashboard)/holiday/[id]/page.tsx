@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { buildI18nTextSchema, useInstituteLocales, useRouter, zodValidator } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -20,6 +19,7 @@ import {
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -108,6 +108,7 @@ export default function EditHolidayPage() {
 
 function EditHolidayForm({ holiday }: { holiday: HolidayRecord }) {
   const t = useTranslations('holiday');
+  const errorCopy = useErrorCopy('holiday.errors');
   const router = useRouter();
   const { mutate: updateHoliday } = useUpdateHoliday();
   const { mutate: deleteHoliday, loading: deleting } = useDeleteHoliday();
@@ -148,7 +149,7 @@ function EditHolidayForm({ holiday }: { holiday: HolidayRecord }) {
         toast.success(t('actions.save'));
         router.push('/institute/holiday');
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('actions.save')));
+        toast.error(errorCopy(err));
       }
     },
   });
@@ -159,7 +160,7 @@ function EditHolidayForm({ holiday }: { holiday: HolidayRecord }) {
       toast.success(t('actions.delete'));
       router.push('/institute/holiday');
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('actions.delete')));
+      toast.error(errorCopy(err));
     } finally {
       setConfirmOpen(false);
     }

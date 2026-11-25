@@ -1,7 +1,7 @@
 'use client';
 
 import { EMPLOYMENT_TYPE_VALUES, GENDER_VALUES, SOCIAL_CATEGORY_VALUES } from '@roviq/common-types';
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import {
   buildI18nTextSchema,
   dateSchema,
@@ -24,6 +24,7 @@ import {
   useBreadcrumbOverride,
 } from '@roviq/ui';
 import { staffNewHelp } from '@web/help/staff/staff-new.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -76,6 +77,7 @@ const EMPTY_DEFAULTS: CreateStaffFormValues = {
 
 export default function CreateStaffPage() {
   const t = useTranslations('staff');
+  const errorCopy = useErrorCopy();
   const router = useRouter();
   const [createStaffMember] = useCreateStaffMember();
 
@@ -119,13 +121,7 @@ export default function CreateStaffPage() {
           toast.error(t('new.errors.employeeIdDuplicate'));
           return;
         }
-        const message = extractGraphQLError(err, t('new.errors.generic'));
-        if (message.includes('DUPLICATE') || message.includes('already exists')) {
-          setServerFieldError(form, 'email', t('new.errors.duplicate'));
-          toast.error(t('new.errors.duplicate'));
-        } else {
-          toast.error(t('new.errors.generic'), { description: message });
-        }
+        toast.error(errorCopy(err, t('new.errors.generic')));
       }
     },
   });

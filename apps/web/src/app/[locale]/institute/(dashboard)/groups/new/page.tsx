@@ -35,6 +35,7 @@ import {
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
 import { groupNewHelp } from '@web/help/groups/group-new.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft, ArrowRight, Check, Plus, Search, Trash2, UserPlus, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -172,6 +173,7 @@ type Step = 'basics' | 'rule' | 'members';
 
 export default function NewGroupPage() {
   const t = useTranslations('groups');
+  const errorCopy = useErrorCopy();
   const router = useRouter();
   const [createGroup, { loading: creating }] = useCreateGroup();
 
@@ -210,7 +212,7 @@ export default function NewGroupPage() {
         toast.success(t('new.createSuccess'));
         router.push(`/institute/groups/${created.id}`);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('new.createError'));
+        toast.error(errorCopy(err, t('new.createError')));
       }
     },
   });
@@ -489,6 +491,7 @@ function RuleStep({
   onChange: (next: RuleNode) => void;
 }) {
   const t = useTranslations('groups');
+  const errorCopy = useErrorCopy();
   const [runPreview, { loading: previewing }] = usePreviewGroupRule();
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewData, setPreviewData] = React.useState<{
@@ -509,7 +512,7 @@ function RuleStep({
         setPreviewOpen(true);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('new.rule.previewError'));
+      toast.error(errorCopy(err, t('new.rule.previewError')));
     }
   };
 

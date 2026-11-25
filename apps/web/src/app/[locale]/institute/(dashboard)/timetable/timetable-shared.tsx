@@ -1,23 +1,14 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { Field, FieldLabel, Input } from '@roviq/ui';
 import type { useTranslations } from 'next-intl';
 import { useId } from 'react';
 
 /** Maps known timetable GraphQL error codes to localized messages. */
 export function mapError(err: unknown, t: ReturnType<typeof useTranslations<'timetable'>>): string {
-  const msg = extractGraphQLError(err, t('errors.generic'));
-  for (const code of [
-    'TIMETABLE_NAME_DUPLICATE',
-    'TIMETABLE_TEACHER_CONFLICT',
-    'TIMETABLE_ROOM_CONFLICT',
-    'INVALID_STATE_TRANSITION',
-    'INVALID_DATE_RANGE',
-  ] as const) {
-    if (msg.includes(code)) return t(`errors.${code}`);
-  }
-  return msg;
+  const code = extractGraphQLErrorCode(err);
+  return code && t.has(`errors.${code}`) ? t(`errors.${code}`) : t('errors.generic');
 }
 
 /** Decode a base64 PDF and trigger a browser download. Shared by the section/staff views. */

@@ -1339,8 +1339,8 @@ function BulkSectionChangeDialog({
           },
         });
         succeeded += 1;
-      } catch (err) {
-        failures.push(`${student.admissionNumber}: ${(err as Error).message}`);
+      } catch {
+        failures.push(student.id);
       }
     }
     if (failures.length === 0) {

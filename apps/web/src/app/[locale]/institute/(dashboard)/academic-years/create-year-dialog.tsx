@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useFormatDate, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -31,6 +31,7 @@ import {
   useFieldHelpIds,
 } from '@roviq/ui';
 import { academicYearHelp } from '@web/help/academic-years/academic-year.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { parseISO } from 'date-fns';
 import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -103,6 +104,7 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
 export function CreateYearDialog() {
   const t = useTranslations('academicYears');
   const tCommon = useTranslations('common');
+  const errorCopy = useErrorCopy('academicYears.errors');
   const { format: formatLocalized } = useFormatDate();
   const { createYear, loading } = useCreateAcademicYear();
   const [open, setOpen] = useState(false);
@@ -126,15 +128,15 @@ export function CreateYearDialog() {
         form.reset(EMPTY_FORM);
         setOpen(false);
       } catch (err) {
-        const message = extractGraphQLError(err, t('errors.INVALID_DATE_RANGE'));
-        if (/overlap/i.test(message)) {
+        const code = extractGraphQLErrorCode(err);
+        if (code === 'ACADEMIC_YEAR_OVERLAP') {
           toast.error(t('errors.ACADEMIC_YEAR_OVERLAP'));
-        } else if (/date/i.test(message)) {
+        } else if (code === 'INVALID_DATE_RANGE') {
           setServerFieldError(form, 'endDate', t('errors.INVALID_DATE_RANGE'), {
             alsoClearOnChangeOf: ['startDate'],
           });
         } else {
-          toast.error(message);
+          toast.error(errorCopy(err));
         }
       }
     },

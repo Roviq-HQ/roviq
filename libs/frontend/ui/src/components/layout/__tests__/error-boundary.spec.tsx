@@ -27,14 +27,15 @@ describe('PageErrorBoundary', () => {
     expect(screen.getByText('healthy')).toBeInTheDocument();
   });
 
-  it('renders fallback with error message when child throws', () => {
+  it('renders the fallback copy, never the error text, when child throws', () => {
     render(
       <PageErrorBoundary>
         <Throws message="something exploded" />
       </PageErrorBoundary>,
     );
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText('something exploded')).toBeInTheDocument();
+    expect(screen.getByText('An unexpected error occurred')).toBeInTheDocument();
+    expect(screen.queryByText('something exploded')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 

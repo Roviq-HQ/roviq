@@ -27,7 +27,9 @@ The portals share components from `@roviq/ui`, auth from `@roviq/auth` and i18n 
 
 Never show `error.message` from the API and never match on its text. Branch on the error code and show translated copy:
 
-- **Apollo operations** — `extractGraphQLErrorCode(error)` from `@roviq/graphql`, then `t(code)`; `extractGraphQLError(error, fallback)` only for developer-facing detail.
+- **Apollo operations** — `useErrorCopy(namespace?)` (`@web/hooks/use-error-copy`) returns `errorCopy(err, fallback?)`: the copy for the error's `extensions.code` from the page's `errors` group, then the shared `error` namespace; `error.network` when the request never reached the server (`isNetworkError` from `@roviq/graphql`); otherwise the translated fallback. Branch on `extractGraphQLErrorCode(error)` when a code needs its own handling (a field error, a dialog). `extractGraphQLError(error, fallback)` is developer-facing detail only.
+- **Network failures** — the GraphQL client shows one translated toast (`error.networkTitle`, `error.network`) passed to `GraphQLProvider` as `networkErrorLabels`.
+- **Crashes** — `PageErrorBoundary` shows the translated fallback (`AdminLayout` passes `error.*` labels), never the crash's own text.
 - **Auth flows** (`@roviq/auth` uses its own fetch client) — errors are `AuthRequestError` with a `code`. `isAppError(error, 'SESSION_EXPIRED')` to branch, `resolveAuthErrorMessage(error, labels)` for copy. It also classifies browser failures: `network`, `passkeyCancelled`, `passkeyAlreadyRegistered`, `passkeyNotSupported`.
 - **Labels** — `useAuthErrorLabels()` (`@web/hooks/use-auth-error-labels`) returns every `auth.errors.*` message; pass it as `labels.errors` to `LoginForm`, `PasskeyManager`, `PasswordChangeForm` and the session-expired dialog. A new auth code needs an entry in `AUTH_ERROR_CODES` (`libs/frontend/auth/src/lib/error-utils.ts`) and in both `auth.json` files.
 - **Where it shows** — errors the user must act on render inline (`role="alert"`). Transient ones are toasts: a dropped connection gets a Retry action, a dismissed passkey prompt is an info toast, not an error.
@@ -113,6 +115,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `notifications/NotificationBell` — the topbar bell of all three portals (passed to `AdminLayout` as `LayoutConfig.notificationBell`): unread badge, the signed-in user's notifications for the current scope with paging and live arrivals (`notificationReceived`), mark one on open and mark all; opens only a `data.path` inside the current portal (`notificationPath`); no mark controls while impersonating. `usePushNotifications()` returns `unregisterPushToken`, which each layout calls before logout.
 - `buildCsv(headers, rows)` + `downloadCsv(filename, csv)` (`@web/lib/csv`) — CSV export of what a table shows: every field quoted, UTF-8 with a BOM so Excel opens Hindi correctly. Pass translated headers and values, never ids.
 - `useRoleName()` (`@web/hooks/use-role-name`) — display name for any role. System roles store their key as the name (`class_teacher`, matched by the server), so they get a translated label from the `roles` namespace; a role an institute named itself is shown as written. Use it wherever a role name is shown, never `useI18nField()` on a role name.
+- `useErrorCopy(namespace?)` (`@web/hooks/use-error-copy`) — translated copy for a failed request (see "Error messages"); use it for every error toast or inline error, never `err.message`.
 
 ## Shared Libraries
 

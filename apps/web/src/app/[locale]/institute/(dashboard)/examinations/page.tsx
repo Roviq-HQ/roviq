@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { Link, useI18nField } from '@roviq/i18n';
 import {
   Button,
@@ -37,6 +36,7 @@ import {
   AcademicYearSelector,
   useSelectedAcademicYear,
 } from '@web/components/pickers/academic-year-picker';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { CalendarClock, GraduationCap, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -56,6 +56,7 @@ const { instituteExaminations: ex } = testIds;
 
 export default function ExaminationsPage() {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { yearId } = useSelectedAcademicYear();
   const resolveI18n = useI18nField();
   const { exams, loading } = useExams(yearId);
@@ -68,7 +69,7 @@ export default function ExaminationsPage() {
       await deleteExam(id);
       toast.success(t('deleted'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -180,6 +181,7 @@ function CreateExamDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { createExam, loading } = useCreateExam();
   const { terms } = useExamTerms(academicYearId);
@@ -209,7 +211,7 @@ function CreateExamDialog({
       toast.success(t('created'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.generic')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 

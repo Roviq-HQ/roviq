@@ -51,6 +51,7 @@ function GraphQLBridge({
 }) {
   const { notifyImpersonationEnded, refreshSession, markPasswordChangeRequired } = useAuth();
   const t = useTranslations('auth');
+  const tError = useTranslations('error');
 
   const handleImpersonationEnded = React.useCallback(() => {
     notifyImpersonationEnded();
@@ -83,6 +84,7 @@ function GraphQLBridge({
       onTokenRefresh={handleTokenRefresh}
       onImpersonationEnded={handleImpersonationEnded}
       onPasswordChangeRequired={markPasswordChangeRequired}
+      networkErrorLabels={{ title: tError('networkTitle'), description: tError('network') }}
       // One id, so a page that fires several refused writes shows one message.
       onImpersonationReadOnly={() =>
         toast.error(t('impersonationViewOnlyRefused'), { id: 'impersonation-view-only' })
