@@ -23,7 +23,26 @@ export function extractGraphQLErrorCode(error: unknown): string | null {
   return typeof code === 'string' ? code : null;
 }
 
-/** True when the request failed before a GraphQL response arrived: offline, server down, bad reply. */
+/**
+ * What `fetch` rejects with when the request never got a response (offline, DNS, refused,
+ * CORS), per engine: Chromium, Firefox, Safari, Node. Apollo Client 4 passes it on unwrapped.
+ */
+const FETCH_FAILURE_MESSAGES = [
+  'Failed to fetch',
+  'NetworkError when attempting to fetch resource',
+  'Load failed',
+  'fetch failed',
+];
+
+function isFetchFailure(error: unknown): boolean {
+  if (!(error instanceof Error) || error.name !== 'TypeError') return false;
+  return FETCH_FAILURE_MESSAGES.some((message) => error.message.startsWith(message));
+}
+
+/**
+ * True when the request failed before a GraphQL response arrived: offline, server down, bad reply.
+ * A TypeError from a bug in the app's own code is not one.
+ */
 export function isNetworkError(error: unknown): boolean {
-  return ServerError.is(error) || ServerParseError.is(error) || error instanceof TypeError;
+  return ServerError.is(error) || ServerParseError.is(error) || isFetchFailure(error);
 }
