@@ -38,7 +38,7 @@ import {
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -400,6 +400,83 @@ describe('section capacity warning at the optimal crossing (ROV-361)', () => {
     expect(warnings(emit.mock.calls, EVENT_PATTERNS.SECTION.capacity_warning, sectionId)).toEqual(
       [],
     );
+  });
+
+  /** Until some backend waits on another transaction's lock. */
+  async function waitForLockWait(): Promise<void> {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const waiting = await asAdmin((tx) =>
+        tx.execute(
+          sql`SELECT count(*) AS n FROM pg_locks WHERE NOT granted AND locktype = 'transactionid'`,
+        ),
+      );
+      if (Number((waiting.rows[0] as { n: string }).n) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error('The write never waited on the held placement row');
+  }
+
+  /** Whether another transaction could lock the section right now. */
+  const sectionIsFree = (sectionId: string) =>
+    asAdmin(async (tx) => {
+      const rows = await tx.execute(
+        sql`SELECT id FROM sections WHERE id = ${sectionId} FOR NO KEY UPDATE SKIP LOCKED`,
+      );
+      return rows.rows.length === 1;
+    });
+
+  it.each([
+    ['a section change', 'move'],
+    ['a class change', 'changeClass'],
+  ] as const)('should lock the placement row before the sections in %s', async (_label, write) => {
+    const fromId = await addSection(write === 'move' ? standardId : otherStandardId);
+    const toId = await addSection(standardId);
+    const student = await addStudent(await addSection());
+    const academicId = student.academicId as string;
+    // Puts the student in `fromId` first, so the write has a section to leave as well.
+    await asAdmin((tx) =>
+      tx
+        .update(studentAcademics)
+        .set({
+          sectionId: fromId,
+          standardId: write === 'move' ? standardId : otherStandardId,
+        })
+        .where(eq(studentAcademics.id, academicId)),
+    );
+
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let markHeld = () => {};
+    const held = new Promise<void>((resolve) => {
+      markHeld = resolve;
+    });
+    const holder = asAdmin(async (tx) => {
+      await tx.execute(
+        sql`SELECT id FROM student_academics WHERE id = ${academicId} FOR NO KEY UPDATE`,
+      );
+      markHeld();
+      await released;
+    });
+    await held;
+
+    const pending =
+      write === 'move'
+        ? move(academicId, toId)
+        : gqlRequest<{ changeStudentClass: string }>(result.httpServer, {
+            query: CHANGE_CLASS,
+            variables: { input: { studentAcademicId: academicId, standardId, sectionId: toId } },
+            token,
+          });
+    await waitForLockWait();
+    const free = [await sectionIsFree(fromId), await sectionIsFree(toId)];
+    release();
+    await holder;
+    const res = await pending;
+
+    expect(free).toEqual([true, true]);
+    expect(res.errors).toBeUndefined();
   });
 
   it('should warn when a class change takes the new section to its optimal strength', async () => {

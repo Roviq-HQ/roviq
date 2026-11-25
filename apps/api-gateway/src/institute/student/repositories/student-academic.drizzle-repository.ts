@@ -163,11 +163,13 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
     actorId: string,
   ): Promise<SectionStrengthChange | null> {
     return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      // The placement row first, then the sections: the same order as every other placement write.
       const [current] = await tx
         .select({ sectionId: studentAcademicsLive.sectionId })
         .from(studentAcademicsLive)
         .where(eq(studentAcademicsLive.id, studentAcademicId))
-        .limit(1);
+        .limit(1)
+        .for('no key update');
       const locked = await lockSectionForPlacement(tx, sectionId, [current?.sectionId ?? null]);
       await tx
         .update(studentAcademics)
@@ -193,7 +195,8 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
         })
         .from(studentAcademicsLive)
         .where(eq(studentAcademicsLive.id, data.studentAcademicId))
-        .limit(1);
+        .limit(1)
+        .for('no key update');
       if (!row) return { kind: 'academic_not_found' };
 
       const placement = await findClassInYear(
