@@ -157,7 +157,7 @@
       "previewDialog": {
         "title": "नियम पूर्वावलोकन",
         "countSummary": "{count, plural, one {# सदस्य इस नियम से मेल खाता है।} other {# सदस्य इस नियम से मेल खाते हैं।}}",
-        "sampleHeading": "नमूना सदस्यता आईडी",
+        "sampleHeading": "नमूना सदस्य",
         "noMatches": "कोई सदस्य इस नियम से मेल नहीं खाता।"
       }
     }
@@ -202,7 +202,7 @@
       "previewing": "पूर्वावलोकन हो रहा है…",
       "previewCount": "{count, plural, one {# सदस्य इस नियम से मेल खाता है।} other {# सदस्य इस नियम से मेल खाते हैं।}}",
       "previewEmpty": "कोई सदस्य इस नियम से मेल नहीं खाता।",
-      "previewSample": "नमूना सदस्यता आईडी",
+      "previewSample": "नमूना सदस्य",
       "previewError": "नियम पूर्वावलोकन विफल",
       "previewDialogTitle": "नियम पूर्वावलोकन"
     },

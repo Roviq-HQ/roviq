@@ -1229,7 +1229,6 @@ export const testIds = {
     absenteesEndDateInput: 'absentees-end-date-input',
     absenteesStandardSelect: 'absentees-standard-select',
     absenteesSectionSelect: 'absentees-section-select',
-    absenteesSectionHint: 'absentees-section-hint',
     absenteesStandardOption: (id: string) => `absentees-standard-option-${id}`,
     absenteesSectionOption: (id: string) => `absentees-section-option-${id}`,
     absenteesNoAssignedSections: 'absentees-no-assigned-sections',

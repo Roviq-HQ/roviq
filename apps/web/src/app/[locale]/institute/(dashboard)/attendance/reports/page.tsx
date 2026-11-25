@@ -411,14 +411,6 @@ function AbsenteesByStudentTab() {
               </Select>
             </div>
           </div>
-          {!scope.sectionId && !scope.noAssignments ? (
-            <p
-              className="text-xs text-muted-foreground mt-3"
-              data-testid={instituteAttendance.absenteesSectionHint}
-            >
-              {t('reports.pickSectionHint')}
-            </p>
-          ) : null}
         </CardContent>
       </Card>
 
