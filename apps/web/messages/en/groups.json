@@ -253,7 +253,8 @@
         "title": "The preview did not run",
         "description": "Check the values in your conditions and press Preview again. If it fails again, contact your institute admin or support."
       }
-    }
+    },
+    "accessDenied": "You do not have permission to create groups. Ask your institute admin to give your role permission to create groups."
   },
   "previewSample": {
     "admissionNumber": "Adm. no. {number}"

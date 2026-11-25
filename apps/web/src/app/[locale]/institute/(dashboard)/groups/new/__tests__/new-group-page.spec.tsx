@@ -119,6 +119,31 @@ function expectAlert(copy: { title: string; description: string }) {
   expect(within(alert).getByText(copy.description)).toBeInTheDocument();
 }
 
+describe('NewGroupPage access', () => {
+  it('should show the no-permission state instead of the form without create Group', () => {
+    renderWithProviders(<NewGroupPage />, {
+      abilityRules: [{ action: 'read', subject: 'Group' }],
+    });
+
+    expect(screen.getByTestId(ids.newAccessDenied)).toHaveTextContent(groupsEn.new.accessDenied);
+    expect(
+      screen.queryByRole('textbox', { name: new RegExp(groupsEn.new.basics.name) }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId(ids.newNextBtn)).not.toBeInTheDocument();
+  });
+
+  it('should show the form with create Group', () => {
+    renderWithProviders(<NewGroupPage />, {
+      abilityRules: [{ action: 'create', subject: 'Group' }],
+    });
+
+    expect(
+      screen.getByRole('textbox', { name: new RegExp(groupsEn.new.basics.name) }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId(ids.newAccessDenied)).not.toBeInTheDocument();
+  });
+});
+
 describe('NewGroupPage submit errors', () => {
   beforeEach(() => {
     createGroupMock.mockReset();

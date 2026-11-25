@@ -9,6 +9,7 @@ import {
   AlertTitle,
   Badge,
   Button,
+  Can,
   Card,
   CardContent,
   Checkbox,
@@ -216,6 +217,30 @@ function coerceValue(raw: string): string | number | boolean {
 type Step = 'basics' | 'rule' | 'members';
 
 export default function NewGroupPage() {
+  return (
+    <Can I="create" a="Group" passThrough>
+      {(allowed: boolean) => (allowed ? <NewGroupForm /> : <NoCreateAccess />)}
+    </Can>
+  );
+}
+
+function NoCreateAccess() {
+  const t = useTranslations('groups');
+  const router = useRouter();
+  return (
+    <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 text-center">
+      <p className="text-muted-foreground" data-testid={instituteGroups.newAccessDenied}>
+        {t('new.accessDenied')}
+      </p>
+      <Button variant="outline" onClick={() => router.push('/institute/groups')}>
+        <ArrowLeft className="size-4" />
+        {t('actions.back')}
+      </Button>
+    </div>
+  );
+}
+
+function NewGroupForm() {
   const t = useTranslations('groups');
   const errorCopy = useErrorCopy();
   const router = useRouter();
