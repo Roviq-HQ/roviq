@@ -153,7 +153,7 @@ describe('TenantAnalyticsTable', () => {
     renderTable([analytics({}, [BETA], { metricsAvailable: false })]);
 
     expect(await screen.findByTestId(ids.tenantMetricsUnavailable)).toHaveTextContent(
-      'API call metrics are unavailable right now.',
+      'API call counts are unavailable: the metrics store (OpenObserve) does not answer.',
     );
   });
 

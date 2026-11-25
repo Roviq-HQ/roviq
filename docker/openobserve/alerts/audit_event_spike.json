@@ -26,6 +26,7 @@
   "destinations": ["roviq_ops_email"],
   "context_attributes": {
     "severity": "warning",
-    "component": "audit"
+    "component": "audit",
+    "runbook": "docs/runbooks/audit-alerts.md#event-spike"
   }
 }

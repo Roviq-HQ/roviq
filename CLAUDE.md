@@ -115,6 +115,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - `@EventPattern` classes go in module `controllers`, and the app's `main.ts` calls `connectJetStreamMicroservice()` (`pnpm check:event-handlers`)
 - `defineStateMachine` for status transitions · `calendarDaysBetween` / `isValidDateRange` / `rangesOverlap` from `@roviq/common-types/date-range`
 - i18n text (`i18nText()`, tenant-authored names only): the database and the API carry the whole `{ en, hi }` object, the frontend picks the locale with `useI18nField()`; never resolve a locale in a resolver or service · validate with `i18nTextSchema`, edit with `<I18nInput>`
+- A message that reports a problem passes the six-point test (what, which one, so what, first steps, where, when it ends): `docs/frontend.md` → "Messages that report a problem"
 - UI: `<Button>` and `<FieldInfoPopover>` from `@roviq/ui`, `useTranslations()`, `useFormatDate()`, scope-prefixed nav hrefs
 - Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`
 - Errors: `BusinessException(ErrorCode.X, …)` on the backend; frontend branches on `extensions.code` (`isAppError`, `extractGraphQLErrorCode`) and shows translated copy — never `err.message`

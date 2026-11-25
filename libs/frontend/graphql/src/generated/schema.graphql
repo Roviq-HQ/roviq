@@ -154,15 +154,28 @@ enum AcademicYearStatus {
 
 """A firing OpenObserve alert"""
 type ActiveAlert {
+  """
+  What the rule's own query names now (channel, consumer, stream…); empty when unknown
+  """
+  affected: [AlertLabel!]!
+
   """Alert summary (falls back to description, then the alert name)"""
   message: String!
 
   """Alert name"""
   name: String!
+
+  """The rule's runbook section: a repository path with an anchor"""
+  runbook: String
   severity: AlertSeverity!
 
   """When the alert became active"""
   since: DateTime!
+
+  """
+  False when the rule's own query no longer passes its condition: the alert closes at its next run
+  """
+  stillTrue: Boolean!
 }
 
 """
@@ -797,6 +810,17 @@ enum AffiliationStatus {
   PROVISIONAL
   REGULAR
   REVOKED
+}
+
+"""
+One label of a row that passes the rule now; bounded values, never personal data
+"""
+type AlertLabel {
+  """Label name, for example `channel`"""
+  label: String!
+
+  """Label value, for example `WHATSAPP`"""
+  value: String!
 }
 
 """Severity label of a firing alert"""

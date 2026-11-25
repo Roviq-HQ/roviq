@@ -32,6 +32,26 @@ Never show `error.message` from the API and never match on its text. Branch on t
 - **Labels** — `useAuthErrorLabels()` (`@web/hooks/use-auth-error-labels`) returns every `auth.errors.*` message; pass it as `labels.errors` to `LoginForm`, `PasskeyManager`, `PasswordChangeForm` and the session-expired dialog. A new auth code needs an entry in `AUTH_ERROR_CODES` (`libs/frontend/auth/src/lib/error-utils.ts`) and in both `auth.json` files.
 - **Where it shows** — errors the user must act on render inline (`role="alert"`). Transient ones are toasts: a dropped connection gets a Retry action, a dismissed passkey prompt is an info toast, not an error.
 
+## Messages that report a problem
+
+An alert, a banner, a failed or skipped status, an "unavailable" state: anything that tells a
+person something is wrong must let someone who has never seen the code act on it. Check each one
+against these six points before calling it done:
+
+1. **What** happened, in the reader's words. An internal name (a rule, a code, an enum value) is
+   never the only title; it may follow as small secondary text.
+2. **Which one**: the channel, sender, institute, queue or record, by name.
+3. **So what**: who is affected and whether it is happening now.
+4. **Do this first**: one to three steps the reader can take from where they are.
+5. **Go here**: a button or link to the screen, record or runbook section the step needs.
+6. **When it ends**: how the reader knows it is over, and a state that looks different once it
+   is (the Monitoring page shows a rule whose own query no longer passes as "Recovered").
+
+The full procedure stays in its runbook (`docs/runbooks/`); the message carries the first steps
+and links there. Example: the alert card on the admin Monitoring page
+(`_components/alerts-panel.tsx`, copy in `adminMonitoring.alerts.rules`, screens in
+`_lib/alert-guide.ts`; `scripts/__tests__/alert-copy.spec.ts` fails for a rule without copy).
+
 ## Common components
 
 App-wide reusable components live in `apps/web/src/components/` (import via the `@web/components/*` alias) — prefer these over re-building per feature. Data-coupled ones fetch via `@roviq/graphql` (inline `gql`/`useQuery`) or reuse existing feature hooks through the `@web/*` alias; they must NOT live in `@roviq/ui` (a lib cannot import app code). **Add one concise line here per new common component.**

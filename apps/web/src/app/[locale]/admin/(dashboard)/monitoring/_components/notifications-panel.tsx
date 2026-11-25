@@ -49,7 +49,7 @@ export function NotificationsPanel() {
   const health = data?.adminNotificationHealth;
 
   return (
-    <Card data-testid={ids.notificationsPanel}>
+    <Card id="notification-delivery" className="scroll-mt-20" data-testid={ids.notificationsPanel}>
       <CardHeader>
         <CardTitle>{t('heading')}</CardTitle>
         <CardDescription>{t('description')}</CardDescription>
@@ -228,6 +228,11 @@ function SendersList() {
                 )}
                 {t(`senderStatus.${sender.status}`)}
               </Badge>
+              {sender.status === 'ACTIVE' ? null : (
+                <p className="basis-full text-xs text-muted-foreground">
+                  {t(`senderStatusHint.${sender.status}`)}
+                </p>
+              )}
             </li>
           ))}
         </ul>

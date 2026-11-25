@@ -18,7 +18,7 @@ export function NatsLagPanel({ streams, history }: NatsLagPanelProps) {
   const t = useTranslations('adminMonitoring.nats');
 
   return (
-    <Card data-testid={ids.natsPanel}>
+    <Card id="event-streams" className="scroll-mt-20" data-testid={ids.natsPanel}>
       <CardHeader>
         <CardTitle>{t('heading')}</CardTitle>
         <CardDescription>{t('description')}</CardDescription>

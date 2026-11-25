@@ -1177,3 +1177,14 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 - In the browser pass, check the list, the detail page and any filter that depends on the changed field, then refresh once to compare with stored state
 
 ---
+
+### [PRBMS] Messages That Report a Problem
+
+**Problem:** An alert, banner, failed or skipped status or "unavailable" state states a condition and stops. The person who sees it cannot tell what is affected, whether it is happening now, or what to do.
+**Rules:**
+
+- Pass the six-point test in `docs/frontend.md` → "Messages that report a problem": what, which one, so what, first steps, where to take them, when it ends
+- An internal name (rule, error code, enum value) is never the only title
+- The message carries the first steps and links to the runbook section for the rest; it does not copy the runbook
+
+---

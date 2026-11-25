@@ -56,9 +56,9 @@
   },
   "reasons": {
     "channel_disabled": "Switched off in notification settings",
-    "no_consent": "The guardian has not agreed to messages on this channel",
-    "no_provider": "This channel is not set up for the institute yet",
-    "no_address": "No phone number or email on record",
+    "no_consent": "The guardian has not agreed to messages on this channel: they can agree in their Data consent settings",
+    "no_provider": "This channel is not set up for the institute yet: ask platform support to set it up",
+    "no_address": "No phone number or email on record: add one to the person's profile",
     "no_template": "No approved message wording for this notification yet",
     "opted_out": "The guardian asked to stop messages on this channel",
     "sender_cap": "Daily sending limit reached",
