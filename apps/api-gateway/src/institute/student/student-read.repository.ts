@@ -520,6 +520,9 @@ export class StudentReadRepository {
         ),
       );
     }
+    if (filter.membershipId) {
+      conditions.push(eq(studentProfilesLive.membershipId, filter.membershipId));
+    }
     if (filter.standardId) {
       conditions.push(eq(studentAcademicsLive.standardId, filter.standardId));
     }

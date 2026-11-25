@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import {
   createIntegrationApp,
   createPlatformToken,
+  createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
 } from '@roviq/testing/integration';
@@ -42,18 +43,24 @@ describe('DLQ admin reader (integration)', () => {
   let token: string;
   const originStream = `ITEST_${randomUUID().slice(0, 8)}`;
   const recentStream = `ITEST_RECENT_${randomUUID().slice(0, 8)}`;
+  const namedStream = `ITEST_NAMED_${randomUUID().slice(0, 8)}`;
   const seqBase = BigInt(Date.now()) * 1000n + 500n;
   const ids: string[] = [];
 
-  const insert = async (offset: bigint, stream = originStream, writtenAt = new Date()) => {
+  const insert = async (
+    offset: bigint,
+    stream = originStream,
+    writtenAt = new Date(),
+    tenantId: string | null = null,
+  ) => {
     const res = await superPool.query(
       `INSERT INTO dlq_messages
         (dlq_stream_seq, original_subject, origin_stream, payload, error,
          retry_count, correlation_id, tenant_id, failed_at, status, replay_count, created_at)
-       VALUES ($1, 'NOTIFICATION.user.created', $2, '{}'::jsonb, 'failure', 3, $3, NULL, NOW(),
+       VALUES ($1, 'NOTIFICATION.user.created', $2, '{}'::jsonb, 'failure', 3, $3, $5, NOW(),
                'pending', 0, $4)
        RETURNING id`,
-      [(seqBase + offset).toString(), stream, randomUUID(), writtenAt],
+      [(seqBase + offset).toString(), stream, randomUUID(), writtenAt, tenantId],
     );
     const id = res.rows[0]?.id;
     assert(typeof id === 'string');
@@ -87,7 +94,7 @@ describe('DLQ admin reader (integration)', () => {
 
   afterAll(async () => {
     await superPool?.query('DELETE FROM dlq_messages WHERE origin_stream = ANY($1)', [
-      [originStream, recentStream],
+      [originStream, recentStream, namedStream],
     ]);
     await superPool?.end();
     await result?.close();
@@ -106,6 +113,38 @@ describe('DLQ admin reader (integration)', () => {
     expect(page2.edges.map((e) => e.node.id)).toEqual([ids[0]]);
     expect(page2.pageInfo.hasNextPage).toBe(false);
     expect(page2.pageInfo.hasPreviousPage).toBe(true);
+  });
+
+  it("should name each message's institute, and none for a deleted institute or no institute (ROV-360)", async () => {
+    const live = await createTestInstitute(result.db);
+    const deleted = await createTestInstitute(result.db);
+    await superPool.query(
+      'UPDATE institutes SET deleted_at = NOW(), deleted_by = created_by WHERE id = $1',
+      [deleted.tenantId],
+    );
+    const nameRes = await superPool.query('SELECT name FROM institutes WHERE id = $1', [
+      live.tenantId,
+    ]);
+    const withName = await insert(10n, namedStream, new Date(), live.tenantId);
+    const withDeleted = await insert(11n, namedStream, new Date(), deleted.tenantId);
+    const withNone = await insert(12n, namedStream, new Date(), null);
+
+    const res = await gqlRequest<{
+      adminListDlqMessages: { edges: { node: { id: string; tenantName: unknown } }[] };
+    }>(result.httpServer, {
+      query: `query ($filter: DlqMessageFilterInput) {
+        adminListDlqMessages(filter: $filter) { edges { node { id tenantName } } }
+      }`,
+      token,
+      variables: { filter: { originStream: namedStream } },
+    });
+
+    expect(res.errors).toBeUndefined();
+    expect(res.data?.adminListDlqMessages.edges.map((e) => e.node)).toEqual([
+      { id: withNone, tenantName: null },
+      { id: withDeleted, tenantName: null },
+      { id: withName, tenantName: nameRes.rows[0]?.name },
+    ]);
   });
 
   it('should count the rows written since the given time per origin stream, for the gauge', async () => {

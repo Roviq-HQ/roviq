@@ -4,6 +4,7 @@ import type { useI18nField } from '@roviq/i18n';
 import { Badge, ImpersonationBadge, type ImpersonationBadgeLabels } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { ColumnDef } from '@tanstack/react-table';
+import { CopyIdButton } from '@web/components/copy-id-button';
 import Link from 'next/link';
 import {
   type AuditLogRow,
@@ -83,8 +84,8 @@ export function createAuditLogColumns({
       cell: ({ row }) => {
         const log = row.original;
         const unnamed = outsideActorScope(log, scope);
-        const actor =
-          log.actorName ?? (unnamed ? t(`actorScope.${unnamed}`) : log.actorId.slice(0, 8));
+        const actor = log.actorName ?? (unnamed ? t(`actorScope.${unnamed}`) : t('unknownUser'));
+        const unknown = !log.actorName && !unnamed;
         // On an institute's own log, mark what the platform or its reseller did to it. An
         // unnamed outsider already reads as its side, so the badge would only repeat it.
         const outside =
@@ -96,6 +97,7 @@ export function createAuditLogColumns({
         return (
           <div className="flex items-center gap-1.5">
             <span className="max-w-[120px] truncate text-xs">{actor}</span>
+            {unknown && <CopyIdButton value={log.actorId} name={t('detail.actorId')} />}
             {outside && (
               <Badge
                 variant="outline"
@@ -169,20 +171,26 @@ export function createAuditLogColumns({
         const { id, entityId, entityType } = row.original;
         if (!entityId) return DASH;
         const href = auditEntityHref(scope, entityType, entityId);
-        if (!href) {
-          return <span className="font-mono text-xs">{entityId.slice(0, 8)}</span>;
-        }
         return (
-          <Link
-            href={href}
-            title={t('detail.openEntity')}
-            className="font-mono text-xs text-primary underline-offset-2 hover:underline"
-            data-testid={testIds.auditLogs.entityLink(id)}
-            // The row opens the detail sheet on click; the link must only navigate.
-            onClick={(event) => event.stopPropagation()}
-          >
-            {entityId.slice(0, 8)}
-          </Link>
+          <div className="flex items-center gap-1">
+            {href ? (
+              <Link
+                href={href}
+                title={t('detail.openEntity')}
+                className="max-w-[140px] truncate font-mono text-xs text-primary underline-offset-2 hover:underline"
+                data-testid={testIds.auditLogs.entityLink(id)}
+                // The row opens the detail sheet on click; the link must only navigate.
+                onClick={(event) => event.stopPropagation()}
+              >
+                {entityId}
+              </Link>
+            ) : (
+              <span className="max-w-[140px] truncate font-mono text-xs" title={entityId}>
+                {entityId}
+              </span>
+            )}
+            <CopyIdButton value={entityId} name={t('detail.entityId')} />
+          </div>
         );
       },
     },

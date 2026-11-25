@@ -1,5 +1,6 @@
 import { AcademicStatus } from '@roviq/common-types';
-import { screen } from '@testing-library/react';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../messages/en/certificates.json';
@@ -14,15 +15,29 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Stable results: a new object per render would re-fire the dialog's reset effect.
-const draftCertificate = {
+interface CertificateRow {
+  id: string;
+  serialNumber: string;
+  studentProfileId: string | null;
+  studentFirstName: Record<string, string> | null;
+  studentLastName: Record<string, string> | null;
+  studentAdmissionNumber: string | null;
+  purpose: string;
+  status: string;
+  createdAt: string;
+}
+const draftCertificate: CertificateRow = {
   id: 'cert-1',
   serialNumber: 'CERT/BON/0001',
   studentProfileId: null,
+  studentFirstName: null,
+  studentLastName: null,
+  studentAdmissionNumber: null,
   purpose: 'Scholarship application',
   status: 'DRAFT',
   createdAt: '2026-11-25T10:00:00.000Z',
 };
-const certificatesResult: { certificates: (typeof draftCertificate)[]; loading: boolean } = {
+const certificatesResult: { certificates: CertificateRow[]; loading: boolean } = {
   certificates: [],
   loading: false,
 };
@@ -77,6 +92,40 @@ describe('OtherCertificatesPage — certificate list', () => {
 
     expect(screen.getByText(messagesEn.certificateStatuses.DRAFT)).toBeInTheDocument();
     expect(screen.queryByText('certificates.certificateStatuses.DRAFT')).not.toBeInTheDocument();
+    certificatesResult.certificates = [];
+  });
+
+  const STUDENT_ID = '01a2b3c4-d5e6-7f80-9a0b-1c2d3e4f5a6b';
+
+  it("shows the student's name and admission number, never a shortened id (ROV-360)", () => {
+    certificatesResult.certificates = [
+      {
+        ...draftCertificate,
+        studentProfileId: STUDENT_ID,
+        studentFirstName: { en: 'Asha', hi: 'आशा' },
+        studentLastName: { en: 'Verma', hi: 'वर्मा' },
+        studentAdmissionNumber: 'ADM-0042',
+      },
+    ];
+    renderWithProviders(<OtherCertificatesPage />, { locale: 'hi' });
+
+    const cell = screen.getByTestId(testIds.instituteCertificatesOther.student('cert-1'));
+    expect(within(cell).getByRole('button', { name: 'आशा वर्मा' })).toBeInTheDocument();
+    expect(cell).toHaveTextContent(
+      messagesHi.columns.admissionNumber.replace('{number}', 'ADM-0042'),
+    );
+    expect(screen.queryByText(new RegExp(STUDENT_ID.slice(0, 8)))).not.toBeInTheDocument();
+    certificatesResult.certificates = [];
+  });
+
+  it('says "Unknown student" when the student can no longer be read (ROV-360)', () => {
+    certificatesResult.certificates = [{ ...draftCertificate, studentProfileId: STUDENT_ID }];
+    renderWithProviders(<OtherCertificatesPage />, { messages: { certificates: messagesEn } });
+
+    expect(
+      screen.getByTestId(testIds.instituteCertificatesOther.student('cert-1')),
+    ).toHaveTextContent(messagesEn.columns.unknownStudent);
+    expect(screen.queryByText(new RegExp(STUDENT_ID.slice(0, 8)))).not.toBeInTheDocument();
     certificatesResult.certificates = [];
   });
 });

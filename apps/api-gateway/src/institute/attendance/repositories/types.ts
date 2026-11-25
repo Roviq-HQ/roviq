@@ -1,4 +1,4 @@
-import type { AttendanceMode, AttendanceStatus } from '@roviq/database';
+import type { AttendanceMode, AttendanceStatus, I18nContent } from '@roviq/database';
 
 export interface AttendanceSessionRecord {
   id: string;
@@ -63,8 +63,19 @@ export interface AbsenteesReportQuery {
   endDate: string;
 }
 
+/** A person named by membership id; the fields are null when the institute has no readable profile. */
+export interface MembershipNameRow {
+  firstName: I18nContent | null;
+  lastName: I18nContent | null;
+  /** Null for staff. */
+  admissionNumber: string | null;
+}
+
 export interface AbsenteeReportRow {
   studentId: string;
+  studentFirstName: I18nContent | null;
+  studentLastName: I18nContent | null;
+  admissionNumber: string | null;
   totalSessions: number;
   presentCount: number;
   absentCount: number;
@@ -81,11 +92,14 @@ export interface SectionDailyBreakdownRow {
   period: number | null;
   subjectId: string | null;
   lecturerId: string;
+  lecturerFirstName: I18nContent | null;
+  lecturerLastName: I18nContent | null;
   presentCount: number;
   absentCount: number;
   leaveCount: number;
   lateCount: number;
   absenteeIds: string[];
+  absentees: Array<MembershipNameRow & { studentId: string }>;
 }
 
 export interface StudentHistoryQuery {

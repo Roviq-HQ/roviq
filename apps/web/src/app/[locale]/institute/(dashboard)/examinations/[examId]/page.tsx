@@ -407,7 +407,7 @@ function hasDateGap(dates: string[], i: number): boolean {
   return next !== undefined && next !== addDaysISO(dates[i], 1);
 }
 
-function Datesheet({
+export function Datesheet({
   examId,
   examStatus,
   academicYearId,
@@ -432,7 +432,7 @@ function Datesheet({
   const { loading } = useExamDatesheet(examId);
   const { removeSchedule } = useRemoveExamSchedule();
   const { staff } = useStaff();
-  const { subjects } = useAllSubjects();
+  const { subjects, loading: subjectsLoading } = useAllSubjects();
   // null = closed; 'add' = blank dialog; an ExamSchedule = edit that row pre-filled.
   const [dialog, setDialog] = React.useState<'add' | ExamSchedule | null>(null);
   const [marksFor, setMarksFor] = React.useState<string | null>(null);
@@ -450,13 +450,13 @@ function Datesheet({
     return map;
   }, [staff, resolveI18n]);
 
-  // Map subjectId → resolved name; fall back to a short id slice if not yet loaded.
   const subjectNames = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const s of subjects) map.set(s.id, resolveI18n(s.name));
     return map;
   }, [subjects, resolveI18n]);
-  const subjectName = (id: string) => subjectNames.get(id) ?? id.slice(0, 8);
+  const subjectName = (id: string) =>
+    subjectNames.get(id) || (subjectsLoading ? '' : t('datesheet.unknownSubject'));
 
   const handleRemove = async (id: string) => {
     try {

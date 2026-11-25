@@ -85,6 +85,12 @@ const baseApp = {
   updatedAt: new Date('2026-04-15T10:00:00Z').toISOString(),
 };
 
+const unnamedApp = {
+  ...baseApp,
+  id: '01a2b3c4-d5e6-7f80-9a0b-1c2d3e4f5a6b',
+  status: 'SUBMITTED',
+  formData: {},
+};
 const feePaidApp = { ...baseApp, id: 'app-2', status: 'FEE_PAID', isRteApplication: false };
 const submittedApp = { ...baseApp, status: 'SUBMITTED' };
 const rejectedApp = {
@@ -107,7 +113,7 @@ const birthCertificate = {
 };
 
 const refetch = vi.fn();
-const listState = { failed: false };
+const listState = { failed: false, unnamed: false };
 const approve = vi.fn((_options: unknown) => Promise.resolve({}));
 
 vi.mock('sonner', () => ({
@@ -127,7 +133,7 @@ vi.mock('../../use-admission', () => ({
           fetchMore: vi.fn(),
         }
       : {
-          applications: [submittedApp, feePaidApp, rejectedApp],
+          applications: listState.unnamed ? [unnamedApp] : [submittedApp, feePaidApp, rejectedApp],
           totalCount: 3,
           hasNextPage: false,
           endCursor: null,
@@ -181,6 +187,21 @@ describe('ApplicationsPage (component)', () => {
       messagesEn.applications.title,
     );
     expect(screen.getByTestId('application-applicant-app-1')).toHaveTextContent('Diya Patel');
+  });
+
+  it('shows a copyable id, not a shortened one, for an applicant without a name (ROV-360)', async () => {
+    const user = userEvent.setup();
+    listState.unnamed = true;
+    renderPage();
+
+    const cell = screen.getByTestId(instituteAdmissionApplications.applicant(unnamedApp.id));
+    expect(cell).toHaveTextContent(messagesEn.applications.unnamedApplicant);
+    expect(cell).not.toHaveTextContent(unnamedApp.id.slice(0, 8));
+
+    await user.click(within(cell).getByTestId(testIds.copyId.button(unnamedApp.id)));
+    expect(await navigator.clipboard.readText()).toBe(unnamedApp.id);
+    expect(toast.success).toHaveBeenCalledWith('Copied!', { duration: 2000 });
+    listState.unnamed = false;
   });
 
   it('names the class applied for instead of showing its id', () => {

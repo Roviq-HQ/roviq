@@ -1,6 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE_DB, type DrizzleDB, dlqMessages, mkAdminCtx, withAdmin } from '@roviq/database';
-import { and, count, desc, eq, gte, type SQL, sql } from 'drizzle-orm';
+import {
+  DRIZZLE_DB,
+  type DrizzleDB,
+  dlqMessages,
+  type I18nContent,
+  institutesLive,
+  mkAdminCtx,
+  withAdmin,
+} from '@roviq/database';
+import { and, count, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm';
 import { DlqRepository, type DlqStreamCount } from './dlq.repository';
 import type { DlqListQuery, DlqMessageRecord, DlqTransitionResult } from './types';
 
@@ -35,6 +43,17 @@ export class DlqDrizzleRepository extends DlqRepository {
         .where(eq(dlqMessages.status, 'pending'));
       return row?.value ?? 0;
     });
+  }
+
+  async findInstituteNames(tenantIds: readonly string[]): Promise<Map<string, I18nContent>> {
+    if (tenantIds.length === 0) return new Map();
+    const rows = await withAdmin(this.db, mkAdminCtx('service:dlq'), (tx) =>
+      tx
+        .select({ id: institutesLive.id, name: institutesLive.name })
+        .from(institutesLive)
+        .where(inArray(institutesLive.id, [...tenantIds])),
+    );
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   async countSinceByStream(since: Date): Promise<DlqStreamCount[]> {

@@ -53,7 +53,6 @@ test.describe('Attendance section scope — single-section teacher', () => {
 
     await attendance.gotoReports('absentees');
     await expect(page).toHaveURL(new RegExp(`[?&]section=${assigned}`), { timeout: 15_000 });
-    await expect(page.getByTestId(ids.absenteesSectionHint)).toHaveCount(0);
     const sectionOptions = await attendance.openOptions(ids.absenteesSectionSelect);
     await expect(sectionOptions).toHaveCount(1);
     await attendance.closeOptions();

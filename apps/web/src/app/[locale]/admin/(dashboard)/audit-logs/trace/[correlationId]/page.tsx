@@ -1,8 +1,11 @@
 'use client';
 
 import { useFormatDate } from '@roviq/i18n';
-import { Badge, Button, Can, Separator } from '@roviq/ui';
-import { ArrowLeft, Check, ClipboardCopy } from 'lucide-react';
+import { Badge, Can, Separator } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { auditEntityHref } from '@web/components/audit/audit-utils';
+import { CopyIdButton } from '@web/components/copy-id-button';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -23,7 +26,6 @@ export default function CorrelationTracePage() {
   const correlationId = params.correlationId;
   const t = useTranslations('auditLogs');
   const { format } = useFormatDate();
-  const [copied, setCopied] = React.useState(false);
 
   const { logs, totalCount, loading } = useAuditLogs({
     filter: { correlationId },
@@ -59,12 +61,6 @@ export default function CorrelationTracePage() {
     return `+${formatDuration(offset)}`;
   };
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(correlationId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -88,8 +84,6 @@ export default function CorrelationTracePage() {
                 eventCount={totalCount}
                 durationMs={durationMs}
                 loading={loading}
-                copied={copied}
-                onCopy={handleCopy}
                 t={t}
                 formatDuration={formatDuration}
               />
@@ -138,8 +132,6 @@ function TraceSummary({
   eventCount,
   durationMs,
   loading,
-  copied,
-  onCopy,
   t,
   formatDuration,
 }: {
@@ -147,8 +139,6 @@ function TraceSummary({
   eventCount: number;
   durationMs: number;
   loading: boolean;
-  copied: boolean;
-  onCopy: () => void;
   t: (key: string, values?: Record<string, string | number | Date>) => string;
   formatDuration: (ms: number) => string;
 }) {
@@ -163,13 +153,7 @@ function TraceSummary({
             <span className="font-mono text-sm text-blue-600 dark:text-blue-400 break-all">
               {correlationId}
             </span>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onCopy}>
-              {copied ? (
-                <Check className="h-3.5 w-3.5 text-green-600" />
-              ) : (
-                <ClipboardCopy className="h-3.5 w-3.5" />
-              )}
-            </Button>
+            <CopyIdButton value={correlationId} name={t('trace.correlationId')} />
           </div>
         </div>
 
@@ -240,7 +224,7 @@ function TimelineEvent({
               {log.entityId && (
                 <>
                   <span className="text-muted-foreground">{t('detail.entityId')}:</span>
-                  <span className="font-mono text-xs">{log.entityId.slice(0, 8)}</span>
+                  <EntityId entityType={log.entityType} entityId={log.entityId} t={t} />
                 </>
               )}
             </div>
@@ -248,14 +232,12 @@ function TimelineEvent({
             <div className="flex gap-2">
               <span className="text-muted-foreground">{t('trace.actor')}:</span>
               {log.actorName ? (
-                <>
-                  <span className="text-sm">{log.actorName}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {log.actorId.slice(0, 8)}
-                  </span>
-                </>
+                <span className="text-sm">{log.actorName}</span>
               ) : (
-                <span className="font-mono text-xs">{log.actorId.slice(0, 8)}</span>
+                <span className="flex items-center gap-1">
+                  <span className="text-sm">{t('unknownUser')}</span>
+                  <CopyIdButton value={log.actorId} name={t('detail.actorId')} />
+                </span>
               )}
               {log.impersonatorId && (
                 <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
@@ -276,5 +258,34 @@ function TimelineEvent({
         </div>
       </div>
     </div>
+  );
+}
+
+function EntityId({
+  entityType,
+  entityId,
+  t,
+}: {
+  entityType: string;
+  entityId: string;
+  t: (key: string) => string;
+}) {
+  const href = auditEntityHref('admin', entityType, entityId);
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      {href ? (
+        <Link
+          href={href}
+          title={t('detail.openEntity')}
+          className="truncate font-mono text-xs text-primary underline-offset-2 hover:underline"
+          data-testid={testIds.auditLogs.traceEntityLink(entityId)}
+        >
+          {entityId}
+        </Link>
+      ) : (
+        <span className="truncate font-mono text-xs">{entityId}</span>
+      )}
+      <CopyIdButton value={entityId} name={t('detail.entityId')} />
+    </span>
   );
 }

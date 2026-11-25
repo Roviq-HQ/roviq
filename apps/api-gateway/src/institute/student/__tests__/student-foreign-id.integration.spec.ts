@@ -33,7 +33,7 @@ import {
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { Connection } from '@temporalio/client';
-import { inArray, or } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 import { EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
@@ -495,6 +495,26 @@ describe('student: another institute id (ROV-293)', () => {
   ] as const)('listStudents should list its own %s and no student of another institute', async (filter, key, expected) => {
     expect(await listIds({ [filter]: a[key] })).toEqual({ totalCount: 1, ids: [a[expected]] });
     expect(await listIds({ [filter]: b[key] })).toEqual({ totalCount: 0, ids: [] });
+  });
+
+  it('listStudents should find its own student by membership id and none of another institute (ROV-360)', async () => {
+    const membershipOf = (studentId: string) =>
+      asAdmin(async (tx) => {
+        const [row] = await tx
+          .select({ membershipId: studentProfiles.membershipId })
+          .from(studentProfiles)
+          .where(eq(studentProfiles.id, studentId));
+        return row.membershipId;
+      });
+
+    expect(await listIds({ membershipId: await membershipOf(a.studentId) })).toEqual({
+      totalCount: 1,
+      ids: [a.studentId],
+    });
+    expect(await listIds({ membershipId: await membershipOf(b.studentId) })).toEqual({
+      totalCount: 0,
+      ids: [],
+    });
   });
 
   it.each([

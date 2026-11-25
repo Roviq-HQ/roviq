@@ -253,7 +253,10 @@
     "student": "Student",
     "purpose": "Purpose",
     "createdAt": "Created",
-    "issuedDate": "Issued Date"
+    "issuedDate": "Issued Date",
+    "unknownStudent": "Unknown student",
+    "openStudent": "Open the student's profile",
+    "admissionNumber": "Adm. no. {number}"
   },
   "filters": {
     "searchPlaceholder": "Search serial number or reason…",

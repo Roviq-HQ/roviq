@@ -39,7 +39,7 @@ import {
   type TestReseller,
 } from '@roviq/testing/integration';
 import { Connection } from '@temporalio/client';
-import { asc, inArray, or } from 'drizzle-orm';
+import { asc, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app/app.module';
 
@@ -105,6 +105,7 @@ const REFUND = /* GraphQL */ `
 `;
 const INVOICE_PAYMENTS = 'query ($id: ID!) { invoicePayments(invoiceId: $id) { id } }';
 const VERIFY_UPI = 'mutation ($id: ID!) { verifyUpiPayment(paymentId: $id) { id } }';
+const UNVERIFIED_PAYMENTS = '{ unverifiedPayments { id invoiceNumber instituteName } }';
 const REJECT_UPI = /* GraphQL */ `
   mutation ($id: ID!) {
     rejectUpiPayment(input: { paymentId: $id, reason: "UTR not found in statement" }) {
@@ -592,6 +593,54 @@ describe('billing: another reseller or institute id (ROV-293)', () => {
         { id: billsB.upiPaymentId },
         ErrorCode.PAYMENT_NOT_FOUND,
       );
+    });
+
+    it("unverifiedPayments should show its own invoice number and institute, never another reseller's (ROV-360)", async () => {
+      // A payment of A pointing at B's invoice and institute: the foreign keys accept it, the
+      // reseller's RLS must hide B's invoice number and institute name.
+      const { pointingId, invoiceNumber, instituteName } = await asAdmin(async (tx) => {
+        const [pointing] = await tx
+          .insert(payments)
+          .values({
+            invoiceId: billsB.otherInvoiceId,
+            tenantId: b[1].tenantId,
+            resellerId: resellerA.resellerId,
+            status: 'SUCCEEDED',
+            method: 'UPI_P2P',
+            amountPaise: 1_000n,
+            utrNumber: `${Date.now()}${Math.floor(Math.random() * 1e6)}`.slice(0, 16),
+            verificationStatus: 'PENDING_VERIFICATION',
+            verificationDeadline: new Date(Date.now() + DAY),
+            paidAt: new Date(),
+            ...BY,
+          })
+          .returning({ id: payments.id });
+        const [invoice] = await tx
+          .select({ invoiceNumber: invoices.invoiceNumber })
+          .from(invoices)
+          .where(eq(invoices.id, billsA.invoiceId));
+        const [institute] = await tx
+          .select({ name: institutes.name })
+          .from(institutes)
+          .where(eq(institutes.id, a[0].tenantId));
+        return {
+          pointingId: pointing.id,
+          invoiceNumber: invoice.invoiceNumber,
+          instituteName: institute.name,
+        };
+      });
+
+      const data = await query<{
+        unverifiedPayments: { id: string; invoiceNumber: string | null; instituteName: unknown }[];
+      }>(UNVERIFIED_PAYMENTS, {});
+
+      expect(data?.unverifiedPayments).toEqual(
+        expect.arrayContaining([
+          { id: billsA.upiPaymentId, invoiceNumber, instituteName },
+          { id: pointingId, invoiceNumber: null, instituteName: null },
+        ]),
+      );
+      expect(data?.unverifiedPayments.map((row) => row.id)).not.toContain(billsB.upiPaymentId);
     });
   });
 

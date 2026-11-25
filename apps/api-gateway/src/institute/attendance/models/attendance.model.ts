@@ -162,6 +162,22 @@ export class AbsenteeReportItem {
   @Field(() => ID, { description: 'Student membership id.' })
   studentId!: string;
 
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description:
+      "Student's first name (i18n) from the institute's profile copy; null when the student is no longer readable.",
+  })
+  studentFirstName!: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true, description: "Student's last name (i18n)." })
+  studentLastName!: I18nContent | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Student's admission number, to tell apart students with the same name.",
+  })
+  admissionNumber!: string | null;
+
   @Field(() => Int, {
     description:
       'Total number of attendance sessions this student had an entry in across the range.',
@@ -185,6 +201,24 @@ export class AbsenteeReportItem {
       'Sorted, distinct list of ISO YYYY-MM-DD dates on which the student was marked ABSENT.',
   })
   absentDates!: string[];
+}
+
+@ObjectType({ description: 'A student marked ABSENT in a session, with the name to show.' })
+export class AttendanceAbsentee {
+  @Field(() => ID, { description: 'Student membership id.' })
+  studentId!: string;
+
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: 'First name (i18n); null when the student is no longer readable.',
+  })
+  firstName!: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true, description: 'Last name (i18n).' })
+  lastName!: I18nContent | null;
+
+  @Field(() => String, { nullable: true, description: 'Admission number.' })
+  admissionNumber!: string | null;
 }
 
 @ObjectType({
@@ -215,6 +249,15 @@ export class SectionDailyBreakdown {
   @Field(() => ID, { description: 'Membership id of the staff who owned this session.' })
   lecturerId!: string;
 
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: "Lecturer's first name (i18n); null when the lecturer is no longer readable.",
+  })
+  lecturerFirstName!: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true, description: "Lecturer's last name (i18n)." })
+  lecturerLastName!: I18nContent | null;
+
   @Field(() => Int, { description: 'Number of PRESENT marks for this session.' })
   presentCount!: number;
 
@@ -231,6 +274,12 @@ export class SectionDailyBreakdown {
     description: 'Membership ids of students marked ABSENT in this session.',
   })
   absenteeIds!: string[];
+
+  @Field(() => [AttendanceAbsentee], {
+    description:
+      'Students marked ABSENT in this session, with their names; same order as absenteeIds.',
+  })
+  absentees!: AttendanceAbsentee[];
 }
 
 @ObjectType({

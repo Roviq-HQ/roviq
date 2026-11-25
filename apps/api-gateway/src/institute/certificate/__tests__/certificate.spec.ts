@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CertificateService } from '../certificate.service';
 import { CertificatePdfService } from '../certificate-pdf.service';
 import { CertificateRepository } from '../repositories/certificate.repository';
-import type { IssuedCertificateRow } from '../repositories/certificate.types';
+import type { CertificateDetailsRow } from '../repositories/certificate.types';
 import { TcRepository } from '../repositories/tc.repository';
 import type { TcDetailsRow } from '../repositories/tc.types';
 
@@ -33,7 +33,7 @@ const ctx: InstituteContext = {
   type: 'access',
 };
 
-function certificateRow(overrides: Partial<IssuedCertificateRow> = {}): IssuedCertificateRow {
+function certificateRow(overrides: Partial<CertificateDetailsRow> = {}): CertificateDetailsRow {
   return {
     id: 'cert-1',
     tenantId: 'tenant-1',
@@ -55,6 +55,9 @@ function certificateRow(overrides: Partial<IssuedCertificateRow> = {}): IssuedCe
     deletedAt: null,
     deletedBy: null,
     version: 1,
+    studentFirstName: null,
+    studentLastName: null,
+    studentAdmissionNumber: null,
     ...overrides,
   };
 }
@@ -244,6 +247,39 @@ describe('CertificateService (unit)', () => {
         certificateData: {},
         purpose: 'Bonafide for passport',
         actorId: 'user-1',
+      });
+    });
+
+    it("returns the student's name and admission number with the new certificate", async () => {
+      vi.mocked(certificates.findTemplate).mockResolvedValue({
+        id: 'tpl-1',
+        type: CertificateTemplateType.BONAFIDE_CERTIFICATE,
+        name: 'Bonafide',
+        templateContent: null,
+        approvalChain: [],
+      });
+      vi.mocked(certificates.findStudent).mockResolvedValue({
+        admissionNumber: 'ADM-7',
+        admissionClass: '5',
+        firstName: { en: 'Asha', hi: 'आशा' },
+        lastName: { en: 'Verma' },
+      });
+      vi.mocked(certificates.nextSerial).mockResolvedValue('CERT/BON/0001');
+      vi.mocked(certificates.create).mockResolvedValue(
+        certificateRow({ id: 'cert-new', studentProfileId: 'student-1' }),
+      );
+
+      const result = await service.requestCertificate(ctx, {
+        templateId: 'tpl-1',
+        studentProfileId: 'student-1',
+        purpose: 'Passport',
+      });
+
+      expect(result).toMatchObject({
+        id: 'cert-new',
+        studentFirstName: { en: 'Asha', hi: 'आशा' },
+        studentLastName: { en: 'Verma' },
+        studentAdmissionNumber: 'ADM-7',
       });
     });
   });

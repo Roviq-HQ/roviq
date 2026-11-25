@@ -74,8 +74,8 @@
     "absentees": "अनुपस्थित",
     "noAbsenteesRow": "सभी उपस्थित",
     "unknownStudent": "अज्ञात छात्र",
-    "unknownSection": "सेक्शन {id}",
-    "pickSectionHint": "छात्रों के नाम देखने के लिए कक्षा और सेक्शन चुनें।",
+    "unknownSection": "अज्ञात सेक्शन",
+    "unknownLecturer": "अज्ञात स्टाफ़ सदस्य",
     "last30Days": "पिछले 30 दिन",
     "exportCsv": "CSV निर्यात",
     "viewHistory": "इतिहास देखें"

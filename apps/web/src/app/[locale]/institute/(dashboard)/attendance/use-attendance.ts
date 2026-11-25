@@ -300,6 +300,9 @@ const ABSENTEES_REPORT = gql`
       endDate: $endDate
     ) {
       studentId
+      studentFirstName
+      studentLastName
+      admissionNumber
       totalSessions
       presentCount
       absentCount
@@ -318,11 +321,19 @@ const SECTION_DAILY_BREAKDOWN = gql`
       period
       subjectId
       lecturerId
+      lecturerFirstName
+      lecturerLastName
       presentCount
       absentCount
       leaveCount
       lateCount
       absenteeIds
+      absentees {
+        studentId
+        firstName
+        lastName
+        admissionNumber
+      }
     }
   }
 `;

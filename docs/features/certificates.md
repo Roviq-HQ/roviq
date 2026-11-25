@@ -54,6 +54,8 @@ All tables spread `tenantColumns` and use `tenantPolicies()` for RLS.
 
 Student name snapshots are stored as `i18nText` jsonb; a template's `name` is plain text. The TC PDF renderer picks the tenant's default locale for the issued copy and falls back through `current → en → first available`. Forms use `<I18nInput>` + `i18nTextSchema`. Searching the TC register by student name uses `search_vector @@ plainto_tsquery('simple', query)` joined onto the student profile row.
 
+A certificate in `listCertificates` and `getCertificate` carries the student's name and admission number (`studentFirstName`, `studentLastName`, `studentAdmissionNumber`), joined from the institute's own profile copy; they are null for a staff certificate or a student the institute can no longer read, and the list then shows "Unknown student".
+
 ## Frontend patterns
 
 - DataTable with `stickyFirstColumn` + `skeletonRows={8}` ([IXABI], [IMUXO])

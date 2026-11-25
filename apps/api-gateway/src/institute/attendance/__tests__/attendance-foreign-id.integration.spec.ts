@@ -112,6 +112,30 @@ const BREAKDOWN = /* GraphQL */ `
     }
   }
 `;
+const NAMED_ABSENTEES = /* GraphQL */ `
+  query NamedAbsentees($date: String!, $sectionId: ID) {
+    attendanceAbsenteesReport(startDate: $date, endDate: $date, sectionId: $sectionId) {
+      studentId
+      studentFirstName
+      studentLastName
+      admissionNumber
+    }
+  }
+`;
+const NAMED_BREAKDOWN = /* GraphQL */ `
+  query NamedBreakdown($date: String!, $standardId: ID) {
+    attendanceSectionDailyBreakdown(date: $date, standardId: $standardId) {
+      lecturerFirstName
+      lecturerLastName
+      absentees {
+        studentId
+        firstName
+        lastName
+        admissionNumber
+      }
+    }
+  }
+`;
 const HISTORY = /* GraphQL */ `
   query AttendanceStudentHistory($studentId: ID!, $date: String!) {
     attendanceStudentHistory(studentId: $studentId, startDate: $date, endDate: $date) {
@@ -458,6 +482,91 @@ describe('attendance: another institute id (ROV-293)', () => {
       });
       expect(await query(BREAKDOWN, { date: TODAY, standardId: b.standardId })).toEqual({
         attendanceSectionDailyBreakdown: [],
+      });
+    });
+
+    it("both reports should name its own people and never join in another institute's (ROV-360)", async () => {
+      // A past date no other test reads. The entry pointing at B's student is a fixture the
+      // foreign key accepts; the joined names must still come only from A.
+      const date = '2026-05-04';
+      const own = await asAdmin(async (tx) => {
+        const [student] = await tx
+          .select({
+            firstName: tenantUserProfiles.firstName,
+            admissionNumber: studentProfiles.admissionNumber,
+          })
+          .from(studentProfiles)
+          .innerJoin(tenantUserProfiles, eq(tenantUserProfiles.userId, studentProfiles.userId))
+          .where(eq(studentProfiles.membershipId, a.studentId));
+        const [lecturer] = await tx
+          .select({ userId: memberships.userId })
+          .from(memberships)
+          .where(eq(memberships.id, a.lecturerId));
+        await tx.insert(tenantUserProfiles).values([
+          { tenantId: instA.tenantId, userId: lecturer.userId, firstName: { en: 'Kavita' }, ...BY },
+          { tenantId: instB.tenantId, userId: lecturer.userId, firstName: { en: 'Wrong' }, ...BY },
+        ]);
+        const [session] = await tx
+          .insert(attendanceSessions)
+          .values({
+            tenantId: instA.tenantId,
+            sectionId: a.sectionId,
+            academicYearId: a.yearId,
+            date,
+            subjectId: a.subjectId,
+            lecturerId: a.lecturerId,
+            ...BY,
+          })
+          .returning({ id: attendanceSessions.id });
+        await tx.insert(attendanceEntries).values(
+          [a.studentId, b.studentId].map((studentId) => ({
+            tenantId: instA.tenantId,
+            sessionId: session.id,
+            studentId,
+            status: 'ABSENT' as const,
+            ...BY,
+          })),
+        );
+        return student;
+      });
+      const named = {
+        firstName: own.firstName,
+        lastName: null,
+        admissionNumber: own.admissionNumber,
+      };
+      const unknown = { firstName: null, lastName: null, admissionNumber: null };
+
+      const byStudent = (x: { studentId: string }, y: { studentId: string }) =>
+        x.studentId.localeCompare(y.studentId);
+      // The report orders rows by membership id.
+      expect(await query(NAMED_ABSENTEES, { date, sectionId: a.sectionId })).toEqual({
+        attendanceAbsenteesReport: [
+          {
+            studentId: a.studentId,
+            studentFirstName: named.firstName,
+            studentLastName: null,
+            admissionNumber: named.admissionNumber,
+          },
+          {
+            studentId: b.studentId,
+            studentFirstName: null,
+            studentLastName: null,
+            admissionNumber: null,
+          },
+        ].sort(byStudent),
+      });
+
+      expect(await query(NAMED_BREAKDOWN, { date, standardId: a.standardId })).toEqual({
+        attendanceSectionDailyBreakdown: [
+          {
+            lecturerFirstName: { en: 'Kavita' },
+            lecturerLastName: null,
+            absentees: expect.arrayContaining([
+              { studentId: a.studentId, ...named },
+              { studentId: b.studentId, ...unknown },
+            ]),
+          },
+        ],
       });
     });
 

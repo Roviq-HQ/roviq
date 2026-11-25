@@ -465,6 +465,7 @@
     "accessDenied": "आपको भुगतान सत्यापित करने की अनुमति नहीं है।",
     "columns": {
       "invoiceId": "चालान",
+      "institute": "संस्थान",
       "utr": "UTR नंबर",
       "amount": "राशि",
       "submittedAt": "जमा तिथि",
@@ -487,7 +488,10 @@
       "cancel": "रद्द करें",
       "confirm": "भुगतान अस्वीकार करें",
       "rejecting": "अस्वीकार हो रहा है..."
-    }
+    },
+    "unknownInvoice": "अज्ञात चालान",
+    "unknownInstitute": "अज्ञात संस्थान",
+    "invoiceIdName": "चालान आईडी"
   },
   "pagination": {
     "loadMore": "और लोड करें",

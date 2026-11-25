@@ -10,6 +10,9 @@ type AbsenteeReportItem {
   """
   absentDates: [String!]!
 
+  """Student's admission number, to tell apart students with the same name."""
+  admissionNumber: String
+
   """Number of sessions marked LATE for this student."""
   lateCount: Int!
 
@@ -19,8 +22,16 @@ type AbsenteeReportItem {
   """Number of sessions marked PRESENT for this student."""
   presentCount: Int!
 
+  """
+  Student's first name (i18n) from the institute's profile copy; null when the student is no longer readable.
+  """
+  studentFirstName: I18nText
+
   """Student membership id."""
   studentId: ID!
+
+  """Student's last name (i18n)."""
+  studentLastName: I18nText
 
   """
   Total number of attendance sessions this student had an entry in across the range.
@@ -993,6 +1004,21 @@ input AssignTimetableEntryInput {
   timetableId: ID!
 }
 
+"""A student marked ABSENT in a session, with the name to show."""
+type AttendanceAbsentee {
+  """Admission number."""
+  admissionNumber: String
+
+  """First name (i18n); null when the student is no longer readable."""
+  firstName: I18nText
+
+  """Last name (i18n)."""
+  lastName: I18nText
+
+  """Student membership id."""
+  studentId: ID!
+}
+
 """
 Attendance totals for one date within the caller's authorized sections, optionally narrowed to one section and academic year.
 """
@@ -1464,6 +1490,17 @@ type CertificateModel {
   serialNumber: String!
   staffProfileId: String
   status: CertificateStatus!
+
+  """Student's admission number, to tell apart students with the same name"""
+  studentAdmissionNumber: String
+
+  """
+  Student's first name (i18n) from the institute's profile copy; null for a staff certificate or a student who is no longer readable
+  """
+  studentFirstName: I18nText
+
+  """Student's last name (i18n) from the institute's profile copy"""
+  studentLastName: I18nText
   studentProfileId: String
   templateId: String!
 }
@@ -2551,6 +2588,11 @@ type DlqMessageModel {
 
   """Tenant the message belonged to; null if cross-tenant"""
   tenantId: ID
+
+  """
+  Name (i18n) of the institute the message belonged to; null for a cross-institute message or a deleted institute
+  """
+  tenantName: I18nText
 }
 
 """Lifecycle state of a dead-lettered NATS message"""
@@ -2623,6 +2665,25 @@ enum EmploymentType {
   VOLUNTEER
 }
 
+"""
+The staff member an enquiry is assigned to, as this institute knows them
+"""
+type EnquiryAssigneeModel {
+  """
+  Employee id, to tell apart staff with the same name; null when none was set
+  """
+  employeeId: String
+
+  """First name (i18n) from the institute's profile copy"""
+  firstName: I18nText!
+
+  """Last name (i18n)"""
+  lastName: I18nText
+
+  """User id, the same as the enquiry's `assignedTo`"""
+  userId: ID!
+}
+
 type EnquiryConnection {
   edges: [EnquiryEdge!]!
   pageInfo: PageInfo!
@@ -2656,6 +2717,11 @@ input EnquiryFilterInput {
 type EnquiryModel {
   academicYearId: String
   assignedTo: String
+
+  """
+  Staff member named by `assignedTo`; null when unassigned or when this institute has no profile for that user
+  """
+  assignee: EnquiryAssigneeModel
   classRequested: String!
   convertedToApplicationId: String
   createdAt: DateTime!
@@ -6029,7 +6095,7 @@ type Query {
     sectionId: ID
     status: TimetableStatus
   ): PaginatedTimetablesModel!
-  unverifiedPayments(after: String, first: Int = 20): [PaymentModel!]!
+  unverifiedPayments(after: String, first: Int = 20): [UnverifiedPaymentModel!]!
 
   """
   Public check of a transfer certificate by the token in its QR code. Null when no TC has the token.
@@ -6726,9 +6792,25 @@ type RolloverSectionMove {
   toStandardId: ID
 }
 
+"""A student matching a group rule, with the name to show in a preview"""
+type RulePreviewMember {
+  """Admission number, to tell apart students with the same name"""
+  admissionNumber: String!
+
+  """First name (i18n) from the institute's profile copy"""
+  firstName: I18nText!
+
+  """Last name (i18n)"""
+  lastName: I18nText
+  membershipId: ID!
+}
+
 """Preview result from dry-run rule evaluation"""
 type RulePreviewResult {
   count: Int!
+
+  """The same sample as sampleMembershipIds, with names, in the same order"""
+  sampleMembers: [RulePreviewMember!]!
 
   """Sample of up to 10 matching membership IDs"""
   sampleMembershipIds: [String!]!
@@ -6749,14 +6831,27 @@ type SectionDailyBreakdown {
   """Membership ids of students marked ABSENT in this session."""
   absenteeIds: [ID!]!
 
+  """
+  Students marked ABSENT in this session, with their names; same order as absenteeIds.
+  """
+  absentees: [AttendanceAbsentee!]!
+
   """Number of LATE marks for this session."""
   lateCount: Int!
 
   """Number of LEAVE marks for this session."""
   leaveCount: Int!
 
+  """
+  Lecturer's first name (i18n); null when the lecturer is no longer readable.
+  """
+  lecturerFirstName: I18nText
+
   """Membership id of the staff who owned this session."""
   lecturerId: ID!
+
+  """Lecturer's last name (i18n)."""
+  lecturerLastName: I18nText
 
   """Period / lecture slot number. Null for whole-day (DAILY) attendance."""
   period: Int
@@ -7175,6 +7270,11 @@ input StudentFilterInput {
   first: Int = 25
   gender: Gender
   isRteAdmitted: Boolean
+
+  """
+  Only the student with this membership id (attendance records name students by it)
+  """
+  membershipId: ID
 
   """
   Students still studying here who have a year record before this year but none in it. Class and section then show their latest placement. Cannot be combined with academicYearId.
@@ -7868,6 +7968,48 @@ input UnlinkGuardianInput {
   """
   newPrimaryGuardianId: ID
   studentProfileId: ID!
+}
+
+"""A UPI payment waiting for the reseller to check its UTR"""
+type UnverifiedPaymentModel {
+  amountPaise: BigInt!
+  collectedById: String
+  collectionDate: String
+  createdAt: DateTime!
+  currency: String!
+  failedAt: DateTime
+  failureReason: String
+  gatewayOrderId: String
+  gatewayPaymentId: String
+  gatewayProvider: String
+  id: ID!
+
+  """
+  Name (i18n) of the paying institute; null when the institute can't be read
+  """
+  instituteName: I18nText
+  invoiceId: String!
+
+  """
+  Number of the invoice the payment is for; null when the invoice can't be read
+  """
+  invoiceNumber: String
+  method: PaymentMethod!
+  notes: String
+  paidAt: DateTime
+  receiptNumber: String
+  refundGatewayId: String
+  refundReason: String
+  refundedAmountPaise: BigInt
+  refundedAt: DateTime
+  resellerId: String!
+  status: PaymentStatus!
+  tenantId: String!
+  utrNumber: String
+  verificationDeadline: DateTime
+  verificationStatus: String
+  verifiedAt: DateTime
+  verifiedById: String
 }
 
 """

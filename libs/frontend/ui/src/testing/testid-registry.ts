@@ -11,6 +11,11 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  // ── Common: copy an id (apps/web/src/components/copy-id-button.tsx) ──
+  copyId: {
+    button: (value: string) => `copy-id-btn-${value}`,
+  },
+
   profilePhoto: {
     changeBtn: 'profile-photo-change-btn',
     dialog: 'profile-photo-dialog',
@@ -356,6 +361,7 @@ export const testIds = {
     instituteFilterClear: 'audit-log-institute-filter-clear',
     clearFilters: 'audit-log-clear-filters',
     entityLink: (logId: string) => `audit-log-entity-link-${logId}`,
+    traceEntityLink: (entityId: string) => `audit-trace-entity-link-${entityId}`,
     outsideActorBadge: (id: string) => `audit-log-outside-actor-${id}`,
     detailEntityLink: 'audit-log-detail-entity-link',
   },
@@ -1082,6 +1088,7 @@ export const testIds = {
   // ── Institute: admission → applications ───────────────────────────────
   instituteAdmissionApplications: {
     title: 'applications-title',
+    applicant: (id: string) => `application-applicant-${id}`,
     total: 'applications-total',
     table: 'applications-table',
     statusFilter: 'applications-status-filter',
@@ -1131,6 +1138,7 @@ export const testIds = {
 
   // ── Institute: admission → enquiries ──────────────────────────────────
   instituteAdmissionEnquiries: {
+    assignee: (id: string) => `enquiry-assignee-${id}`,
     title: 'enquiries-title',
     total: 'enquiries-total',
     table: 'enquiries-table',
@@ -1221,7 +1229,6 @@ export const testIds = {
     absenteesEndDateInput: 'absentees-end-date-input',
     absenteesStandardSelect: 'absentees-standard-select',
     absenteesSectionSelect: 'absentees-section-select',
-    absenteesSectionHint: 'absentees-section-hint',
     absenteesStandardOption: (id: string) => `absentees-standard-option-${id}`,
     absenteesSectionOption: (id: string) => `absentees-section-option-${id}`,
     absenteesNoAssignedSections: 'absentees-no-assigned-sections',
@@ -1263,6 +1270,7 @@ export const testIds = {
   // ── Institute: certificates → other ───────────────────────────────────
   instituteCertificatesOther: {
     title: 'other-certs-title',
+    student: (id: string) => `other-certs-student-${id}`,
     templateSelect: 'other-certs-template-select',
   },
 
@@ -1286,6 +1294,8 @@ export const testIds = {
     newPrevBtn: 'groups-new-prev-btn',
     newNextBtn: 'groups-new-next-btn',
     newRulePreviewBtn: 'groups-new-rule-preview-btn',
+    // Rule preview
+    previewMember: (membershipId: string) => `groups-preview-member-${membershipId}`,
   },
 
   // ── Institute: holiday ────────────────────────────────────────────────
@@ -1874,6 +1884,8 @@ export const testIds = {
   resellerBillingUpi: {
     table: 'reseller-billing-upi-table',
     empty: 'reseller-billing-upi-empty',
+    invoice: (paymentId: string) => `reseller-billing-upi-invoice-${paymentId}`,
+    institute: (paymentId: string) => `reseller-billing-upi-institute-${paymentId}`,
   },
 
   // ── Reseller: billing → invoices ──────────────────────────────────────

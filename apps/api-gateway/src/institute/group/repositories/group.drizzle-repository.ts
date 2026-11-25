@@ -15,6 +15,7 @@ import {
   groupRulesLive,
   groups,
   groupsLive,
+  type I18nContent,
   mapUniqueViolation,
   membershipsLive,
   mkInstituteCtx,
@@ -366,7 +367,9 @@ export class GroupDrizzleRepository extends GroupRepository {
       // `groupRuleToDrizzleSql` (DIMENSION_TO_COLUMN — e.g., "student_profiles"."gender")
       // resolve, including "tenant_user_profiles" (the institute's copy of the demographics).
       const rows = await tx.execute(
-        sql`SELECT student_profiles.membership_id FROM student_profiles_live AS student_profiles
+        sql`SELECT student_profiles.membership_id, student_profiles.admission_number,
+                   tenant_user_profiles.first_name, tenant_user_profiles.last_name
+            FROM student_profiles_live AS student_profiles
             INNER JOIN tenant_user_profiles_live AS tenant_user_profiles ON tenant_user_profiles.user_id = student_profiles.user_id AND tenant_user_profiles.tenant_id = student_profiles.tenant_id
             LEFT JOIN student_academics_live AS student_academics ON student_academics.student_profile_id = student_profiles.id
             LEFT JOIN sections_live AS sections ON sections.id = student_academics.section_id
@@ -382,9 +385,21 @@ export class GroupDrizzleRepository extends GroupRepository {
             WHERE ${whereClause}`,
       );
 
+      const sample = rows.rows as {
+        membership_id: string;
+        admission_number: string;
+        first_name: I18nContent;
+        last_name: I18nContent | null;
+      }[];
       return {
         count: (countRows.rows[0] as { total: number }).total,
-        sampleMembershipIds: (rows.rows as { membership_id: string }[]).map((r) => r.membership_id),
+        sampleMembershipIds: sample.map((r) => r.membership_id),
+        sampleMembers: sample.map((r) => ({
+          membershipId: r.membership_id,
+          firstName: r.first_name,
+          lastName: r.last_name,
+          admissionNumber: r.admission_number,
+        })),
       };
     });
   }

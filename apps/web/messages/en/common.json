@@ -51,5 +51,10 @@
     "addStudent": "Add student",
     "addStaff": "Add staff",
     "description": "Pick an action, or type to search pages."
+  },
+  "copyId": {
+    "label": "Copy {name}",
+    "copied": "Copied!",
+    "failed": "Couldn't copy. Allow clipboard access for this site, or select the text and copy it."
   }
 }

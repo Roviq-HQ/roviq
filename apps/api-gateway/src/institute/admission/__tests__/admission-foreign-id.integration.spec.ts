@@ -4,7 +4,7 @@
  * returns none of its data, and stores no reference to it.
  */
 import { randomUUID } from 'node:crypto';
-import { AdmissionApplicationStatus, ErrorCode } from '@roviq/common-types';
+import { AdmissionApplicationStatus, ErrorCode, Gender } from '@roviq/common-types';
 import {
   academicYears,
   admissionApplications,
@@ -16,8 +16,10 @@ import {
   mkAdminCtx,
   SYSTEM_USER_ID,
   sections,
+  staffProfiles,
   standards,
   tenantSequences,
+  tenantUserProfiles,
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -26,6 +28,7 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
+  createTestTeacher,
   gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
@@ -67,6 +70,24 @@ const LIST_ENQUIRIES = /* GraphQL */ `
       edges {
         node {
           id
+        }
+      }
+    }
+  }
+`;
+const LIST_ENQUIRY_ASSIGNEES = /* GraphQL */ `
+  query ListEnquiryAssignees($filter: EnquiryFilterInput) {
+    listEnquiries(filter: $filter) {
+      edges {
+        node {
+          id
+          assignedTo
+          assignee {
+            userId
+            firstName
+            lastName
+            employeeId
+          }
         }
       }
     }
@@ -497,6 +518,79 @@ describe('admission: another institute id (ROV-293)', () => {
       expect(await query(LIST_ENQUIRIES, { filter: { assignedTo: instB.userId } })).toEqual({
         listEnquiries: { totalCount: 0, edges: [] },
       });
+    });
+
+    it("listEnquiries should name the assignee from its own institute's profile only (ROV-360)", async () => {
+      // A's admin also has a profile in B under another name; only A's copy may be joined.
+      const outsider = await createTestTeacher(result.db, instB.tenantId);
+      const pointingId = await asAdmin(async (tx) => {
+        const profile = (tenantId: string, userId: string, first: string) => ({
+          tenantId,
+          userId,
+          firstName: { en: first, hi: `${first} (hi)` },
+          lastName: { en: 'Rao' },
+          gender: Gender.FEMALE,
+          ...BY,
+        });
+        await tx
+          .insert(tenantUserProfiles)
+          .values([
+            profile(instA.tenantId, instA.userId, 'Meena'),
+            profile(instB.tenantId, instA.userId, 'Wrong'),
+            profile(instB.tenantId, outsider.userId, 'Outsider'),
+          ]);
+        await tx.insert(staffProfiles).values({
+          tenantId: instA.tenantId,
+          userId: instA.userId,
+          membershipId: instA.membershipId,
+          employeeId: 'EMP-360',
+          designation: 'Admission officer',
+          dateOfJoining: '2025-06-01',
+          ...BY,
+        });
+        // The foreign key accepts any user; the assignee must still not be read from B.
+        const [row] = await tx
+          .insert(enquiries)
+          .values({
+            tenantId: instA.tenantId,
+            studentName: 'Ravi Shah',
+            classRequested: 'Class 2',
+            parentName: 'Sunil Shah',
+            parentPhone: '9012345679',
+            assignedTo: outsider.userId,
+            ...BY,
+          })
+          .returning({ id: enquiries.id });
+        return row.id;
+      });
+
+      type Rows = {
+        listEnquiries: { edges: { node: { id: string; assignedTo: string; assignee: unknown } }[] };
+      };
+      const own = await query<Rows>(LIST_ENQUIRY_ASSIGNEES, {
+        filter: { assignedTo: instA.userId },
+      });
+      expect(own?.listEnquiries.edges).toEqual([
+        {
+          node: {
+            id: a.enquiryId,
+            assignedTo: instA.userId,
+            assignee: {
+              userId: instA.userId,
+              firstName: { en: 'Meena', hi: 'Meena (hi)' },
+              lastName: { en: 'Rao' },
+              employeeId: 'EMP-360',
+            },
+          },
+        },
+      ]);
+
+      const pointing = await query<Rows>(LIST_ENQUIRY_ASSIGNEES, {
+        filter: { assignedTo: outsider.userId },
+      });
+      expect(pointing?.listEnquiries.edges).toEqual([
+        { node: { id: pointingId, assignedTo: outsider.userId, assignee: null } },
+      ]);
     });
   });
 

@@ -22,7 +22,7 @@ import { UpdatePlanInput } from '../dto/update-plan.input';
 import { AssignPlanResult } from '../models/assign-plan-result.model';
 import { BillingDashboardModel } from '../models/billing-dashboard.model';
 import { InvoiceModel } from '../models/invoice.model';
-import { PaymentModel } from '../models/payment.model';
+import { PaymentModel, UnverifiedPaymentModel } from '../models/payment.model';
 import { PaymentGatewayConfigModel } from '../models/payment-gateway-config.model';
 import { SubscriptionModel } from '../models/subscription.model';
 import { SubscriptionPlanModel } from '../models/subscription-plan.model';
@@ -364,7 +364,7 @@ export class ResellerBillingResolver {
     return this.paymentService.listInvoicePayments(rid(user), invoiceId);
   }
 
-  @Query(() => [PaymentModel], { name: 'unverifiedPayments' })
+  @Query(() => [UnverifiedPaymentModel], { name: 'unverifiedPayments' })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'read', subject: 'Payment' })
   async resellerUnverifiedPayments(

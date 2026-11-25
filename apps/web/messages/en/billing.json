@@ -465,6 +465,7 @@
     "accessDenied": "You do not have permission to verify payments.",
     "columns": {
       "invoiceId": "Invoice",
+      "institute": "Institute",
       "utr": "UTR Number",
       "amount": "Amount",
       "submittedAt": "Submitted",
@@ -487,7 +488,10 @@
       "cancel": "Cancel",
       "confirm": "Reject Payment",
       "rejecting": "Rejecting..."
-    }
+    },
+    "unknownInvoice": "Unknown invoice",
+    "unknownInstitute": "Unknown institute",
+    "invoiceIdName": "invoice ID"
   },
   "pagination": {
     "loadMore": "Load more",

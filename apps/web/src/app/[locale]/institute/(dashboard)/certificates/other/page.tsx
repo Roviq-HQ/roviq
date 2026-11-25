@@ -33,6 +33,7 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import type { ColumnDef } from '@tanstack/react-table';
 import { otherCertificateHelp } from '@web/help/certificates/other-certificate.help';
+import { usePersonName } from '@web/hooks/use-person-name';
 import { Award, CheckCircle2, Clock, Plus, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -150,6 +151,7 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
   const router = useRouter();
   const [issueCertificate] = useIssueCertificate();
   const { certificates, loading } = useCertificates({ type });
+  const personName = usePersonName();
 
   const handleIssue = React.useCallback(
     async (id: string) => {
@@ -175,21 +177,45 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
       {
         id: 'student',
         header: t('columns.student'),
-        cell: ({ row }) =>
-          row.original.studentProfileId ? (
-            <button
-              type="button"
-              className="text-sm text-primary hover:underline"
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/institute/people/students/${row.original.studentProfileId}`);
-              }}
+        cell: ({ row }) => {
+          const { id, studentProfileId, studentAdmissionNumber } = row.original;
+          if (!studentProfileId) return <span className="text-sm text-muted-foreground">—</span>;
+          const name = personName(row.original.studentFirstName, row.original.studentLastName);
+          if (!name) {
+            return (
+              <span
+                className="text-sm text-muted-foreground"
+                data-testid={instituteCertificatesOther.student(id)}
+              >
+                {t('columns.unknownStudent')}
+              </span>
+            );
+          }
+          return (
+            <div
+              className="flex flex-col items-start"
+              data-testid={instituteCertificatesOther.student(id)}
             >
-              {row.original.studentProfileId.slice(0, 8)}…
-            </button>
-          ) : (
-            <span className="text-sm text-muted-foreground">—</span>
-          ),
+              <Button
+                variant="link"
+                size="xs"
+                className="h-auto px-0 text-sm"
+                title={t('columns.openStudent')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/institute/people/students/${studentProfileId}`);
+                }}
+              >
+                {name}
+              </Button>
+              {studentAdmissionNumber && (
+                <span className="text-xs text-muted-foreground">
+                  {t('columns.admissionNumber', { number: studentAdmissionNumber })}
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'purpose',
@@ -245,7 +271,7 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
           ) : null,
       },
     ],
-    [t, router, handleIssue],
+    [t, router, handleIssue, personName],
   );
 
   return (

@@ -44,6 +44,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { RulePreviewSample } from '../rule-preview-sample';
 import {
   type GroupRule,
   type RulePreviewResult,
@@ -518,18 +519,12 @@ function RulesPanel({ groupId, version }: { groupId: string; version: number }) 
                   : ''}
               </DialogDescription>
             </DialogHeader>
-            {previewResult && previewResult.sampleMembershipIds.length > 0 ? (
+            {previewResult && previewResult.sampleMembers.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">
                   {t('detail.rules.previewDialog.sampleHeading')}
                 </p>
-                <ul className="max-h-64 space-y-1 overflow-y-auto rounded border bg-muted/30 p-3">
-                  {previewResult.sampleMembershipIds.slice(0, 10).map((mid) => (
-                    <li key={mid} className="font-mono text-xs">
-                      {mid}
-                    </li>
-                  ))}
-                </ul>
+                <RulePreviewSample members={previewResult.sampleMembers} />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">

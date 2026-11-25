@@ -82,7 +82,12 @@ const PREVIEW_GROUP_RULE_QUERY = gql`
   query PreviewGroupRule($rule: JSON!) {
     previewGroupRule(rule: $rule) {
       count
-      sampleMembershipIds
+      sampleMembers {
+        membershipId
+        firstName
+        lastName
+        admissionNumber
+      }
     }
   }
 `;

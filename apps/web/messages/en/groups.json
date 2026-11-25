@@ -157,7 +157,7 @@
       "previewDialog": {
         "title": "Rule preview",
         "countSummary": "{count, plural, one {# member matches} other {# members match}} this rule.",
-        "sampleHeading": "Sample membership IDs",
+        "sampleHeading": "Sample members",
         "noMatches": "No members match this rule."
       }
     }
@@ -202,7 +202,7 @@
       "previewing": "Previewing…",
       "previewCount": "{count, plural, one {# member matches} other {# members match}} this rule.",
       "previewEmpty": "No members match this rule.",
-      "previewSample": "Sample membership IDs",
+      "previewSample": "Sample members",
       "previewError": "Failed to preview rule",
       "previewDialogTitle": "Rule preview"
     },
@@ -219,5 +219,8 @@
     },
     "createSuccess": "Group created",
     "createError": "Failed to create group"
+  },
+  "previewSample": {
+    "admissionNumber": "Adm. no. {number}"
   }
 }

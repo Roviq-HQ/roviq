@@ -1,6 +1,6 @@
 'use client';
 
-import { useFormatDate, useI18nField } from '@roviq/i18n';
+import { useFormatDate } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -22,18 +22,20 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Skeleton,
   useAbility,
   useDebounce,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { usePersonName } from '@web/hooks/use-person-name';
 import { ArrowLeft, Check, ChevronsUpDown, ClipboardList, MailCheck, User } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
-import { useStudents } from '../../people/students/use-students';
+import { type StudentListNode, useStudents } from '../../people/students/use-students';
 import {
   type AttendanceStatus,
   type StudentHistoryItem,
@@ -191,23 +193,28 @@ function StudentPicker({
   onChange: (next: string | null) => void;
 }) {
   const t = useTranslations('attendance');
-  const resolveI18n = useI18nField();
+  const personName = usePersonName();
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebounce(search, 250);
 
   const { students } = useStudents({ first: 50, search: debouncedSearch || undefined });
+  // `value` is a membership id (attendance entries key on it), and the chosen
+  // student may be outside the search page, e.g. after a refresh.
+  const { students: selected, loading: selectedLoading } = useStudents(
+    { first: 1, membershipId: value ?? undefined },
+    { skip: !value },
+  );
 
-  const selectedLabel = React.useMemo(() => {
-    if (!value) return null;
-    // `value` is a membership id (matches attendance_entries.student_id),
-    // not the student profile id. Look up by membership.
-    const stu = students.find((s) => s.membershipId === value);
-    if (!stu) return value.slice(0, 8);
-    const first = resolveI18n(stu.firstName) ?? '';
-    const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
-    return `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`.trim();
-  }, [value, students, resolveI18n]);
+  const labelOf = (stu: Pick<StudentListNode, 'firstName' | 'lastName' | 'admissionNumber'>) =>
+    `${personName(stu.firstName, stu.lastName)} · ${stu.admissionNumber}`;
+
+  let selectedLabel: string | null = null;
+  if (value) {
+    const stu = selected[0];
+    if (stu) selectedLabel = labelOf(stu);
+    else if (!selectedLoading) selectedLabel = t('reports.unknownStudent');
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -219,7 +226,11 @@ function StudentPicker({
           className="w-full justify-between font-normal"
           data-testid={instituteAttendance.historyStudentPicker}
         >
-          <span className="truncate">{selectedLabel ?? t('history.pickStudent')}</span>
+          {value && selectedLoading && !selectedLabel ? (
+            <Skeleton className="h-4 w-40" />
+          ) : (
+            <span className="truncate">{selectedLabel ?? t('history.pickStudent')}</span>
+          )}
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -237,9 +248,7 @@ function StudentPicker({
               {students.map((stu) => {
                 const membershipId = stu.membershipId;
                 if (!membershipId) return null;
-                const first = resolveI18n(stu.firstName) ?? '';
-                const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
-                const label = `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`;
+                const label = labelOf(stu);
                 // The history query takes the membership id; pass it as the
                 // CommandItem value so onSelect ships the right id upstream.
                 return (

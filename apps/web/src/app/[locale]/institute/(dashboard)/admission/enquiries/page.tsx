@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
+import { usePersonName } from '@web/hooks/use-person-name';
 import { ArrowRightCircle, Inbox, LayoutGrid, List, Plus, Search, SearchX, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, parseAsStringEnum, useQueryStates } from 'nuqs';
@@ -58,6 +59,7 @@ const filterParsers = {
 export default function EnquiriesPage() {
   const t = useTranslations('admission');
   const { format, formatDistance } = useFormatDate();
+  const personName = usePersonName();
 
   const [filters, setFilters] = useQueryStates(filterParsers);
   const [searchInput, setSearchInput] = React.useState(filters.search ?? '');
@@ -203,18 +205,27 @@ export default function EnquiriesPage() {
       {
         accessorKey: 'assignedTo',
         header: t('enquiries.columns.assignedTo'),
-        cell: ({ row }) =>
-          row.original.assignedTo ? (
-            // Backend returns a UUID; we don't currently resolve it to a
-            // staff name in the list response. Surfacing the short form keeps
-            // it useful for assignment audit; full name resolution lives on
-            // the detail view (TODO once a staff lookup query exists).
-            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-              {row.original.assignedTo.slice(0, 8)}
-            </code>
-          ) : (
-            <span className="text-xs text-muted-foreground">{t('enquiries.unassigned')}</span>
-          ),
+        cell: ({ row }) => {
+          const { id, assignedTo, assignee } = row.original;
+          if (!assignedTo) {
+            return (
+              <span className="text-xs text-muted-foreground">{t('enquiries.unassigned')}</span>
+            );
+          }
+          const name = assignee ? personName(assignee.firstName, assignee.lastName) : '';
+          return (
+            <div className="flex flex-col" data-testid={instituteAdmissionEnquiries.assignee(id)}>
+              <span className={name ? 'text-sm' : 'text-sm text-muted-foreground'}>
+                {name || t('enquiries.unknownAssignee')}
+              </span>
+              {name && assignee?.employeeId && (
+                <span className="text-xs text-muted-foreground">
+                  {t('enquiries.employeeId', { id: assignee.employeeId })}
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'createdAt',
@@ -252,7 +263,7 @@ export default function EnquiriesPage() {
         ),
       },
     ],
-    [t, format, formatDistance],
+    [t, format, formatDistance, personName],
   );
 
   return (

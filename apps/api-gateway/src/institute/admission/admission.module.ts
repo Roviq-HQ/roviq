@@ -9,7 +9,9 @@ import { ApplicationDocumentRepository } from './application-document.repository
 import { ApplicationDocumentResolver } from './application-document.resolver';
 import { ApplicationDocumentService } from './application-document.service';
 import { ApplicationFieldResolver } from './application-field.resolver';
+import { AssigneeLoaders } from './assignee.loaders';
 import { EnquiryResolver } from './enquiry.resolver';
+import { EnquiryFieldResolver } from './enquiry-field.resolver';
 import { AdmissionRepositoryModule } from './repositories/admission-repository.module';
 import { StandardNameLoaders } from './standard-name.loaders';
 import { StudentAdmissionWorkerService } from './workflows/student-admission.worker';
@@ -21,6 +23,8 @@ import { StudentAdmissionWorkerService } from './workflows/student-admission.wor
     AdmissionQueryService,
     AdmissionReadRepository,
     EnquiryResolver,
+    EnquiryFieldResolver,
+    AssigneeLoaders,
     ApplicationResolver,
     ApplicationFieldResolver,
     StandardNameLoaders,

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  institutes,
   institutesLive,
   mkResellerCtx,
   withReseller,
@@ -246,16 +247,28 @@ export class PaymentRepository {
 
       const where = and(...conditions);
 
-      const [items, [{ total }]] = await Promise.all([
+      const [rows, [{ total }]] = await Promise.all([
         tx
-          .select()
+          .select({
+            payment: payments,
+            invoiceNumber: invoices.invoiceNumber,
+            instituteName: institutes.name,
+          })
           .from(payments)
+          // Left joins under the reseller's RLS: an invoice or institute it cannot read stays null.
+          .leftJoin(invoices, eq(invoices.id, payments.invoiceId))
+          .leftJoin(institutes, eq(institutes.id, payments.tenantId)) // allow-base-read: a payment keeps its institute's name after the institute is deleted
           .where(where)
           .orderBy(desc(payments.createdAt), desc(payments.id))
           .limit(params.first),
         tx.select({ total: count() }).from(payments).where(where),
       ]);
 
+      const items = rows.map(({ payment, invoiceNumber, instituteName }) => ({
+        ...payment,
+        invoiceNumber,
+        instituteName,
+      }));
       return { items, totalCount: total };
     });
   }

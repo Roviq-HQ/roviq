@@ -121,7 +121,8 @@
     "viewDesigner": "डिज़ाइनर",
     "editDatesheet": "डेटशीट संपादित करें",
     "backToList": "सूची पर वापस जाएं",
-    "done": "पूर्ण"
+    "done": "पूर्ण",
+    "unknownSubject": "अज्ञात विषय"
   },
   "designer": {
     "title": "डेटशीट डिज़ाइनर",

@@ -49,6 +49,8 @@ All three modules use `@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuar
 | `leave` | `leaves`, `leave` | `applyLeave`, `updateLeave`, `approveLeave`, `rejectLeave`, `cancelLeave`, `deleteLeave` |
 | `holiday` | `holidays`, `holiday`, `holidaysOnDate` | `createHoliday`, `updateHoliday`, `deleteHoliday` |
 
+`attendanceAbsenteesReport` and `attendanceSectionDailyBreakdown` return the names the reports show: each student's name and admission number, and the lecturer's name, joined from the institute's own profile copies. A name the institute can no longer read comes back null, and the screen shows "Unknown student".
+
 Platform admin also exposes one cross-tenant query (see [Admin cross-tenant view](#admin-cross-tenant-view)).
 
 ### Events

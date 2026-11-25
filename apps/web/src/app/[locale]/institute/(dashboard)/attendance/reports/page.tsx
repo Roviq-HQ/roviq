@@ -30,6 +30,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { usePersonName } from '@web/hooks/use-person-name';
 import { buildCsv, downloadCsv } from '@web/lib/csv';
 import { ArrowLeft, BarChart3, CalendarDays, Download, History, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -38,13 +39,11 @@ import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { useAcademicYears } from '../../academic-years/use-academic-years';
-import { useStudents } from '../../people/students/use-students';
 import {
   type AbsenteeReportItem,
   type SectionDailyBreakdown,
   useAbsenteesReport,
   useSectionDailyBreakdown,
-  useStudentsInSection,
 } from '../use-attendance';
 import { type AttendanceScopeSelection, useAttendanceScope } from '../use-attendance-scope';
 
@@ -150,6 +149,7 @@ interface AbsenteeRow extends AbsenteeReportItem {
 function AbsenteesByStudentTab() {
   const t = useTranslations('attendance');
   const resolveI18n = useI18nField();
+  const personName = usePersonName();
   const params = useParams();
   const locale = params.locale as string;
 
@@ -185,33 +185,19 @@ function AbsenteesByStudentTab() {
     endDate,
     skip: !scope.ready || scope.noAssignments,
   });
-  const { students } = useStudentsInSection(scope.sectionId, activeYearId);
-
-  // Build a membershipId → student map so the table can render names
-  // without an extra round-trip. Only students in the selected section
-  // are available; rows without a match fall back to a masked id.
-  const studentById = React.useMemo(() => {
-    const map = new Map<string, (typeof students)[number]>();
-    for (const s of students) map.set(s.membershipId, s);
-    return map;
-  }, [students]);
-
   const tableRows: AbsenteeRow[] = React.useMemo(() => {
     return rows.map((r) => {
-      const stu = studentById.get(r.studentId);
-      const first = stu ? resolveI18n(stu.firstName) : '';
-      const last = stu?.lastName ? resolveI18n(stu.lastName) : '';
-      const studentName = [first, last].filter(Boolean).join(' ').trim();
       const absentPct =
         r.totalSessions > 0 ? Math.round((r.absentCount / r.totalSessions) * 100) : 0;
       return {
         ...r,
-        studentName: studentName || t('reports.unknownStudent'),
-        admissionNumber: stu?.admissionNumber ?? '—',
+        studentName:
+          personName(r.studentFirstName, r.studentLastName) || t('reports.unknownStudent'),
+        admissionNumber: r.admissionNumber ?? '—',
         absentPct,
       };
     });
-  }, [rows, studentById, resolveI18n, t]);
+  }, [rows, personName, t]);
 
   const columnHelper = createColumnHelper<AbsenteeRow>();
 
@@ -425,14 +411,6 @@ function AbsenteesByStudentTab() {
               </Select>
             </div>
           </div>
-          {!scope.sectionId && !scope.noAssignments ? (
-            <p
-              className="text-xs text-muted-foreground mt-3"
-              data-testid={instituteAttendance.absenteesSectionHint}
-            >
-              {t('reports.pickSectionHint')}
-            </p>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -551,11 +529,19 @@ function AbsentDatesCell({ dates }: { dates: string[] }) {
 
 interface DailyBreakdownRow extends SectionDailyBreakdown {
   sectionLabel: string;
+  lecturerName: string;
 }
+
+type BreakdownAbsentee = SectionDailyBreakdown['absentees'][number];
 
 function DailyBreakdownTab() {
   const t = useTranslations('attendance');
   const resolveI18n = useI18nField();
+  const personName = usePersonName();
+  const absenteeLabel = (a: BreakdownAbsentee) => {
+    const name = personName(a.firstName, a.lastName) || t('reports.unknownStudent');
+    return a.admissionNumber ? `${name} (${a.admissionNumber})` : name;
+  };
 
   const [date, setDate] = useQueryState('date', parseAsString.withDefault(todayIso()));
   const [standardId, setStandardId] = useQueryState('breakdownStandard', parseAsString);
@@ -580,22 +566,6 @@ function DailyBreakdownTab() {
     skip: !scope.ready || scope.noAssignments,
   });
 
-  // Resolve absentee membership ids → readable names. The query returns
-  // membership ids; we fetch the first 200 students of the institute and
-  // build a lookup. Unknown ids fall back to a masked chip.
-  const { students } = useStudents({ first: 200 });
-  const nameByMembership = React.useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of students) {
-      if (!s.membershipId) continue;
-      const first = resolveI18n(s.firstName) ?? '';
-      const last = s.lastName ? (resolveI18n(s.lastName) ?? '') : '';
-      const fullName = [first, last].filter(Boolean).join(' ');
-      map.set(s.membershipId, fullName || s.admissionNumber || s.id);
-    }
-    return map;
-  }, [students, resolveI18n]);
-
   const sectionById = React.useMemo(
     () => new Map(scope.sections.map((s) => [s.id, s])),
     [scope.sections],
@@ -603,18 +573,21 @@ function DailyBreakdownTab() {
 
   const filteredRows: DailyBreakdownRow[] = React.useMemo(() => {
     return rows.map((r) => {
-      // Prefer the backend-provided section name (always populated via the
-      // server-side JOIN); fall back to the standard-scoped display label
-      // when present, then to a masked id as a last resort.
       const sec = sectionById.get(r.sectionId);
+      // resolveI18n answers '' for a missing name, so the chain needs `||`.
       const label =
-        resolveI18n(r.sectionName) ??
-        sec?.displayLabel ??
-        (sec ? resolveI18n(sec.name) : null) ??
-        t('reports.unknownSection', { id: r.sectionId.slice(0, 8) });
-      return { ...r, sectionLabel: label };
+        resolveI18n(r.sectionName) ||
+        sec?.displayLabel ||
+        (sec ? resolveI18n(sec.name) : '') ||
+        t('reports.unknownSection');
+      return {
+        ...r,
+        sectionLabel: label,
+        lecturerName:
+          personName(r.lecturerFirstName, r.lecturerLastName) || t('reports.unknownLecturer'),
+      };
     });
-  }, [rows, sectionById, resolveI18n, t]);
+  }, [rows, sectionById, resolveI18n, personName, t]);
 
   function handleExport() {
     const headers = [
@@ -630,12 +603,12 @@ function DailyBreakdownTab() {
     const body: (string | number)[][] = filteredRows.map((r) => [
       r.sectionLabel,
       r.period === null ? t('dailyMode') : `${t('period')} ${r.period}`,
-      r.lecturerId,
+      r.lecturerName,
       r.presentCount,
       r.absentCount,
       r.leaveCount,
       r.lateCount,
-      r.absenteeIds.join(';'),
+      r.absentees.map(absenteeLabel).join(';'),
     ]);
     downloadCsv(`attendance-daily-${date}.csv`, buildCsv(headers, body));
   }
@@ -771,7 +744,7 @@ function DailyBreakdownTab() {
                     <td className="px-4 py-2 tabular-nums text-amber-700">{r.leaveCount}</td>
                     <td className="px-4 py-2 tabular-nums text-sky-700">{r.lateCount}</td>
                     <td className="px-4 py-2">
-                      <AbsenteeChips ids={r.absenteeIds} nameByMembership={nameByMembership} />
+                      <AbsenteeChips absentees={r.absentees} label={absenteeLabel} />
                     </td>
                   </tr>
                 ))}
@@ -785,30 +758,28 @@ function DailyBreakdownTab() {
 }
 
 function AbsenteeChips({
-  ids,
-  nameByMembership,
+  absentees,
+  label,
 }: {
-  ids: string[];
-  nameByMembership: Map<string, string>;
+  absentees: BreakdownAbsentee[];
+  label: (absentee: BreakdownAbsentee) => string;
 }) {
   const t = useTranslations('attendance');
-  if (ids.length === 0) {
+  if (absentees.length === 0) {
     return <span className="text-xs text-muted-foreground">{t('reports.noAbsenteesRow')}</span>;
   }
-  const label = (id: string) => nameByMembership.get(id) ?? id.slice(0, 8);
-  const visible = ids.slice(0, 3);
-  const hidden = ids.slice(3);
+  const visible = absentees.slice(0, 3);
+  const hidden = absentees.slice(3);
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {visible.map((id) => (
+      {visible.map((a) => (
         <Badge
-          key={id}
+          key={a.studentId}
           variant="outline"
           className="bg-rose-50 text-rose-700 border-rose-200 text-[11px] font-normal"
-          data-testid={`breakdown-absentee-${id}`}
-          title={id}
+          data-testid={`breakdown-absentee-${a.studentId}`}
         >
-          {label(id)}
+          {label(a)}
         </Badge>
       ))}
       {hidden.length > 0 ? (
@@ -825,14 +796,13 @@ function AbsenteeChips({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="end">
             <div className="flex flex-wrap gap-1">
-              {hidden.map((id) => (
+              {hidden.map((a) => (
                 <Badge
-                  key={id}
+                  key={a.studentId}
                   variant="outline"
                   className="bg-rose-50 text-rose-700 border-rose-200 text-[11px] font-normal"
-                  title={id}
                 >
-                  {label(id)}
+                  {label(a)}
                 </Badge>
               ))}
             </div>

@@ -35,6 +35,15 @@ export class StudentFilterInput {
   @IsUUID()
   notPlacedInYearId?: string;
 
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'Only the student with this membership id (attendance records name students by it)',
+  })
+  @IsOptional()
+  @IsUUID()
+  membershipId?: string;
+
   @Field(() => ID, { nullable: true })
   @IsOptional()
   @IsUUID()

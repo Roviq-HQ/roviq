@@ -1,7 +1,8 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
+import type { I18nContent } from '@roviq/database';
 import { PaymentMethod, PaymentStatus } from '@roviq/ee-billing-types';
 import type { payments } from '@roviq/ee-database';
-import { DateTimeScalar } from '@roviq/nestjs-graphql';
+import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import { GraphQLBigInt } from 'graphql-scalars';
 
 type PaymentRow = typeof payments.$inferSelect;
@@ -102,4 +103,19 @@ export class PaymentModel {
 
   @Field(() => DateTimeScalar)
   createdAt!: Date;
+}
+
+@ObjectType({ description: 'A UPI payment waiting for the reseller to check its UTR' })
+export class UnverifiedPaymentModel extends PaymentModel {
+  @Field(() => String, {
+    nullable: true,
+    description: "Number of the invoice the payment is for; null when the invoice can't be read",
+  })
+  invoiceNumber!: string | null;
+
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: "Name (i18n) of the paying institute; null when the institute can't be read",
+  })
+  instituteName!: I18nContent | null;
 }

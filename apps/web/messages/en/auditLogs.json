@@ -172,5 +172,6 @@
   "actorScope": {
     "platform": "Roviq platform",
     "reseller": "Reseller"
-  }
+  },
+  "unknownUser": "Unknown user"
 }
