@@ -123,6 +123,8 @@ function FieldInfoPopover({
         side={side}
         align={align}
         sideOffset={2}
+        // The 16px page gutter on phones: Radix otherwise lets the panel touch the screen edge.
+        collisionPadding={16}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onMouseEnter={cancelTimer}
         onMouseLeave={scheduleClose}
