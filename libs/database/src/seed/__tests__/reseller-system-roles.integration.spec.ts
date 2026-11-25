@@ -1,6 +1,8 @@
 import assert from 'node:assert';
 import { and, eq } from 'drizzle-orm';
+import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
+import { TEST_SUPERUSER_URL } from '../../__tests__/test-helpers';
 import { SYSTEM_USER_ID } from '../../constants';
 import type { DrizzleDB } from '../../providers';
 import {
@@ -135,5 +137,56 @@ describe('seedSystemRoles', () => {
         ['reseller_viewer', RESELLER_SYSTEM_ROLE_ABILITIES.reseller_viewer],
       ]);
     });
+  });
+
+  it('should skip a reseller another transaction is deleting, not fail on it', async () => {
+    const resellerId = await createReseller(db, `rov-284-lock-${Date.now()}`);
+    const other = new pg.Client({ connectionString: TEST_SUPERUSER_URL });
+    await other.connect();
+    try {
+      // Another spec's cleanup has deleted the reseller but not committed yet.
+      await other.query('BEGIN');
+      await other.query('DELETE FROM resellers WHERE id = $1', [resellerId]);
+
+      const seeded = inRolledBackTx(async (tx) => {
+        await seedSystemRoles(tx);
+        expect(await resellerRoles(tx, resellerId)).toEqual([]);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await other.query('COMMIT');
+
+      await expect(seeded).resolves.toBeUndefined();
+    } finally {
+      await other.query('ROLLBACK').catch(() => undefined);
+      await other.query('DELETE FROM resellers WHERE id = $1', [resellerId]);
+      await other.end();
+    }
+  });
+
+  it('should give no roles to a reseller a cleanup has locked, so its delete commits', async () => {
+    const resellerId = await createReseller(db, `rov-284-cleanup-${Date.now()}`);
+    const other = new pg.Client({ connectionString: TEST_SUPERUSER_URL });
+    await other.connect();
+    try {
+      // The order of cleanupTestReseller: lock the row, delete its roles, delete it.
+      await other.query('BEGIN');
+      await other.query('SELECT id FROM resellers WHERE id = $1 FOR UPDATE', [resellerId]);
+      await other.query(`DELETE FROM roles WHERE reseller_id = $1 AND scope = 'reseller'`, [
+        resellerId,
+      ]);
+
+      const seeded = db.transaction((tx) => seedSystemRoles(tx));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await other.query('DELETE FROM resellers WHERE id = $1', [resellerId]);
+      await other.query('COMMIT');
+
+      await expect(seeded).resolves.toBeUndefined();
+      expect(await resellerRoles(db, resellerId)).toEqual([]);
+    } finally {
+      await other.query('ROLLBACK').catch(() => undefined);
+      await other.query('DELETE FROM roles WHERE reseller_id = $1', [resellerId]);
+      await other.query('DELETE FROM resellers WHERE id = $1', [resellerId]);
+      await other.end();
+    }
   });
 });

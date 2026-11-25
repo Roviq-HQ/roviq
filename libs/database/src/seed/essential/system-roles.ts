@@ -86,7 +86,8 @@ export async function seedSystemRoles(tx: DrizzleDB): Promise<void> {
     });
 
   // Every reseller owns a copy of the system roles; a changed ability list reaches them all.
-  const live = await tx.select({ id: resellersLive.id }).from(resellersLive);
+  // The lock keeps a reseller from being deleted between this read and its roles' insert.
+  const live = await tx.select({ id: resellersLive.id }).from(resellersLive).for('key share');
   for (const reseller of live) {
     await provisionResellerSystemRoles(tx, reseller.id, SYSTEM_USER_ID);
   }
