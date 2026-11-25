@@ -121,6 +121,9 @@ export default function CreateStaffPage() {
           toast.error(t('new.errors.employeeIdDuplicate'));
           return;
         }
+        if (extractGraphQLErrorCode(err) === 'EMAIL_TAKEN') {
+          setServerFieldError(form, 'email', errorCopy(err));
+        }
         toast.error(errorCopy(err, t('new.errors.generic')));
       }
     },

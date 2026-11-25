@@ -2,6 +2,7 @@
  * ROV-349: a typed employee ID is saved and unique among an institute's current staff; a blank
  * one takes the next free value of the series; social category is saved.
  */
+import { randomUUID } from 'node:crypto';
 import { DefaultRoles, ErrorCode } from '@roviq/common-types';
 import {
   type DrizzleDB,
@@ -142,6 +143,18 @@ describe('staff employee ID and social category (ROV-349)', () => {
     const res = await create(b, { employeeId: 'T-101' });
     expect(res.errors).toBeUndefined();
     expect(res.data?.createStaffMember.employeeId).toBe('T-101');
+  });
+
+  it('refuses an email that is already an account email, and creates no account (ROV-358)', async () => {
+    const email = `teacher_${randomUUID().slice(0, 8)}@test.local`;
+    const first = await create(b, { email, employeeId: 'MAIL-1' });
+    expect(first.errors).toBeUndefined();
+    const before = await membershipCount(b.tenantId);
+
+    const res = await create(b, { email, employeeId: 'MAIL-2' });
+
+    expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.EMAIL_TAKEN);
+    expect(await membershipCount(b.tenantId)).toBe(before);
   });
 
   it('generates the next free number when the ID is left blank, skipping a typed one', async () => {

@@ -79,5 +79,6 @@
   "GROUP_NAME_DUPLICATE": "This institute already has a group with this name. Type a different name, or open the existing group.",
   "INSTITUTE_GROUP_CODE_DUPLICATE": "Another institute group already uses this code. Type a different code.",
   "INSTITUTE_GROUP_MEMBER_DUPLICATE": "This person is already a member of the institute group. Refresh the member list.",
-  "ATTENDANCE_SLOT_TAKEN": "Attendance for this section, date and period was just started by someone else. Refresh to open it."
+  "ATTENDANCE_SLOT_TAKEN": "Attendance for this section, date and period was just started by someone else. Refresh to open it.",
+  "EMAIL_TAKEN": "This email address already belongs to a Roviq account. Use a different email address, or leave it empty."
 }

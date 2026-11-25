@@ -293,6 +293,8 @@ export const ErrorCode = {
   STAFF_NOT_FOUND: 'STAFF_NOT_FOUND',
   /** Another current staff member of the institute already has this employee ID */
   EMPLOYEE_ID_DUPLICATE: 'EMPLOYEE_ID_DUPLICATE',
+  /** The email is already the email of a Roviq account, a deleted one included */
+  EMAIL_TAKEN: 'EMAIL_TAKEN',
   /** Staff qualification not found */
   STAFF_QUALIFICATION_NOT_FOUND: 'STAFF_QUALIFICATION_NOT_FOUND',
   /** Standard not found */
@@ -605,6 +607,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SECTION_NOT_FOUND: HttpStatus.NOT_FOUND,
   STAFF_NOT_FOUND: HttpStatus.NOT_FOUND,
   EMPLOYEE_ID_DUPLICATE: HttpStatus.CONFLICT,
+  EMAIL_TAKEN: HttpStatus.CONFLICT,
   STAFF_QUALIFICATION_NOT_FOUND: HttpStatus.NOT_FOUND,
   STANDARD_NOT_FOUND: HttpStatus.NOT_FOUND,
   STUDENT_ACADEMIC_NOT_FOUND: HttpStatus.NOT_FOUND,

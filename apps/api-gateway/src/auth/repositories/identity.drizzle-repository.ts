@@ -47,6 +47,13 @@ const RESELLER_MEMBER_TAKEN: UniqueViolationErrors = {
     ),
 };
 
+// Only the email can be taken here: usernames are generated, or checked first where the email
+// is the username.
+const EMAIL_TAKEN: UniqueViolationErrors = {
+  users_email_key: () =>
+    new BusinessException(ErrorCode.EMAIL_TAKEN, 'This email is already used by an account'),
+};
+
 @Injectable()
 export class IdentityDrizzleRepository extends IdentityRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -244,7 +251,7 @@ export class IdentityDrizzleRepository extends IdentityRepository {
           mustChangePassword: true,
         })
         .returning({ id: users.id });
-    });
+    }).catch(mapUniqueViolation(EMAIL_TAKEN));
     return row.id;
   }
 

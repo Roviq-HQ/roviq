@@ -77,6 +77,20 @@ describe('guardian writes that repeat a unique value (ROV-358)', () => {
     return row.n;
   };
 
+  const membershipCount = async () => {
+    const [row] = await asAdmin((tx) =>
+      tx.select({ n: count() }).from(memberships).where(eq(memberships.tenantId, inst.tenantId)),
+    );
+    return row.n;
+  };
+
+  const usersWithEmail = async (email: string) => {
+    const [row] = await asAdmin((tx) =>
+      tx.select({ n: count() }).from(users).where(eq(users.email, email)),
+    );
+    return row.n;
+  };
+
   beforeAll(async () => {
     result = await createIntegrationApp({ modules: [AppModule] });
     inst = await createTestInstitute(result.db);
@@ -154,5 +168,18 @@ describe('guardian writes that repeat a unique value (ROV-358)', () => {
 
     expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.GUARDIAN_ALREADY_LINKED);
     expect(await linkCount()).toBe(1);
+  });
+
+  it('refuses an email that is already an account email, and creates no account', async () => {
+    const email = `parent_${randomUUID().slice(0, 8)}@test.local`;
+    const first = await createGuardian({ email });
+    expect(first.errors).toBeUndefined();
+    const before = await membershipCount();
+
+    const res = await createGuardian({ email, firstName: { en: 'Anita' } });
+
+    expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.EMAIL_TAKEN);
+    expect(await membershipCount()).toBe(before);
+    expect(await usersWithEmail(email)).toBe(1);
   });
 });
