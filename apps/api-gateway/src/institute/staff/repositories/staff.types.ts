@@ -43,30 +43,28 @@ export interface StaffListQuery {
   limit: number;
 }
 
-export interface CreateStaffMembershipData {
+export interface CreateStaffData {
   tenantId: string;
+  /** A new account, made just before; it has no membership yet. */
   userId: string;
   roleId: string;
   actorId: string;
-  profile: TenantUserProfileFields;
+  /** Null takes the next free value of the institute's series. */
+  employeeId: string | null;
+  /** The institute's own record of the person (name and demographics). */
+  tenantProfile: TenantUserProfileFields;
+  staff: {
+    designation: string | null;
+    department: string | null;
+    dateOfJoining: string;
+    employmentType: EmploymentType;
+    specialization: string | null;
+    socialCategory: SocialCategory | null;
+  };
 }
 
-export interface CreateStaffProfileData {
-  tenantId: string;
-  userId: string;
-  membershipId: string;
-  employeeId: string;
-  designation: string | null;
-  department: string | null;
-  dateOfJoining: string;
-  employmentType: EmploymentType;
-  specialization: string | null;
-  socialCategory: SocialCategory | null;
-  actorId: string;
-}
-
-/** `employee_id_taken`: another current staff member of the institute has the ID. */
-export type CreateStaffProfileResult =
+/** `employee_id_taken`: another current staff member of the institute has the typed ID. */
+export type CreateStaffResult =
   | { kind: 'ok'; row: StaffProfileRow }
   | { kind: 'employee_id_taken' };
 

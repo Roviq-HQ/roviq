@@ -154,13 +154,8 @@ export interface NewUserRecord {
   username: string;
   /** Already hashed by the service. */
   passwordHash: string;
-  actorId: string;
-}
-
-export interface NewUserPhone {
-  userId: string;
-  countryCode: string;
-  number: string;
+  /** Stored as the account's primary phone, unverified. */
+  phone: { countryCode: string; number: string } | null;
   actorId: string;
 }
 

@@ -24,9 +24,8 @@ import { withSignInStates } from '../../sign-in-details/sign-in-status';
 import { readSignInTarget } from '../../sign-in-details/sign-in-target';
 import { StaffRepository } from './staff.repository';
 import type {
-  CreateStaffMembershipData,
-  CreateStaffProfileData,
-  CreateStaffProfileResult,
+  CreateStaffData,
+  CreateStaffResult,
   DeletedStaffRecord,
   RestoreStaffResult,
   StaffListQuery,
@@ -142,59 +141,53 @@ export class StaffDrizzleRepository extends StaffRepository {
     return staffRole[0]?.id ?? null;
   }
 
-  async createMembership(data: CreateStaffMembershipData): Promise<{ id: string }> {
+  async create(data: CreateStaffData): Promise<CreateStaffResult> {
     const { tenantId, actorId } = data;
-    const inserted = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .insert(memberships)
-        .values({
-          userId: data.userId,
+    try {
+      return await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+        const [membership] = await tx
+          .insert(memberships)
+          .values({
+            userId: data.userId,
+            tenantId,
+            roleId: data.roleId,
+            status: 'ACTIVE',
+            abilities: [],
+            createdBy: actorId,
+            updatedBy: actorId,
+          })
+          .returning({ id: memberships.id });
+        await ensureTenantUserProfile(tx, {
           tenantId,
-          roleId: data.roleId,
-          status: 'ACTIVE',
-          abilities: [],
+          userId: data.userId,
+          actorId,
+          ...data.tenantProfile,
+        });
+
+        const values = {
+          ...data.staff,
+          userId: data.userId,
+          membershipId: membership.id,
+          tenantId,
           createdBy: actorId,
           updatedBy: actorId,
-        })
-        .returning({ id: memberships.id });
-      await ensureTenantUserProfile(tx, {
-        tenantId,
-        userId: data.userId,
-        actorId,
-        ...data.profile,
+        };
+        if (data.employeeId !== null) {
+          // A unique violation here rolls back the membership and profile copy with it.
+          const [row] = await tx
+            .insert(staffProfiles)
+            .values({ ...values, employeeId: data.employeeId })
+            .returning();
+          return { kind: 'ok' as const, row };
+        }
+        return { kind: 'ok' as const, row: await insertWithSeriesId(tx, tenantId, values) };
       });
-      return rows;
-    });
-    return inserted[0];
-  }
-
-  async nextEmployeeId(tenantId: string): Promise<string> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      await tx
-        .insert(tenantSequences)
-        .values({
-          tenantId,
-          sequenceName: 'employee_id',
-          currentValue: 0n,
-          formatTemplate: 'EMP-{value:04d}',
-        })
-        .onConflictDoNothing();
-
-      for (let attempt = 0; attempt < MAX_SEQUENCE_SKIPS; attempt++) {
-        const result = await tx.execute(
-          sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'employee_id')`,
-        );
-        const row = result.rows[0] as { next_val: string; formatted: string };
-        const candidate = row.formatted || `EMP-${row.next_val}`;
-        const [taken] = await tx
-          .select({ id: staffProfilesLive.id })
-          .from(staffProfilesLive)
-          .where(eq(staffProfilesLive.employeeId, candidate))
-          .limit(1);
-        if (!taken) return candidate;
+    } catch (err) {
+      if (uniqueViolationConstraint(err) === EMPLOYEE_ID_UNIQUE) {
+        return { kind: 'employee_id_taken' };
       }
-      throw new Error(`employee_id series of ${tenantId} has no free value`);
-    });
+      throw err;
+    }
   }
 
   async isEmployeeIdTaken(tenantId: string, employeeId: string): Promise<boolean> {
@@ -206,36 +199,6 @@ export class StaffDrizzleRepository extends StaffRepository {
         .limit(1);
       return Boolean(row);
     });
-  }
-
-  async createProfile(data: CreateStaffProfileData): Promise<CreateStaffProfileResult> {
-    try {
-      return await withTenant(this.db, mkInstituteCtx(data.tenantId, ORIGIN), async (tx) => {
-        const rows = await tx
-          .insert(staffProfiles)
-          .values({
-            userId: data.userId,
-            membershipId: data.membershipId,
-            tenantId: data.tenantId,
-            employeeId: data.employeeId,
-            designation: data.designation,
-            department: data.department,
-            dateOfJoining: data.dateOfJoining,
-            employmentType: data.employmentType,
-            specialization: data.specialization,
-            socialCategory: data.socialCategory,
-            createdBy: data.actorId,
-            updatedBy: data.actorId,
-          })
-          .returning();
-        return { kind: 'ok' as const, row: rows[0] };
-      });
-    } catch (err) {
-      if (uniqueViolationConstraint(err) === EMPLOYEE_ID_UNIQUE) {
-        return { kind: 'employee_id_taken' };
-      }
-      throw err;
-    }
   }
 
   async findSignInTarget(tenantId: string, id: string): Promise<SignInTarget | null> {
@@ -374,4 +337,42 @@ export class StaffDrizzleRepository extends StaffRepository {
       };
     });
   }
+}
+
+/**
+ * Inserts the profile with the next value of the institute's employee_id series (created on
+ * first use). A value a current staff member already holds, typed or committed by a create
+ * racing this one, is skipped: the insert waits for that create and then does nothing.
+ */
+async function insertWithSeriesId(
+  tx: DrizzleDB,
+  tenantId: string,
+  values: Omit<typeof staffProfiles.$inferInsert, 'employeeId'>,
+): Promise<StaffProfileRow> {
+  await tx
+    .insert(tenantSequences)
+    .values({
+      tenantId,
+      sequenceName: 'employee_id',
+      currentValue: 0n,
+      formatTemplate: 'EMP-{value:04d}',
+    })
+    .onConflictDoNothing();
+
+  for (let attempt = 0; attempt < MAX_SEQUENCE_SKIPS; attempt++) {
+    const result = await tx.execute(
+      sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'employee_id')`,
+    );
+    const next = result.rows[0] as { next_val: string; formatted: string };
+    const [row] = await tx
+      .insert(staffProfiles)
+      .values({ ...values, employeeId: next.formatted || `EMP-${next.next_val}` })
+      .onConflictDoNothing({
+        target: [staffProfiles.tenantId, staffProfiles.employeeId],
+        where: sql`${staffProfiles.deletedAt} IS NULL`,
+      })
+      .returning();
+    if (row) return row;
+  }
+  throw new Error(`employee_id series of ${tenantId} has no free value`);
 }

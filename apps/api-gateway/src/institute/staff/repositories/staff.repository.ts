@@ -1,8 +1,7 @@
 import type { SignInTarget } from '../../sign-in-details/sign-in-details.service';
 import type {
-  CreateStaffMembershipData,
-  CreateStaffProfileData,
-  CreateStaffProfileResult,
+  CreateStaffData,
+  CreateStaffResult,
   DeletedStaffRecord,
   RestoreStaffResult,
   StaffListQuery,
@@ -18,16 +17,14 @@ export abstract class StaffRepository {
   abstract list(tenantId: string, query: StaffListQuery): Promise<StaffWithSignIn[]>;
   /** The institute's Teacher role, matched on its English name. */
   abstract findTeacherRoleId(tenantId: string): Promise<string | null>;
-  /** Membership plus the institute's copy of the person's details, in one transaction. */
-  abstract createMembership(data: CreateStaffMembershipData): Promise<{ id: string }>;
   /**
-   * Next value of the institute's employee_id sequence (created on first use) that no current
-   * staff member holds: a typed ID may already have taken a value of the series.
+   * Membership, the institute's copy of the person's details and the staff profile, in one
+   * transaction: nothing is written unless all of it is. A null employee ID takes the next free
+   * value of the series; `employee_id_taken` only for a typed ID.
    */
-  abstract nextEmployeeId(tenantId: string): Promise<string>;
+  abstract create(data: CreateStaffData): Promise<CreateStaffResult>;
   /** Whether a current staff member of the institute holds this employee ID. */
   abstract isEmployeeIdTaken(tenantId: string, employeeId: string): Promise<boolean>;
-  abstract createProfile(data: CreateStaffProfileData): Promise<CreateStaffProfileResult>;
   /** Null when the staff profile is not in this institute. */
   abstract findSignInTarget(tenantId: string, id: string): Promise<SignInTarget | null>;
   /** Existence check, versioned update and institute profile change, in one transaction. */

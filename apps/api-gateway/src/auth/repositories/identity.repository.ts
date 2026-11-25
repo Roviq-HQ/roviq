@@ -2,7 +2,6 @@ import type {
   NewInstituteMembership,
   NewPlatformMembership,
   NewResellerMembership,
-  NewUserPhone,
   NewUserProfile,
   NewUserRecord,
   UserContactRow,
@@ -42,10 +41,8 @@ export abstract class IdentityRepository {
     tenantId: string,
     roleId: string,
   ): Promise<string | null>;
-  /** Returns the new user id. */
+  /** The account and its primary phone, in one transaction. Returns the user id. */
   abstract insertUser(user: NewUserRecord): Promise<string>;
-  /** Ignored when the number already exists for the user. */
-  abstract insertPrimaryPhone(phone: NewUserPhone): Promise<void>;
   /**
    * In one institute transaction: the membership, then the institute's own copy of the
    * account name when the account has a profile. Returns the membership id.
