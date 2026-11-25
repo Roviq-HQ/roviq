@@ -990,3 +990,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the machine-wide queue lock is a `flock` on a file descriptor, and every process the gate starts inherits the descriptor. The lock is released only when the last holder exits. The wait had no time limit and never looked at whether the gate named in the holder file was alive.
 - **Fix:** a waiting gate checks every 20 seconds whether the holder's process exists. When it is gone on two checks in a row, the waiter prints the processes that hold the lock, replaces the lock file and continues; a gate that gets a lock checks it is still the current file. `pnpm ci:queue` reports this state as `stale`.
 - **Lesson:** a lock that children inherit needs a liveness check on its owner.
+
+## 2026-11-25 — diagnosed and fixed: gates timed out with one gate running; the dev servers had filled memory
+
+- **Symptom:** after the gate queue, single gates still failed on tests hitting their time limits (a 30 s unit test, 5 s Playwright URL waits); the same specs passed alone.
+- **Cause:** the development machine was out of memory and swapping. Every checkout's dev web server (`next dev`) held several GB: Turbopack's dev disk cache is loaded whole at start, so a restart freed nothing. The type-check watchers add a fixed amount per checkout.
+- **Fix:** Turbopack's disk cache is off in dev (`apps/web/next.config.js`), and `scripts/with-memory-cap.sh` restarts the dev web server and the type-check watchers above a cap (`DEV_WEB_MEMORY_CAP_MB`, `DEV_TYPECHECK_MEMORY_CAP_MB`). A first cap below what a fresh start needs made the server restart in a loop; both defaults now sit above the start-up need.
+- **Lesson:** when tests time out under load, look at memory before worker counts; and measure a process just after it starts before choosing its cap.

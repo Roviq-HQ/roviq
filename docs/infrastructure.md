@@ -46,6 +46,13 @@ Check these before debugging the code:
    `pnpm codegen` again once the gateway answers.
 4. **Changed `.env`.** Tilt reads it once at start. Stop Tilt and `pnpm tilt up` again; check a
    running process with `tr '\0' '\n' < /proc/<pid>/environ | grep NAME`.
+5. **The web server or the type-check restarted by itself.** Both keep what they have built in
+   memory, so `scripts/with-memory-cap.sh` restarts each above a cap and says so in its log
+   (`pnpm tilt logs web`, `pnpm tilt logs typecheck`). The caps are `DEV_WEB_MEMORY_CAP_MB`
+   (default 6144) and `DEV_TYPECHECK_MEMORY_CAP_MB` (default 3584) in `.env`; `0` switches one
+   off. After a web restart the first request to each route compiles again, which takes a few
+   seconds; after a type-check restart both apps are checked from scratch. Turbopack's disk
+   cache is off in dev, because a start loads all of it into memory.
 5. **Schema behind the branch.** `pnpm tilt logs db-push`; `pnpm tilt trigger db-clean` resets and
    re-seeds this instance's own database.
 
