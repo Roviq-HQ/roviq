@@ -1,6 +1,7 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { DomainGroupType, DynamicGroupStatus, GroupMembershipType } from '@roviq/common-types';
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -96,6 +97,18 @@ export class CreateGroupInput {
   @ArrayUnique()
   @IsUUID('all', { each: true })
   childGroupIds?: string[];
+
+  @Field(() => [ID], {
+    nullable: true,
+    description:
+      'Memberships added by hand when the group is created (at most 500, no repeats). Each must be a membership of this institute. Not allowed when membershipType is DYNAMIC.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  memberMembershipIds?: string[];
 }
 
 @InputType({

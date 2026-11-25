@@ -234,6 +234,10 @@
       "unknown": {
         "title": "The group could not be created",
         "description": "Nothing was saved. Press Create Group again. If it fails again, contact your institute admin or support."
+      },
+      "memberNotFound": {
+        "title": "One of the chosen people could not be added",
+        "description": "Nothing was saved. Someone you chose may have left the institute. Remove them in the Members step, then press Create Group again."
       }
     },
     "previewErrors": {

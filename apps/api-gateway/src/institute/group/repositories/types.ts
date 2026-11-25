@@ -30,6 +30,8 @@ export interface CreateGroupData {
   /** Null when the group has no rule. */
   rule: GroupRuleData | null;
   childGroupIds: string[];
+  /** Distinct membership ids stored as manual members. */
+  memberMembershipIds: string[];
 }
 
 export interface GroupListQuery {

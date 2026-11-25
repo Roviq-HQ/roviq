@@ -113,10 +113,10 @@
     }
   },
   "groups.new.memberTypes": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "createGroup now also stores hand-picked members; member types are still saved with the group and cannot be changed later",
     "targets": {
       "apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput": "31a986e62a3a5a46",
-      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "43636c6bebadf043"
+      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "b01679e15a3191fd"
     }
   },
   "groups.new.membershipType": {

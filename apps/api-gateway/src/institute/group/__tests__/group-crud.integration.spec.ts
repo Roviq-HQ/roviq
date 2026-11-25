@@ -6,12 +6,15 @@ import { randomUUID } from 'node:crypto';
 import { DomainGroupType, DynamicGroupStatus, GroupMembershipType } from '@roviq/common-types';
 import { groupMembers, mkAdminCtx, SYSTEM_USER_ID, withAdmin } from '@roviq/database';
 import {
+  cleanupTestTeacher,
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
+  createTestTeacher,
   gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
+  type TestTeacher,
 } from '@roviq/testing/integration';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
@@ -253,6 +256,107 @@ describe('Group CRUD (integration)', () => {
       });
 
       expect(res.errors?.[0]?.extensions?.code).toBe('GROUP_NOT_FOUND');
+    });
+  });
+
+  describe('members picked when the group is created', () => {
+    const CREATE_WITH_MEMBERS = /* GraphQL */ `
+      mutation CreateGroup($input: CreateGroupInput!) {
+        createGroup(input: $input) { id memberCount }
+      }
+    `;
+    const MEMBERS = /* GraphQL */ `
+      query ListGroupMembers($groupId: ID!) {
+        listGroupMembers(groupId: $groupId) { membershipId source isExcluded }
+      }
+    `;
+    let teacher: TestTeacher;
+
+    beforeAll(async () => {
+      teacher = await createTestTeacher(result.db, instA.tenantId);
+    });
+
+    afterAll(async () => {
+      await cleanupTestTeacher(result.db, teacher);
+    });
+
+    function createWithMembers(
+      name: string,
+      membershipType: GroupMembershipType,
+      memberMembershipIds: string[],
+    ) {
+      return gqlRequest<{ createGroup: { id: string; memberCount: number } }>(result.httpServer, {
+        query: CREATE_WITH_MEMBERS,
+        token: tokenA,
+        variables: {
+          input: {
+            name,
+            groupType: DomainGroupType.CLUB,
+            membershipType,
+            memberMembershipIds,
+            ...(membershipType === GroupMembershipType.STATIC
+              ? {}
+              : { rule: { '==': [{ var: 'gender' }, 'female'] } }),
+          },
+        },
+      });
+    }
+
+    async function membersOf(groupId: string) {
+      const res = await gqlRequest<{
+        listGroupMembers: { membershipId: string; source: string; isExcluded: boolean }[];
+      }>(result.httpServer, { query: MEMBERS, token: tokenA, variables: { groupId } });
+      expect(res.errors).toBeUndefined();
+      return [...(res.data?.listGroupMembers ?? [])].sort((x, y) =>
+        x.membershipId.localeCompare(y.membershipId),
+      );
+    }
+
+    it('should store each picked membership as a manual member and count them', async () => {
+      const res = await createWithMembers('Library Club', GroupMembershipType.STATIC, [
+        instA.membershipId,
+        teacher.membershipId,
+      ]);
+
+      expect(res.errors).toBeUndefined();
+      const id = res.data?.createGroup.id ?? '';
+      expect(res.data?.createGroup.memberCount).toBe(2);
+      expect(await membersOf(id)).toEqual(
+        [instA.membershipId, teacher.membershipId].sort().map((membershipId) => ({
+          membershipId,
+          source: 'MANUAL',
+          isExcluded: false,
+        })),
+      );
+    });
+
+    it('should refuse a membership picked twice and create nothing', async () => {
+      const res = await createWithMembers('Garden Club', GroupMembershipType.HYBRID, [
+        teacher.membershipId,
+        teacher.membershipId,
+      ]);
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+      const listed = await gqlRequest<{ listGroups: { id: string }[] }>(result.httpServer, {
+        query: LIST_GROUPS,
+        token: tokenA,
+        variables: { filter: { search: 'Garden Club' } },
+      });
+      expect(listed.data?.listGroups).toEqual([]);
+    });
+
+    it('should refuse members for a dynamic group and create nothing', async () => {
+      const res = await createWithMembers('Sports Club', GroupMembershipType.DYNAMIC, [
+        instA.membershipId,
+      ]);
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+      const listed = await gqlRequest<{ listGroups: { id: string }[] }>(result.httpServer, {
+        query: LIST_GROUPS,
+        token: tokenA,
+        variables: { filter: { search: 'Sports Club' } },
+      });
+      expect(listed.data?.listGroups).toEqual([]);
     });
   });
 

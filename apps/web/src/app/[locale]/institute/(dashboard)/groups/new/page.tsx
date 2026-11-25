@@ -109,7 +109,7 @@ interface RuleNode {
 }
 
 interface SelectedMember {
-  id: string;
+  membershipId: string;
   memberType: MemberType;
   displayName: string;
 }
@@ -234,6 +234,7 @@ export default function NewGroupPage() {
       const parsed = schema.parse(value);
       const needsRuleAtSubmit =
         parsed.membershipType === 'DYNAMIC' || parsed.membershipType === 'HYBRID';
+      const takesMembers = parsed.membershipType === 'STATIC' || parsed.membershipType === 'HYBRID';
       const rule = needsRuleAtSubmit ? nodeToJsonLogic(rootNode) : undefined;
       if (needsRuleAtSubmit && Object.keys(rule ?? {}).length === 0) {
         setFormSubmitError(formApi, {
@@ -253,6 +254,9 @@ export default function NewGroupPage() {
               membershipType: parsed.membershipType,
               memberTypes: parsed.memberTypes,
               rule,
+              memberMembershipIds: takesMembers
+                ? selectedMembers.map((m) => m.membershipId)
+                : undefined,
             },
           },
         });
@@ -261,6 +265,14 @@ export default function NewGroupPage() {
         if (extractGraphQLErrorCode(err) === 'GROUP_NAME_DUPLICATE') {
           setStep('basics');
           setServerFieldError(formApi, 'name', errorCopy(err));
+          return;
+        }
+        if (extractGraphQLErrorCode(err) === 'MEMBERSHIP_NOT_FOUND') {
+          setFormSubmitError(formApi, {
+            title: t('new.submitErrors.memberNotFound.title'),
+            description: t('new.submitErrors.memberNotFound.description'),
+          });
+          setStep('members');
           return;
         }
         setFormSubmitError(formApi, failureCopy(t, errorCopy, 'submitErrors', err));
@@ -818,12 +830,12 @@ function MembersStep({
   const debouncedSearch = useDebounce(searchInput, 250);
 
   const addMember = (m: SelectedMember) => {
-    if (selected.some((s) => s.id === m.id && s.memberType === m.memberType)) return;
+    if (selected.some((s) => s.membershipId === m.membershipId)) return;
     onSelectedChange([...selected, m]);
   };
 
-  const removeMember = (id: string, memberType: MemberType) => {
-    onSelectedChange(selected.filter((s) => !(s.id === id && s.memberType === memberType)));
+  const removeMember = (membershipId: string) => {
+    onSelectedChange(selected.filter((s) => s.membershipId !== membershipId));
   };
 
   return (
@@ -873,7 +885,7 @@ function MembersStep({
               <ul className="space-y-1">
                 {selected.map((m) => (
                   <li
-                    key={`${m.memberType}-${m.id}`}
+                    key={m.membershipId}
                     className="flex items-center justify-between gap-2 rounded border bg-background px-2 py-1.5 text-sm"
                   >
                     <div className="flex items-center gap-2">
@@ -886,7 +898,7 @@ function MembersStep({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeMember(m.id, m.memberType)}
+                      onClick={() => removeMember(m.membershipId)}
                       aria-label={t('new.members.removeMember')}
                       title={t('new.members.removeMember')}
                     >
@@ -917,6 +929,8 @@ function StudentCandidates({
   return (
     <CandidateList title={t('memberTypes.student')} loading={loading} empty={students.length === 0}>
       {students.map((s) => {
+        const { membershipId } = s;
+        if (!membershipId) return null;
         const first = ti(s.firstName) ?? '';
         const last = ti(s.lastName ?? undefined) ?? '';
         const displayName = `${first} ${last}`.trim() || s.admissionNumber || s.id;
@@ -924,7 +938,7 @@ function StudentCandidates({
           <CandidateRow
             key={s.id}
             label={`${displayName} · ${s.admissionNumber}`}
-            onAdd={() => onAdd({ id: s.id, memberType: 'student', displayName })}
+            onAdd={() => onAdd({ membershipId, memberType: 'student', displayName })}
           />
         );
       })}
@@ -953,7 +967,7 @@ function StaffCandidates({
           <CandidateRow
             key={s.id}
             label={displayName}
-            onAdd={() => onAdd({ id: s.id, memberType: 'staff', displayName })}
+            onAdd={() => onAdd({ membershipId: s.membershipId, memberType: 'staff', displayName })}
           />
         );
       })}
@@ -987,7 +1001,9 @@ function GuardianCandidates({
           <CandidateRow
             key={g.id}
             label={displayName}
-            onAdd={() => onAdd({ id: g.id, memberType: 'guardian', displayName })}
+            onAdd={() =>
+              onAdd({ membershipId: g.membershipId, memberType: 'guardian', displayName })
+            }
           />
         );
       })}

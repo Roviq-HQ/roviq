@@ -27,6 +27,7 @@ import type {
 const GUARDIAN_LIST_FIELDS = `
   id
   userId
+  membershipId
   firstName
   lastName
   profileImage {

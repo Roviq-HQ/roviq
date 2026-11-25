@@ -21,11 +21,26 @@ vi.mock('../../use-groups', () => ({
   usePreviewGroupRule: () => [runPreviewMock, { loading: false }],
 }));
 
+const STUDENT = {
+  id: 'stu-profile-1',
+  membershipId: 'stu-membership-1',
+  firstName: { en: 'Asha' },
+  lastName: { en: 'Verma' },
+  admissionNumber: 'ADM-1',
+};
+const STAFF = {
+  id: 'staff-profile-1',
+  membershipId: 'staff-membership-1',
+  firstName: { en: 'Ravi' },
+  lastName: { en: 'Nair' },
+  employeeId: 'EMP-1',
+};
+
 vi.mock('../../../people/students/use-students', () => ({
-  useStudents: () => ({ students: [], loading: false }),
+  useStudents: () => ({ students: [STUDENT], loading: false }),
 }));
 vi.mock('../../../people/staff/use-staff', () => ({
-  useStaff: () => ({ staff: [], loading: false }),
+  useStaff: () => ({ staff: [STAFF], loading: false }),
 }));
 vi.mock('../../../people/guardians/use-guardians', () => ({
   useGuardians: () => ({ data: { listGuardians: [] }, loading: false }),
@@ -71,6 +86,24 @@ async function toRuleStep(m: Messages, membership: 'DYNAMIC' | 'HYBRID') {
   await pick(m.new.basics.membershipType, m.membershipTypes[membership]);
   await userEvent.click(screen.getByTestId(ids.newNextBtn));
   await screen.findByText(m.new.rule.sectionTitle);
+}
+
+/** Fills Basics for a static group of students and staff and moves to the Members step. */
+async function toMembersStep(m: Messages) {
+  await userEvent.type(
+    screen.getByRole('textbox', { name: new RegExp(m.new.basics.name) }),
+    'Science Club',
+  );
+  await pick(m.new.basics.type, m.types.CLUB);
+  await userEvent.click(screen.getByRole('checkbox', { name: m.memberTypes.staff }));
+  await userEvent.click(screen.getByTestId(ids.newNextBtn));
+  await screen.findByText(m.new.members.sectionTitle);
+}
+
+async function addCandidate(m: Messages, label: string) {
+  const row = screen.getAllByRole('listitem').find((li) => within(li).queryByText(label));
+  if (!row) throw new Error(`no candidate row for ${label}`);
+  await userEvent.click(within(row).getByRole('button', { name: m.new.members.addMember }));
 }
 
 async function fillCondition(m: Messages) {
@@ -211,6 +244,51 @@ describe('NewGroupPage submit errors', () => {
     await screen.findByTestId(formIds.submitError);
     expectAlert(m.new.submitErrors.unknown);
     expect(pushMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('NewGroupPage members', () => {
+  beforeEach(() => {
+    createGroupMock.mockReset();
+    pushMock.mockReset();
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('should send the membership ids of the picked people', async () => {
+    createGroupMock.mockResolvedValue({ data: { createGroup: { id: 'grp-2' } } });
+    const m = renderPage();
+    await toMembersStep(m);
+    await addCandidate(m, 'Asha Verma · ADM-1');
+    await addCandidate(m, 'Ravi Nair');
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/institute/groups/grp-2'));
+    expect(createGroupMock).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          name: 'Science Club',
+          groupType: 'CLUB',
+          membershipType: 'STATIC',
+          memberTypes: ['student', 'staff'],
+          rule: undefined,
+          memberMembershipIds: ['stu-membership-1', 'staff-membership-1'],
+        },
+      },
+    });
+  });
+
+  it('should show the member alert on the Members step when a member is refused', async () => {
+    createGroupMock.mockRejectedValue(graphQLError('MEMBERSHIP_NOT_FOUND'));
+    const m = renderPage();
+    await toMembersStep(m);
+    await addCandidate(m, 'Asha Verma · ADM-1');
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await screen.findByTestId(formIds.submitError);
+    expectAlert(m.new.submitErrors.memberNotFound);
+    expect(screen.getByText(m.new.members.sectionTitle)).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 
