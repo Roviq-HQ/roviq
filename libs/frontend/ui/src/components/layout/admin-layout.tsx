@@ -1,6 +1,5 @@
 'use client';
 
-import { ThemeProvider } from 'next-themes';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 import { useAbility } from '../auth/ability-provider';
@@ -23,57 +22,55 @@ export function AdminLayout({
 }) {
   const config = useAbilityFilteredConfig(rawConfig);
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <SidebarProvider>
-        {/* Skip link — visible only when focused, lets keyboard users jump
+    <SidebarProvider>
+      {/* Skip link — visible only when focused, lets keyboard users jump
             straight to the main content past the sidebar + topbar. */}
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:shadow-lg"
-        >
-          Skip to main
-        </a>
-        {/* App chrome hides in print so window.print() outputs page content
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:shadow-lg"
+      >
+        Skip to main
+      </a>
+      {/* App chrome hides in print so window.print() outputs page content
             only. `contents` keeps flex layout untouched on screen. The scroll
             containers below must also release their clipping, otherwise only
             the visible viewport prints. */}
-        <div className="flex h-screen flex-col overflow-hidden print:block print:h-auto print:overflow-visible">
-          {banner && <div className="shrink-0 print:hidden">{banner}</div>}
-          <div className="flex min-h-0 flex-1 overflow-hidden print:block print:overflow-visible">
+      <div className="flex h-screen flex-col overflow-hidden print:block print:h-auto print:overflow-visible">
+        {banner && <div className="shrink-0 print:hidden">{banner}</div>}
+        <div className="flex min-h-0 flex-1 overflow-hidden print:block print:overflow-visible">
+          <div className="contents print:hidden">
+            <DesktopSidebar config={config} />
+          </div>
+          <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
             <div className="contents print:hidden">
-              <DesktopSidebar config={config} />
+              <Topbar config={config} />
             </div>
-            <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+            {config.bottomNav && config.navRegistry && (
               <div className="contents print:hidden">
-                <Topbar config={config} />
+                <BottomTabBar bottomNav={config.bottomNav} navRegistry={config.navRegistry} />
               </div>
-              {config.bottomNav && config.navRegistry && (
-                <div className="contents print:hidden">
-                  <BottomTabBar bottomNav={config.bottomNav} navRegistry={config.navRegistry} />
-                </div>
+            )}
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className={cn(
+                'flex-1 overflow-y-auto p-4 md:p-6 print:h-auto print:overflow-visible',
+                // Content scrolls under the fixed bottom-tab bar so its
+                // backdrop-blur picks up the page. The end padding lets the
+                // last control (a Save button) come to rest above the bar;
+                // scroll-padding alone does not move what is already at the end.
+                config.bottomNav &&
+                  config.navRegistry &&
+                  'pb-24 [scroll-padding-bottom:5rem] md:pb-24 xl:pb-6 xl:[scroll-padding-bottom:0]',
               )}
-              <main
-                id="main-content"
-                tabIndex={-1}
-                className={cn(
-                  'flex-1 overflow-y-auto p-4 md:p-6 print:h-auto print:overflow-visible',
-                  // Content scrolls under the fixed bottom-tab bar so its
-                  // backdrop-blur picks up the page. The end padding lets the
-                  // last control (a Save button) come to rest above the bar;
-                  // scroll-padding alone does not move what is already at the end.
-                  config.bottomNav &&
-                    config.navRegistry &&
-                    'pb-24 [scroll-padding-bottom:5rem] md:pb-24 xl:pb-6 xl:[scroll-padding-bottom:0]',
-                )}
-              >
-                <PageErrorBoundary>{children}</PageErrorBoundary>
-              </main>
-            </div>
+            >
+              <PageErrorBoundary>{children}</PageErrorBoundary>
+            </main>
           </div>
         </div>
-        <CommandPalette config={config} />
-      </SidebarProvider>
-    </ThemeProvider>
+      </div>
+      <CommandPalette config={config} />
+    </SidebarProvider>
   );
 }
 
