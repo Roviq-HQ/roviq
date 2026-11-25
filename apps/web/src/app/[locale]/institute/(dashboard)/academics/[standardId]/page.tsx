@@ -689,7 +689,7 @@ function buildSectionSchema(
   defaultLocale: string,
 ) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.SECTION_NAME_DUPLICATE'), defaultLocale),
+    name: buildI18nTextSchema(t('errors.nameRequired'), defaultLocale),
     displayLabel: z.string(),
     streamName: z.string(),
     streamCode: z.string(),

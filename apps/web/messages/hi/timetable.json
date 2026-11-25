@@ -247,6 +247,7 @@
     "TIMETABLE_PERIOD_NOT_FOUND": "यह पीरियड अब मौजूद नहीं है। पेज रीफ़्रेश करें।",
     "TIMETABLE_PERIOD_NOT_ASSIGNABLE": "ब्रेक में विषय या शिक्षक नहीं हो सकता। कोई पढ़ाई वाला पीरियड चुनें।",
     "TIMETABLE_SECTION_NOT_COVERED": "यह सेक्शन इस समय-सारणी में नहीं है। पहले इसे समय-सारणी में जोड़ें।",
-    "TIMETABLE_OVERRIDE_NOT_FOUND": "दिन का यह बदलाव अब मौजूद नहीं है। पेज रीफ़्रेश करें।"
+    "TIMETABLE_OVERRIDE_NOT_FOUND": "दिन का यह बदलाव अब मौजूद नहीं है। पेज रीफ़्रेश करें।",
+    "nameRequired": "नाम लिखें।"
   }
 }

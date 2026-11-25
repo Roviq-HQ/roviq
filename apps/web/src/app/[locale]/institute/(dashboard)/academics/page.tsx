@@ -83,7 +83,7 @@ function buildStandardSchema(
   defaultLocale: string,
 ) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.STANDARD_NAME_DUPLICATE'), defaultLocale),
+    name: buildI18nTextSchema(t('errors.nameRequired'), defaultLocale),
     numericOrder: z.number().int().min(MIN_STANDARD_NUMERIC_ORDER),
     level: z.union([z.enum(LEVEL_VALUES), z.literal('')]),
     nepStage: z.union([z.enum(NEP_STAGE_VALUES), z.literal('')]),

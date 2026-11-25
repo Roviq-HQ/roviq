@@ -33,6 +33,7 @@ vi.mock('nuqs', () => ({
 }));
 
 const deleteSectionMock = vi.fn();
+const createSectionMock = vi.fn();
 const createSubjectMock = vi.fn();
 const sectionsState: { sections: Section[] } = { sections: [] };
 
@@ -50,7 +51,7 @@ vi.mock('../../use-academics', () => ({
     error: undefined,
     refetch: vi.fn(),
   }),
-  useCreateSection: () => ({ createSection: vi.fn(), loading: false }),
+  useCreateSection: () => ({ createSection: createSectionMock, loading: false }),
   useCreateSubject: () => ({ createSubject: createSubjectMock, loading: false }),
   useDeleteSection: () => ({ deleteSection: deleteSectionMock, loading: false }),
 }));
@@ -195,5 +196,29 @@ describe('StandardDetailPage subject create', () => {
       standardIds: ['std-6'],
     });
     expect(toast.success).toHaveBeenCalledWith('Created successfully');
+  });
+});
+
+describe('StandardDetailPage section create', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createSectionMock.mockReset();
+    sectionsState.sections = [SECTION_B];
+  });
+
+  async function openCreateDialog() {
+    renderPage();
+    await userEvent.click(screen.getByTestId(ids.sectionNewBtn));
+    return screen.findByRole('dialog');
+  }
+
+  it('should ask for a name when the name is empty, not report it as taken', async () => {
+    const dialog = await openCreateDialog();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'New Section' }));
+
+    expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/already/)).toBeNull();
+    expect(createSectionMock).not.toHaveBeenCalled();
   });
 });

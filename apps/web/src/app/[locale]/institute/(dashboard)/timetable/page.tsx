@@ -463,7 +463,7 @@ function buildWizardSchema(
   defaultLocale: string,
 ) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.TIMETABLE_NAME_DUPLICATE'), defaultLocale),
+    name: buildI18nTextSchema(t('errors.nameRequired'), defaultLocale),
     description: z.string(),
     sectionIds: z.array(z.string()).min(1),
     effectiveFrom: z.string().regex(DATE_REGEX),

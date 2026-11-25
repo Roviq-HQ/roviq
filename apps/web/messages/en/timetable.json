@@ -247,6 +247,7 @@
     "TIMETABLE_PERIOD_NOT_FOUND": "This period no longer exists. Refresh the page.",
     "TIMETABLE_PERIOD_NOT_ASSIGNABLE": "A break cannot have a subject or a teacher. Choose a teaching period.",
     "TIMETABLE_SECTION_NOT_COVERED": "This section is not part of the timetable. Add it to the timetable first.",
-    "TIMETABLE_OVERRIDE_NOT_FOUND": "This change for the day no longer exists. Refresh the page."
+    "TIMETABLE_OVERRIDE_NOT_FOUND": "This change for the day no longer exists. Refresh the page.",
+    "nameRequired": "Enter a name."
   }
 }

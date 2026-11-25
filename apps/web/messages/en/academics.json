@@ -117,7 +117,8 @@
     "HAS_RECORDED_ASSESSMENTS": "Cannot delete — assessments recorded",
     "SUBJECT_CODE_DUPLICATE": "Board code already used in this standard",
     "CONCURRENT_MODIFICATION": "Someone else modified this. Please refresh.",
-    "generic": "Something went wrong. Try again; if it keeps happening, contact support."
+    "generic": "Something went wrong. Try again; if it keeps happening, contact support.",
+    "nameRequired": "Enter a name."
   },
   "accessDenied": "You don't have permission to view academic structure.",
   "deleteConfirmTitle": "Delete {name}?",
