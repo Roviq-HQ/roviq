@@ -18,8 +18,8 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   FieldLegend,
   FieldSet,
   fieldErrorMessages,
@@ -34,6 +34,7 @@ import {
   useDebounce,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { groupNewHelp } from '@web/help/groups/group-new.help';
 import { ArrowLeft, ArrowRight, Check, Plus, Search, Trash2, UserPlus, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -334,15 +335,7 @@ export default function NewGroupPage() {
                         placeholder={t('new.basics.typePlaceholder')}
                         testId="groups-new-type-select"
                         optional={false}
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.basics.fieldHelp.typeTitle')}
-                            data-testid={instituteGroups.newTypeInfo}
-                          >
-                            <p>{t('new.basics.fieldHelp.typeBody')}</p>
-                            <p>{t('new.basics.fieldHelp.typeOptions')}</p>
-                          </FieldInfoPopover>
-                        }
+                        help={groupNewHelp.type}
                       />
                     )}
                   </form.AppField>
@@ -354,19 +347,7 @@ export default function NewGroupPage() {
                         options={membershipOptions}
                         testId="groups-new-membership-type-select"
                         optional={false}
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.basics.fieldHelp.membershipTypeTitle')}
-                            data-testid={instituteGroups.newMembershipTypeInfo}
-                          >
-                            <p>{t('new.basics.fieldHelp.membershipTypeBody')}</p>
-                            <ul className="mt-1 list-disc space-y-0.5 ps-4">
-                              <li>{t('new.basics.fieldHelp.membershipTypeStatic')}</li>
-                              <li>{t('new.basics.fieldHelp.membershipTypeDynamic')}</li>
-                              <li>{t('new.basics.fieldHelp.membershipTypeHybrid')}</li>
-                            </ul>
-                          </FieldInfoPopover>
-                        }
+                        help={groupNewHelp.membershipType}
                       />
                     )}
                   </form.AppField>
@@ -384,15 +365,9 @@ export default function NewGroupPage() {
                       };
                       return (
                         <Field data-invalid={invalid || undefined}>
-                          <FieldLabel>
+                          <FieldLabelWithInfo help={groupNewHelp.memberTypes}>
                             {t('new.basics.memberTypes')}
-                            <FieldInfoPopover
-                              title={t('new.basics.fieldHelp.memberTypesTitle')}
-                              data-testid={instituteGroups.newMemberTypesInfo}
-                            >
-                              <p>{t('new.basics.fieldHelp.memberTypesBody')}</p>
-                            </FieldInfoPopover>
-                          </FieldLabel>
+                          </FieldLabelWithInfo>
                           <div className="flex flex-wrap gap-4 pt-1">
                             {MEMBER_TYPES.map((mt) => {
                               const checked = value.includes(mt);

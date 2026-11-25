@@ -11,15 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
   Field,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  useFieldHelpIds,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { convertEnquiryHelp } from '@web/help/admission/convert-enquiry.help';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -58,6 +60,12 @@ export function ConvertEnquiryDialog({
 
   const [academicYearId, setAcademicYearId] = React.useState('');
   const [standardId, setStandardId] = React.useState('');
+  const yearIds = useFieldHelpIds({
+    name: 'convert-academic-year',
+    help: convertEnquiryHelp.academicYear,
+    hasDescription: false,
+    invalid: false,
+  });
 
   const { data: yearsData } = useAcademicYearsForAdmission();
   const academicYears = yearsData?.academicYears ?? [];
@@ -117,21 +125,17 @@ export function ConvertEnquiryDialog({
 
         <div className="space-y-4">
           <Field>
-            <FieldLabel htmlFor="convert-academic-year">
+            <FieldLabelWithInfo
+              htmlFor="convert-academic-year"
+              help={convertEnquiryHelp.academicYear}
+              hintId={yearIds.hintId}
+            >
               {t('enquiries.convertDialog.academicYearLabel')}
-              <FieldInfoPopover
-                title={t('enquiries.convertDialog.fieldHelp.academicYearTitle')}
-                data-testid={instituteAdmissionEnquiries.convertYearInfo}
-              >
-                <p>{t('enquiries.convertDialog.fieldHelp.academicYearBody')}</p>
-                <p>
-                  <em>{t('enquiries.convertDialog.fieldHelp.academicYearExample')}</em>
-                </p>
-              </FieldInfoPopover>
-            </FieldLabel>
+            </FieldLabelWithInfo>
             <Select value={academicYearId} onValueChange={setAcademicYearId}>
               <SelectTrigger
                 id="convert-academic-year"
+                aria-describedby={yearIds.describedBy}
                 data-testid={instituteAdmissionEnquiries.convertYearSelect}
               >
                 <SelectValue placeholder={t('enquiries.convertDialog.academicYearPlaceholder')} />

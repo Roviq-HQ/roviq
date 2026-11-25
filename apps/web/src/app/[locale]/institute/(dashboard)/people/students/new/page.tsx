@@ -17,7 +17,6 @@ import {
   Can,
   DraftBanner,
   FieldGroup,
-  FieldInfoPopover,
   FieldLegend,
   FieldSet,
   I18nField,
@@ -27,6 +26,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
+import { studentNewHelp } from '@web/help/students/student-new.help';
 import { useFormDraft } from '@web/hooks/use-form-draft';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -282,15 +282,7 @@ function StudentForm({ years }: { years: readonly AcademicYearNode[] }) {
                   options={socialOptions}
                   placeholder={t('new.placeholders.socialCategory')}
                   testId="students-new-social-category-select"
-                  info={
-                    <FieldInfoPopover
-                      title={t('new.fieldHelp.socialCategoryTitle')}
-                      data-testid={instituteStudents.newSocialCategoryInfo}
-                    >
-                      <p>{t('new.fieldHelp.socialCategoryBody')}</p>
-                      <p>{t('new.fieldHelp.socialCategoryOptions')}</p>
-                    </FieldInfoPopover>
-                  }
+                  help={studentNewHelp.socialCategory}
                 />
               )}
             </form.AppField>
@@ -335,17 +327,7 @@ function StudentForm({ years }: { years: readonly AcademicYearNode[] }) {
                   placeholder={t('new.placeholders.academicYear')}
                   optional={false}
                   testId="students-new-academic-year-select"
-                  info={
-                    <FieldInfoPopover
-                      title={t('new.fieldHelp.academicYearTitle')}
-                      data-testid={instituteStudents.newAcademicYearInfo}
-                    >
-                      <p>{t('new.fieldHelp.academicYearBody')}</p>
-                      <p>
-                        <em>{t('new.fieldHelp.academicYearExample')}</em>
-                      </p>
-                    </FieldInfoPopover>
-                  }
+                  help={studentNewHelp.academicYear}
                 />
               )}
             </form.AppField>
@@ -396,20 +378,7 @@ function StudentForm({ years }: { years: readonly AcademicYearNode[] }) {
                   options={admissionTypeOptions}
                   placeholder={t('new.placeholders.admissionType')}
                   testId="students-new-admission-type-select"
-                  info={
-                    <FieldInfoPopover
-                      title={t('new.fieldHelp.admissionTypeTitle')}
-                      data-testid={instituteStudents.newAdmissionTypeInfo}
-                    >
-                      <p>{t('new.fieldHelp.admissionTypeBody')}</p>
-                      <ul className="mt-1 list-disc space-y-0.5 ps-4">
-                        <li>{t('new.fieldHelp.admissionTypeNew')}</li>
-                        <li>{t('new.fieldHelp.admissionTypeLateral')}</li>
-                        <li>{t('new.fieldHelp.admissionTypeReadmission')}</li>
-                        <li>{t('new.fieldHelp.admissionTypeTransfer')}</li>
-                      </ul>
-                    </FieldInfoPopover>
-                  }
+                  help={studentNewHelp.admissionType}
                 />
               )}
             </form.AppField>

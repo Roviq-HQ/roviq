@@ -14,7 +14,7 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldInfoPopover,
+  FieldHelpButton,
   FieldLabel,
   FieldSeparator,
   I18nField,
@@ -29,6 +29,7 @@ import {
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { instituteInfoHelp } from '@web/help/institute-settings/institute-info.help';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -310,13 +311,10 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {ti('identifiers')}
-                  <FieldInfoPopover
-                    title={ti('fieldHelp.identifiersTitle')}
-                    data-testid={instituteSettings.infoIdentifiersInfo}
-                  >
-                    <p>{ti('fieldHelp.identifiersBody')}</p>
-                    <p>{ti('fieldHelp.identifiersTypes')}</p>
-                  </FieldInfoPopover>
+                  <FieldHelpButton
+                    topic={instituteInfoHelp.identifiers}
+                    fieldLabel={ti('identifiers')}
+                  />
                 </CardTitle>
                 <CardDescription>{ti('identifiersDescription')}</CardDescription>
               </CardHeader>
@@ -351,14 +349,10 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {ti('affiliations')}
-                  <FieldInfoPopover
-                    title={ti('fieldHelp.affiliationsTitle')}
-                    data-testid={instituteSettings.infoAffiliationsInfo}
-                  >
-                    <p>{ti('fieldHelp.affiliationsBody')}</p>
-                    <p>{ti('fieldHelp.affiliationStatusOptions')}</p>
-                    <p>{ti('fieldHelp.affiliationGrantedLevelBody')}</p>
-                  </FieldInfoPopover>
+                  <FieldHelpButton
+                    topic={instituteInfoHelp.affiliations}
+                    fieldLabel={ti('affiliations')}
+                  />
                 </CardTitle>
                 <CardDescription>{ti('affiliationsDescription')}</CardDescription>
               </CardHeader>

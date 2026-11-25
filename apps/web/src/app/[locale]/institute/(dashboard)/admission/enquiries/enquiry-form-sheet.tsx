@@ -5,7 +5,6 @@ import { emptyStringToUndefined, phoneSchema, zodValidator } from '@roviq/i18n';
 import {
   Button,
   FieldGroup,
-  FieldInfoPopover,
   FieldLegend,
   FieldSet,
   Sheet,
@@ -16,6 +15,7 @@ import {
   SheetTitle,
   useAppForm,
 } from '@roviq/ui';
+import { enquiryHelp } from '@web/help/admission/enquiry.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -287,15 +287,7 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
                     options={sourceOptions}
                     placeholder={t('enquiries.newForm.fields.source')}
                     testId="enquiry-source-select"
-                    info={
-                      <FieldInfoPopover
-                        title={t('enquiries.newForm.fieldHelp.sourceTitle')}
-                        data-testid={instituteAdmissionEnquiries.sourceInfo}
-                      >
-                        <p>{t('enquiries.newForm.fieldHelp.sourceBody')}</p>
-                        <p>{t('enquiries.newForm.fieldHelp.sourceOptions')}</p>
-                      </FieldInfoPopover>
-                    }
+                    help={enquiryHelp.source}
                   />
                 )}
               </form.AppField>
@@ -323,14 +315,7 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
                   <field.DateField
                     label={t('enquiries.newForm.fields.followUpDate')}
                     testId="enquiry-followup-input"
-                    info={
-                      <FieldInfoPopover
-                        title={t('enquiries.newForm.fieldHelp.followUpDateTitle')}
-                        data-testid={instituteAdmissionEnquiries.followupInfo}
-                      >
-                        <p>{t('enquiries.newForm.fieldHelp.followUpDateBody')}</p>
-                      </FieldInfoPopover>
-                    }
+                    help={enquiryHelp.followUpDate}
                   />
                 )}
               </form.AppField>

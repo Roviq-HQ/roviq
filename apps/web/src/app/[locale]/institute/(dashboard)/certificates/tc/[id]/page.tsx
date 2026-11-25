@@ -32,7 +32,6 @@ import {
   DialogTitle,
   Field,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
   Skeleton,
   useAbility,
@@ -41,6 +40,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { FileDownloadButton } from '@web/components/file-upload/file-download-button';
+import { tcHelp } from '@web/help/certificates/tc.help';
 import { parseISO } from 'date-fns';
 import {
   ArrowLeft,
@@ -619,14 +619,7 @@ function RejectTCDialog({
                 label={t('tc.rejectDialog.reasonLabel')}
                 placeholder={t('tc.rejectDialog.reasonPlaceholder')}
                 rows={4}
-                info={
-                  <FieldInfoPopover
-                    title={t('tc.rejectDialog.fieldHelp.reasonTitle')}
-                    data-testid={instituteCertificatesTc.rejectReasonInfo}
-                  >
-                    <p>{t('tc.rejectDialog.fieldHelp.reasonBody')}</p>
-                  </FieldInfoPopover>
-                }
+                help={tcHelp.rejectReason}
               />
             )}
           </form.AppField>
@@ -709,17 +702,7 @@ function RequestDuplicateDialog({
                 label={t('tc.duplicateDialog.reasonLabel')}
                 placeholder={t('tc.duplicateDialog.reasonPlaceholder')}
                 rows={4}
-                info={
-                  <FieldInfoPopover
-                    title={t('tc.duplicateDialog.fieldHelp.reasonTitle')}
-                    data-testid={instituteCertificatesTc.duplicateReasonInfo}
-                  >
-                    <p>{t('tc.duplicateDialog.fieldHelp.reasonBody')}</p>
-                    <p>
-                      <em>{t('tc.duplicateDialog.fieldHelp.reasonExamples')}</em>
-                    </p>
-                  </FieldInfoPopover>
-                }
+                help={tcHelp.duplicateReason}
               />
             )}
           </form.AppField>

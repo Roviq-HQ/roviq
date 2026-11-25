@@ -23,7 +23,6 @@ import {
   EmptyTitle,
   Field,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
   Input,
   Popover,
@@ -41,6 +40,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import type { ColumnDef } from '@tanstack/react-table';
+import { tcHelp } from '@web/help/certificates/tc.help';
 import {
   ChevronDown,
   ChevronLeft,
@@ -539,14 +539,7 @@ function RequestTCDialog({
                   options={yearOptions}
                   placeholder={t('tc.requestDialog.academicYearPlaceholder')}
                   optional={false}
-                  info={
-                    <FieldInfoPopover
-                      title={t('tc.requestDialog.fieldHelp.academicYearTitle')}
-                      data-testid={instituteCertificatesTc.requestAcademicYearInfo}
-                    >
-                      <p>{t('tc.requestDialog.fieldHelp.academicYearBody')}</p>
-                    </FieldInfoPopover>
-                  }
+                  help={tcHelp.requestAcademicYear}
                 />
               )}
             </form.AppField>
@@ -561,17 +554,7 @@ function RequestTCDialog({
                     count: reasonLength,
                     max: TC_REASON_MAX_LENGTH,
                   })}
-                  info={
-                    <FieldInfoPopover
-                      title={t('tc.requestDialog.fieldHelp.reasonTitle')}
-                      data-testid={instituteCertificatesTc.requestReasonInfo}
-                    >
-                      <p>{t('tc.requestDialog.fieldHelp.reasonBody')}</p>
-                      <p>
-                        <em>{t('tc.requestDialog.fieldHelp.reasonExample')}</em>
-                      </p>
-                    </FieldInfoPopover>
-                  }
+                  help={tcHelp.requestReason}
                 />
               )}
             </form.AppField>

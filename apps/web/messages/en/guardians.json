@@ -38,11 +38,6 @@
     "fieldDescriptions": {
       "phoneFormat": "10-digit Indian mobile, stored without country code"
     },
-    "fieldHelp": {
-      "educationLevelTitle": "Education level",
-      "educationLevelBody": "The highest qualification the guardian has completed. Used for UDISE+ parent-education census and to tailor parent communication (e.g. sending PDF newsletters vs. audio bulletins). Only the category is stored — not the specific degree or university.",
-      "educationLevelOptions": "No formal education — never studied at any institute. Primary — up to Class 5. Secondary — Class 10 or 12 pass. Graduate — any 3 or 4 year bachelor's degree. Post-graduate — master's or above. Professional — MBBS, LLB, CA, and similar chartered qualifications."
-    },
     "genders": {
       "MALE": "Male",
       "FEMALE": "Female",
