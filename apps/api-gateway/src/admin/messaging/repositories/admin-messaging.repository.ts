@@ -50,6 +50,9 @@ export abstract class AdminMessagingRepository {
    */
   abstract smsUsage(ctx: PlatformContext, month: string): Promise<SmsUsageRecord[]>;
 
+  /** The sender's stored token, encrypted; null when the sender is gone. Never returned by the API. */
+  abstract findTokenEncrypted(ctx: PlatformContext, id: string): Promise<Buffer | null>;
+
   /** The template rows of one provider account (ROV-333), by name then language. */
   abstract listTemplates(
     ctx: PlatformContext,

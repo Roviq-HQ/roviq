@@ -45,7 +45,10 @@ function sender(overrides: Partial<MessagingSenderRecord> = {}): MessagingSender
 
 function setup(repoOverrides: Partial<AdminMessagingRepository> = {}, check: AccountCheck = 'ok') {
   const repo = createMock<AdminMessagingRepository>(repoOverrides);
-  const cipher = createMock<MessagingTokenCipher>({ encrypt: vi.fn(() => CIPHERTEXT) });
+  const cipher = createMock<MessagingTokenCipher>({
+    encrypt: vi.fn(() => CIPHERTEXT),
+    decrypt: vi.fn(() => TOKEN),
+  });
   const redis = createMock<Redis>({ del: vi.fn().mockResolvedValue(2) });
   const accounts = createMock<WhatsAppAccountCheck>({
     canManageTemplates: vi.fn().mockResolvedValue(check),
@@ -211,6 +214,33 @@ describe('AdminMessagingService.rotateToken', () => {
 });
 
 describe('AdminMessagingService WhatsApp templates (ROV-333)', () => {
+  it("should set a sender's account only when its stored token may manage that account", async () => {
+    const update = vi.fn(async () => sender());
+    const ok = setup({
+      findById: vi.fn(async () => sender({ providerAccountId: null })),
+      findTokenEncrypted: vi.fn(async () => CIPHERTEXT),
+      update,
+    });
+    await ok.service.update(ctx, ID, { providerAccountId: ACCOUNT });
+    expect(ok.accounts.canManageTemplates).toHaveBeenCalledWith(ACCOUNT, TOKEN);
+    expect(update).toHaveBeenCalled();
+
+    const refusedUpdate = vi.fn(async () => sender());
+    const refused = setup(
+      {
+        findById: vi.fn(async () => sender({ providerAccountId: null })),
+        findTokenEncrypted: vi.fn(async () => CIPHERTEXT),
+        update: refusedUpdate,
+      },
+      'refused',
+    );
+    await expect(
+      refused.service.update(ctx, ID, { providerAccountId: '900000000000111' }),
+    ).rejects.toMatchObject({ code: ErrorCode.MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES });
+    expect(refusedUpdate).not.toHaveBeenCalled();
+    expect(refused.eventBus.emit).not.toHaveBeenCalled();
+  });
+
   it('should check the token before storing anything, and ask for a sync after', async () => {
     const register = vi.fn(async () => ({ kind: 'ok' as const, sender: sender() }));
     const { service, accounts, eventBus } = setup({ register });

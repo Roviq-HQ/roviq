@@ -305,6 +305,20 @@ export class AdminMessagingDrizzleRepository extends AdminMessagingRepository {
     );
   }
 
+  async findTokenEncrypted(ctx: PlatformContext, id: string): Promise<Buffer | null> {
+    const [row] = await withAdmin(this.db, ctx, (tx) =>
+      tx
+        .select({ token: messagingSenderSecrets.accessTokenEncrypted })
+        .from(messagingSenderSecrets)
+        .innerJoin(
+          messagingSendersLive,
+          eq(messagingSendersLive.id, messagingSenderSecrets.senderId),
+        )
+        .where(eq(messagingSenderSecrets.senderId, id)),
+    );
+    return row?.token ?? null;
+  }
+
   async listTemplates(
     ctx: PlatformContext,
     providerAccountId: string,

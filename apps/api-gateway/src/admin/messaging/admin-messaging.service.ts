@@ -81,6 +81,13 @@ export class AdminMessagingService {
     if (existing.scope === 'institute' && input.instituteDailyCap != null) {
       refuseInstituteShare();
     }
+    // An institute reads the template rows of its sender's account: the sender's own token must
+    // be the account's, as at registration.
+    if (input.providerAccountId !== undefined) {
+      const stored = await this.repo.findTokenEncrypted(ctx, id);
+      if (stored === null) throw notFound(id);
+      await this.assertTokenFits(input.providerAccountId, this.cipher.decrypt(stored));
+    }
     const data: UpdateMessagingSenderData = {
       ...(input.displayNumber !== undefined && { displayNumber: input.displayNumber }),
       ...(input.providerAccountId !== undefined && {
