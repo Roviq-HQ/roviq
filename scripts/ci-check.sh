@@ -43,6 +43,25 @@ if ! flock -n "$LOCK_FD"; then
   exit 1
 fi
 
+# ── One gate per machine — two at once oversubscribe the CPU and tests time out ─
+# A later gate waits its turn here instead of failing; `pnpm ci:queue` shows the holder.
+QUEUE_FD=201
+QUEUE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/roviq"
+QUEUE_FILE="$QUEUE_DIR/ci-check.lock"
+QUEUE_HOLDER="$QUEUE_DIR/ci-check.holder"
+if (( ! IS_CI )); then
+  mkdir -p "$QUEUE_DIR"
+  exec {QUEUE_FD}>"$QUEUE_FILE" || { log "ERROR: cannot open $QUEUE_FILE"; exit 1; }
+  if ! flock -n "$QUEUE_FD"; then
+    log "waiting for the gate already running on this machine: $(cat "$QUEUE_HOLDER" 2>/dev/null || echo unknown)"
+    queue_start=$SECONDS
+    flock "$QUEUE_FD"
+    log "queue free after $((SECONDS - queue_start))s"
+  fi
+  printf 'slot %s, branch %s, pid %s, since %s\n' "${ROVIQ_INSTANCE:-0}" \
+    "$(git branch --show-current)" "$$" "$(date +%H:%M:%S)" > "$QUEUE_HOLDER"
+fi
+
 # ── Resolve base/head from pre-push stdin or origin/main ────────────────────
 # Edge cases per githooks(5): new branch (rsha=zeros), deletion (lsha=zeros or
 # lref=='(delete)'), force-push (rsha unreachable), multi-ref, empty stdin,
@@ -76,6 +95,28 @@ if (( ! IS_CI )); then
   fi
   head=$(git rev-parse HEAD)
   log "mode=affected base=${base:0:10} head=${head:0:10}"
+
+  # ── Does the branch still apply to the latest main? Fails in seconds, not after the suites.
+  # A branch behind main needs no rebase unless it conflicts or both sides add a migration
+  # (drizzle-kit refuses two migrations generated on the same parent).
+  git fetch --no-tags --quiet origin main 2>/dev/null || warn "git fetch origin/main failed"
+  if ! git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+    if ! git merge-tree --write-tree origin/main HEAD > /dev/null 2>&1; then
+      log "✗ this branch conflicts with origin/main: rebase on origin/main, then push again"
+      exit 1
+    fi
+    fork=$(git merge-base HEAD origin/main)
+    added_migrations() {
+      git diff --name-only --diff-filter=A "$fork" "$1" -- libs/database/migrations \
+        | grep -c '/migration\.sql$' || true
+    }
+    if (( $(added_migrations origin/main) > 0 && $(added_migrations HEAD) > 0 )); then
+      log "✗ main gained a migration since this branch began, and this branch adds one too."
+      log "  Rebase on origin/main and generate this branch's migrations again on top of main's."
+      exit 1
+    fi
+    log "origin/main has moved on, with no conflict and no second migration: no rebase needed"
+  fi
 else
   log "mode=ci (full suite)"
 fi
@@ -119,11 +160,36 @@ if (( ! IS_CI )); then
   fi
 fi
 
+# Seconds, and it fails what would otherwise fail at the seed step minutes in.
+if ! pnpm -s check:migration-chain; then
+  log "✗ migration chain forked"
+  exit 1
+fi
+
 run_typecheck=0; run_unit=0
-run_int=1; run_e2e=1
+run_int=1; run_e2e_api=1; run_e2e_ui=1
 if (( IS_CI )) || [[ -n "$affected" ]]; then
   run_typecheck=1; run_unit=1
 fi
+
+# ── Run only the suites the change can break (local only) ───────────────────
+# Shared paths (tooling, the shared lib, dependencies, Docker, scripts) run everything.
+# A backend change skips Playwright: a changed GraphQL schema is a web path (the
+# committed schema under libs/frontend), and the web type-check catches the rest.
+if (( ! IS_CI )); then
+  changed=$(git diff --name-only "$base" "$head")
+  touches() { grep -qE "$1" <<< "$changed"; }
+  shared_re='^(libs/shared/|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig|vitest|docker/|scripts/|e2e/shared/|patches/|\.github/)'
+  backend_re='^(apps/api-gateway/|apps/notification-service/|libs/backend/|libs/database/|ee/|e2e/api-gateway-e2e/)'
+  web_re='^(apps/web/|libs/frontend/|e2e/web-)'
+  if ! touches "$shared_re"; then
+    touches "$backend_re" || { run_int=0; run_e2e_api=0; }
+    touches "$web_re" || run_e2e_ui=0
+  fi
+  log "suites from the changed paths: integration=$run_int e2e-api=$run_e2e_api e2e-ui=$run_e2e_ui"
+fi
+run_e2e=$(( run_e2e_api || run_e2e_ui ))
+export RUN_E2E_API=$run_e2e_api RUN_E2E_UI=$run_e2e_ui
 
 # The integration suite uses the dev infra, not the e2e stack. Check it now so
 # a stopped database fails (or is started) here, not minutes into the run.
@@ -137,6 +203,7 @@ fi
 # Phase 3 (sequential): start app containers (need built images + seeded DB).
 if (( run_e2e )); then
   COMPOSE=(scripts/e2e-compose.sh)
+  prewarm_start=$SECONDS
   log "phase 1 (parallel): infra start + backend image build + web build"
 
   wait_setup_service() {
@@ -165,10 +232,15 @@ if (( run_e2e )); then
   # Stream C: frontend build on host. Independent of Docker. Generated GraphQL
   # types are git-ignored and go stale after a rebase or merge, so regenerate
   # them first from the committed schema (CI=true: no gateway needed, as in CI).
-  ( { CI=true pnpm -s codegen \
-      && cd apps/web \
-      && NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
-         pnpm exec next build; } > "$tmpdir/web-build.log" 2>&1 ) & web_pid=$!
+  # Only Playwright needs the web build.
+  if (( run_e2e_ui )); then
+    ( { CI=true pnpm -s codegen \
+        && cd apps/web \
+        && NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
+           pnpm exec next build; } > "$tmpdir/web-build.log" 2>&1 ) & web_pid=$!
+  else
+    ( : ) & web_pid=$!
+  fi
 
   infra_rc=0; build_rc=0; web_rc=0
   wait "$infra_pid" || infra_rc=$?
@@ -221,7 +293,7 @@ if (( run_e2e )); then
     docker logs "${ROVIQ_E2E_COMPOSE_PROJECT:-roviq-e2e}-api-gateway-1" --tail 40 2>&1 | sed 's/^/  /'
     exit 1
   fi
-  log "✓ api-gateway ready ($((SECONDS - warmup_start))s warmup)"
+  log "✓ api-gateway ready ($((SECONDS - warmup_start))s warmup, e2e stack up after $((SECONDS - prewarm_start))s)"
 fi
 
 # ── Build Nx invocation prefix for affected/full-suite split ────────────────
@@ -264,10 +336,14 @@ launch lint pnpm -s lint
 # fails fast so a stream-config PR doesn't waste a full e2e run before the
 # drift becomes the obvious fix.
 (( run_e2e )) && launch e2e bash -c 'set -e
-  NATS_URL="nats://localhost:$E2E_NATS_PORT" pnpm -s check:jetstream-drift
-  pnpm -s nx run api-gateway-e2e:test-e2e
-  NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
-  pnpm -s nx run web-e2e-suite:e2e'
+  if (( RUN_E2E_API )); then
+    NATS_URL="nats://localhost:$E2E_NATS_PORT" pnpm -s check:jetstream-drift
+    pnpm -s nx run api-gateway-e2e:test-e2e
+  fi
+  if (( RUN_E2E_UI )); then
+    NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
+    pnpm -s nx run web-e2e-suite:e2e
+  fi'
 
 # Static gates — fast, always run regardless of affected set since they catch
 # global drift (live views / RLS / testid registry / drizzle migration↔snapshot

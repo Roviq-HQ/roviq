@@ -35,6 +35,6 @@ The rules are in root `CLAUDE.md`; this is the order to apply them in.
 - Invoke it again when a later commit on the branch changes behaviour, and after the merge (issue status `Done`, roadmap line).
 
 ## 6. Commit and report
-- `pnpm lint:fix`, commit (`CLAUDE.md` → "Finishing a change"). Push and open the PR when the user asks or the session's working agreement says so; rebase on `origin/main` first and re-run the touched integration specs after the rebase.
+- `pnpm lint:fix`, commit (`CLAUDE.md` → "Finishing a change"). Push and open the PR when the user asks or the session's working agreement says so (`docs/working-method.md` → "Pushing": `pnpm ci:queue`, message the other sessions). Rebase only when the gate reports a conflict or a forked migration chain, then re-run the touched integration specs.
 - The issue comment written in step 5 says what was built, decisions and deviations, what was checked in the browser, what was not.
 - Tell the user the same, shortly, with anything they must decide.

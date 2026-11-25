@@ -62,12 +62,32 @@ database read).
 7. After deleting a library's last spec file, run `pnpm nx run <project>:test`: CI runs each
    project's own target, the pre-push gate does not.
 
+## Pushing
+
 The full gate (`pnpm ci:check`: lint, typecheck, unit, integration, e2e, gates) runs once, on
-`git push`. Do not run it by hand after each round of fixes. If you do run it in the background,
-close its input (`< /dev/null`) or it waits forever. Read the push result from a file and look for
-`[ci:check] FAILED`; `; echo $?` and `| tail` both report success for a failed push. A long gate
-can drop the SSH connection: push with a keep-alive
-(`GIT_SSH_COMMAND="ssh -o ServerAliveInterval=30"`) and confirm with `git ls-remote`.
+`git push`. Do not run it by hand after each round of fixes.
+
+- **One gate per machine.** Each gate uses every CPU thread; two at once made tests time out. A
+  push waits while another checkout's gate runs (`[ci:check] waiting for the gate already
+  running…`), and `pnpm ci:queue` shows whose it is.
+- **Tell the other sessions.** Before pushing, run `pnpm ci:queue`, list the local sessions and
+  message the busy ones: your branch, your slot, and whether it adds a migration. After merging a
+  pull request that adds a migration, message them again: theirs must be generated again on top.
+- **Rebase only when the gate says so.** `main` moving on is not a reason: GitHub requires no
+  up-to-date branch, and CI tests the pull request merged into `main`. The gate fails within
+  seconds when the branch conflicts with `origin/main`, or when `main` and the branch both add a
+  migration.
+- **A forked migration chain** (`pnpm check:migration-chain`): rebase on `origin/main`, delete the
+  branch's migration folders and generate them again, then re-run the touched integration specs.
+- **The suites follow the change.** Integration and e2e API run for backend and shared paths,
+  Playwright for web and shared paths; lint, typecheck, unit and the static gates always run
+  (`scripts/ci-check.sh` lists the paths).
+- **The command**, from a slot other than 0:
+  `env -u NX_WORKSPACE_ROOT_PATH GIT_SSH_COMMAND="ssh -o ServerAliveInterval=30" git push`.
+  Without `env -u` the gate builds and tests the main checkout's files. The keep-alive stops a long
+  gate dropping the connection; confirm with `git ls-remote`. In the background, close its input
+  (`< /dev/null`) or it waits forever. Read the result from a file and look for
+  `[ci:check] FAILED`: `; echo $?` and `| tail` both report success for a failed push.
 
 After a rebase onto a `main` that changed the same area, run the touched integration specs again
 before pushing: fixtures written before the rebase may no longer match the schema or the queries.
