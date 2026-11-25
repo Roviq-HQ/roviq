@@ -203,7 +203,6 @@
       "previewCount": "{count, plural, one {# member matches} other {# members match}} this rule.",
       "previewEmpty": "No members match this rule.",
       "previewSample": "Sample members",
-      "previewError": "Failed to preview rule",
       "previewDialogTitle": "Rule preview"
     },
     "members": {
@@ -218,7 +217,39 @@
       "candidatePlaceholder": "Member picker is backed by list queries; pick candidates below."
     },
     "createSuccess": "Group created",
-    "createError": "Failed to create group"
+    "ruleEmpty": {
+      "title": "The rule has no complete condition",
+      "submitDescription": "Nothing was saved. Add at least one condition with a value in the Rule step, then press Create Group again.",
+      "previewDescription": "Add at least one condition with a value, then press Preview again."
+    },
+    "submitErrors": {
+      "forbidden": {
+        "title": "You do not have permission to create groups",
+        "description": "Nothing was saved. Ask your institute admin to give your role permission to create groups."
+      },
+      "network": {
+        "title": "Could not reach the server",
+        "description": "Nothing was saved. Check your internet connection, then press Create Group again."
+      },
+      "unknown": {
+        "title": "The group could not be created",
+        "description": "Nothing was saved. Press Create Group again. If it fails again, contact your institute admin or support."
+      }
+    },
+    "previewErrors": {
+      "forbidden": {
+        "title": "You do not have permission to preview group rules",
+        "description": "Ask your institute admin to give your role permission to view groups."
+      },
+      "network": {
+        "title": "Could not reach the server",
+        "description": "The preview did not run. Check your internet connection, then press Preview again."
+      },
+      "unknown": {
+        "title": "The preview did not run",
+        "description": "Check the values in your conditions and press Preview again. If it fails again, contact your institute admin or support."
+      }
+    }
   },
   "previewSample": {
     "admissionNumber": "Adm. no. {number}"

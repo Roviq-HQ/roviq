@@ -121,6 +121,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - Hindi copy is the Hindi people speak: English office words in Devanagari (एडमिशन, सेशन, कोड), never textbook words (पहचानकर्ता, अनुमोदन): `docs/frontend.md` → "Hindi copy"
 - Field help: a topic from `apps/web/src/help` passed as `help={…}`; nothing between a label and its input; instructions after the input (`pnpm check:field-help`)
 - Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`
+- A form's submit error stays in the form, never `toast.error`: `setServerFieldError` under the field, or `setFormSubmitError` + `<form.SubmitError />` above the submit button (`pnpm check:form-errors`)
 - Errors: `BusinessException(ErrorCode.X, …)` on the backend; frontend branches on `extensions.code` (`isAppError`, `extractGraphQLErrorCode`) and shows translated copy — never `err.message`
 - Files: reference `files.id` and return `FileRef`; upload with `<FileUpload>`, attach with `FileService.verifyUploads` + `markFilesReady(tx, …)`; never a URL column, a typed-in URL or a raw S3 call
 - Seed credentials and names only from `e2e/shared/seed-fixtures.ts` · e2e database is `roviq_test` · `REDIS_KEYS` constants · impersonation tokens never refresh

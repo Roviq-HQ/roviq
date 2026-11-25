@@ -1,0 +1,238 @@
+import '@testing-library/jest-dom/vitest';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import type { Locale } from '@roviq/i18n';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import groupsEn from '../../../../../../../../messages/en/groups.json';
+import groupsHi from '../../../../../../../../messages/hi/groups.json';
+import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
+
+const { instituteGroups: ids, form: formIds } = testIds;
+
+const createGroupMock = vi.fn();
+const runPreviewMock = vi.fn();
+
+vi.mock('../../use-groups', () => ({
+  useCreateGroup: () => [createGroupMock, { loading: false }],
+  usePreviewGroupRule: () => [runPreviewMock, { loading: false }],
+}));
+
+vi.mock('../../../people/students/use-students', () => ({
+  useStudents: () => ({ students: [], loading: false }),
+}));
+vi.mock('../../../people/staff/use-staff', () => ({
+  useStaff: () => ({ staff: [], loading: false }),
+}));
+vi.mock('../../../people/guardians/use-guardians', () => ({
+  useGuardians: () => ({ data: { listGuardians: [] }, loading: false }),
+}));
+
+const pushMock = vi.fn();
+vi.mock('next/navigation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+  return {
+    ...actual,
+    useRouter: () => ({ push: pushMock, back: vi.fn(), replace: vi.fn() }),
+  };
+});
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+import NewGroupPage from '../page';
+
+type Messages = typeof groupsEn;
+
+const graphQLError = (code: string) =>
+  new CombinedGraphQLErrors({ errors: [{ message: 'raw server text', extensions: { code } }] });
+
+function renderPage(locale: Locale = 'en') {
+  renderWithProviders(<NewGroupPage />, { locale });
+  return locale === 'hi' ? groupsHi : groupsEn;
+}
+
+async function pick(label: string, option: string) {
+  await userEvent.click(screen.getByRole('combobox', { name: new RegExp(label) }));
+  await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${option}`) }));
+}
+
+/** Fills the Basics step and moves to the Rule step. */
+async function toRuleStep(m: Messages, membership: 'DYNAMIC' | 'HYBRID') {
+  await userEvent.type(
+    screen.getByRole('textbox', { name: new RegExp(m.new.basics.name) }),
+    'Science Club',
+  );
+  await pick(m.new.basics.type, m.types.CLUB);
+  await pick(m.new.basics.membershipType, m.membershipTypes[membership]);
+  await userEvent.click(screen.getByTestId(ids.newNextBtn));
+  await screen.findByText(m.new.rule.sectionTitle);
+}
+
+async function fillCondition(m: Messages) {
+  await userEvent.type(screen.getByRole('textbox', { name: m.new.rule.value }), 'female');
+}
+
+const submitAlert = () => screen.getByTestId(formIds.submitError);
+
+function expectAlert(copy: { title: string; description: string }) {
+  const alert = submitAlert();
+  expect(alert).toHaveAttribute('role', 'alert');
+  expect(within(alert).getByText(copy.title)).toBeInTheDocument();
+  expect(within(alert).getByText(copy.description)).toBeInTheDocument();
+}
+
+describe('NewGroupPage submit errors', () => {
+  beforeEach(() => {
+    createGroupMock.mockReset();
+    runPreviewMock.mockReset();
+    pushMock.mockReset();
+    vi.mocked(toast.success).mockReset();
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('should show the empty-rule alert and move to the Rule step instead of creating', async () => {
+    const m = renderPage();
+    await toRuleStep(m, 'HYBRID');
+    await userEvent.click(screen.getByTestId(ids.newNextBtn));
+    await screen.findByText(m.new.members.sectionTitle);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await screen.findByTestId(formIds.submitError);
+    expectAlert({ title: m.new.ruleEmpty.title, description: m.new.ruleEmpty.submitDescription });
+    expect(screen.getByText(m.new.rule.sectionTitle)).toBeInTheDocument();
+    expect(screen.queryByText(m.new.members.sectionTitle)).not.toBeInTheDocument();
+    expect(createGroupMock).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('should show the permission copy in the form and keep Create enabled when FORBIDDEN', async () => {
+    createGroupMock.mockRejectedValue(graphQLError('FORBIDDEN'));
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await screen.findByTestId(formIds.submitError);
+    expectAlert(m.new.submitErrors.forbidden);
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId(ids.newSubmitBtn)).toBeEnabled());
+  });
+
+  it('should show the connection copy when the server cannot be reached', async () => {
+    createGroupMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await screen.findByTestId(formIds.submitError);
+    expectAlert(m.new.submitErrors.network);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('should show the connection copy in Hindi', async () => {
+    createGroupMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const m = renderPage('hi');
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await screen.findByTestId(formIds.submitError);
+    expectAlert(groupsHi.new.submitErrors.network);
+  });
+
+  it('should clear the alert and create the group when Create is pressed again', async () => {
+    createGroupMock
+      .mockRejectedValueOnce(graphQLError('INTERNAL_ERROR'))
+      .mockResolvedValueOnce({ data: { createGroup: { id: 'grp-1' } } });
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+    await screen.findByTestId(formIds.submitError);
+    expectAlert(m.new.submitErrors.unknown);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/institute/groups/grp-1'));
+    expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith(m.new.createSuccess);
+    expect(createGroupMock).toHaveBeenCalledTimes(2);
+    expect(createGroupMock).toHaveBeenLastCalledWith({
+      variables: {
+        input: {
+          name: 'Science Club',
+          groupType: 'CLUB',
+          membershipType: 'DYNAMIC',
+          memberTypes: ['student'],
+          rule: { and: [{ '==': [{ var: 'gender' }, 'female'] }] },
+        },
+      },
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('should show the unknown copy when the server returns no group', async () => {
+    createGroupMock.mockResolvedValue({ data: null });
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    await screen.findByTestId(formIds.submitError);
+    expectAlert(m.new.submitErrors.unknown);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('NewGroupPage rule preview errors', () => {
+  beforeEach(() => {
+    runPreviewMock.mockReset();
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('should show the empty-rule message beside Preview and clear it when the rule changes', async () => {
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+
+    await userEvent.click(screen.getByTestId(ids.newRulePreviewBtn));
+
+    const message = await screen.findByTestId(ids.newRulePreviewError);
+    expect(message).toHaveAttribute('role', 'alert');
+    expect(within(message).getByText(m.new.ruleEmpty.title)).toBeInTheDocument();
+    expect(within(message).getByText(m.new.ruleEmpty.previewDescription)).toBeInTheDocument();
+    expect(runPreviewMock).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+
+    await fillCondition(m);
+
+    expect(screen.queryByTestId(ids.newRulePreviewError)).not.toBeInTheDocument();
+  });
+
+  it('should show the permission copy beside Preview when the preview is refused', async () => {
+    runPreviewMock.mockRejectedValue(graphQLError('FORBIDDEN'));
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+
+    await userEvent.click(screen.getByTestId(ids.newRulePreviewBtn));
+
+    const message = await screen.findByTestId(ids.newRulePreviewError);
+    expect(within(message).getByText(m.new.previewErrors.forbidden.title)).toBeInTheDocument();
+    expect(
+      within(message).getByText(m.new.previewErrors.forbidden.description),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});

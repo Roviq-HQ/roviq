@@ -11,7 +11,7 @@ import { SelectField } from './fields/select-field';
 import { SwitchField } from './fields/switch-field';
 import { TextField } from './fields/text-field';
 import { TextareaField } from './fields/textarea-field';
-import { FORM_ID_ATTRIBUTE, SubmitButton } from './form-components';
+import { FORM_ID_ATTRIBUTE, SubmitButton, SubmitError } from './form-components';
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
@@ -23,7 +23,8 @@ export const { fieldContext, formContext, useFieldContext, useFormContext } =
  *   - `useAppForm({ defaultValues, validators, onSubmit })`
  *   - typed `<form.AppField>` whose render-prop exposes the registered
  *     field components (`field.TextField`, `field.SelectField`, …)
- *   - typed `<form.AppForm>` for form-level components (`form.SubmitButton`)
+ *   - typed `<form.AppForm>` for form-level components (`form.SubmitButton`,
+ *     `form.SubmitError`)
  *   - `withForm` HOC for splitting large forms into reusable chunks
  *
  * Cascading-select pattern: when one field's value drives another's options
@@ -49,6 +50,7 @@ const { useAppForm: useBaseAppForm, withForm } = createFormHook({
   },
   formComponents: {
     SubmitButton,
+    SubmitError,
   },
 });
 

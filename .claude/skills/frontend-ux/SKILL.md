@@ -66,7 +66,7 @@ Users are Indian institute admins, clerks, teachers, parents — non-technical, 
 ## States
 
 - [MYORD] Skeleton page layouts. Shell renders instantly. Apollo stale-while-revalidate over spinner wipes
-- [NGIAC] Every mutation: idle → loading (spinner) → success toast | error toast + retry. Map GraphQL errors to human text
+- [NGIAC] Every mutation: idle → loading (spinner) → success toast | error. A form's submit error stays in the form, never a toast: under its field (`setServerFieldError`) or above the submit button (`setFormSubmitError` + `<form.SubmitError />`); `pnpm check:form-errors`. An action with no form: error toast + retry. Table: `docs/frontend.md` → "Where it shows"
 - [NTLOD] Toggles: optimistic via Apollo `optimisticResponse`. Revert + toast on rejection
 - [OJAAC] Offline banner. Auto-save drafts (see HUPGP). Connection indicator (green/yellow/red). Refetch on reconnect
 - [OPULR] Each section in own `react-error-boundary`. Fallback: "Failed to load" + Retry. Log to Sentry
@@ -74,7 +74,7 @@ Users are Indian institute admins, clerks, teachers, parents — non-technical, 
 
 ## Feedback
 
-- [PAODR] Success toast: 3–4s. Error: persist. Action: Undo (5s). Stack vertically (Sonner)
+- [PAODR] Toasts are for success, undo and actions with no form. Success: 3–4s. Error: persist. Action: Undo (5s). Stack vertically (Sonner)
 - [PLNIH] Destructive: soft-delete → undo toast. Significant → consequence dialog. Catastrophic → type-to-confirm
 - [PRMVO] >3s operations: progress with stages. Stream Temporal via subscription. Navigate-away safe
 - [PTUCK] Wizard completion: summary screen + next-step action cards

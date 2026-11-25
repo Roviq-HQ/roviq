@@ -1,9 +1,12 @@
 'use client';
 
 import { DOMAIN_GROUP_TYPE_VALUES, GROUP_MEMBERSHIP_TYPE_VALUES } from '@roviq/common-types';
-import { extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode, isNetworkError } from '@roviq/graphql';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Badge,
   Button,
   Card,
@@ -23,6 +26,7 @@ import {
   FieldLabelWithInfo,
   FieldLegend,
   FieldSet,
+  type FormSubmitError,
   fieldErrorMessages,
   Input,
   Select,
@@ -31,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
+  setFormSubmitError,
   setServerFieldError,
   useAppForm,
   useDebounce,
@@ -38,7 +43,17 @@ import {
 import { useStore } from '@tanstack/react-form';
 import { groupNewHelp } from '@web/help/groups/group-new.help';
 import { useErrorCopy } from '@web/hooks/use-error-copy';
-import { ArrowLeft, ArrowRight, Check, Plus, Search, Trash2, UserPlus, Zap } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+  Zap,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -166,6 +181,27 @@ function nodeToJsonLogic(node: RuleNode): GroupRule {
   return { [node.combinator]: parts };
 }
 
+type FailureCopyGroup = 'submitErrors' | 'previewErrors';
+
+function failureCopy(
+  t: ReturnType<typeof useTranslations>,
+  errorCopy: ReturnType<typeof useErrorCopy>,
+  group: FailureCopyGroup,
+  err: unknown,
+): FormSubmitError {
+  const kind = isNetworkError(err)
+    ? 'network'
+    : extractGraphQLErrorCode(err) === 'FORBIDDEN'
+      ? 'forbidden'
+      : 'unknown';
+  const description = t(`new.${group}.${kind}.description`);
+  return {
+    title: t(`new.${group}.${kind}.title`),
+    // An unforeseen code still gets its own translated copy when there is one.
+    description: kind === 'unknown' ? errorCopy(err, description) : description,
+  };
+}
+
 /** Try to coerce a literal to boolean/number before falling back to string. */
 function coerceValue(raw: string): string | number | boolean {
   const trimmed = raw.trim();
@@ -194,16 +230,21 @@ export default function NewGroupPage() {
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value, formApi }) => {
       const parsed = schema.parse(value);
       const needsRuleAtSubmit =
         parsed.membershipType === 'DYNAMIC' || parsed.membershipType === 'HYBRID';
+      const rule = needsRuleAtSubmit ? nodeToJsonLogic(rootNode) : undefined;
+      if (needsRuleAtSubmit && Object.keys(rule ?? {}).length === 0) {
+        setFormSubmitError(formApi, {
+          title: t('new.ruleEmpty.title'),
+          description: t('new.ruleEmpty.submitDescription'),
+        });
+        setStep('rule');
+        return;
+      }
+      let created: { id: string } | undefined;
       try {
-        const rule = needsRuleAtSubmit ? nodeToJsonLogic(rootNode) : undefined;
-        if (needsRuleAtSubmit && Object.keys(rule ?? {}).length === 0) {
-          toast.error(t('new.rule.previewError'));
-          return;
-        }
         const result = await createGroup({
           variables: {
             input: {
@@ -215,18 +256,22 @@ export default function NewGroupPage() {
             },
           },
         });
-        const created = result.data?.createGroup;
-        if (!created) throw new Error(t('new.createError'));
-        toast.success(t('new.createSuccess'));
-        router.push(`/institute/groups/${created.id}`);
+        created = result.data?.createGroup;
       } catch (err) {
         if (extractGraphQLErrorCode(err) === 'GROUP_NAME_DUPLICATE') {
           setStep('basics');
           setServerFieldError(form, 'name', errorCopy(err));
-        } else {
-          toast.error(errorCopy(err, t('new.createError')));
+          return;
         }
+        setFormSubmitError(formApi, failureCopy(t, errorCopy, 'submitErrors', err));
+        return;
       }
+      if (!created) {
+        setFormSubmitError(formApi, failureCopy(t, errorCopy, 'submitErrors', undefined));
+        return;
+      }
+      toast.success(t('new.createSuccess'));
+      router.push(`/institute/groups/${created.id}`);
     },
   });
 
@@ -422,38 +467,43 @@ export default function NewGroupPage() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex items-center justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={goPrev}
-            disabled={stepIndex === 0 || creating}
-            data-testid={instituteGroups.newPrevBtn}
-          >
-            <ArrowLeft className="size-4" />
-            {t('actions.previous')}
-          </Button>
-          {isLastStep ? (
-            <form.AppForm>
-              <form.SubmitButton
-                testId="groups-new-submit-btn"
-                submittingLabel={t('actions.saving')}
-              >
-                <Check className="size-4" />
-                {t('actions.finish')}
-              </form.SubmitButton>
-            </form.AppForm>
-          ) : (
+        <div className="mt-6 space-y-4">
+          <form.AppForm>
+            <form.SubmitError />
+          </form.AppForm>
+          <div className="flex items-center justify-between">
             <Button
               type="button"
-              onClick={goNext}
-              disabled={creating}
-              data-testid={instituteGroups.newNextBtn}
+              variant="outline"
+              onClick={goPrev}
+              disabled={stepIndex === 0 || creating}
+              data-testid={instituteGroups.newPrevBtn}
             >
-              {t('actions.next')}
-              <ArrowRight className="size-4" />
+              <ArrowLeft className="size-4" />
+              {t('actions.previous')}
             </Button>
-          )}
+            {isLastStep ? (
+              <form.AppForm>
+                <form.SubmitButton
+                  testId={instituteGroups.newSubmitBtn}
+                  submittingLabel={t('actions.saving')}
+                >
+                  <Check className="size-4" />
+                  {t('actions.finish')}
+                </form.SubmitButton>
+              </form.AppForm>
+            ) : (
+              <Button
+                type="button"
+                onClick={goNext}
+                disabled={creating}
+                data-testid={instituteGroups.newNextBtn}
+              >
+                {t('actions.next')}
+                <ArrowRight className="size-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </form>
     </div>
@@ -511,11 +561,21 @@ function RuleStep({
     RulePreviewResult,
     'count' | 'sampleMembers'
   > | null>(null);
+  const [previewProblem, setPreviewProblem] = React.useState<FormSubmitError | null>(null);
+
+  const changeRule = (next: RuleNode) => {
+    setPreviewProblem(null);
+    onChange(next);
+  };
 
   const handlePreview = async () => {
+    setPreviewProblem(null);
     const logic = nodeToJsonLogic(rootNode);
     if (Object.keys(logic).length === 0) {
-      toast.error(t('new.rule.previewError'));
+      setPreviewProblem({
+        title: t('new.ruleEmpty.title'),
+        description: t('new.ruleEmpty.previewDescription'),
+      });
       return;
     }
     try {
@@ -525,7 +585,7 @@ function RuleStep({
         setPreviewOpen(true);
       }
     } catch (err) {
-      toast.error(errorCopy(err, t('new.rule.previewError')));
+      setPreviewProblem(failureCopy(t, errorCopy, 'previewErrors', err));
     }
   };
 
@@ -535,9 +595,9 @@ function RuleStep({
         <FieldLegend>{t('new.rule.sectionTitle')}</FieldLegend>
         <FieldDescription>{t('new.rule.sectionDescription')}</FieldDescription>
 
-        <RuleNodeEditor node={rootNode} onChange={onChange} depth={0} />
+        <RuleNodeEditor node={rootNode} onChange={changeRule} depth={0} />
 
-        <div className="flex justify-end pt-2">
+        <div className="flex flex-col items-end gap-2 pt-2">
           <Button
             type="button"
             variant="outline"
@@ -548,6 +608,17 @@ function RuleStep({
             <Zap className="size-4" />
             {previewing ? t('new.rule.previewing') : t('new.rule.preview')}
           </Button>
+          {previewProblem && (
+            <Alert
+              variant="destructive"
+              className="py-2"
+              data-testid={instituteGroups.newRulePreviewError}
+            >
+              <AlertCircle aria-hidden="true" />
+              <AlertTitle className="line-clamp-none">{previewProblem.title}</AlertTitle>
+              <AlertDescription>{previewProblem.description}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FieldSet>
 

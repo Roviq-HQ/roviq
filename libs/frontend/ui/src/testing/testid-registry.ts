@@ -93,6 +93,10 @@ export const testIds = {
     userAgent: 'session-user-agent',
     ipAddress: 'session-ip-address',
   },
+  // ── Form kit (consumed by libs/frontend/ui/src/form) ──────────────────
+  form: {
+    submitError: 'form-submit-error',
+  },
   // ── Cross-cutting layout (consumed by libs/frontend/ui components) ─────
   layout: {
     topbar: 'topbar',
@@ -1297,6 +1301,8 @@ export const testIds = {
     newPrevBtn: 'groups-new-prev-btn',
     newNextBtn: 'groups-new-next-btn',
     newRulePreviewBtn: 'groups-new-rule-preview-btn',
+    newRulePreviewError: 'groups-new-rule-preview-error',
+    newSubmitBtn: 'groups-new-submit-btn',
     // Rule preview
     previewMember: (membershipId: string) => `groups-preview-member-${membershipId}`,
   },
