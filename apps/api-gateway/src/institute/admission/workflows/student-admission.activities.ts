@@ -240,7 +240,8 @@ export function createStudentAdmissionActivities(
               .from(studentProfilesLive)
               .where(eq(studentProfilesLive.userId, userId))
               .limit(1);
-            // An earlier attempt committed and already sent its warning.
+            // An earlier attempt committed. Its warning is best effort: lost if the worker
+            // stopped between that commit and the emit.
             if (done) return { kind: 'ok' as const, ...done, strength: null };
             return admitStudentInTx(tx, {
               tenantId,
