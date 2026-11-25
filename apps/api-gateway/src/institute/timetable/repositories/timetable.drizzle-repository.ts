@@ -232,6 +232,39 @@ const ALREADY_ACTIVE: UniqueViolationErrors = {
     ),
 };
 
+const SECTION_TAKEN: UniqueViolationErrors = {
+  timetable_sections_timetable_section_key: () =>
+    new BusinessException(
+      ErrorCode.TIMETABLE_SECTION_DUPLICATE,
+      'This section is already covered by this timetable.',
+    ),
+};
+
+const PERIOD_LABEL_TAKEN: UniqueViolationErrors = {
+  timetable_periods_timetable_label_key: () =>
+    new BusinessException(
+      ErrorCode.TIMETABLE_PERIOD_LABEL_DUPLICATE,
+      'Another period of this timetable already has this label.',
+    ),
+};
+
+// The conflict check reads first; only a second assignment running at once gets here.
+const TEACHER_SLOT_TAKEN: UniqueViolationErrors = {
+  timetable_entries_teacher_slot_key: () =>
+    new BusinessException(
+      ErrorCode.TIMETABLE_TEACHER_CONFLICT,
+      'The teacher is already assigned to another section in this period.',
+    ),
+};
+
+const OVERRIDE_TAKEN: UniqueViolationErrors = {
+  timetable_day_overrides_cell_key: () =>
+    new BusinessException(
+      ErrorCode.TIMETABLE_DAY_OVERRIDE_DUPLICATE,
+      'This period already has a change for this section on this date.',
+    ),
+};
+
 @Injectable()
 export class TimetableDrizzleRepository extends TimetableRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -567,7 +600,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         .values({ tenantId, timetableId, sectionId, createdBy: userId, updatedBy: userId })
         .returning(sectionWriteReturning);
       return rows[0] as TimetableSectionRecord;
-    });
+    }).catch(mapUniqueViolation(SECTION_TAKEN));
   }
 
   async removeSection(timetableId: string, sectionId: string): Promise<void> {
@@ -621,7 +654,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
           })),
         )
         .returning(periodWriteReturning) as Promise<TimetablePeriodRecord[]>;
-    });
+    }).catch(mapUniqueViolation(PERIOD_LABEL_TAKEN));
   }
 
   async findPeriods(timetableId: string): Promise<TimetablePeriodRecord[]> {
@@ -663,7 +696,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
           `Timetable period ${id} not found`,
         );
       return rows[0] as TimetablePeriodRecord;
-    });
+    }).catch(mapUniqueViolation(PERIOD_LABEL_TAKEN));
   }
 
   async softDeletePeriod(id: string): Promise<void> {
@@ -755,7 +788,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         })
         .returning(entryWriteReturning);
       return rows[0] as TimetableEntryRecord;
-    });
+    }).catch(mapUniqueViolation(TEACHER_SLOT_TAKEN));
   }
 
   async clearEntry(query: ClearEntryQuery): Promise<void> {
@@ -868,7 +901,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         })
         .returning(overrideWriteReturning);
       return rows[0] as TimetableDayOverrideRecord;
-    });
+    }).catch(mapUniqueViolation(OVERRIDE_TAKEN));
   }
 
   async findOverrideById(id: string): Promise<TimetableDayOverrideRecord | null> {

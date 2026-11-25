@@ -13,6 +13,7 @@ import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsDateString,
   IsIn,
@@ -116,6 +117,7 @@ export class CreateTimetableInput {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayUnique()
   @IsUUID('all', { each: true })
   @Field(() => [ID], { description: 'Sections this timetable covers.' })
   sectionIds!: string[];

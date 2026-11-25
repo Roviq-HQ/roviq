@@ -31,6 +31,7 @@ import {
   gradingSchemes,
   gradingSchemesLive,
   i18nDisplay,
+  mapUniqueViolation,
   membershipsLive,
   mkInstituteCtx,
   reportCardInstances,
@@ -47,6 +48,7 @@ import {
   subjectTopics,
   subjectTopicsLive,
   tenantUserProfilesLive,
+  type UniqueViolationErrors,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -229,6 +231,67 @@ function dec(n: number | null | undefined): number | null {
   return n ?? null;
 }
 
+const GRADING_SCHEME_TAKEN: UniqueViolationErrors = {
+  grading_schemes_name_key: () =>
+    new BusinessException(
+      ErrorCode.GRADING_SCHEME_NAME_DUPLICATE,
+      'A grading scheme with this name already exists in this institute',
+    ),
+  grade_bands_scheme_grade_key: () =>
+    new BusinessException(
+      ErrorCode.GRADING_SCHEME_INVALID_BANDS,
+      'Two bands of this grading scheme have the same grade',
+    ),
+};
+
+const EXAM_TERM_TAKEN: UniqueViolationErrors = {
+  exam_terms_year_name_key: () =>
+    new BusinessException(
+      ErrorCode.EXAM_TERM_NAME_DUPLICATE,
+      'An exam term with this name already exists in this academic year',
+    ),
+};
+
+const EXAM_TAKEN: UniqueViolationErrors = {
+  exams_year_name_key: () =>
+    new BusinessException(
+      ErrorCode.EXAM_NAME_DUPLICATE,
+      'An exam with this name already exists in this academic year',
+    ),
+};
+
+const SCHEDULE_TAKEN: UniqueViolationErrors = {
+  exam_schedules_cell_key: () =>
+    new BusinessException(
+      ErrorCode.EXAM_SCHEDULE_DUPLICATE,
+      'This exam already has a paper for this section, subject and component',
+    ),
+};
+
+const TOPIC_TAKEN: UniqueViolationErrors = {
+  subject_topics_subject_standard_code_key: () =>
+    new BusinessException(
+      ErrorCode.SUBJECT_TOPIC_CODE_DUPLICATE,
+      'Another topic of this subject and standard already has this code',
+    ),
+};
+
+const CO_SCHOLASTIC_AREA_TAKEN: UniqueViolationErrors = {
+  co_scholastic_areas_name_key: () =>
+    new BusinessException(
+      ErrorCode.CO_SCHOLASTIC_AREA_NAME_DUPLICATE,
+      'A co-scholastic area with this name already exists in this institute',
+    ),
+};
+
+const REPORT_CARD_TAKEN: UniqueViolationErrors = {
+  report_cards_year_name_key: () =>
+    new BusinessException(
+      ErrorCode.REPORT_CARD_NAME_DUPLICATE,
+      'A report card with this name already exists in this academic year',
+    ),
+};
+
 @Injectable()
 export class ExaminationDrizzleRepository extends ExaminationRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -355,7 +418,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         );
       }
       return scheme;
-    });
+    }).catch(mapUniqueViolation(GRADING_SCHEME_TAKEN));
   }
 
   async updateGradingScheme(
@@ -390,7 +453,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           `Grading scheme ${id} not found`,
         );
       return rows[0] as GradingSchemeRecord;
-    });
+    }).catch(mapUniqueViolation(GRADING_SCHEME_TAKEN));
   }
 
   async replaceBands(gradingSchemeId: string, bands: GradeBandData[]): Promise<GradeBandRecord[]> {
@@ -433,7 +496,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           createdAt: gradeBands.createdAt,
           updatedAt: gradeBands.updatedAt,
         }) as Promise<GradeBandRecord[]>;
-    });
+    }).catch(mapUniqueViolation(GRADING_SCHEME_TAKEN));
   }
 
   async findGradingSchemeById(id: string): Promise<GradingSchemeRecord | null> {
@@ -536,7 +599,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           updatedAt: examTerms.updatedAt,
         });
       return rows[0] as ExamTermRecord;
-    });
+    }).catch(mapUniqueViolation(EXAM_TERM_TAKEN));
   }
 
   async updateExamTerm(id: string, data: Partial<CreateExamTermData>): Promise<ExamTermRecord> {
@@ -564,7 +627,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.EXAM_TERM_NOT_FOUND, `Exam term ${id} not found`);
       return rows[0] as ExamTermRecord;
-    });
+    }).catch(mapUniqueViolation(EXAM_TERM_TAKEN));
   }
 
   async listExamTerms(academicYearId: string): Promise<ExamTermRecord[]> {
@@ -614,7 +677,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .returning(examWrite);
       return rows[0] as ExamRecord;
-    });
+    }).catch(mapUniqueViolation(EXAM_TAKEN));
   }
 
   async findExamById(id: string): Promise<ExamRecord | null> {
@@ -681,7 +744,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.EXAM_NOT_FOUND, `Exam ${id} not found`);
       return rows[0] as ExamRecord;
-    });
+    }).catch(mapUniqueViolation(EXAM_TAKEN));
   }
 
   async setExamStatus(id: string, status: ExamStatus): Promise<ExamRecord> {
@@ -744,7 +807,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .returning(scheduleWrite);
       return rows[0] as ExamScheduleRecord;
-    });
+    }).catch(mapUniqueViolation(SCHEDULE_TAKEN));
   }
 
   async updateSchedule(id: string, data: UpdateExamScheduleData): Promise<ExamScheduleRecord> {
@@ -771,7 +834,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           `Exam schedule ${id} not found`,
         );
       return rows[0] as ExamScheduleRecord;
-    });
+    }).catch(mapUniqueViolation(SCHEDULE_TAKEN));
   }
 
   async findScheduleById(id: string): Promise<ExamScheduleRecord | null> {
@@ -1059,7 +1122,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .returning();
       return rows[0] as SubjectTopicRecord;
-    });
+    }).catch(mapUniqueViolation(TOPIC_TAKEN));
   }
 
   async listSubjectTopics(subjectId: string, standardId?: string): Promise<SubjectTopicRecord[]> {
@@ -1188,7 +1251,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .returning();
       return rows[0] as CoScholasticAreaRecord;
-    });
+    }).catch(mapUniqueViolation(CO_SCHOLASTIC_AREA_TAKEN));
   }
 
   async listCoScholasticAreas(): Promise<CoScholasticAreaRecord[]> {
@@ -1291,7 +1354,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .returning();
       return rows[0] as ReportCardRecord;
-    });
+    }).catch(mapUniqueViolation(REPORT_CARD_TAKEN));
   }
 
   async updateReportCard(
@@ -1320,7 +1383,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.REPORT_CARD_NOT_FOUND, `Report card ${id} not found`);
       return rows[0] as ReportCardRecord;
-    });
+    }).catch(mapUniqueViolation(REPORT_CARD_TAKEN));
   }
 
   async listReportCards(academicYearId: string): Promise<ReportCardRecord[]> {

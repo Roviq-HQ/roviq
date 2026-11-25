@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ResellerStatus, type ResellerTier } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  ResellerStatus,
+  type ResellerTier,
+} from '@roviq/common-types';
 import {
   authEvents,
   DRIZZLE_DB,
@@ -7,6 +12,7 @@ import {
   impersonationSessions,
   institutes,
   institutesLive,
+  mapUniqueViolation,
   mkAdminCtx,
   provisionResellerSystemRoles,
   resellerMemberships,
@@ -14,6 +20,7 @@ import {
   resellers,
   roles,
   rolesLive,
+  type UniqueViolationErrors,
   userProfilesLive,
   usersLive,
   withAdmin,
@@ -58,6 +65,15 @@ function buildListConditions(query: AdminResellerListQuery): SQL[] {
   }
   return conditions;
 }
+
+// The service checks the slug first; only a second create running at once gets here.
+const SLUG_TAKEN: UniqueViolationErrors = {
+  resellers_slug_key: () =>
+    new BusinessException(
+      ErrorCode.SLUG_DUPLICATE,
+      'This slug is already taken by another reseller',
+    ),
+};
 
 @Injectable()
 export class AdminResellerDrizzleRepository extends AdminResellerRepository {
@@ -161,7 +177,7 @@ export class AdminResellerDrizzleRepository extends AdminResellerRepository {
 
       const roleIds = await provisionResellerSystemRoles(tx, created.id, data.actorId);
       return { reseller: created, roleIds };
-    });
+    }).catch(mapUniqueViolation(SLUG_TAKEN));
   }
 
   async update(

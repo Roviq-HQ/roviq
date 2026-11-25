@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DynamicGroupStatus, GroupMemberSource } from '@roviq/common-types';
+import {
+  BusinessException,
+  DynamicGroupStatus,
+  ErrorCode,
+  GroupMemberSource,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -10,8 +15,10 @@ import {
   groupRulesLive,
   groups,
   groupsLive,
+  mapUniqueViolation,
   membershipsLive,
   mkInstituteCtx,
+  type UniqueViolationErrors,
   usersLive,
   withTenant,
 } from '@roviq/database';
@@ -32,6 +39,14 @@ import type {
 } from './types';
 
 const ORIGIN = 'service:group';
+
+const NAME_TAKEN: UniqueViolationErrors = {
+  idx_group_name_active: () =>
+    new BusinessException(
+      ErrorCode.GROUP_NAME_DUPLICATE,
+      'A group with this name already exists in this institute',
+    ),
+};
 
 @Injectable()
 export class GroupDrizzleRepository extends GroupRepository {
@@ -96,7 +111,7 @@ export class GroupDrizzleRepository extends GroupRepository {
       }
 
       return newGroups;
-    });
+    }).catch(mapUniqueViolation(NAME_TAKEN));
     return rows.length === 0 ? null : (rows[0] as GroupRecord);
   }
 
@@ -155,7 +170,7 @@ export class GroupDrizzleRepository extends GroupRepository {
         description: rule.description,
       });
       return updated;
-    });
+    }).catch(mapUniqueViolation(NAME_TAKEN));
     return rows.length === 0 ? null : (rows[0] as GroupRecord);
   }
 

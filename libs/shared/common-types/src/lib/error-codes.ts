@@ -70,8 +70,6 @@ export const ErrorCode = {
   INSTITUTE_NOT_ACTIVE: 'INSTITUTE_NOT_ACTIVE',
   /** Another non-deleted institute already uses this code */
   INSTITUTE_CODE_DUPLICATE: 'INSTITUTE_CODE_DUPLICATE',
-  /** Another non-deleted institute already uses this primary email */
-  INSTITUTE_EMAIL_DUPLICATE: 'INSTITUTE_EMAIL_DUPLICATE',
   /** Cannot activate institute before setup_status = completed */
   SETUP_NOT_COMPLETE: 'SETUP_NOT_COMPLETE',
   /** Status transition not permitted by the domain state machine */
@@ -132,10 +130,14 @@ export const ErrorCode = {
   NO_ACTIVE_ACADEMIC_YEAR: 'NO_ACTIVE_ACADEMIC_YEAR',
   /** Academic year label (YYYY-YY) does not match the start/end date range */
   LABEL_DATE_MISMATCH: 'LABEL_DATE_MISMATCH',
+  /** Another academic year of the institute, a deleted one included, already has this label */
+  ACADEMIC_YEAR_LABEL_DUPLICATE: 'ACADEMIC_YEAR_LABEL_DUPLICATE',
 
   // ── Standard / Section / Subject ───────────────────────
   /** A standard with this name already exists in the same academic year */
   STANDARD_NAME_DUPLICATE: 'STANDARD_NAME_DUPLICATE',
+  /** A standard with this class level (numeric order) already exists in the same academic year */
+  STANDARD_ORDER_DUPLICATE: 'STANDARD_ORDER_DUPLICATE',
   /** A section with this name already exists in the same standard */
   SECTION_NAME_DUPLICATE: 'SECTION_NAME_DUPLICATE',
   /** Cannot delete — students are actively enrolled */
@@ -154,8 +156,6 @@ export const ErrorCode = {
   STUDENT_ALREADY_ENROLLED: 'STUDENT_ALREADY_ENROLLED',
   /** Student has attendance, marks, assessments or report cards in that year — cannot remove */
   STUDENT_YEAR_HAS_RECORDS: 'STUDENT_YEAR_HAS_RECORDS',
-  /** Board code is already used by another subject in this standard */
-  SUBJECT_CODE_DUPLICATE: 'SUBJECT_CODE_DUPLICATE',
 
   // ── Student ────────────────────────────────────────────
   /** Cannot mark a student TRANSFERRED_OUT before issuing a Transfer Certificate */
@@ -182,6 +182,12 @@ export const ErrorCode = {
   TIMETABLE_PERIOD_NOT_ASSIGNABLE: 'TIMETABLE_PERIOD_NOT_ASSIGNABLE',
   /** The section is not covered by this timetable */
   TIMETABLE_SECTION_NOT_COVERED: 'TIMETABLE_SECTION_NOT_COVERED',
+  /** The section is already covered by this timetable */
+  TIMETABLE_SECTION_DUPLICATE: 'TIMETABLE_SECTION_DUPLICATE',
+  /** Another period of this timetable already has this label */
+  TIMETABLE_PERIOD_LABEL_DUPLICATE: 'TIMETABLE_PERIOD_LABEL_DUPLICATE',
+  /** That section, period and group already has a change for that date */
+  TIMETABLE_DAY_OVERRIDE_DUPLICATE: 'TIMETABLE_DAY_OVERRIDE_DUPLICATE',
 
   // ── Examination & report cards ─────────────────────────
   /** Exam not found or soft-deleted */
@@ -196,9 +202,21 @@ export const ErrorCode = {
   EXAM_NOT_IN_MARKS_ENTRY: 'EXAM_NOT_IN_MARKS_ENTRY',
   /** Two exam schedule rows clash on room + date + time */
   EXAM_SCHEDULE_CONFLICT: 'EXAM_SCHEDULE_CONFLICT',
+  /** The exam already has a paper for this section, subject and component */
+  EXAM_SCHEDULE_DUPLICATE: 'EXAM_SCHEDULE_DUPLICATE',
+  /** An exam term with this name already exists in the academic year */
+  EXAM_TERM_NAME_DUPLICATE: 'EXAM_TERM_NAME_DUPLICATE',
+  /** A grading scheme with this name already exists in the institute */
+  GRADING_SCHEME_NAME_DUPLICATE: 'GRADING_SCHEME_NAME_DUPLICATE',
+  /** A co-scholastic area with this name already exists in the institute */
+  CO_SCHOLASTIC_AREA_NAME_DUPLICATE: 'CO_SCHOLASTIC_AREA_NAME_DUPLICATE',
+  /** Another topic of this subject and standard already has this code */
+  SUBJECT_TOPIC_CODE_DUPLICATE: 'SUBJECT_TOPIC_CODE_DUPLICATE',
+  /** A report card with this name already exists in the academic year */
+  REPORT_CARD_NAME_DUPLICATE: 'REPORT_CARD_NAME_DUPLICATE',
   /** Grading scheme not found or soft-deleted */
   GRADING_SCHEME_NOT_FOUND: 'GRADING_SCHEME_NOT_FOUND',
-  /** Grade bands overlap or leave a gap in 0–100 */
+  /** Grade bands overlap, leave a gap in 0–100, or repeat a grade */
   GRADING_SCHEME_INVALID_BANDS: 'GRADING_SCHEME_INVALID_BANDS',
   /** Grading scheme is referenced by an exam/report card and cannot be deleted */
   GRADING_SCHEME_IN_USE: 'GRADING_SCHEME_IN_USE',
@@ -243,6 +261,8 @@ export const ErrorCode = {
   GROUP_MEMBER_NOT_FOUND: 'GROUP_MEMBER_NOT_FOUND',
   /** User group not found */
   GROUP_NOT_FOUND: 'GROUP_NOT_FOUND',
+  /** Another live group of the institute already has this name */
+  GROUP_NAME_DUPLICATE: 'GROUP_NAME_DUPLICATE',
   /** Guardian is not linked to the student */
   GUARDIAN_LINK_NOT_FOUND: 'GUARDIAN_LINK_NOT_FOUND',
   /** Guardian profile not found */
@@ -251,6 +271,10 @@ export const ErrorCode = {
   HOLIDAY_NOT_FOUND: 'HOLIDAY_NOT_FOUND',
   /** Institute group not found */
   INSTITUTE_GROUP_NOT_FOUND: 'INSTITUTE_GROUP_NOT_FOUND',
+  /** Another live institute group already has this code */
+  INSTITUTE_GROUP_CODE_DUPLICATE: 'INSTITUTE_GROUP_CODE_DUPLICATE',
+  /** The user is already a member of this institute group */
+  INSTITUTE_GROUP_MEMBER_DUPLICATE: 'INSTITUTE_GROUP_MEMBER_DUPLICATE',
   /** Leave request not found */
   LEAVE_NOT_FOUND: 'LEAVE_NOT_FOUND',
   /** Stored file not found, not owned by the caller, or not usable for this purpose */
@@ -476,7 +500,6 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INSTITUTE_NOT_FOUND: HttpStatus.NOT_FOUND,
   INSTITUTE_NOT_ACTIVE: HttpStatus.FORBIDDEN,
   INSTITUTE_CODE_DUPLICATE: HttpStatus.CONFLICT,
-  INSTITUTE_EMAIL_DUPLICATE: HttpStatus.CONFLICT,
   SETUP_NOT_COMPLETE: HttpStatus.UNPROCESSABLE_ENTITY,
   INVALID_STATE_TRANSITION: HttpStatus.UNPROCESSABLE_ENTITY,
   INVALID_LOCALE_SETTINGS: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -506,7 +529,9 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   YEAR_ALREADY_ACTIVE: HttpStatus.CONFLICT,
   NO_ACTIVE_ACADEMIC_YEAR: HttpStatus.UNPROCESSABLE_ENTITY,
   LABEL_DATE_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
+  ACADEMIC_YEAR_LABEL_DUPLICATE: HttpStatus.CONFLICT,
   STANDARD_NAME_DUPLICATE: HttpStatus.CONFLICT,
+  STANDARD_ORDER_DUPLICATE: HttpStatus.CONFLICT,
   SECTION_NAME_DUPLICATE: HttpStatus.CONFLICT,
   HAS_ACTIVE_ENROLLMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
   ADMISSION_NUMBER_TAKEN: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -518,7 +543,6 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SECTION_HAS_STUDENTS: HttpStatus.CONFLICT,
   STUDENT_ALREADY_ENROLLED: HttpStatus.CONFLICT,
   STUDENT_YEAR_HAS_RECORDS: HttpStatus.CONFLICT,
-  SUBJECT_CODE_DUPLICATE: HttpStatus.CONFLICT,
   TIMETABLE_NOT_FOUND: HttpStatus.NOT_FOUND,
   TIMETABLE_NAME_DUPLICATE: HttpStatus.CONFLICT,
   TIMETABLE_INVALID_CONFIG: HttpStatus.BAD_REQUEST,
@@ -527,12 +551,21 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   TIMETABLE_ROOM_CONFLICT: HttpStatus.CONFLICT,
   TIMETABLE_PERIOD_NOT_ASSIGNABLE: HttpStatus.UNPROCESSABLE_ENTITY,
   TIMETABLE_SECTION_NOT_COVERED: HttpStatus.UNPROCESSABLE_ENTITY,
+  TIMETABLE_SECTION_DUPLICATE: HttpStatus.CONFLICT,
+  TIMETABLE_PERIOD_LABEL_DUPLICATE: HttpStatus.CONFLICT,
+  TIMETABLE_DAY_OVERRIDE_DUPLICATE: HttpStatus.CONFLICT,
   EXAM_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXAM_NAME_DUPLICATE: HttpStatus.CONFLICT,
   EXAM_INVALID_CONFIG: HttpStatus.BAD_REQUEST,
   EXAM_MARKS_OUT_OF_RANGE: HttpStatus.BAD_REQUEST,
   EXAM_NOT_IN_MARKS_ENTRY: HttpStatus.UNPROCESSABLE_ENTITY,
   EXAM_SCHEDULE_CONFLICT: HttpStatus.CONFLICT,
+  EXAM_SCHEDULE_DUPLICATE: HttpStatus.CONFLICT,
+  EXAM_TERM_NAME_DUPLICATE: HttpStatus.CONFLICT,
+  GRADING_SCHEME_NAME_DUPLICATE: HttpStatus.CONFLICT,
+  CO_SCHOLASTIC_AREA_NAME_DUPLICATE: HttpStatus.CONFLICT,
+  SUBJECT_TOPIC_CODE_DUPLICATE: HttpStatus.CONFLICT,
+  REPORT_CARD_NAME_DUPLICATE: HttpStatus.CONFLICT,
   GRADING_SCHEME_NOT_FOUND: HttpStatus.NOT_FOUND,
   GRADING_SCHEME_INVALID_BANDS: HttpStatus.BAD_REQUEST,
   GRADING_SCHEME_IN_USE: HttpStatus.CONFLICT,
@@ -556,10 +589,13 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   EXAM_TERM_NOT_FOUND: HttpStatus.NOT_FOUND,
   GROUP_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
   GROUP_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GROUP_NAME_DUPLICATE: HttpStatus.CONFLICT,
   GUARDIAN_LINK_NOT_FOUND: HttpStatus.NOT_FOUND,
   GUARDIAN_NOT_FOUND: HttpStatus.NOT_FOUND,
   HOLIDAY_NOT_FOUND: HttpStatus.NOT_FOUND,
   INSTITUTE_GROUP_NOT_FOUND: HttpStatus.NOT_FOUND,
+  INSTITUTE_GROUP_CODE_DUPLICATE: HttpStatus.CONFLICT,
+  INSTITUTE_GROUP_MEMBER_DUPLICATE: HttpStatus.CONFLICT,
   LEAVE_NOT_FOUND: HttpStatus.NOT_FOUND,
   FILE_NOT_FOUND: HttpStatus.NOT_FOUND,
   MEMBERSHIP_NOT_FOUND: HttpStatus.NOT_FOUND,

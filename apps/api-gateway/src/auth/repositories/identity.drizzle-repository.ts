@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  mapUniqueViolation,
   memberships,
   membershipsLive,
   mkAdminCtx,
@@ -13,6 +15,7 @@ import {
   refreshTokens,
   resellerMemberships,
   resellerMembershipsLive,
+  type UniqueViolationErrors,
   userProfiles,
   userProfilesLive,
   users,
@@ -34,6 +37,15 @@ import type {
   UserContactRow,
   UserEmailMatch,
 } from './types';
+
+// The team invite checks first; only a second invite running at once gets here.
+const RESELLER_MEMBER_TAKEN: UniqueViolationErrors = {
+  uq_reseller_membership: () =>
+    new BusinessException(
+      ErrorCode.TEAM_MEMBER_ALREADY_EXISTS,
+      'This person is already on the team',
+    ),
+};
 
 @Injectable()
 export class IdentityDrizzleRepository extends IdentityRepository {
@@ -314,7 +326,7 @@ export class IdentityDrizzleRepository extends IdentityRepository {
           })
           .returning({ id: resellerMemberships.id });
       },
-    );
+    ).catch(mapUniqueViolation(RESELLER_MEMBER_TAKEN));
     return row.id;
   }
 

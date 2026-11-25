@@ -1,16 +1,25 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
   i18nNameSearch,
+  mapUniqueViolation,
   mkResellerCtx,
   softDelete,
+  type UniqueViolationErrors,
   withReseller,
 } from '@roviq/database';
 import { plans, plansLive } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, desc, eq, type SQL, sql } from 'drizzle-orm';
 import { billingError } from '../billing.errors';
+
+// The service checks the code first; only a second create running at once gets here.
+const PLAN_CODE_TAKEN: UniqueViolationErrors = {
+  uq_plan_code_reseller: () =>
+    new BusinessException(ErrorCode.PLAN_CODE_DUPLICATE, 'A plan with this code already exists'),
+};
 
 @Injectable()
 export class PlanRepository {
@@ -94,7 +103,7 @@ export class PlanRepository {
     return withReseller(this.db, mkResellerCtx(resellerId, 'repository:plan'), async (tx) => {
       const [plan] = await tx.insert(plans).values(data).returning();
       return plan;
-    });
+    }).catch(mapUniqueViolation(PLAN_CODE_TAKEN));
   }
 
   async update(

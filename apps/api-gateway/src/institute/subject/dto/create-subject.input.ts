@@ -1,6 +1,7 @@
 import { Field, ID, InputType, Int } from '@nestjs/graphql';
 import { SubjectType } from '@roviq/common-types';
 import {
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -106,6 +107,7 @@ export class CreateSubjectInput {
   electiveGroup?: string;
 
   @IsArray()
+  @ArrayUnique()
   @IsUUID(undefined, { each: true })
   @IsOptional()
   @Field(() => [ID], {
@@ -115,6 +117,7 @@ export class CreateSubjectInput {
   standardIds?: string[];
 
   @IsArray()
+  @ArrayUnique()
   @IsUUID(undefined, { each: true })
   @IsOptional()
   @Field(() => [ID], {

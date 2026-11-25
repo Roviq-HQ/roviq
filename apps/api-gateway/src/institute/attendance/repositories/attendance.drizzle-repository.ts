@@ -8,6 +8,7 @@ import {
   attendanceSessionsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  mapUniqueViolation,
   membershipsLive,
   mkInstituteCtx,
   sectionsLive,
@@ -16,6 +17,7 @@ import {
   studentAcademicsLive,
   studentProfilesLive,
   subjectsLive,
+  type UniqueViolationErrors,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -113,6 +115,15 @@ const entryWriteReturning = {
 
 const countWhere = (condition: SQL | undefined) =>
   sql<number>`count(*) filter (where ${condition})`.mapWith(Number);
+
+// The service reads the slot first; only a second session started at once gets here.
+const SLOT_TAKEN: UniqueViolationErrors = {
+  attendance_sessions_section_date_period_key: () =>
+    new BusinessException(
+      ErrorCode.ATTENDANCE_SLOT_TAKEN,
+      'Attendance for this slot was just started by another session',
+    ),
+};
 
 @Injectable()
 export class AttendanceDrizzleRepository extends AttendanceRepository {
@@ -305,7 +316,7 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
         })
         .returning(sessionWriteReturning);
       return rows[0] as AttendanceSessionRecord;
-    });
+    }).catch(mapUniqueViolation(SLOT_TAKEN));
   }
 
   async assignLecturer(sessionId: string, lecturerId: string): Promise<AttendanceSessionRecord> {

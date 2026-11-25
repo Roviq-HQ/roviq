@@ -64,6 +64,35 @@ const UPDATE_TIMETABLE = /* GraphQL */ `
   }
 `;
 
+const ADD_SECTION = /* GraphQL */ `
+  mutation ($timetableId: ID!, $sectionId: ID!) {
+    addTimetableSection(timetableId: $timetableId, sectionId: $sectionId) {
+      id
+    }
+  }
+`;
+const ADD_PERIOD = /* GraphQL */ `
+  mutation ($timetableId: ID!, $label: String!) {
+    addTimetablePeriod(input: { timetableId: $timetableId, kind: "PERIOD", label: $label }) {
+      id
+    }
+  }
+`;
+const UPDATE_PERIOD = /* GraphQL */ `
+  mutation ($timetableId: ID!, $periodId: ID!, $label: String!) {
+    updateTimetablePeriod(timetableId: $timetableId, periodId: $periodId, input: { label: $label }) {
+      id
+    }
+  }
+`;
+const CREATE_OVERRIDE = /* GraphQL */ `
+  mutation ($input: CreateTimetableDayOverrideInput!) {
+    createTimetableDayOverride(input: $input) {
+      id
+    }
+  }
+`;
+
 interface Year {
   yearId: string;
   sectionId: string;
@@ -145,6 +174,71 @@ describe('timetable writes that repeat a unique value (ROV-358)', () => {
 
     it('allows the same name in another academic year', async () => {
       ok(await createTimetable(otherYear, 'Regular'));
+    });
+
+    it('refuses a section listed twice before anything is written', async () => {
+      const res = await gql(CREATE_TIMETABLE, {
+        academicYearId: year.yearId,
+        sectionIds: [year.sectionId, year.sectionId],
+        name: { en: 'Twice' },
+      });
+      expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.VALIDATION_FAILED);
+    });
+  });
+
+  describe('sections, periods and day changes', () => {
+    let timetableId: string;
+    let otherTimetableId: string;
+
+    const addPeriod = (target: string, label: string) =>
+      gql<{ addTimetablePeriod: { id: string } }>(ADD_PERIOD, { timetableId: target, label });
+
+    const cancel = (periodId: string, date: string) =>
+      gql<{ createTimetableDayOverride: { id: string } }>(CREATE_OVERRIDE, {
+        input: {
+          timetableId,
+          date,
+          sectionId: year.sectionId,
+          periodId,
+          overrideType: 'CANCELLATION',
+        },
+      });
+
+    beforeAll(async () => {
+      timetableId = ok(await createTimetable(year, 'Grid')).createTimetable.id;
+      otherTimetableId = ok(await createTimetable(year, 'Other grid')).createTimetable.id;
+    });
+
+    it('refuses adding a section the timetable already covers', async () => {
+      const res = await gql(ADD_SECTION, { timetableId, sectionId: year.sectionId });
+      expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.TIMETABLE_SECTION_DUPLICATE);
+    });
+
+    it('refuses a period label the timetable already has, on add and on rename', async () => {
+      const zero = ok(await addPeriod(timetableId, 'Zero')).addTimetablePeriod.id;
+      const repeated = await addPeriod(timetableId, 'Zero');
+      expect(repeated.errors?.[0]?.extensions?.code).toBe(
+        ErrorCode.TIMETABLE_PERIOD_LABEL_DUPLICATE,
+      );
+
+      const extra = ok(await addPeriod(timetableId, 'Extra')).addTimetablePeriod.id;
+      const renamed = await gql(UPDATE_PERIOD, { timetableId, periodId: extra, label: 'Zero' });
+      expect(renamed.errors?.[0]?.extensions?.code).toBe(
+        ErrorCode.TIMETABLE_PERIOD_LABEL_DUPLICATE,
+      );
+      expect(zero).not.toBe(extra);
+    });
+
+    it('allows the same period label in another timetable', async () => {
+      ok(await addPeriod(otherTimetableId, 'Zero'));
+    });
+
+    it('refuses a second change of the same period, section and date', async () => {
+      const periodId = ok(await addPeriod(timetableId, 'Assembly')).addTimetablePeriod.id;
+      ok(await cancel(periodId, '2026-12-07'));
+      const res = await cancel(periodId, '2026-12-07');
+      expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.TIMETABLE_DAY_OVERRIDE_DUPLICATE);
+      ok(await cancel(periodId, '2026-12-14'));
     });
   });
 });

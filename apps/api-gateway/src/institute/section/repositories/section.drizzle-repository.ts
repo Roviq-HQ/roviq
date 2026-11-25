@@ -5,6 +5,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   i18nNameSearch,
+  mapUniqueViolation,
   membershipsLive,
   mkInstituteCtx,
   sections,
@@ -12,6 +13,7 @@ import {
   softDelete,
   standardsLive,
   studentAcademicsLive,
+  type UniqueViolationErrors,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -78,6 +80,14 @@ const writeReturning = {
 type GenderEnum = (typeof sections.genderRestriction.enumValues)[number];
 type BatchEnum = (typeof sections.batchStatus.enumValues)[number];
 
+const SECTION_TAKEN: UniqueViolationErrors = {
+  sections_standard_name_key: () =>
+    new BusinessException(
+      ErrorCode.SECTION_NAME_DUPLICATE,
+      'A section with this name already exists in this standard',
+    ),
+};
+
 @Injectable()
 export class SectionDrizzleRepository extends SectionRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -138,99 +148,107 @@ export class SectionDrizzleRepository extends SectionRepository {
   async create(data: CreateSectionData): Promise<SectionWriteResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:section'), async (tx) => {
-      // Foreign keys accept any institute's row; the views under RLS do not.
-      const [year] = await tx
-        .select({ id: academicYearsLive.id })
-        .from(academicYearsLive)
-        .where(eq(academicYearsLive.id, data.academicYearId))
-        .limit(1);
-      if (!year) return { kind: 'year_not_found' };
-      const [standard] = await tx
-        .select({ id: standardsLive.id })
-        .from(standardsLive)
-        .where(
-          and(
-            eq(standardsLive.id, data.standardId),
-            eq(standardsLive.academicYearId, data.academicYearId),
-          ),
-        )
-        .limit(1);
-      if (!standard) return { kind: 'standard_not_found' };
-      if (data.classTeacherId && !(await this.membershipExists(tx, data.classTeacherId))) {
-        return { kind: 'class_teacher_not_found' };
-      }
+    return withTenant<SectionWriteResult>(
+      this.db,
+      mkInstituteCtx(tenantId, 'repository:section'),
+      async (tx) => {
+        // Foreign keys accept any institute's row; the views under RLS do not.
+        const [year] = await tx
+          .select({ id: academicYearsLive.id })
+          .from(academicYearsLive)
+          .where(eq(academicYearsLive.id, data.academicYearId))
+          .limit(1);
+        if (!year) return { kind: 'year_not_found' };
+        const [standard] = await tx
+          .select({ id: standardsLive.id })
+          .from(standardsLive)
+          .where(
+            and(
+              eq(standardsLive.id, data.standardId),
+              eq(standardsLive.academicYearId, data.academicYearId),
+            ),
+          )
+          .limit(1);
+        if (!standard) return { kind: 'standard_not_found' };
+        if (data.classTeacherId && !(await this.membershipExists(tx, data.classTeacherId))) {
+          return { kind: 'class_teacher_not_found' };
+        }
 
-      const rows = await tx
-        .insert(sections)
-        .values({
-          tenantId,
-          standardId: data.standardId,
-          academicYearId: data.academicYearId,
-          name: data.name,
-          displayLabel: data.displayLabel,
-          stream: data.stream,
-          mediumOfInstruction: data.mediumOfInstruction,
-          shift: data.shift,
-          classTeacherId: data.classTeacherId,
-          room: data.room,
-          capacity: data.capacity,
-          genderRestriction: (data.genderRestriction as GenderEnum) ?? 'CO_ED',
-          displayOrder: data.displayOrder ?? 0,
-          startTime: data.startTime,
-          endTime: data.endTime,
-          batchStatus: data.batchStatus as BatchEnum | undefined,
-          createdBy: userId,
-          updatedBy: userId,
-        })
-        .returning(writeReturning);
-      return { kind: 'ok', record: rows[0] as SectionRecord };
-    });
+        const rows = await tx
+          .insert(sections)
+          .values({
+            tenantId,
+            standardId: data.standardId,
+            academicYearId: data.academicYearId,
+            name: data.name,
+            displayLabel: data.displayLabel,
+            stream: data.stream,
+            mediumOfInstruction: data.mediumOfInstruction,
+            shift: data.shift,
+            classTeacherId: data.classTeacherId,
+            room: data.room,
+            capacity: data.capacity,
+            genderRestriction: (data.genderRestriction as GenderEnum) ?? 'CO_ED',
+            displayOrder: data.displayOrder ?? 0,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            batchStatus: data.batchStatus as BatchEnum | undefined,
+            createdBy: userId,
+            updatedBy: userId,
+          })
+          .returning(writeReturning);
+        return { kind: 'ok', record: rows[0] as SectionRecord };
+      },
+    ).catch(mapUniqueViolation(SECTION_TAKEN));
   }
 
   async update(id: string, data: UpdateSectionData): Promise<SectionWriteResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:section'), async (tx) => {
-      // The section first: a missing section is the answer whatever the teacher id is.
-      const [section] = await tx
-        .select({ id: sectionsLive.id })
-        .from(sectionsLive)
-        .where(eq(sectionsLive.id, id))
-        .limit(1);
-      if (!section) return { kind: 'section_not_found' };
-      if (data.classTeacherId && !(await this.membershipExists(tx, data.classTeacherId))) {
-        return { kind: 'class_teacher_not_found' };
-      }
+    return withTenant<SectionWriteResult>(
+      this.db,
+      mkInstituteCtx(tenantId, 'repository:section'),
+      async (tx) => {
+        // The section first: a missing section is the answer whatever the teacher id is.
+        const [section] = await tx
+          .select({ id: sectionsLive.id })
+          .from(sectionsLive)
+          .where(eq(sectionsLive.id, id))
+          .limit(1);
+        if (!section) return { kind: 'section_not_found' };
+        if (data.classTeacherId && !(await this.membershipExists(tx, data.classTeacherId))) {
+          return { kind: 'class_teacher_not_found' };
+        }
 
-      const rows = await tx
-        .update(sections)
-        .set({
-          ...(data.name !== undefined && { name: data.name }),
-          ...(data.displayLabel !== undefined && { displayLabel: data.displayLabel }),
-          ...(data.stream !== undefined && { stream: data.stream }),
-          ...(data.mediumOfInstruction !== undefined && {
-            mediumOfInstruction: data.mediumOfInstruction,
-          }),
-          ...(data.shift !== undefined && { shift: data.shift }),
-          ...(data.classTeacherId !== undefined && { classTeacherId: data.classTeacherId }),
-          ...(data.room !== undefined && { room: data.room }),
-          ...(data.capacity !== undefined && { capacity: data.capacity }),
-          ...(data.genderRestriction !== undefined && {
-            genderRestriction: data.genderRestriction as GenderEnum,
-          }),
-          ...(data.displayOrder !== undefined && { displayOrder: data.displayOrder }),
-          ...(data.startTime !== undefined && { startTime: data.startTime }),
-          ...(data.endTime !== undefined && { endTime: data.endTime }),
-          ...(data.batchStatus !== undefined && { batchStatus: data.batchStatus as BatchEnum }),
-          updatedBy: userId,
-        })
-        .where(and(eq(sections.id, id), isNull(sections.deletedAt)))
-        .returning(writeReturning);
+        const rows = await tx
+          .update(sections)
+          .set({
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.displayLabel !== undefined && { displayLabel: data.displayLabel }),
+            ...(data.stream !== undefined && { stream: data.stream }),
+            ...(data.mediumOfInstruction !== undefined && {
+              mediumOfInstruction: data.mediumOfInstruction,
+            }),
+            ...(data.shift !== undefined && { shift: data.shift }),
+            ...(data.classTeacherId !== undefined && { classTeacherId: data.classTeacherId }),
+            ...(data.room !== undefined && { room: data.room }),
+            ...(data.capacity !== undefined && { capacity: data.capacity }),
+            ...(data.genderRestriction !== undefined && {
+              genderRestriction: data.genderRestriction as GenderEnum,
+            }),
+            ...(data.displayOrder !== undefined && { displayOrder: data.displayOrder }),
+            ...(data.startTime !== undefined && { startTime: data.startTime }),
+            ...(data.endTime !== undefined && { endTime: data.endTime }),
+            ...(data.batchStatus !== undefined && { batchStatus: data.batchStatus as BatchEnum }),
+            updatedBy: userId,
+          })
+          .where(and(eq(sections.id, id), isNull(sections.deletedAt)))
+          .returning(writeReturning);
 
-      if (rows.length === 0) return { kind: 'section_not_found' };
-      return { kind: 'ok', record: rows[0] as SectionRecord };
-    });
+        if (rows.length === 0) return { kind: 'section_not_found' };
+        return { kind: 'ok', record: rows[0] as SectionRecord };
+      },
+    ).catch(mapUniqueViolation(SECTION_TAKEN));
   }
 
   private async membershipExists(tx: DrizzleDB, membershipId: string): Promise<boolean> {
