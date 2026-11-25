@@ -6,17 +6,19 @@ import {
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  messagingSendersLive,
   messagingTemplates,
   mkAdminCtx,
   SYSTEM_USER_ID,
   withAdmin,
 } from '@roviq/database';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import {
+  type AccountTemplateProblems,
   type MessagingTemplateRecord,
   MessagingTemplateRepository,
+  PENDING_LONG_HOURS,
   type TemplateEventChange,
-  type TemplateProblem,
 } from './messaging-template.repository';
 
 const ORIGIN = 'repository:messaging-template';
@@ -62,7 +64,10 @@ export class MessagingTemplateDrizzleRepository extends MessagingTemplateReposit
 
   async listForAccount(providerAccountId: string): Promise<MessagingTemplateRecord[]> {
     const rows = await withAdmin(this.db, mkAdminCtx(ORIGIN), (tx) =>
-      tx.select(columns).from(t).where(eq(t.providerAccountId, providerAccountId)),
+      tx
+        .select(columns)
+        .from(t)
+        .where(and(eq(t.providerAccountId, providerAccountId), eq(t.retired, false))),
     );
     return rows.map(recordOf);
   }
@@ -72,7 +77,14 @@ export class MessagingTemplateDrizzleRepository extends MessagingTemplateReposit
     await withAdmin(this.db, mkAdminCtx(ORIGIN), (tx) =>
       tx
         .insert(t)
-        .values(rows.map((r) => ({ ...r, createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID })))
+        .values(
+          rows.map((r) => ({
+            ...r,
+            retired: false,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })),
+        )
         .onConflictDoUpdate({
           target: [t.providerAccountId, t.name, t.language],
           set: {
@@ -84,9 +96,27 @@ export class MessagingTemplateDrizzleRepository extends MessagingTemplateReposit
             rejectedReason: sql`excluded.rejected_reason`,
             quality: sql`excluded.quality`,
             outOfStep: sql`excluded.out_of_step`,
+            retired: false,
             updatedBy: SYSTEM_USER_ID,
           },
         }),
+    );
+  }
+
+  async retireExcept(providerAccountId: string, names: readonly string[]): Promise<void> {
+    // An empty registry would retire every row: never the intent.
+    if (names.length === 0) return;
+    await withAdmin(this.db, mkAdminCtx(ORIGIN), (tx) =>
+      tx
+        .update(t)
+        .set({ retired: true, updatedBy: SYSTEM_USER_ID })
+        .where(
+          and(
+            eq(t.providerAccountId, providerAccountId),
+            eq(t.retired, false),
+            notInArray(t.name, [...names]),
+          ),
+        ),
     );
   }
 
@@ -144,25 +174,33 @@ export class MessagingTemplateDrizzleRepository extends MessagingTemplateReposit
     return row ? recordOf(row) : null;
   }
 
-  async countProblems(): Promise<Array<{ problem: TemplateProblem; count: number }>> {
-    const [row] = await withAdmin(this.db, mkAdminCtx(ORIGIN), (tx) =>
+  async countProblems(): Promise<AccountTemplateProblems[]> {
+    return withAdmin(this.db, mkAdminCtx(ORIGIN), (tx) =>
       tx
         .select({
+          providerAccountId: t.providerAccountId,
           REJECTED: sql<number>`count(*) FILTER (WHERE ${t.status} = 'REJECTED')::int`,
           PAUSED: sql<number>`count(*) FILTER (WHERE ${t.status} = 'PAUSED')::int`,
           DISABLED: sql<number>`count(*) FILTER (WHERE ${t.status} = 'DISABLED')::int`,
           CATEGORY_CHANGED: sql<number>`count(*) FILTER (WHERE ${t.approvedCategory} IS NOT NULL AND ${t.approvedCategory} <> ${t.declaredCategory})::int`,
           OUT_OF_STEP: sql<number>`count(*) FILTER (WHERE ${t.outOfStep})::int`,
+          PENDING_LONG: sql<number>`count(*) FILTER (WHERE ${t.status} = 'PENDING' AND ${t.createdAt} < now() - make_interval(hours => ${PENDING_LONG_HOURS}))::int`,
         })
-        .from(t),
+        .from(t)
+        .where(
+          and(
+            eq(t.retired, false),
+            // A deleted sender's account is nobody's problem any more.
+            inArray(
+              t.providerAccountId,
+              tx
+                .select({ account: messagingSendersLive.providerAccountId })
+                .from(messagingSendersLive)
+                .where(isNotNull(messagingSendersLive.providerAccountId)),
+            ),
+          ),
+        )
+        .groupBy(t.providerAccountId),
     );
-    const problems: TemplateProblem[] = [
-      'REJECTED',
-      'PAUSED',
-      'DISABLED',
-      'CATEGORY_CHANGED',
-      'OUT_OF_STEP',
-    ];
-    return problems.map((problem) => ({ problem, count: row?.[problem] ?? 0 }));
   }
 }

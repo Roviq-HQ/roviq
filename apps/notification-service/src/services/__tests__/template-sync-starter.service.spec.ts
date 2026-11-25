@@ -1,7 +1,6 @@
 import { NOTIFICATION_REDIS_KEYS } from '@roviq/redis';
 import type { TemporalClientService } from '@roviq/temporal';
 import { createMock } from '@roviq/testing';
-import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import type Redis from 'ioredis';
 import { describe, expect, it, vi } from 'vitest';
 import { registryHash } from '../../delivery/whatsapp/template-submission';
@@ -11,7 +10,7 @@ import { TemplateSyncStarter } from '../template-sync-starter.service';
 
 function setup(storedHash: string | null) {
   const temporal = createMock<TemporalClientService>({
-    startWorkflow: vi.fn().mockResolvedValue('run-1'),
+    signalWithStart: vi.fn().mockResolvedValue('run-1'),
   });
   const senders = createMock<MessagingSenderRepository>({
     listAccounts: vi.fn().mockResolvedValue(['acct-1', 'acct-2']),
@@ -24,25 +23,18 @@ function setup(storedHash: string | null) {
 }
 
 describe('TemplateSyncStarter', () => {
-  it('should start one run per account, keyed by the account', async () => {
+  it('should start a run of the account, or tell the one going to read the list again', async () => {
     const { starter, temporal } = setup(null);
 
-    await expect(starter.start('acct-1')).resolves.toBe(true);
+    await starter.start('acct-1');
 
-    expect(temporal.startWorkflow).toHaveBeenCalledWith('WhatsAppTemplateSyncWorkflow', {
+    expect(temporal.signalWithStart).toHaveBeenCalledWith('WhatsAppTemplateSyncWorkflow', {
       workflowId: 'whatsapp-template-sync:acct-1',
       taskQueue: 'notifications',
       args: [{ providerAccountId: 'acct-1' }],
+      signal: 'templateSyncRequested',
+      signalArgs: [null],
     });
-  });
-
-  it('should answer false when a run of the account is already going', async () => {
-    const { starter, temporal } = setup(null);
-    temporal.startWorkflow.mockRejectedValue(
-      new WorkflowExecutionAlreadyStartedError('running', 'whatsapp-template-sync:acct-1', 'type'),
-    );
-
-    await expect(starter.start('acct-1')).resolves.toBe(false);
   });
 
   it('should sync every account at start when the registry changed, then remember it', async () => {
@@ -50,7 +42,7 @@ describe('TemplateSyncStarter', () => {
 
     await starter.startIfRegistryChanged();
 
-    expect(temporal.startWorkflow).toHaveBeenCalledTimes(2);
+    expect(temporal.signalWithStart).toHaveBeenCalledTimes(2);
     expect(redis.set).toHaveBeenCalledWith(
       NOTIFICATION_REDIS_KEYS.NOTIFICATION_TEMPLATE_REGISTRY_HASH,
       registryHash(),
@@ -62,14 +54,16 @@ describe('TemplateSyncStarter', () => {
 
     await starter.startIfRegistryChanged();
 
-    expect(temporal.startWorkflow).not.toHaveBeenCalled();
+    expect(temporal.signalWithStart).not.toHaveBeenCalled();
     expect(redis.set).not.toHaveBeenCalled();
   });
 });
 
 describe('TemplateSyncListener', () => {
   it("should start the account's sync from the gateway's request and refuse a bad payload", async () => {
-    const starter = createMock<TemplateSyncStarter>({ start: vi.fn().mockResolvedValue(true) });
+    const starter = createMock<TemplateSyncStarter>({
+      start: vi.fn().mockResolvedValue(undefined),
+    });
     const listener = new TemplateSyncListener(starter);
 
     await listener.handle({ providerAccountId: 'acct-1', tenantId: null });

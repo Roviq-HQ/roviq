@@ -1,0 +1,1 @@
+ALTER TABLE "messaging_templates" ADD COLUMN "retired" boolean DEFAULT false NOT NULL;

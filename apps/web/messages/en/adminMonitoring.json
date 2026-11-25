@@ -170,11 +170,11 @@
         "step2": "Check the audit partition workflow in Temporal."
       },
       "notification_template_rejected": {
-        "title": "WhatsApp template refused",
-        "impact": "The provider refused, paused or switched off a WhatsApp template on an account. Alerts that use it are not sent from that account.",
+        "title": "WhatsApp template cannot be sent",
+        "impact": "The provider refused, paused or switched off a WhatsApp template on an account, or has not reviewed it in two days. Alerts that use it are not sent from that account.",
         "step1": "Open \"WhatsApp senders\" below and open Templates on the sender: it names the template and the reason.",
         "step2": "Fix the wording under a new name, then press Sync now.",
-        "step3": "A paused template comes back by itself when its quality improves."
+        "step3": "A paused template comes back by itself when its quality improves. For one still waiting after two days, ask the provider about its review."
       },
       "notification_template_changed": {
         "title": "WhatsApp template changed by the provider",

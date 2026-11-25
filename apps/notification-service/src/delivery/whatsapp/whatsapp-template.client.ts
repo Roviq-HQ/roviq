@@ -26,7 +26,7 @@ export interface ProviderTemplate {
   buttonLabel: string | null;
 }
 
-/** The provider's template statuses, reduced to the ones the system acts on. */
+/** A template's status in the provider's list, reduced to the ones the system acts on. */
 export function templateStatusOf(value: unknown): MessageTemplateStatus {
   switch (typeof value === 'string' ? value.toUpperCase() : '') {
     case 'APPROVED':
@@ -90,13 +90,27 @@ function providerTemplateOf(row: unknown): ProviderTemplate | null {
   };
 }
 
-/** Permission (10, 200, 190: token), throttling (4, 80008, 130429), an existing name (2388024). */
+/** The provider's subcodes about a template's own content or name. */
+const isTemplateSubcode = (subcode: number | null) =>
+  subcode !== null && subcode >= 2388000 && subcode < 2389000;
+
+/**
+ * Permission (10, 200, 190: token), throttling (4, 80008, 130429), an existing name (2388024),
+ * a template the provider will not take (100, or a template subcode). Any other answer is not
+ * known to be about the template, so it is never recorded as a rejection.
+ */
 function errorFor(body: unknown, httpStatus: number, retryAfterMs: number | null) {
   const error = isRecord(body) && isRecord(body.error) ? body.error : null;
   const code = error && typeof error.code === 'number' ? error.code : null;
   const subcode = error && typeof error.error_subcode === 'number' ? error.error_subcode : null;
-  if (code === 10 || code === 200 || code === 190 || (code !== null && code >= 200 && code < 300)) {
-    return new ChannelAdapterError('WA_PERMISSION_MISSING', `provider code ${code}`, false);
+  const detail = `provider code ${code ?? 'none'}${subcode === null ? '' : `/${subcode}`}, http ${httpStatus}`;
+  if (
+    code === 10 ||
+    code === 190 ||
+    (code !== null && code >= 200 && code < 300) ||
+    (code === null && (httpStatus === 401 || httpStatus === 403))
+  ) {
+    return new ChannelAdapterError('WA_PERMISSION_MISSING', detail, false);
   }
   if (code === 4 || code === 80008 || code === 130429 || httpStatus === 429) {
     return new ChannelAdapterError('WA_RATE_LIMITED', `provider code ${code}`, true, retryAfterMs);
@@ -105,11 +119,10 @@ function errorFor(body: unknown, httpStatus: number, retryAfterMs: number | null
     return new ChannelAdapterError('WA_TEMPLATE_EXISTS', `provider subcode ${subcode}`, false);
   }
   if (httpStatus >= 500) return new ChannelAdapterError('WA_UNREACHABLE', `http ${httpStatus}`);
-  return new ChannelAdapterError(
-    'WA_TEMPLATE_INVALID',
-    `provider code ${code ?? 'none'}${subcode === null ? '' : `/${subcode}`}, http ${httpStatus}`,
-    false,
-  );
+  if (code === 100 || isTemplateSubcode(subcode)) {
+    return new ChannelAdapterError('WA_TEMPLATE_INVALID', detail, false);
+  }
+  return new ChannelAdapterError('WA_REJECTED', detail, false);
 }
 
 /**

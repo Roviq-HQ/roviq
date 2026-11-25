@@ -44,7 +44,19 @@ interface Held {
 class FakeTemplateProvider {
   readonly held = new Map<string, Held[]>();
   readonly created: string[] = [];
+  /**
+   * Runs when the request after a creation arrives, before it is answered: where a provider's
+   * verdict on the template just created lands while the sync is still going.
+   */
+  onCreated: ((key: string) => Promise<void>) | null = null;
+  private justCreated: string | null = null;
   private server: Server | null = null;
+
+  approve(account: string, name: string, language: string): void {
+    const held = this.held.get(account)?.find((h) => h.name === name && h.language === language);
+    assert(held);
+    held.status = 'APPROVED';
+  }
 
   async start(): Promise<string> {
     const server = createServer((req, res) => {
@@ -54,7 +66,10 @@ class FakeTemplateProvider {
       req.on('data', (chunk) => {
         raw += chunk;
       });
-      req.on('end', () => {
+      req.on('end', async () => {
+        const created = this.justCreated;
+        this.justCreated = null;
+        if (created !== null) await this.onCreated?.(created);
         res.setHeader('content-type', 'application/json');
         if (req.method === 'GET') {
           res.end(JSON.stringify({ data: list }));
@@ -69,8 +84,10 @@ class FakeTemplateProvider {
         const id = `tpl-${randomUUID()}`;
         list.push({ id, ...body, status: 'PENDING' });
         this.held.set(account, list);
-        this.created.push(`${body.name}:${body.language}`);
+        const key = `${body.name}:${body.language}`;
+        this.created.push(key);
         res.end(JSON.stringify({ id, status: 'PENDING', category: body.category }));
+        this.justCreated = key;
       });
     });
     this.server = server;
@@ -168,6 +185,13 @@ describe('WhatsApp template sync (integration)', () => {
     await pool.end();
     await superPool.end();
   });
+
+  /** This test's account only: other specs write template rows at the same time. */
+  const problems = async () => {
+    const mine = (await templates.countProblems()).find((p) => p.providerAccountId === account);
+    assert(mine);
+    return mine;
+  };
 
   const statuses = async () =>
     (await templates.listForAccount(account))
@@ -289,9 +313,66 @@ describe('WhatsApp template sync (integration)', () => {
     }
 
     expect(await sendability.check(account, name, 'hi')).toEqual({ sendable: false });
-    expect(
-      (await templates.countProblems()).find((p) => p.problem === 'CATEGORY_CHANGED')?.count,
-    ).toBeGreaterThan(0);
+    expect((await problems()).CATEGORY_CHANGED).toBe(1);
+  });
+
+  it('should stop counting a rejected template once the code no longer defines its name', async () => {
+    await sync.sync(account);
+    const old = `reworded_since_${randomUUID().slice(0, 8)}_v1`;
+    await superPool.query(
+      `INSERT INTO messaging_templates
+         (provider_account_id, name, language, declared_category, content_hash, status,
+          created_by, updated_by)
+       VALUES ($1, $2, 'en', 'UTILITY', 'h', 'REJECTED', $3, $3)`,
+      [account, old, SYSTEM],
+    );
+    expect((await problems()).REJECTED).toBe(1);
+
+    await sync.sync(account);
+
+    expect((await problems()).REJECTED).toBe(0);
+    expect((await templates.listForAccount(account)).map((r) => r.name)).not.toContain(old);
+    const { rows } = await superPool.query<{ retired: boolean }>(
+      'SELECT retired FROM messaging_templates WHERE provider_account_id = $1 AND name = $2',
+      [account, old],
+    );
+    expect(rows).toEqual([{ retired: true }]);
+  });
+
+  it('should count a template that has waited two days for its review, and none of an account without a sender', async () => {
+    await sync.sync(account);
+    expect((await problems()).PENDING_LONG).toBe(0);
+    await superPool.query(
+      `UPDATE messaging_templates SET created_at = now() - interval '49 hours'
+        WHERE provider_account_id = $1 AND name = 'attendance_absent_v1'`,
+      [account],
+    );
+
+    expect((await problems()).PENDING_LONG).toBe(2);
+
+    await superPool.query('DELETE FROM messaging_senders WHERE id = $1', [senderId]);
+    expect((await templates.countProblems()).map((p) => p.providerAccountId)).not.toContain(
+      account,
+    );
+  });
+
+  it('should take an approval that arrives while later templates are still being submitted', async () => {
+    const [first] = registrySubmissions(PORTAL);
+    assert(first);
+    provider.onCreated = async (created) => {
+      // The provider's verdict on the first template overtakes the rest of the sync.
+      if (created !== `${first.name}:${first.language}`) return;
+      provider.onCreated = null;
+      provider.approve(account, first.name, first.language);
+      await templates.applyEvent(account, first.name, first.language, { status: 'APPROVED' });
+    };
+
+    await sync.sync(account);
+
+    expect(await sendability.check(account, first.name, first.language)).toEqual({
+      sendable: true,
+      approvedCategory: first.category,
+    });
   });
 
   it('should change nothing for an event about a template it never registered', async () => {

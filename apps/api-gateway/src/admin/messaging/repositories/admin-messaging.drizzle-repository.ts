@@ -339,7 +339,8 @@ export class AdminMessagingDrizzleRepository extends AdminMessagingRepository {
           updatedAt: t.updatedAt,
         })
         .from(t)
-        .where(eq(t.providerAccountId, providerAccountId))
+        // A retired name was replaced by a new one: it is no longer this account's concern.
+        .where(and(eq(t.providerAccountId, providerAccountId), eq(t.retired, false)))
         .orderBy(t.name, t.language),
     );
   }

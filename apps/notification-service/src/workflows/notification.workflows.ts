@@ -10,7 +10,8 @@
  * per configured channel.
  *
  * WhatsAppTemplateSyncWorkflow (ROV-333): one per provider account at a time; registers the
- * code's WhatsApp templates and records their state.
+ * code's WhatsApp templates and records their state, again on each request and while any
+ * template waits for the provider's review.
  *
  * None ever receives an address, a name, a code or a password.
  */
@@ -43,6 +44,8 @@ import {
   type NotificationActivities,
   type SendChannelInput,
   sendData,
+  TEMPLATE_RECHECK_WAITS_MS,
+  TEMPLATE_SYNC_REQUESTED_SIGNAL,
   type TemplateSyncInput,
 } from './notification-workflow.types';
 
@@ -254,6 +257,22 @@ export async function DeliveryCanaryWorkflow(input: CanaryWorkflowInput): Promis
   await runCanary(input, new Date().toISOString(), canaryActivities.requestCanary);
 }
 
+export const templateSyncRequestedSignal = defineSignal(TEMPLATE_SYNC_REQUESTED_SIGNAL);
+
 export async function WhatsAppTemplateSyncWorkflow(input: TemplateSyncInput): Promise<void> {
-  await templateActivities.syncWhatsAppTemplates(input);
+  let requested = false;
+  setHandler(templateSyncRequestedSignal, () => {
+    requested = true;
+  });
+  let rechecks = 0;
+  while (true) {
+    requested = false;
+    const { pending } = await templateActivities.syncWhatsAppTemplates(input);
+    // A request that arrived during the sync may be newer than what it read.
+    if (requested) continue;
+    const wait = TEMPLATE_RECHECK_WAITS_MS[rechecks];
+    if (pending === 0 || wait === undefined) return;
+    rechecks += 1;
+    await condition(() => requested, wait);
+  }
 }
