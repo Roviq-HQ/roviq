@@ -153,7 +153,7 @@ export function DlqTab() {
           return (
             <span className="flex items-center gap-1">
               <span className="text-xs">{t('unknownInstitute')}</span>
-              <CopyIdButton value={tenantId} name={t('inspect.tenant')} />
+              <CopyIdButton value={tenantId} name={t('inspect.tenant')} rowKey={row.original.id} />
             </span>
           );
         },

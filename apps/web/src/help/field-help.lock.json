@@ -61,10 +61,10 @@
     }
   },
   "certificates.other.purpose": {
-    "reviewedReason": "ROV-360 adds the student name to the result; purpose handling unchanged",
+    "reviewedReason": "requestCertificate now refuses an inactive template; the purpose text is still printed as described",
     "targets": {
       "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#DEFAULT_CERTIFICATE_BODY": "ffcb189bbff27afb",
-      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate": "a306fecc4f4285af"
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate": "71659d5142b8f032"
     }
   },
   "certificates.other.template": {

@@ -105,7 +105,7 @@ describe('AuditLogTable', () => {
     expect(screen.getByText(STUDENT_ID)).toBeInTheDocument();
     expect(screen.queryByText(STUDENT_ID.slice(0, 8))).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId(testIds.copyId.button(STUDENT_ID)));
+    await user.click(screen.getByTestId(testIds.copyId.button('log-1', STUDENT_ID)));
     expect(await navigator.clipboard.readText()).toBe(STUDENT_ID);
     // Copying must not open the row's detail sheet.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -185,9 +185,30 @@ describe('AuditLogTable', () => {
     renderTable({ scope: 'admin', logs: [log] }, 'hi');
 
     expect(screen.getByText('अज्ञात उपयोगकर्ता')).toBeInTheDocument();
-    expect(screen.getByTestId(testIds.copyId.button(OUTSIDER_ID))).toBeInTheDocument();
+    expect(screen.getByTestId(testIds.copyId.button(log.id, OUTSIDER_ID))).toBeInTheDocument();
     expect(screen.queryByText(OUTSIDER_ID.slice(0, 8))).not.toBeInTheDocument();
     expect(screen.queryByText('Roviq platform')).not.toBeInTheDocument();
+  });
+
+  it('gives each row its own copy button when two rows share an unnamed actor', async () => {
+    const user = userEvent.setup();
+    const first = makeLog({
+      id: 'log-1',
+      scope: 'platform',
+      actorName: null,
+      actorId: OUTSIDER_ID,
+    });
+    const second = makeLog({
+      id: 'log-2',
+      scope: 'platform',
+      actorName: null,
+      actorId: OUTSIDER_ID,
+    });
+    renderTable({ scope: 'admin', logs: [first, second], totalCount: 2 });
+
+    await user.click(screen.getByTestId(testIds.copyId.button(second.id, OUTSIDER_ID)));
+    expect(await navigator.clipboard.readText()).toBe(OUTSIDER_ID);
+    expect(screen.getByTestId(testIds.copyId.button(first.id, OUTSIDER_ID))).toBeInTheDocument();
   });
 
   it('translates the impersonation badge', () => {

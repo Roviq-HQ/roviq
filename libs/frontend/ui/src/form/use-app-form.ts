@@ -11,7 +11,7 @@ import { SelectField } from './fields/select-field';
 import { SwitchField } from './fields/switch-field';
 import { TextField } from './fields/text-field';
 import { TextareaField } from './fields/textarea-field';
-import { SubmitButton } from './form-components';
+import { FORM_ID_ATTRIBUTE, SubmitButton } from './form-components';
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
@@ -54,18 +54,23 @@ const { useAppForm: useBaseAppForm, withForm } = createFormHook({
 
 /**
  * After a refused submit, moves focus to the first field showing an error, in page order.
+ * The form is found through its `SubmitButton`, which carries the form's id; field ids are only
+ * a fallback, since two mounted forms (a page and its dialog) can share a field name. Focus is
+ * no guide: Safari does not focus a clicked button.
  * Runs on the next frame: the errors render only once the submit has marked every field touched.
  */
-function focusFirstInvalidField(fieldNames: string[]): void {
+function focusFirstInvalidField(formId: string, fieldNames: string[]): void {
   if (typeof window === 'undefined') return;
-  const returnFocus = document.activeElement;
   window.requestAnimationFrame(() => {
-    const fieldElement = fieldNames
-      .map((name) => document.getElementById(name))
-      .find((el): el is HTMLElement => el !== null);
+    const submitButton = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(`button[${FORM_ID_ATTRIBUTE}]`),
+    ).find((button) => button.getAttribute(FORM_ID_ATTRIBUTE) === formId);
     const root =
-      fieldElement?.closest('form') ??
-      (returnFocus instanceof HTMLElement ? returnFocus.closest('form') : null);
+      submitButton?.form ??
+      fieldNames
+        .map((name) => document.getElementById(name))
+        .find((el): el is HTMLElement => el !== null)
+        ?.closest('form');
     const target = root?.querySelector<HTMLElement>('[aria-invalid="true"]');
     target?.focus();
   });
@@ -81,6 +86,7 @@ export const useAppForm: typeof useBaseAppForm = (options) =>
         { errors?: ReadonlyArray<unknown> } | undefined
       >;
       focusFirstInvalidField(
+        props.formApi.formId,
         Object.keys(fieldMeta).filter((name) => (fieldMeta[name]?.errors?.length ?? 0) > 0),
       );
     },

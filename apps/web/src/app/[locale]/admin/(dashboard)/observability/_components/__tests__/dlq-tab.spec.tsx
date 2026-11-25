@@ -70,9 +70,11 @@ describe('DlqTab institute column (ROV-360)', () => {
 
     expect(screen.getByText('Unknown institute')).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(GONE_TENANT.slice(0, 8));
-    expect(screen.queryByTestId(testIds.copyId.button(NAMED_TENANT))).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(testIds.copyId.button('m-1', NAMED_TENANT)),
+    ).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId(testIds.copyId.button(GONE_TENANT)));
+    await user.click(screen.getByTestId(testIds.copyId.button('m-2', GONE_TENANT)));
     expect(await navigator.clipboard.readText()).toBe(GONE_TENANT);
     // Copying must not open the message sheet.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

@@ -4,6 +4,7 @@ import { extractGraphQLErrorCode } from '@roviq/graphql';
 /** Error codes the certificate mutations raise that the user can act on. */
 const CERTIFICATE_ERROR_KEYS = {
   [ErrorCode.CERTIFICATE_TEMPLATE_NOT_FOUND]: 'templateNotFound',
+  [ErrorCode.CERTIFICATE_TEMPLATE_INACTIVE]: 'templateInactive',
   [ErrorCode.CERTIFICATE_NOT_FOUND]: 'certificateNotFound',
   [ErrorCode.STUDENT_NOT_FOUND]: 'studentNotFound',
   [ErrorCode.INVALID_STATE_TRANSITION]: 'invalidState',

@@ -6,6 +6,9 @@ import type { ReactNode } from 'react';
 import { Button, type buttonVariants } from '../components/ui/button';
 import { useFormContext } from './use-app-form';
 
+/** Ties a submit button to its TanStack form, so a refused submit can find the form's fields. */
+export const FORM_ID_ATTRIBUTE = 'data-form-id';
+
 export interface SubmitButtonProps extends VariantProps<typeof buttonVariants> {
   /** Label shown when the form is idle. */
   children: ReactNode;
@@ -44,6 +47,7 @@ export function SubmitButton({
           size={size}
           disabled={disabled || isSubmitting}
           data-testid={testId}
+          {...{ [FORM_ID_ATTRIBUTE]: form.formId }}
           className={className}
         >
           {isSubmitting && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}

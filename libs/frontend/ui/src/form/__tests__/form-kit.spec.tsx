@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { zodValidator } from '@roviq/i18n';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -545,5 +545,45 @@ describe('SubmitButton', () => {
     await userEvent.click(btn);
     await waitFor(() => expect(screen.getByTestId('email')).toHaveFocus());
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('focuses the invalid field of the submitted form when another mounted form shares its name', async () => {
+    const schema = z.object({ name: z.string().min(1, 'Enter a name.') });
+    function NamedForm({ prefix }: { prefix: string }) {
+      const form = useAppForm({
+        defaultValues: { name: '' },
+        validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
+        onSubmit: vi.fn(),
+      });
+      return (
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+        >
+          <form.AppField name="name">
+            {(field) => <field.TextField label="Name" testId={`${prefix}-name`} />}
+          </form.AppField>
+          <form.AppForm>
+            <form.SubmitButton testId={`${prefix}-submit`}>Save</form.SubmitButton>
+          </form.AppForm>
+        </form>
+      );
+    }
+
+    render(
+      <>
+        <NamedForm prefix="page" />
+        <NamedForm prefix="dialog" />
+      </>,
+    );
+    // Safari does not focus a clicked button: focus stays in the other form while this one submits.
+    screen.getByTestId('page-name').focus();
+    fireEvent.click(screen.getByTestId('dialog-submit'));
+
+    await waitFor(() => expect(screen.getByTestId('dialog-name')).toHaveFocus());
+    expect(screen.getByTestId('page-name')).not.toHaveFocus();
   });
 });

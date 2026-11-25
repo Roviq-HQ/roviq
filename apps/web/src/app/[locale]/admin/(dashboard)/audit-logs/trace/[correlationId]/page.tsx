@@ -153,7 +153,7 @@ function TraceSummary({
             <span className="font-mono text-sm text-blue-600 dark:text-blue-400 break-all">
               {correlationId}
             </span>
-            <CopyIdButton value={correlationId} name={t('trace.correlationId')} />
+            <CopyIdButton value={correlationId} name={t('trace.correlationId')} rowKey="trace" />
           </div>
         </div>
 
@@ -224,7 +224,12 @@ function TimelineEvent({
               {log.entityId && (
                 <>
                   <span className="text-muted-foreground">{t('detail.entityId')}:</span>
-                  <EntityId entityType={log.entityType} entityId={log.entityId} t={t} />
+                  <EntityId
+                    logId={log.id}
+                    entityType={log.entityType}
+                    entityId={log.entityId}
+                    t={t}
+                  />
                 </>
               )}
             </div>
@@ -236,7 +241,7 @@ function TimelineEvent({
               ) : (
                 <span className="flex items-center gap-1">
                   <span className="text-sm">{t('unknownUser')}</span>
-                  <CopyIdButton value={log.actorId} name={t('detail.actorId')} />
+                  <CopyIdButton value={log.actorId} name={t('detail.actorId')} rowKey={log.id} />
                 </span>
               )}
               {log.impersonatorId && (
@@ -262,10 +267,12 @@ function TimelineEvent({
 }
 
 function EntityId({
+  logId,
   entityType,
   entityId,
   t,
 }: {
+  logId: string;
   entityType: string;
   entityId: string;
   t: (key: string) => string;
@@ -285,7 +292,7 @@ function EntityId({
       ) : (
         <span className="truncate font-mono text-xs">{entityId}</span>
       )}
-      <CopyIdButton value={entityId} name={t('detail.entityId')} />
+      <CopyIdButton value={entityId} name={t('detail.entityId')} rowKey={logId} />
     </span>
   );
 }

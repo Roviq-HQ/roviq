@@ -223,6 +223,7 @@ function UpiVerificationContent() {
                                 <CopyIdButton
                                   value={payment.invoiceId}
                                   name={t('upiVerification.invoiceIdName')}
+                                  rowKey={payment.id}
                                 />
                               </span>
                             )}

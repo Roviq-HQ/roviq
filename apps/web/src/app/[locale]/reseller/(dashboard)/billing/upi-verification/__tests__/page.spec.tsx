@@ -70,7 +70,7 @@ describe('UpiVerificationPage (ROV-360)', () => {
     expect(document.body).not.toHaveTextContent(ORPHAN_INVOICE_ID.slice(0, 8));
     expect(document.body).not.toHaveTextContent(INVOICE_ID.slice(0, 8));
 
-    await user.click(screen.getByTestId(testIds.copyId.button(ORPHAN_INVOICE_ID)));
+    await user.click(screen.getByTestId(testIds.copyId.button('pay-2', ORPHAN_INVOICE_ID)));
     expect(await navigator.clipboard.readText()).toBe(ORPHAN_INVOICE_ID);
   });
 });

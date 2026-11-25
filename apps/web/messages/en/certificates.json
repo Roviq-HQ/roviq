@@ -200,6 +200,7 @@
         "purpose": "Purpose"
       },
       "templatesLoading": "Loading templates…",
+      "templatesLoadError": "The certificate templates could not be loaded, so no certificate can be issued yet. Try again; if it keeps failing, contact support.",
       "noTemplates": "Your institute has no active {type} templates. Contact Roviq support to have one set up.",
       "errors": {
         "templateRequired": "Choose a template.",
@@ -209,6 +210,7 @@
     },
     "errors": {
       "templateNotFound": "That certificate template no longer exists. Pick another template.",
+      "templateInactive": "That certificate template has been deactivated. Pick an active template.",
       "certificateNotFound": "This certificate could not be found. It may have been removed.",
       "studentNotFound": "This student could not be found. They may have been removed.",
       "invalidState": "This certificate cannot be issued in its current status.",

@@ -43,11 +43,11 @@ describe('CorrelationTracePage ids (ROV-360)', () => {
     expect(screen.getByText(ENTITY_ID)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(ACTOR_ID.slice(0, 8));
 
-    await user.click(screen.getByTestId(testIds.copyId.button(ACTOR_ID)));
+    await user.click(screen.getByTestId(testIds.copyId.button('log-1', ACTOR_ID)));
     expect(await navigator.clipboard.readText()).toBe(ACTOR_ID);
-    await user.click(screen.getByTestId(testIds.copyId.button(CORRELATION_ID)));
+    await user.click(screen.getByTestId(testIds.copyId.button('trace', CORRELATION_ID)));
     expect(await navigator.clipboard.readText()).toBe(CORRELATION_ID);
-    await user.click(screen.getByTestId(testIds.copyId.button(ENTITY_ID)));
+    await user.click(screen.getByTestId(testIds.copyId.button('log-1', ENTITY_ID)));
     expect(await navigator.clipboard.readText()).toBe(ENTITY_ID);
   });
 
@@ -56,7 +56,7 @@ describe('CorrelationTracePage ids (ROV-360)', () => {
     renderWithProviders(<CorrelationTracePage />);
 
     expect(screen.getByText('Asha Verma')).toBeInTheDocument();
-    expect(screen.queryByTestId(testIds.copyId.button(ACTOR_ID))).not.toBeInTheDocument();
+    expect(screen.queryByTestId(testIds.copyId.button('log-1', ACTOR_ID))).not.toBeInTheDocument();
     expect(screen.queryByText('Unknown user')).not.toBeInTheDocument();
   });
 
