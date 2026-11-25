@@ -23,6 +23,22 @@ export const UserStatus = Object.fromEntries(USER_STATUS_VALUES.map((v) => [v, v
   readonly [K in UserStatus]: K;
 };
 
+// ─── FormHelpMode ───────────────────────────────────────────────────────────
+
+export const FORM_HELP_MODE_VALUES = [
+  // The ⓘ button, plus a one-sentence hint under the label where the topic has one
+  'ICON_AND_HINT',
+  // Only the ⓘ button; optional hints are hidden
+  'ICON_ONLY',
+] as const;
+
+export type FormHelpMode = (typeof FORM_HELP_MODE_VALUES)[number];
+export const FormHelpMode = Object.fromEntries(FORM_HELP_MODE_VALUES.map((v) => [v, v])) as {
+  readonly [K in FormHelpMode]: K;
+};
+/** A new account, a signed-out visitor and an impersonator see this mode. */
+export const DEFAULT_FORM_HELP_MODE: FormHelpMode = 'ICON_AND_HINT';
+
 // ─── MembershipStatus ───────────────────────────────────────────────────────
 
 export const MEMBERSHIP_STATUS_VALUES = [

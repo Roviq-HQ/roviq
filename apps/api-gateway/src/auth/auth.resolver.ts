@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
 import { ChangePasswordArgs } from './dto/change-password.args';
+import { FormHelpMode } from './dto/form-help-mode.enum';
 import { UpdateLocaleInput } from './dto/update-locale.input';
 import { extractMeta, type GqlContext } from './gql-context';
 
@@ -202,6 +203,26 @@ export class AuthResolver {
         'Cannot change account preferences while impersonating',
       );
     return this.authService.updatePreferredLocale(user.userId, input.locale ?? null);
+  }
+
+  @Query(() => FormHelpMode, {
+    description:
+      'Saved form help mode of the signed-in account across all portals; the default while impersonating.',
+  })
+  @UseGuards(GqlAuthGuard)
+  async myFormHelpMode(@CurrentUser() user: AuthUser): Promise<FormHelpMode> {
+    return this.authService.getFormHelpMode(user);
+  }
+
+  @Mutation(() => FormHelpMode, {
+    description: 'Saves the form help mode of the signed-in account. Refused while impersonating.',
+  })
+  @UseGuards(GqlAuthGuard)
+  async updateMyFormHelpMode(
+    @Args('mode', { type: () => FormHelpMode }) mode: FormHelpMode,
+    @CurrentUser() user: AuthUser,
+  ): Promise<FormHelpMode> {
+    return this.authService.updateFormHelpMode(user, mode);
   }
 
   // ── Me query ───────────────────────────────────────────

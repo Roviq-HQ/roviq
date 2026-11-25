@@ -32,6 +32,7 @@ import {
   FILE_PURPOSE_VALUES,
   FILE_STATUS_VALUES,
   FILE_VISIBILITY_VALUES,
+  FORM_HELP_MODE_VALUES,
   GENDER_RESTRICTION_VALUES,
   GENDER_VALUES,
   GRADING_SCHEME_KIND_VALUES,
@@ -82,6 +83,7 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 export const userStatus = pgEnum('UserStatus', USER_STATUS_VALUES);
 export const membershipStatus = pgEnum('MembershipStatus', MEMBERSHIP_STATUS_VALUES);
 export const roleStatus = pgEnum('RoleStatus', ROLE_STATUS_VALUES);
+export const formHelpMode = pgEnum('FormHelpMode', FORM_HELP_MODE_VALUES);
 
 // ── Institute domain enums ─────────────────────────────
 export const instituteStatus = pgEnum('InstituteStatus', INSTITUTE_STATUS_VALUES);

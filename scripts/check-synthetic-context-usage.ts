@@ -134,6 +134,9 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts',
   'apps/api-gateway/src/audit/workflows/partition.activities.ts',
   'apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts',
+  // ROV-344: impersonation-session fixture and the column-grant refusals as the institute and
+  // reseller roles.
+  'apps/api-gateway/src/auth/__tests__/form-help-mode.integration.spec.ts',
   'apps/api-gateway/src/auth/middleware/impersonation-session.guard.ts',
   // ROV-97: global guard reads the reseller's status before any resolver runs.
   // Reads an institute's status for any institute-scope token, before a tenant context exists.

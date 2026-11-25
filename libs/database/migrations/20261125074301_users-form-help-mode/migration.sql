@@ -1,0 +1,2 @@
+CREATE TYPE "FormHelpMode" AS ENUM('ICON_AND_HINT', 'ICON_ONLY');--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "form_help_mode" "FormHelpMode" DEFAULT 'ICON_AND_HINT'::"FormHelpMode" NOT NULL;
