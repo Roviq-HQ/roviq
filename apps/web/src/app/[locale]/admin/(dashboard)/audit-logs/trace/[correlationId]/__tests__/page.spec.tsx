@@ -39,7 +39,7 @@ describe('CorrelationTracePage ids (ROV-360)', () => {
     const user = userEvent.setup();
     renderWithProviders(<CorrelationTracePage />, { locale: 'hi' });
 
-    expect(screen.getByText('अज्ञात उपयोगकर्ता')).toBeInTheDocument();
+    expect(screen.getByText('अज्ञात यूज़र')).toBeInTheDocument();
     expect(screen.getByText(ENTITY_ID)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(ACTOR_ID.slice(0, 8));
 

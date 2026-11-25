@@ -1,13 +1,13 @@
 {
-  "title": "उपयोगकर्ता",
+  "title": "यूज़र",
   "description": "सभी संस्थानों, रीसेलर और प्लेटफ़ॉर्म टीम के सभी Roviqian।",
-  "loadFailed": "उपयोगकर्ता लोड नहीं हो सके।",
-  "retry": "फिर से प्रयास करें",
+  "loadFailed": "यूज़र लोड नहीं हो सके।",
+  "retry": "फिर से कोशिश करें",
   "neverActive": "कभी नहीं",
   "membershipCount": "{count, plural, =0 {कोई संस्थान नहीं} one {# संस्थान} other {# संस्थान}}",
   "statuses": {
-    "ACTIVE": "सक्रिय",
-    "SUSPENDED": "निलंबित",
+    "ACTIVE": "ऐक्टिव",
+    "SUSPENDED": "सस्पेंडेड",
     "LOCKED": "लॉक"
   },
   "genders": {
@@ -23,20 +23,20 @@
     "memberships": "संस्थान",
     "status": "स्थिति",
     "createdAt": "बनाया गया",
-    "lastActive": "अंतिम सक्रियता"
+    "lastActive": "अंतिम ऐक्टिविटी"
   },
   "filters": {
     "search": "नाम, Roviq ID, ईमेल या फ़ोन से छाँटें",
     "allStatuses": "सभी स्थितियाँ",
-    "scopeLabel": "सदस्यता का प्रकार",
+    "scopeLabel": "मेंबरशिप का प्रकार",
     "scope": {
       "institute": "संस्थान",
       "reseller": "रीसेलर",
       "platform": "प्लेटफ़ॉर्म"
     },
     "scopeHint": {
-      "institute": "केवल संस्थान सदस्यता वाले उपयोगकर्ता दिखाएँ",
-      "reseller": "केवल रीसेलर टीम के सदस्य दिखाएँ",
+      "institute": "केवल संस्थान मेंबरशिप वाले यूज़र दिखाएँ",
+      "reseller": "केवल रीसेलर टीम के मेंबर दिखाएँ",
       "platform": "केवल Roviq प्लेटफ़ॉर्म स्टाफ़ दिखाएँ"
     },
     "createdAfter": "इस तारीख या बाद में बना",
@@ -44,21 +44,21 @@
     "clearFilters": "सब हटाएँ"
   },
   "jump": {
-    "trigger": "उपयोगकर्ता पर जाएँ…",
+    "trigger": "यूज़र पर जाएँ…",
     "placeholder": "नाम, Roviq ID, ईमेल या फ़ोन",
     "minChars": "कम से कम 2 अक्षर लिखें",
     "loading": "खोज रहे हैं",
-    "noResults": "कोई मेल खाता उपयोगकर्ता नहीं"
+    "noResults": "कोई मेल अकाउंट यूज़र नहीं"
   },
   "stats": {
-    "loadFailed": "उपयोगकर्ता संख्या लोड नहीं हो सकी।",
-    "retry": "फिर से प्रयास करें",
+    "loadFailed": "यूज़र संख्या लोड नहीं हो सकी।",
+    "retry": "फिर से कोशिश करें",
     "total": {
-      "label": "कुल उपयोगकर्ता",
-      "hint": "सभी खाते"
+      "label": "कुल यूज़र",
+      "hint": "सभी अकाउंट"
     },
     "active": {
-      "label": "इस महीने सक्रिय",
+      "label": "इस महीने ऐक्टिव",
       "hint": "पिछले 30 दिनों में साइन इन किया"
     },
     "new": {
@@ -67,13 +67,13 @@
     },
     "multi": {
       "label": "एक से अधिक संस्थान वाले",
-      "hint": "2 या अधिक संस्थानों के सदस्य"
+      "hint": "2 या अधिक संस्थानों के मेंबर"
     }
   },
   "empty": {
-    "title": "अभी कोई उपयोगकर्ता नहीं",
-    "description": "किसी संस्थान, रीसेलर या प्लेटफ़ॉर्म टीम में बनते ही उपयोगकर्ता यहाँ दिखेंगे।",
-    "filteredTitle": "इन फ़िल्टर से कोई उपयोगकर्ता नहीं मिला",
+    "title": "अभी कोई यूज़र नहीं",
+    "description": "किसी संस्थान, रीसेलर या प्लेटफ़ॉर्म टीम में बनते ही यूज़र यहाँ दिखेंगे।",
+    "filteredTitle": "इन फ़िल्टर से कोई यूज़र नहीं मिला",
     "filteredDescription": "दूसरी खोज आज़माएँ या फ़िल्टर हटाएँ।"
   },
   "pagination": {
@@ -82,8 +82,8 @@
     "of": "में से"
   },
   "detail": {
-    "notFound": "उपयोगकर्ता नहीं मिला",
-    "notFoundDescription": "उपयोगकर्ता हटाया जा चुका हो सकता है, या लिंक गलत है।"
+    "notFound": "यूज़र नहीं मिला",
+    "notFoundDescription": "यूज़र हटाया जा चुका हो सकता है, या लिंक गलत है।"
   },
   "profile": {
     "roviqId": "Roviq ID",
@@ -92,18 +92,18 @@
     "dateOfBirth": "जन्म तिथि",
     "gender": "लिंग",
     "nationality": "राष्ट्रीयता",
-    "joined": "खाता बना",
-    "lastActive": "अंतिम सक्रियता"
+    "joined": "अकाउंट बना",
+    "lastActive": "अंतिम ऐक्टिविटी"
   },
   "tabs": {
-    "memberships": "सदस्यताएँ",
+    "memberships": "मेंबरशिप",
     "identity": "पहचान",
     "documents": "दस्तावेज़",
     "addresses": "पते",
     "audit": "ऑडिट"
   },
   "memberships": {
-    "empty": "इस उपयोगकर्ता की कोई सदस्यता नहीं है।",
+    "empty": "इस यूज़र की कोई मेंबरशिप नहीं है।",
     "institutes": "संस्थान",
     "resellers": "रीसेलर टीमें",
     "platform": "प्लेटफ़ॉर्म टीम",
@@ -116,12 +116,12 @@
       "actions": "कार्य"
     },
     "statuses": {
-      "ACTIVE": "सक्रिय",
-      "SUSPENDED": "निलंबित",
+      "ACTIVE": "ऐक्टिव",
+      "SUSPENDED": "सस्पेंडेड",
       "REVOKED": "रद्द"
     },
-    "active": "सक्रिय",
-    "inactive": "निष्क्रिय",
+    "active": "ऐक्टिव",
+    "inactive": "इनऐक्टिव",
     "viewInstitute": "संस्थान देखें",
     "joinedOn": "{date} को जुड़े"
   },
@@ -129,12 +129,12 @@
     "empty": "कोई पहचान दस्तावेज़ दर्ज नहीं है।",
     "maskingNote": "आधार के केवल अंतिम 4 अंक दिखते हैं। पूरा आधार और PAN नंबर ब्राउज़र को कभी नहीं भेजा जाता।",
     "hidden": "छिपा हुआ",
-    "verified": "सत्यापित",
-    "unverified": "सत्यापित नहीं",
+    "verified": "वेरिफ़ाइड",
+    "unverified": "वेरिफ़ाइड नहीं",
     "columns": {
       "type": "प्रकार",
       "value": "नंबर",
-      "verified": "सत्यापन",
+      "verified": "वेरिफ़िकेशन",
       "issuingAuthority": "जारीकर्ता"
     },
     "types": {
@@ -144,12 +144,12 @@
       "VOTER_ID": "मतदाता पहचान पत्र",
       "APAAR": "APAAR ID",
       "PEN": "PEN",
-      "CBSE_REGISTRATION": "CBSE पंजीकरण संख्या",
-      "BSEH_ENROLLMENT": "BSEH नामांकन संख्या",
+      "CBSE_REGISTRATION": "CBSE रजिस्ट्रेशन संख्या",
+      "BSEH_ENROLLMENT": "BSEH एनरोलमेंट संख्या",
       "SHALA_DARPAN_ID": "शाला दर्पण ID",
       "PARIVAR_PEHCHAN_PATRA": "परिवार पहचान पत्र",
       "JAN_AADHAAR": "जन आधार",
-      "MIGRATION_CERTIFICATE": "माइग्रेशन प्रमाण पत्र संख्या"
+      "MIGRATION_CERTIFICATE": "माइग्रेशन सर्टिफिकेट संख्या"
     }
   },
   "documents": {
@@ -158,30 +158,30 @@
     "columns": {
       "type": "दस्तावेज़",
       "files": "फ़ाइलें",
-      "status": "सत्यापन",
+      "status": "वेरिफ़िकेशन",
       "uploaded": "अपलोड किया"
     },
     "status": {
-      "verified": "सत्यापित",
-      "rejected": "अस्वीकृत",
+      "verified": "वेरिफ़ाइड",
+      "rejected": "रिजेक्टेड",
       "pending": "समीक्षा बाकी"
     },
     "types": {
-      "BIRTH_CERTIFICATE": "जन्म प्रमाण पत्र",
-      "TC_INCOMING": "स्थानांतरण प्रमाण पत्र (आगमन)",
+      "BIRTH_CERTIFICATE": "बर्थ सर्टिफिकेट",
+      "TC_INCOMING": "TC (आगमन)",
       "REPORT_CARD": "पिछला प्रगति पत्र",
       "AADHAAR_CARD": "आधार कार्ड",
-      "CASTE_CERTIFICATE": "जाति प्रमाण पत्र",
-      "INCOME_CERTIFICATE": "आय प्रमाण पत्र",
-      "EWS_CERTIFICATE": "ईडब्ल्यूएस प्रमाण पत्र",
-      "MEDICAL_CERTIFICATE": "चिकित्सा प्रमाण पत्र",
-      "DISABILITY_CERTIFICATE": "विकलांगता प्रमाण पत्र",
+      "CASTE_CERTIFICATE": "जाति सर्टिफिकेट",
+      "INCOME_CERTIFICATE": "आय सर्टिफिकेट",
+      "EWS_CERTIFICATE": "ईडब्ल्यूएस सर्टिफिकेट",
+      "MEDICAL_CERTIFICATE": "चिकित्सा सर्टिफिकेट",
+      "DISABILITY_CERTIFICATE": "विकलांगता सर्टिफिकेट",
       "ADDRESS_PROOF": "पता प्रमाण",
       "PASSPORT_PHOTO": "पासपोर्ट फोटो",
       "FAMILY_PHOTO": "पारिवारिक फोटो",
       "BPL_CARD": "बीपीएल कार्ड",
-      "TRANSFER_ORDER": "स्थानांतरण आदेश",
-      "NOC": "अनापत्ति प्रमाण पत्र",
+      "TRANSFER_ORDER": "ट्रांसफ़र आदेश",
+      "NOC": "अनापत्ति सर्टिफिकेट",
       "AFFIDAVIT": "शपथ पत्र",
       "OTHER": "अन्य"
     }
@@ -196,6 +196,6 @@
     }
   },
   "audit": {
-    "title": "इस उपयोगकर्ता की कार्रवाइयाँ"
+    "title": "इस यूज़र की कार्रवाइयाँ"
   }
 }
