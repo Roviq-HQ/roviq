@@ -8,7 +8,8 @@
   "targets": {
     "codegen": {},
     "build": {
-      "dependsOn": ["codegen", "^build"]
+      "dependsOn": ["codegen", "^build"],
+      "outputs": ["{projectRoot}/.next/!(cache|dev)/**/*", "{projectRoot}/.next/!(cache|dev)"]
     }
   }
 }
