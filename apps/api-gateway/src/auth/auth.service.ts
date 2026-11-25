@@ -517,7 +517,7 @@ export class AuthService {
     }
 
     // Revoked only once the switch is certain, so a rejected switch keeps the
-    // session. `user_initiated`: replaying the old token must not cascade.
+    // session. `USER_INITIATED`: replaying the old token must not cascade.
     await this.refreshTokenRepo.revoke(currentToken.id, 'USER_INITIATED');
 
     const result = await this.issueTokens({
@@ -583,7 +583,7 @@ export class AuthService {
     const membership = await this.resolveRefreshMembership(scope, user.id, payload.membershipId);
 
     // Rotated only after the membership check: a rejected refresh must not
-    // leave a `rotation` row behind, or the client's retry would trip reuse
+    // leave a `ROTATION` row behind, or the client's retry would trip reuse
     // detection and revoke the user's sessions in other institutes.
     await this.refreshTokenRepo.revoke(storedToken.id, 'ROTATION');
 
@@ -707,7 +707,7 @@ export class AuthService {
    * 2. Validate new password (min length, must differ from current).
    * 3. Hash + persist; clears `must_change_password`, bumps `password_changed_at`.
    * 4. Revoke ALL refresh tokens for the user — caller must re-login on next request.
-   * 5. Emit `password_change` + `all_sessions_revoked` auth events (fire-and-forget).
+   * 5. Emit `PASSWORD_CHANGE` + `ALL_SESSIONS_REVOKED` auth events (fire-and-forget).
    *
    * Returns void on success. The resolver maps that to `Boolean!` so callers
    * always get a definitive yes/no instead of a token blob.
@@ -811,9 +811,9 @@ export class AuthService {
    * rotate it.
    *
    * Reuse detection is reason-aware: we cascade-revoke the whole family
-   * only when the presented token was revoked via `rotation` (the
-   * canonical "attacker replayed the rotated token" signal) or legacy
-   * NULL. User-initiated / password-change / admin-revoked tokens raise a
+   * only when the presented token was revoked via `ROTATION` (the
+   * canonical "attacker replayed the rotated token" signal) or has no
+   * known reason. User-initiated / password-change / admin-revoked tokens raise a
    * plain "revoked" error and leave sibling sessions alive — preserving
    * the `revokeAllOtherSessions` keep-alive guarantee.
    *

@@ -14,6 +14,13 @@ ALTER TABLE refresh_tokens DISABLE TRIGGER refresh_tokens_guard;
 --> statement-breakpoint
 ALTER TABLE auth_events DISABLE TRIGGER auth_events_append_only;
 --> statement-breakpoint
+-- FORCE row security would filter the owner too, and no policy names it: lifted for the rewrite only.
+ALTER TABLE refresh_tokens NO FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+ALTER TABLE consent_records NO FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+ALTER TABLE auth_events NO FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
 UPDATE refresh_tokens SET revoked_reason = upper(revoked_reason)
   WHERE revoked_reason IS NOT NULL AND revoked_reason <> upper(revoked_reason);
 --> statement-breakpoint
@@ -25,6 +32,12 @@ UPDATE consent_records SET verification_method = CASE verification_method
   WHERE verification_method IS NOT NULL AND verification_method <> upper(verification_method);
 --> statement-breakpoint
 UPDATE auth_events SET event_type = upper(event_type) WHERE event_type <> upper(event_type);
+--> statement-breakpoint
+ALTER TABLE refresh_tokens FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+ALTER TABLE consent_records FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+ALTER TABLE auth_events FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE refresh_tokens ENABLE TRIGGER refresh_tokens_guard;
 --> statement-breakpoint

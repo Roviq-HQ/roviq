@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import * as enums from '../enums';
 
-// Value sets that are not UPPER_SNAKE on purpose, with the reason.
+const UPPER_SNAKE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+
+// Value sets that are not UPPER_SNAKE, with the reason.
 const EXCEPTIONS: Record<string, string> = {
-  // The JWT scope claim, read by every guard and five CHECK constraints (ROV-227).
-  AUTH_SCOPE_VALUES: 'auth scope',
-  // Lowercase today; not part of ROV-227's decision, open for the owner.
-  NOTIFICATION_SKIP_REASON_VALUES: 'notification skip reason',
+  AUTH_SCOPE_VALUES:
+    'the JWT scope claim, read by every guard and five CHECK constraints (ROV-227)',
+  NOTIFICATION_SKIP_REASON_VALUES:
+    'stored in notification_deliveries.skip_reason as lowercase codes',
 };
 
 const tuples = Object.entries(enums).filter(
@@ -29,6 +31,14 @@ describe('enum value casing', () => {
   it.each(
     tuples.filter(([name]) => !(name in EXCEPTIONS)),
   )('%s holds only UPPER_SNAKE values', (_name, values) => {
-    expect(values.filter((v) => !/^[A-Z][A-Z0-9_]*$/.test(v))).toEqual([]);
+    expect(values.filter((v) => !UPPER_SNAKE.test(v))).toEqual([]);
+  });
+
+  it.each(
+    Object.keys(EXCEPTIONS),
+  )('exception %s still exists and still needs to be one', (name) => {
+    const values = tuples.find(([n]) => n === name)?.[1];
+    expect(values).toBeDefined();
+    expect(values?.some((v) => !UPPER_SNAKE.test(v))).toBe(true);
   });
 });

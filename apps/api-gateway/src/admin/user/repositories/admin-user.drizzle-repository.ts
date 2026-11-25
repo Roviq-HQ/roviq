@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ACTIVITY_EVENT_TYPES } from '@roviq/common-types';
 import {
   authEvents,
   DRIZZLE_DB,
@@ -52,9 +53,6 @@ import type {
   AdminUserRecord,
   AdminUserStatisticsRecord,
 } from './types';
-
-/** Auth events that prove the user was using the app at that moment. */
-const ACTIVITY_EVENT_TYPES = ['LOGIN_SUCCESS', 'TOKEN_REFRESH', 'INSTITUTE_SWITCH'];
 
 /** Encrypted identifier types: only the stored mask may leave the database. */
 const SENSITIVE_IDENTIFIER_TYPES = new Set(['AADHAAR', 'PAN']);

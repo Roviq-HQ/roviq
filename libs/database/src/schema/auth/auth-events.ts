@@ -2,6 +2,7 @@ import {
   AUTH_EVENT_TYPE_VALUES,
   AUTH_FAILURE_REASON_VALUES,
   AUTH_SCOPE_VALUES,
+  type AuthEventType,
 } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import {
@@ -33,7 +34,7 @@ export const authEvents = pgTable(
      * platform_memberships), so no foreign key. Null when no session exists.
      */
     membershipId: uuid('membership_id'),
-    eventType: varchar('event_type', { length: 50 }).notNull(),
+    eventType: varchar('event_type', { length: 50 }).$type<AuthEventType>().notNull(),
     /** Entry point the request came through. Known before, and independent of, any authentication. */
     portal: varchar({ length: 20 }),
     /** Scope of the session that was granted. Never set for an attempt that was refused. */

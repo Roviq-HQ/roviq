@@ -16,29 +16,15 @@ import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import { RefreshTokenRepository, type RefreshTokenRevokeReason } from './refresh-token.repository';
 import type { CreateRefreshTokenData, RefreshTokenWithRelations } from './types';
 
-/**
- * Canonical set of revoke reasons. Used by {@link coerceRevokedReason} to
- * narrow the raw `varchar` coming out of Postgres (`string | null`) into the
- * domain-level {@link RefreshTokenRevokeReason} union the rest of the code
- * expects.
- */
 const VALID_REVOKE_REASONS: ReadonlySet<RefreshTokenRevokeReason> = new Set(
   REFRESH_TOKEN_REVOKE_REASON_VALUES,
 );
 
 /**
- * Validate and narrow a raw DB value into `RefreshTokenRevokeReason | null`.
- *
- * The single `as RefreshTokenRevokeReason` below is the ONE cast justified
- * in this file: it's gated by a runtime `Set.has` check against the canonical
- * reason list, so the cast only fires on values we've just proven to be
- * members of the union.
- *
- * Unknown non-null values collapse to `null` on purpose — the refresh flow's
- * cascade gate already treats `null` as "legacy/unknown ⇒ rotate-as-cascade",
- * which is the safest default for data we can't classify.
+ * An unknown stored reason reads as `null`, which the refresh flow treats like `ROTATION`
+ * (cascade): a reason we cannot classify is not proof the revocation was deliberate.
  */
-function coerceRevokedReason(raw: string | null): RefreshTokenRevokeReason | null {
+export function coerceRevokedReason(raw: string | null): RefreshTokenRevokeReason | null {
   if (raw === null) return null;
   return (VALID_REVOKE_REASONS as ReadonlySet<string>).has(raw)
     ? (raw as RefreshTokenRevokeReason)

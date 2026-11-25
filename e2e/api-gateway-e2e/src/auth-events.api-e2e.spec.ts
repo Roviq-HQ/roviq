@@ -5,7 +5,7 @@
  * through the platform-only `adminAuthEvents` query. Each request carries a
  * User-Agent unique to this run so rows from parallel suites never match.
  *
- * `password_change` + `all_sessions_revoked` are asserted in
+ * `PASSWORD_CHANGE` + `ALL_SESSIONS_REVOKED` are asserted in
  * `password-change.api-e2e.spec.ts`, which already owns the password rotation.
  */
 import assert from 'node:assert';
@@ -108,7 +108,7 @@ describe('Auth events E2E (ROV-96)', () => {
     );
   }
 
-  it('records login_success with scope, tenant, auth method, ip and user agent', async () => {
+  it('records LOGIN_SUCCESS with scope, tenant, auth method, ip and user agent', async () => {
     await teacherLogin();
 
     const event = await findEvent('LOGIN_SUCCESS');
@@ -121,7 +121,7 @@ describe('Auth events E2E (ROV-96)', () => {
     expect(event.ipAddress).toBeTruthy();
   });
 
-  it('records an unknown username as login_failed on the portal it was tried on', async () => {
+  it('records an unknown username as LOGIN_FAILED on the portal it was tried on', async () => {
     // An unknown username: a wrong password on a seed user would count toward its lockout.
     const username = `ghost-${randomUUID()}`;
     const res = await request(
@@ -160,7 +160,7 @@ describe('Auth events E2E (ROV-96)', () => {
     expect(event.metadata).toEqual({});
   });
 
-  it('records login_success, token_refresh and logout against the session membership', async () => {
+  it('records LOGIN_SUCCESS, TOKEN_REFRESH and LOGOUT against the session membership', async () => {
     const login = await teacherLogin();
     const { membershipId } = claims(login.accessToken);
 
@@ -198,7 +198,7 @@ describe('Auth events E2E (ROV-96)', () => {
     expect(logoutEvent.metadata).toEqual({});
   });
 
-  it('records impersonation_start and impersonation_end with the session id', async () => {
+  it('records IMPERSONATION_START and IMPERSONATION_END with the session id', async () => {
     const startRes = await request<{ adminStartImpersonation: { code: string | null } }>(
       `mutation($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
         adminStartImpersonation(

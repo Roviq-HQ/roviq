@@ -1003,7 +1003,7 @@ describe('AuthService', () => {
         userAgent: 'vitest',
         deviceInfo: undefined,
       });
-      // Every successful refresh rotates — old token gets tagged `rotation`
+      // Every successful refresh rotates — old token gets tagged `ROTATION`
       // so any subsequent use triggers the reuse-cascade.
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith(tokenId, 'ROTATION');
     });
@@ -1044,7 +1044,7 @@ describe('AuthService', () => {
         userId: 'user-1',
         membershipScope: 'institute',
         revokedAt: new Date(),
-        // `rotation` (or null) triggers the family-kill cascade — the
+        // `ROTATION` (or no known reason) triggers the family-kill cascade — the
         // attacker-replayed-after-rotation scenario this test guards.
         revokedReason: 'ROTATION',
         expiresAt: new Date(Date.now() + 86400000),
@@ -1133,7 +1133,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
-    it('does NOT cascade-revoke when revoked via password_change', async () => {
+    it('does NOT cascade-revoke when revoked via PASSWORD_CHANGE', async () => {
       // Password-change revocation is a deliberate, user-scoped action. The
       // old token showing up afterwards is a stale client, not an attacker —
       // must not fire the family-kill cascade.
@@ -1182,9 +1182,9 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
-    it('does NOT cascade-revoke when revoked via admin_revoked', async () => {
+    it('does NOT cascade-revoke when revoked via ADMIN_REVOKED', async () => {
       // Admin-initiated revocation is a deliberate, operator-scoped action.
-      // Same reasoning as password_change — no family kill on re-presentation.
+      // Same reasoning as PASSWORD_CHANGE — no family kill on re-presentation.
       const tokenId = 'token-admin-revoked';
       mockJwt.verify.mockReturnValue({
         sub: 'user-1',
@@ -1230,12 +1230,10 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
-    it('DOES cascade-revoke on legacy row with null revokedReason', async () => {
-      // Rows written before the `revokedReason` column existed have NULL
-      // reasons. Without a positive "this was deliberate" signal, the safest
-      // default is to treat a replayed revoked token as rotation reuse — the
-      // cascade fires and the whole family dies.
-      const tokenId = 'token-legacy-null';
+    it('DOES cascade-revoke when the revoked token has no known reason', async () => {
+      // Without a positive "this was deliberate" signal, a replayed revoked token is
+      // treated as rotation reuse: the cascade fires and the whole family dies.
+      const tokenId = 'token-no-reason';
       mockJwt.verify.mockReturnValue({
         sub: 'user-1',
         tokenId,
@@ -1633,7 +1631,7 @@ describe('AuthService', () => {
 
       expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(tokenHash);
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(1);
-      // Not `rotation`: replaying the token later must not trigger the reuse cascade.
+      // Not `ROTATION`: replaying the token later must not trigger the reuse cascade.
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'USER_INITIATED');
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
@@ -1793,7 +1791,7 @@ describe('AuthService', () => {
       expect(updateOrder).toBeLessThan(revokeOrder);
     });
 
-    it('emits both password_change and all_sessions_revoked auth events', async () => {
+    it('emits both PASSWORD_CHANGE and ALL_SESSIONS_REVOKED auth events', async () => {
       await authService.changePassword(userId, CURRENT, NEW, {
         ip: '127.0.0.1',
         userAgent: 'jest',

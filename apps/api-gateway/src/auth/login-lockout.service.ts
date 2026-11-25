@@ -38,7 +38,7 @@ export interface RecordFailureResult {
  * roundtrips.
  *
  * After MAX_LOGIN_ATTEMPTS failures within the window the account is locked,
- * the failure counter is cleared, and an `account_locked` auth event is
+ * the failure counter is cleared, and an `ACCOUNT_LOCKED` auth event is
  * emitted. Successful logins clear the failure counter but leave any active
  * lock in place — an attacker who guesses correctly mid-lockout still gets
  * blocked.
@@ -113,7 +113,7 @@ export class LoginLockoutService {
           },
         })
         .catch((err) => {
-          this.logger.warn(`Failed to emit account_locked auth event: ${String(err)}`);
+          this.logger.warn(`Failed to emit ACCOUNT_LOCKED auth event: ${String(err)}`);
         });
 
       return { locked: true, remainingAttempts: 0 };

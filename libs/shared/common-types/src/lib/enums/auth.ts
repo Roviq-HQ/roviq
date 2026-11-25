@@ -136,7 +136,7 @@ export const AUTH_FAILURE_REASON_VALUES = [
   'PASSKEY_UNKNOWN',
   // The passkey is registered but its signed response failed verification
   'PASSKEY_VERIFICATION_FAILED',
-  // The failed attempt that reached the lockout threshold (on `account_locked` events)
+  // The failed attempt that reached the lockout threshold (on `ACCOUNT_LOCKED` events)
   'TOO_MANY_ATTEMPTS',
 ] as const;
 
@@ -198,6 +198,13 @@ export type AuthEventType = (typeof AUTH_EVENT_TYPE_VALUES)[number];
 export const AuthEventType = Object.fromEntries(AUTH_EVENT_TYPE_VALUES.map((v) => [v, v])) as {
   readonly [K in AuthEventType]: K;
 };
+
+/** Auth events that prove the user was using the app at that moment ("last active"). */
+export const ACTIVITY_EVENT_TYPES = [
+  'LOGIN_SUCCESS',
+  'TOKEN_REFRESH',
+  'INSTITUTE_SWITCH',
+] as const satisfies readonly AuthEventType[];
 
 // ─── SignInStatus ───────────────────────────────────────────────────────────
 // Where a staff member or guardian stands with their first sign-in, as the institute sees it.

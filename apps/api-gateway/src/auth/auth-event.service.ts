@@ -42,7 +42,7 @@ interface SessionEvent extends AuthEventBase {
   scope?: AuthScope;
   tenantId?: string;
   resellerId?: string;
-  /** Set when the event belongs to a session (logout, token_refresh, institute_switch). */
+  /** Set when the event belongs to a session (LOGOUT, TOKEN_REFRESH, INSTITUTE_SWITCH). */
   membershipId?: string;
 }
 

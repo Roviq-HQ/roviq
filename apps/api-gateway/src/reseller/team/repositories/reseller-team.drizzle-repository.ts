@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ResellerTier } from '@roviq/common-types';
+import { ACTIVITY_EVENT_TYPES, type ResellerTier } from '@roviq/common-types';
 import {
   authEvents,
   DRIZZLE_DB,
@@ -41,9 +41,6 @@ import {
 } from './reseller-team.repository';
 
 const CTX = 'repository:reseller-team';
-
-/** Same set as the admin user list: what counts as the person having been active. */
-const ACTIVITY_EVENT_TYPES = ['LOGIN_SUCCESS', 'TOKEN_REFRESH', 'INSTITUTE_SWITCH'];
 
 const memberColumns = {
   id: resellerMembershipsLive.id,
