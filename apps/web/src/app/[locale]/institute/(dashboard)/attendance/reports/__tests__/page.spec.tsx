@@ -176,6 +176,6 @@ describe('AttendanceReportsPage names (ROV-360)', () => {
     await user.click(screen.getByTestId(instituteAttendance.dailyExportCsvBtn));
     const [, csv] = downloadCsv.mock.calls[0] as [string, { body: (string | number)[][] }];
     expect(csv.body[0][2]).toBe('कविता राव');
-    expect(csv.body[0][7]).toBe('आरव शर्मा (ADM-0042);अज्ञात छात्र');
+    expect(csv.body[0][7]).toBe('आरव शर्मा (ADM-0042);अज्ञात स्टूडेंट');
   });
 });
