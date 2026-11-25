@@ -39,8 +39,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertPlatformMembership':
     'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first. Foreign-id test: reseller-team.integration.spec.ts.',
-  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertPrimaryPhone':
-    'Creates a new platform-level user; no existing row is read or changed. Foreign-id test: guardian-create-foreign-id.integration.spec.ts, reseller-team.integration.spec.ts, student-create-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertUser':
     'Creates a new platform-level user; no existing row is read or changed. Foreign-id test: guardian-create-foreign-id.integration.spec.ts, reseller-team.integration.spec.ts, student-create-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertUserProfileIfMissing':
