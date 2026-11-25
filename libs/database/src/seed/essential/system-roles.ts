@@ -1,10 +1,10 @@
 import type { AbilityRule } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
-import { resellersLive, roles, SYSTEM_USER_ID } from '../..';
+import { roles, SYSTEM_USER_ID } from '../..';
 import type { DrizzleDB } from '../../providers';
 import {
-  provisionResellerSystemRoles,
   RESELLER_SYSTEM_ROLE_ABILITIES,
+  refreshResellerSystemRoleAbilities,
 } from '../../reseller-system-roles';
 import { SEED_IDS } from '../ids';
 
@@ -86,9 +86,5 @@ export async function seedSystemRoles(tx: DrizzleDB): Promise<void> {
     });
 
   // Every reseller owns a copy of the system roles; a changed ability list reaches them all.
-  // The lock keeps a reseller from being deleted between this read and its roles' insert.
-  const live = await tx.select({ id: resellersLive.id }).from(resellersLive).for('key share');
-  for (const reseller of live) {
-    await provisionResellerSystemRoles(tx, reseller.id, SYSTEM_USER_ID);
-  }
+  await refreshResellerSystemRoleAbilities(tx, SYSTEM_USER_ID);
 }

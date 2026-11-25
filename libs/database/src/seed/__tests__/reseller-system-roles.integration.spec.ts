@@ -117,16 +117,11 @@ describe('seedSystemRoles', () => {
   it("should refresh every reseller's stale copy of the system roles (ROV-284)", async () => {
     await inRolledBackTx(async (tx) => {
       const resellerId = await createReseller(tx, 'rov-284-stale');
-      await tx.insert(roles).values({
-        scope: 'reseller',
-        resellerId,
-        name: { en: 'reseller_viewer' },
-        abilities: [{ action: 'read', subject: 'all' }],
-        isSystem: true,
-        isDefault: false,
-        createdBy: SYSTEM_USER_ID,
-        updatedBy: SYSTEM_USER_ID,
-      });
+      await provisionResellerSystemRoles(tx, resellerId, SYSTEM_USER_ID);
+      await tx
+        .update(roles)
+        .set({ abilities: [{ action: 'read', subject: 'all' }] })
+        .where(eq(roles.resellerId, resellerId));
 
       await seedSystemRoles(tx);
 
@@ -188,5 +183,16 @@ describe('seedSystemRoles', () => {
       await other.query('DELETE FROM resellers WHERE id = $1', [resellerId]);
       await other.end();
     }
+  });
+
+  // A deploy runs beside reseller deletions; inserting would reference a reseller being removed.
+  it('should create no role copy for a reseller that has none', async () => {
+    await inRolledBackTx(async (tx) => {
+      const resellerId = await createReseller(tx, 'rov-284-no-copies');
+
+      await seedSystemRoles(tx);
+
+      expect(await resellerRoles(tx, resellerId)).toEqual([]);
+    });
   });
 });

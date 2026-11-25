@@ -480,7 +480,7 @@ Default institute roles:
 ### Platform and reseller system roles
 
 - Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
-- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed keeps the Roviq Direct copies on fixed seed ids and refreshes every reseller's copies, so a changed ability list reaches every reseller on the next deploy.
+- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed keeps the Roviq Direct copies on fixed seed ids and rewrites the abilities of every reseller's existing copies (`refreshResellerSystemRoleAbilities`), so a changed ability list reaches every reseller on the next deploy; it creates no copy.
 - `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
 
 ### Reseller team (ROV-185)

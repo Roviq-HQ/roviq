@@ -3,7 +3,7 @@ import {
   RESELLER_SYSTEM_ROLE_NAMES,
   type ResellerSystemRoleName,
 } from '@roviq/common-types';
-import { sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { DrizzleDB } from './providers';
 import { roles } from './schema/tenant/roles';
 
@@ -61,6 +61,35 @@ export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, Abil
   ],
   reseller_viewer: VIEWER_ABILITIES,
 };
+
+/**
+ * Brings every reseller's existing copy of the system roles up to the code's abilities. Runs on
+ * every deploy and creates no role (reseller creation does), so it never inserts a row that
+ * points at a reseller another transaction is removing.
+ */
+export async function refreshResellerSystemRoleAbilities(
+  tx: DrizzleDB,
+  actorId: string,
+): Promise<void> {
+  for (const name of RESELLER_SYSTEM_ROLE_NAMES) {
+    await tx
+      .update(roles)
+      .set({
+        abilities: RESELLER_SYSTEM_ROLE_ABILITIES[name],
+        updatedAt: new Date(),
+        updatedBy: actorId,
+      })
+      .where(
+        and(
+          eq(roles.scope, 'reseller'),
+          eq(roles.isSystem, true),
+          isNotNull(roles.resellerId),
+          eq(roles.name, { en: name }),
+          isNull(roles.deletedAt),
+        ),
+      );
+  }
+}
 
 /**
  * Gives a reseller its own copy of the three reseller system roles and returns
