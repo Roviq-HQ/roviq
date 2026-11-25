@@ -8,9 +8,9 @@ import type { DrizzleDB } from './providers';
 import { roles } from './schema/tenant/roles';
 
 /**
- * Creates the institute's default roles or refreshes their abilities and navigation from the
- * code. The code is the source of truth for default roles; an institute that wants different
- * rules uses a custom role.
+ * Creates the institute's default roles or refreshes their abilities from the code. The code is
+ * the source of truth for default-role abilities; an institute that wants different rules uses a
+ * custom role. Navigation is set only when the role is created: the institute may change it.
  */
 export async function refreshInstituteDefaultRoles(
   tx: DrizzleDB,
@@ -35,7 +35,6 @@ export async function refreshInstituteDefaultRoles(
       target: [roles.tenantId, roles.name],
       set: {
         abilities: sql`excluded.abilities`,
-        primaryNavSlugs: sql`excluded.primary_nav_slugs`,
         updatedAt: new Date(),
         updatedBy: actorId,
       },
@@ -43,8 +42,9 @@ export async function refreshInstituteDefaultRoles(
 }
 
 /**
- * Brings every institute's existing default roles up to the code's abilities and navigation.
- * Runs on every deploy; it creates no role (institute setup does that).
+ * Brings every institute's existing default roles up to the code's abilities. Runs on every
+ * deploy; it creates no role (institute setup does that), leaves the navigation an institute
+ * chose, and touches only the rows whose abilities differ.
  */
 export async function refreshDefaultRoleAbilities(tx: DrizzleDB, actorId: string): Promise<void> {
   for (const roleName of new Set(Object.values(DefaultRoles))) {
@@ -52,7 +52,6 @@ export async function refreshDefaultRoleAbilities(tx: DrizzleDB, actorId: string
       .update(roles)
       .set({
         abilities: DEFAULT_ROLE_ABILITIES[roleName],
-        primaryNavSlugs: [...(DEFAULT_PRIMARY_NAV_SLUGS[roleName] ?? [])],
         updatedAt: new Date(),
         updatedBy: actorId,
       })
@@ -62,6 +61,7 @@ export async function refreshDefaultRoleAbilities(tx: DrizzleDB, actorId: string
           eq(roles.isDefault, true),
           eq(roles.name, { en: roleName }),
           isNull(roles.deletedAt),
+          sql`${roles.abilities} IS DISTINCT FROM ${JSON.stringify(DEFAULT_ROLE_ABILITIES[roleName])}::jsonb`,
         ),
       );
   }

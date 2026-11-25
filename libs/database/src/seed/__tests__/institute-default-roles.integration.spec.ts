@@ -80,4 +80,39 @@ describe('refreshAllInstituteDefaultRoles (ROV-217)', () => {
       expect(created).toHaveLength(2);
     });
   });
+
+  it('should keep the navigation an institute chose and leave an up-to-date role untouched', async () => {
+    await inRolledBackTx(async (tx) => {
+      const tenantId = await createInstitute(tx);
+      const before = new Date('2026-01-01T00:00:00Z');
+      await tx.insert(roles).values([
+        {
+          tenantId,
+          name: { en: 'librarian' },
+          abilities: STALE,
+          primaryNavSlugs: ['dashboard'],
+          isDefault: true,
+          ...BY,
+        },
+        {
+          tenantId,
+          name: { en: 'nurse' },
+          abilities: DEFAULT_ROLE_ABILITIES.nurse,
+          isDefault: true,
+          updatedAt: before,
+          ...BY,
+        },
+      ]);
+
+      await refreshAllInstituteDefaultRoles(tx);
+
+      const rows = await tx
+        .select({ name: roles.name, nav: roles.primaryNavSlugs, updatedAt: roles.updatedAt })
+        .from(roles)
+        .where(eq(roles.tenantId, tenantId));
+      const byName = new Map(rows.map((row) => [row.name.en, row]));
+      expect(byName.get('librarian')?.nav).toEqual(['dashboard']);
+      expect(byName.get('nurse')?.updatedAt).toEqual(before);
+    });
+  });
 });
