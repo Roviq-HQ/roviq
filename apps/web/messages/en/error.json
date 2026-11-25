@@ -36,6 +36,7 @@
   "MESSAGING_SENDER_EXISTS": "A sender is already registered for this institute, or this number is already in use.",
   "ACADEMIC_YEAR_NOT_FOUND": "That academic year was not found. Refresh and try again.",
   "ACADEMIC_YEAR_NOT_ACTIVE": "No academic year is active for this.",
+  "CERTIFICATE_TEMPLATE_INACTIVE": "That certificate template has been deactivated. Pick an active template.",
   "EMPLOYEE_ID_DUPLICATE": "Another current staff member already has this employee ID.",
   "networkTitle": "Cannot reach Roviq",
   "network": "Check your internet connection, then try again.",

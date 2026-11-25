@@ -1,9 +1,11 @@
-import { AcademicStatus } from '@roviq/common-types';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { AcademicStatus, ErrorCode } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../messages/en/certificates.json';
+import errorEn from '../../../../../../../messages/en/error.json';
 import messagesHi from '../../../../../../../messages/hi/certificates.json';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
 
@@ -57,8 +59,20 @@ const templatesResult = {
   loading: false,
 };
 const noTemplatesResult = { data: { listCertificateTemplates: [] }, loading: false };
+const refetchTemplates = vi.fn();
+const failedTemplatesResult = {
+  data: undefined,
+  loading: false,
+  error: new CombinedGraphQLErrors({
+    errors: [{ message: 'raw server text', extensions: { code: ErrorCode.FORBIDDEN } }],
+  }),
+  refetch: refetchTemplates,
+};
 const useCertificateTemplatesMock = vi.fn(
-  (_type: string): typeof templatesResult | typeof noTemplatesResult => templatesResult,
+  (
+    _type: string,
+  ): typeof templatesResult | typeof noTemplatesResult | typeof failedTemplatesResult =>
+    templatesResult,
 );
 vi.mock('../use-certificates', () => ({
   useCertificates: () => certificatesResult,
@@ -156,6 +170,24 @@ describe('OtherCertificatesPage — issue dialog', () => {
       messagesEn.types.BONAFIDE_CERTIFICATE,
     );
     expect(screen.getByRole('option', { name: empty, hidden: true })).toBeDisabled();
+    useCertificateTemplatesMock.mockImplementation(() => templatesResult);
+  });
+
+  it('shows the translated error and a retry when the templates fail to load, not "no templates"', async () => {
+    useCertificateTemplatesMock.mockImplementation(() => failedTemplatesResult);
+    renderWithProviders(<OtherCertificatesPage />, { messages: { certificates: messagesEn } });
+    await openBonafideDialog(messagesEn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(errorEn.FORBIDDEN);
+    const empty = messagesEn.other.dialog.noTemplates.replace(
+      '{type}',
+      messagesEn.types.BONAFIDE_CERTIFICATE,
+    );
+    expect(screen.queryByRole('option', { name: empty, hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: errorEn.tryAgain }));
+    expect(refetchTemplates).toHaveBeenCalled();
     useCertificateTemplatesMock.mockImplementation(() => templatesResult);
   });
 

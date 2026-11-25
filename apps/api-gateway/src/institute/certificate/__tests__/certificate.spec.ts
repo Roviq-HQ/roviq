@@ -221,6 +221,7 @@ describe('CertificateService (unit)', () => {
         name: 'Character',
         templateContent: null,
         approvalChain: [],
+        isActive: true,
       });
       vi.mocked(certificates.nextSerial).mockResolvedValue('CERT/CHA/0001');
       const created = certificateRow({

@@ -3,6 +3,8 @@
 import { AcademicStatus, type CertificateStatus } from '@roviq/common-types';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
+  Alert,
+  AlertDescription,
   Badge,
   Button,
   Can,
@@ -33,8 +35,9 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import type { ColumnDef } from '@tanstack/react-table';
 import { otherCertificateHelp } from '@web/help/certificates/other-certificate.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { usePersonName } from '@web/hooks/use-person-name';
-import { Award, CheckCircle2, Clock, Plus, XCircle } from 'lucide-react';
+import { AlertCircle, Award, CheckCircle2, Clock, Plus, RotateCw, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -334,7 +337,14 @@ function IssueCertificateDialog({
   const [previewHtml, setPreviewHtml] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [runPreview, { loading: previewLoading }] = usePreviewCertificate();
-  const { data: templatesData, loading: templatesLoading } = useCertificateTemplates(defaultType);
+  const {
+    data: templatesData,
+    loading: templatesLoading,
+    error: templatesError,
+    refetch: refetchTemplates,
+  } = useCertificateTemplates(defaultType);
+  const errorCopy = useErrorCopy();
+  const tError = useTranslations('error');
   const templates = templatesData?.listCertificateTemplates ?? [];
   const issueCertSchema = React.useMemo(() => buildIssueCertSchema(t), [t]);
 
@@ -484,22 +494,49 @@ function IssueCertificateDialog({
             className="space-y-4"
           >
             <FieldGroup>
-              <form.AppField name="templateId">
-                {(field) => (
-                  <field.SelectField
-                    label={t('other.dialog.templateLabel')}
-                    options={templateOptions}
-                    placeholder={
-                      templatesLoading
-                        ? t('other.dialog.templatesLoading')
-                        : t('other.dialog.templatePlaceholder')
-                    }
-                    optional={false}
-                    help={otherCertificateHelp.template}
-                    testId={instituteCertificatesOther.templateSelect}
-                  />
-                )}
-              </form.AppField>
+              {templatesError && !templatesLoading ? (
+                <Field>
+                  <FieldLabel>{t('other.dialog.templateLabel')}</FieldLabel>
+                  <Alert
+                    variant="destructive"
+                    role="alert"
+                    data-testid={instituteCertificatesOther.templatesError}
+                  >
+                    <AlertCircle aria-hidden="true" />
+                    <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                      <span>{errorCopy(templatesError, t('other.dialog.templatesLoadError'))}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        title={tError('tryAgain')}
+                        onClick={() => void refetchTemplates()}
+                        data-testid={instituteCertificatesOther.templatesRetryBtn}
+                      >
+                        <RotateCw className="size-4" aria-hidden="true" />
+                        {tError('tryAgain')}
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                </Field>
+              ) : (
+                <form.AppField name="templateId">
+                  {(field) => (
+                    <field.SelectField
+                      label={t('other.dialog.templateLabel')}
+                      options={templateOptions}
+                      placeholder={
+                        templatesLoading
+                          ? t('other.dialog.templatesLoading')
+                          : t('other.dialog.templatePlaceholder')
+                      }
+                      optional={false}
+                      help={otherCertificateHelp.template}
+                      testId={instituteCertificatesOther.templateSelect}
+                    />
+                  )}
+                </form.AppField>
+              )}
               <Field>
                 <FieldLabel htmlFor="cert-student-search">
                   {t('other.dialog.studentLabel')}

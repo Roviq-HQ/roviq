@@ -293,6 +293,11 @@ export class CertificateService {
         ErrorCode.CERTIFICATE_TEMPLATE_NOT_FOUND,
         'Certificate template not found',
       );
+    if (!template.isActive)
+      throw new BusinessException(
+        ErrorCode.CERTIFICATE_TEMPLATE_INACTIVE,
+        'Certificate template is deactivated',
+      );
 
     // Auto-populate certificate data from the student profile
     let certificateData: Record<string, unknown> = {};

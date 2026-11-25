@@ -16,6 +16,8 @@ export interface CertificateTemplateRow {
   name: string;
   templateContent: string | null;
   approvalChain: Array<{ role: string }> | null;
+  /** A deactivated template still renders the certificates issued from it, but takes no new ones. */
+  isActive: boolean;
 }
 
 /** An active template as the issue dialog lists it. */

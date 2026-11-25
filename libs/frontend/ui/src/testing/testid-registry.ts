@@ -1272,6 +1272,8 @@ export const testIds = {
     title: 'other-certs-title',
     student: (id: string) => `other-certs-student-${id}`,
     templateSelect: 'other-certs-template-select',
+    templatesError: 'other-certs-templates-error',
+    templatesRetryBtn: 'other-certs-templates-retry-btn',
   },
 
   // ── Institute: groups ─────────────────────────────────────────────────

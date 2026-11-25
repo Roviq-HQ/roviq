@@ -855,6 +855,30 @@ describe('certificates and TCs: another institute id (ROV-293)', () => {
       );
     });
 
+    it('requestCertificate should refuse a deactivated template of its own and store nothing', async () => {
+      const [retired] = await asAdmin((tx) =>
+        tx
+          .insert(certificateTemplates)
+          .values({
+            tenantId: instA.tenantId,
+            type: 'BONAFIDE_CERTIFICATE',
+            name: 'Bonafide (deactivated)',
+            fieldsSchema: {},
+            isActive: false,
+            ...BY,
+          })
+          .returning({ id: certificateTemplates.id }),
+      );
+
+      await refusesAndWritesNothing(
+        REQUEST_CERTIFICATE,
+        {
+          input: { templateId: retired.id, studentProfileId: a.studentIds[2], purpose: 'Visa' },
+        },
+        ErrorCode.CERTIFICATE_TEMPLATE_INACTIVE,
+      );
+    });
+
     it('issueCertificate should refuse a draft certificate of another institute and render nothing', async () => {
       await refusesAndWritesNothing(
         byId('issueCertificate'),

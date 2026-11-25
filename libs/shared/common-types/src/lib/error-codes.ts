@@ -239,6 +239,8 @@ export const ErrorCode = {
   CERTIFICATE_NOT_FOUND: 'CERTIFICATE_NOT_FOUND',
   /** Certificate template not found */
   CERTIFICATE_TEMPLATE_NOT_FOUND: 'CERTIFICATE_TEMPLATE_NOT_FOUND',
+  /** The certificate template is deactivated: it takes no new certificate requests */
+  CERTIFICATE_TEMPLATE_INACTIVE: 'CERTIFICATE_TEMPLATE_INACTIVE',
   /** Dead-letter message not found */
   DLQ_MESSAGE_NOT_FOUND: 'DLQ_MESSAGE_NOT_FOUND',
   /** Messaging sender not found, or deleted */
@@ -580,6 +582,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   BOT_NOT_FOUND: HttpStatus.NOT_FOUND,
   CERTIFICATE_NOT_FOUND: HttpStatus.NOT_FOUND,
   CERTIFICATE_TEMPLATE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  CERTIFICATE_TEMPLATE_INACTIVE: HttpStatus.UNPROCESSABLE_ENTITY,
   DLQ_MESSAGE_NOT_FOUND: HttpStatus.NOT_FOUND,
   MESSAGING_SENDER_NOT_FOUND: HttpStatus.NOT_FOUND,
   MESSAGING_SENDER_EXISTS: HttpStatus.CONFLICT,

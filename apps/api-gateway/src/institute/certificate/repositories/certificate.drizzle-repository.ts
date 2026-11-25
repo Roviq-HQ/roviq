@@ -48,6 +48,7 @@ export class CertificateDrizzleRepository extends CertificateRepository {
           name: certificateTemplatesLive.name,
           templateContent: certificateTemplatesLive.templateContent,
           approvalChain: certificateTemplatesLive.approvalChain,
+          isActive: certificateTemplatesLive.isActive,
         })
         .from(certificateTemplatesLive)
         .where(eq(certificateTemplatesLive.id, templateId))
