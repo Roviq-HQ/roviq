@@ -118,6 +118,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - i18n text (`i18nText()`, tenant-authored names only): the database and the API carry the whole `{ en, hi }` object, the frontend picks the locale with `useI18nField()`; never resolve a locale in a resolver or service · validate with `i18nTextSchema`, edit with `<I18nInput>`
 - A message that reports a problem passes the six-point test (what, which one, so what, first steps, where, when it ends): `docs/frontend.md` → "Messages that report a problem"
 - UI: `<Button>` from `@roviq/ui`, `useTranslations()`, `useFormatDate()`, scope-prefixed nav hrefs
+- Hindi copy is the Hindi people speak: English office words in Devanagari (एडमिशन, सेशन, कोड), never textbook words (पहचानकर्ता, अनुमोदन): `docs/frontend.md` → "Hindi copy"
 - Field help: a topic from `apps/web/src/help` passed as `help={…}`; nothing between a label and its input; instructions after the input (`pnpm check:field-help`)
 - Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`
 - Errors: `BusinessException(ErrorCode.X, …)` on the backend; frontend branches on `extensions.code` (`isAppError`, `extractGraphQLErrorCode`) and shows translated copy — never `err.message`

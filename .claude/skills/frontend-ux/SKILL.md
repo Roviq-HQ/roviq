@@ -30,7 +30,7 @@ Users are Indian institute admins, clerks, teachers, parents — non-technical, 
 
 ## Forms
 
-- [DNMPQ] Domain language labels, not DB names. Text around a field is one of three kinds: an instruction needed to fill it (format, limit, warning, error) goes in `description`, after the input, always shown; an optional one-sentence `hint` and the explanation (what, why, what each choice changes) go in a help topic in `apps/web/src/help/<area>/<form>.help.ts` (`defineFieldHelp`, en+hi together), passed as `help={…}` to the shared field or `FieldLabelWithInfo`. Nothing goes between a label and its input except the topic hint (`pnpm check:field-help`). A simple field gets no topic; a field needing more than the popover gets an `article`. Every topic lists the code it describes in `<form>.help.sources.ts`. Never inline `<Popover>`+`HelpCircle`. Format: `docs/frontend.md` → "Field help"
+- [DNMPQ] Domain language labels, not DB names. Text around a field is one of three kinds: an instruction needed to fill it (format, limit, warning, error) goes in `description`, after the input, always shown; an optional one-sentence `hint` and the explanation (what, why, what each choice changes) go in a help topic in `apps/web/src/help/<area>/<form>.help.ts` (`defineFieldHelp`, en+hi together), passed as `help={…}` to the shared field or `FieldLabelWithInfo`. Nothing goes between a label and its input except the topic hint (`pnpm check:field-help`). A simple field gets no topic; a field needing more than the popover gets an `article`. New and edited topics use the rich layout: a one-sentence lead `body`, `points` for rules, `options` for the choices table, `example` and `avoid`. Hindi copy follows `docs/frontend.md` → "Hindi copy". Every topic lists the code it describes in `<form>.help.sources.ts`. Never inline `<Popover>`+`HelpCircle`. Format: `docs/frontend.md` → "Field help"
 - [FJPME] Show min/max constraints. ₹ prefix + Indian numbering on blur. % suffix. Validate on blur
 - [FLSCT] Limit fields: "2 of 10 used" inline. Warn before reducing below usage. Plan-gated → "Upgrade" link
 - [FVOLK] Edit: read-only as plain text, creation metadata, "Save Changes" not "Submit"
@@ -96,7 +96,7 @@ Users are Indian institute admins, clerks, teachers, parents — non-technical, 
 - [QUVSN] Logical tab order. Escape closes modals. `focus-visible:ring`. Arrow keys in custom grids
 - [ROGXK] Logical CSS only: `ms-4`/`me-4` not `ml-4`/`mr-4`. Periodic RTL test. Icons flip
 - [RVSBJ] Color + icon/shape always. Badges = color + text. Charts = patterns + colors
-- [SZWFX] `t()` on every string day 1. ICU placeholders. Hindi = 30–40% longer. Per-namespace JSONs
+- [SZWFX] `t()` on every string day 1. ICU placeholders. Hindi = 30–40% longer. Per-namespace JSONs. All Hindi copy is the Hindi people speak: English office words in Devanagari (एडमिशन, सेशन, कोड, यूनिक, रिसीट), abbreviations in Latin (TC, OBC, UDISE+), never textbook words (पहचानकर्ता, अद्वितीय, अनुमोदन, स्थानांतरण). `docs/frontend.md` → "Hindi copy"
 - [TRPFC] Toasts: `aria-live`. Loading: `aria-busy`. Tables: proper semantics. Modals: focus trap. Icons: `aria-label`
 
 ## Dashboards
