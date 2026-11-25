@@ -237,26 +237,26 @@
     }
   },
   "staff.new.employeeId": {
-    "reviewedReason": "Blank still takes the next free EMP- value, now drawn inside the create transaction; a typed ID shared with a current staff member is still refused",
+    "reviewedReason": "create now discards the account on any failure; the ID rules described are unchanged",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
       "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.employeeId": "641f121582967b66",
       "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.isEmployeeIdTaken": "bc568858ff5191e4",
       "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#insertWithSeriesId": "3d12b0f632b1b374",
-      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "0e7e353c21a70040",
+      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "792500698d136e61",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employeeId": "f9e8a61520422893",
       "libs/database/migrations/20261125103827_staff-employee-id-unique/migration.sql": "39095d7d920e7ed1",
       "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.employeeId": "e7eb23b0b39dcabe"
     }
   },
   "staff.new.employmentType": {
-    "reviewedReason": "Default stays REGULAR; only the create's transaction changed",
+    "reviewedReason": "create order changed only; a blank employment type still saves Regular",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#employmentTypeLabel": "77f867f8fc3f9ec3",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#natureOfAppointment": "258551f6a99f01be",
-      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "0e7e353c21a70040",
+      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "792500698d136e61",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employmentType": "475b302d88f226a3",
       "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.employmentType": "10cdeeee06753925",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#EMPLOYMENT_TYPE_VALUES": "94efbeee1c41000e"
