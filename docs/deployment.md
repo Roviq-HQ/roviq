@@ -275,10 +275,11 @@ enforced yet.
 
 Every 15 minutes the notification service sends a test message (the canary, type
 `DELIVERY_CANARY`) on each channel listed, through the same providers as every message
-(ROV-329). The eight `notification_*` alerts in `docker/openobserve/alerts/` page when the
+(ROV-329). The ten `notification_*` alerts in `docker/openobserve/alerts/` page when the
 canary stops reaching the provider, the failure rate rises, a sender is blocked, a circuit
-breaker opens, events wait or the service stops; [Notification delivery alerts](runbooks/notification-delivery.md) says what
-to check for each.
+breaker opens, events wait or the service stops, and raise a ticket for dead letters, skipped
+messages and a WhatsApp template the provider refused or changed;
+[Notification delivery alerts](runbooks/notification-delivery.md) says what to check for each.
 
 | Variable | Value |
 | --- | --- |
