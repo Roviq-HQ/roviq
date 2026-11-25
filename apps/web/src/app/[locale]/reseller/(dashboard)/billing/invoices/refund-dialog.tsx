@@ -13,8 +13,8 @@ import {
   Field,
   FieldError,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   Input,
   Select,
   SelectContent,
@@ -24,6 +24,7 @@ import {
   Skeleton,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { refundHelp } from '@web/help/reseller-billing/refund.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -195,15 +196,9 @@ export function RefundDialog({ open, onOpenChange, invoiceId }: RefundDialogProp
                 </Field>
               )}
               <Field data-invalid={amountError ? true : undefined}>
-                <FieldLabel htmlFor="refundAmount">
+                <FieldLabelWithInfo htmlFor="refundAmount" help={refundHelp.amount}>
                   {t('invoices.refund.amount')}
-                  <FieldInfoPopover
-                    title={t('invoices.refund.fieldHelp.amountTitle')}
-                    data-testid={ids.refundAmountInfo}
-                  >
-                    <p>{t('invoices.refund.fieldHelp.amountBody')}</p>
-                  </FieldInfoPopover>
-                </FieldLabel>
+                </FieldLabelWithInfo>
                 <Input
                   id="refundAmount"
                   type="number"
@@ -229,15 +224,9 @@ export function RefundDialog({ open, onOpenChange, invoiceId }: RefundDialogProp
                 )}
               </Field>
               <Field>
-                <FieldLabel htmlFor="refundReason">
+                <FieldLabelWithInfo htmlFor="refundReason" help={refundHelp.reason}>
                   {t('invoices.refund.reason')}
-                  <FieldInfoPopover
-                    title={t('invoices.refund.fieldHelp.reasonTitle')}
-                    data-testid={ids.refundReasonInfo}
-                  >
-                    <p>{t('invoices.refund.fieldHelp.reasonBody')}</p>
-                  </FieldInfoPopover>
-                </FieldLabel>
+                </FieldLabelWithInfo>
                 <Input
                   id="refundReason"
                   value={reason}

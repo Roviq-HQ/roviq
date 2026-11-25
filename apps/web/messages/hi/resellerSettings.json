@@ -84,13 +84,6 @@
     "customCssDescription": "अतिरिक्त स्टाइल नियम, अधिकतम {max} अक्षर। ये किसी दूसरी साइट से कुछ लोड नहीं कर सकते।",
     "customCssTooLong": "स्टाइलशीट {max} अक्षरों से कम रखें।",
     "customCssForbidden": "\"{token}\" हटाएँ। स्टाइल दूसरी साइटों से फ़ाइलें लोड नहीं कर सकते और उनमें HTML नहीं हो सकता।",
-    "fieldHelp": {
-      "primaryColorTitle": "मुख्य रंग",
-      "primaryColorBody": "इतना गहरा रंग चुनें कि उस पर सफ़ेद अक्षर साफ़ पढ़े जा सकें।",
-      "customCssTitle": "कस्टम CSS",
-      "customCssBody": "केवल सादे स्टाइल नियम। @import, url(), image(), बैकस्लैश और कोण कोष्ठक स्वीकार नहीं होते, ताकि स्टाइलशीट किसी दूसरे सर्वर से सामग्री न ला सके।",
-      "customCssExample": "प्रीव्यू क्लास: .brand-header, .brand-sidebar, .brand-nav-item, .brand-button, .brand-card"
-    },
     "preview": "लाइव प्रीव्यू",
     "previewFrameTitle": "इस ब्रांडिंग के साथ आपके पोर्टल का प्रीव्यू",
     "previewSample": {

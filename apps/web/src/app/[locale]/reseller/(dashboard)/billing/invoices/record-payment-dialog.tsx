@@ -11,8 +11,8 @@ import {
   DialogTitle,
   Field,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   Input,
   Select,
   SelectContent,
@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@roviq/ui';
+import { recordPaymentHelp } from '@web/help/reseller-billing/record-payment.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -105,18 +106,9 @@ export function RecordPaymentDialog({
         <form onSubmit={handleSubmit}>
           <FieldGroup>
             <Field>
-              <FieldLabel>
+              <FieldLabelWithInfo help={recordPaymentHelp.method}>
                 {t('invoices.recordPayment.method')}
-                <FieldInfoPopover
-                  title={t('invoices.recordPayment.fieldHelp.methodTitle')}
-                  data-testid={resellerBillingInvoices.recordPaymentMethodInfo}
-                >
-                  <p>{t('invoices.recordPayment.fieldHelp.methodBody')}</p>
-                  <p>
-                    <em>{t('invoices.recordPayment.fieldHelp.methodOptions')}</em>
-                  </p>
-                </FieldInfoPopover>
-              </FieldLabel>
+              </FieldLabelWithInfo>
               <Select value={method} onValueChange={setMethod}>
                 <SelectTrigger>
                   <SelectValue />
@@ -142,15 +134,9 @@ export function RecordPaymentDialog({
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="receipt">
+              <FieldLabelWithInfo htmlFor="receipt" help={recordPaymentHelp.receiptNumber}>
                 {t('invoices.recordPayment.receiptNumber')}
-                <FieldInfoPopover
-                  title={t('invoices.recordPayment.fieldHelp.receiptNumberTitle')}
-                  data-testid={resellerBillingInvoices.recordPaymentReceiptInfo}
-                >
-                  <p>{t('invoices.recordPayment.fieldHelp.receiptNumberBody')}</p>
-                </FieldInfoPopover>
-              </FieldLabel>
+              </FieldLabelWithInfo>
               <Input
                 id="receipt"
                 value={receiptNumber}
@@ -177,15 +163,12 @@ export function RecordPaymentDialog({
                   {t('invoices.recordPayment.collectedBySelf')}
                 </p>
                 <Field>
-                  <FieldLabel htmlFor="collectionDate">
+                  <FieldLabelWithInfo
+                    htmlFor="collectionDate"
+                    help={recordPaymentHelp.collectionDate}
+                  >
                     {t('invoices.recordPayment.collectionDate')}
-                    <FieldInfoPopover
-                      title={t('invoices.recordPayment.fieldHelp.collectionDateTitle')}
-                      data-testid={resellerBillingInvoices.recordPaymentCollectionDateInfo}
-                    >
-                      <p>{t('invoices.recordPayment.fieldHelp.collectionDateBody')}</p>
-                    </FieldInfoPopover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Input
                     id="collectionDate"
                     type="date"

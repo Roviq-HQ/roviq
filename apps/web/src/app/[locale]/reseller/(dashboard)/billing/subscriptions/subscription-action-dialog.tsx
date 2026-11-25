@@ -9,11 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
   Field,
-  FieldInfoPopover,
-  FieldLabel,
+  FieldLabelWithInfo,
   Input,
 } from '@roviq/ui';
-import { testIds } from '@roviq/ui/testing/testid-registry';
+import { subscriptionActionsHelp } from '@web/help/reseller-billing/subscription-actions.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -86,15 +85,9 @@ export function SubscriptionActionDialog({
 
         {needsReason && (
           <Field>
-            <FieldLabel>
+            <FieldLabelWithInfo help={subscriptionActionsHelp.reason}>
               {t('subscriptions.actions.reason')}
-              <FieldInfoPopover
-                title={t('subscriptions.actions.fieldHelp.reasonTitle')}
-                data-testid={testIds.resellerBillingSubscriptions.subscriptionReasonInfo}
-              >
-                <p>{t('subscriptions.actions.fieldHelp.reasonBody')}</p>
-              </FieldInfoPopover>
-            </FieldLabel>
+            </FieldLabelWithInfo>
             <Input
               value={reason}
               onChange={(e) => setReason(e.target.value)}

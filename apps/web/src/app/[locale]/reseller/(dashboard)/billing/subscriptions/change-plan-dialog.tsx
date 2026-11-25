@@ -10,13 +10,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  FieldInfoPopover,
+  FieldHelpButton,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@roviq/ui';
+import { subscriptionActionsHelp } from '@web/help/reseller-billing/subscription-actions.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -127,12 +128,10 @@ export function ChangePlanDialog({
               <div className="flex items-center justify-between border-t pt-1 font-medium">
                 <span className="flex items-center gap-1.5">
                   {t('subscriptions.actions.prorationNet')}
-                  <FieldInfoPopover
-                    title={t('subscriptions.actions.fieldHelp.prorationTitle')}
-                    data-testid={testIds.resellerBillingSubscriptions.changePlanProrationInfo}
-                  >
-                    <p>{t('subscriptions.actions.fieldHelp.prorationBody')}</p>
-                  </FieldInfoPopover>
+                  <FieldHelpButton
+                    topic={subscriptionActionsHelp.proration}
+                    fieldLabel={t('subscriptions.actions.prorationNet')}
+                  />
                 </span>
                 <span className={delta >= 0 ? 'text-orange-600' : 'text-green-600'}>
                   {delta >= 0 ? '+' : ''}
@@ -157,5 +156,3 @@ export function ChangePlanDialog({
     </Dialog>
   );
 }
-
-import { testIds } from '@roviq/ui/testing/testid-registry';

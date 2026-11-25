@@ -20,7 +20,7 @@ import {
   Checkbox,
   Field,
   FieldGroup,
-  FieldInfoPopover,
+  FieldHelpButton,
   FieldLabel,
   FieldSeparator,
   I18nField,
@@ -29,6 +29,8 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
+import { instituteNewHelp } from '@web/help/institutes/institute-new.help';
+import { resellerInstituteNewHelp } from '@web/help/reseller-institutes/reseller-institute-new.help';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
@@ -273,17 +275,7 @@ export default function ResellerCreateInstitutePage() {
                     label={t('code')}
                     description={t('codeDescription')}
                     placeholder={t('codePlaceholder')}
-                    info={
-                      <FieldInfoPopover
-                        title={t('fieldHelp.codeTitle')}
-                        data-testid={resellerInstitutes.newCodeInfo}
-                      >
-                        <p>{t('fieldHelp.codeBody')}</p>
-                        <p>
-                          <em>{t('fieldHelp.codeExample')}</em>
-                        </p>
-                      </FieldInfoPopover>
-                    }
+                    help={instituteNewHelp.code}
                   />
                 )}
               </form.AppField>
@@ -295,14 +287,7 @@ export default function ResellerCreateInstitutePage() {
                     options={typeOptions}
                     placeholder={t('typePlaceholder')}
                     optional={false}
-                    info={
-                      <FieldInfoPopover
-                        title={t('fieldHelp.typeTitle')}
-                        data-testid={resellerInstitutes.newTypeInfo}
-                      >
-                        <p>{t('fieldHelp.typeBody')}</p>
-                      </FieldInfoPopover>
-                    }
+                    help={instituteNewHelp.type}
                   />
                 )}
               </form.AppField>
@@ -318,14 +303,7 @@ export default function ResellerCreateInstitutePage() {
                         description={t('structureFrameworkDescription')}
                         options={frameworkOptions}
                         optional={false}
-                        info={
-                          <FieldInfoPopover
-                            title={t('fieldHelp.structureFrameworkTitle')}
-                            data-testid={resellerInstitutes.newFrameworkInfo}
-                          >
-                            <p>{t('fieldHelp.structureFrameworkBody')}</p>
-                          </FieldInfoPopover>
-                        }
+                        help={instituteNewHelp.structureFramework}
                       />
                     )}
                   </form.AppField>
@@ -336,14 +314,7 @@ export default function ResellerCreateInstitutePage() {
                         label={t('board')}
                         options={boardOptions}
                         placeholder={t('boardPlaceholder')}
-                        info={
-                          <FieldInfoPopover
-                            title={t('fieldHelp.boardTitle')}
-                            data-testid={resellerInstitutes.newBoardInfo}
-                          >
-                            <p>{t('fieldHelp.boardBody')}</p>
-                          </FieldInfoPopover>
-                        }
+                        help={instituteNewHelp.board}
                       />
                     )}
                   </form.AppField>
@@ -379,14 +350,7 @@ export default function ResellerCreateInstitutePage() {
                     label={t('group')}
                     description={t('groupDescription')}
                     placeholder={t('groupPlaceholder')}
-                    info={
-                      <FieldInfoPopover
-                        title={t('fieldHelp.groupTitle')}
-                        data-testid={resellerInstitutes.newGroupInfo}
-                      >
-                        <p>{t('fieldHelp.groupBody')}</p>
-                      </FieldInfoPopover>
-                    }
+                    help={resellerInstituteNewHelp.group}
                   />
                 )}
               </form.AppField>
@@ -398,12 +362,10 @@ export default function ResellerCreateInstitutePage() {
               <FieldSeparator>{t('firstAdmin.title')}</FieldSeparator>
               <p className="text-sm text-muted-foreground">
                 {t('firstAdmin.description')}
-                <FieldInfoPopover
-                  title={t('firstAdmin.infoTitle')}
-                  data-testid={resellerInstitutes.newFirstAdminInfo}
-                >
-                  <p>{t('firstAdmin.infoBody')}</p>
-                </FieldInfoPopover>
+                <FieldHelpButton
+                  topic={instituteNewHelp.firstAdmin}
+                  fieldLabel={t('firstAdmin.title')}
+                />
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <form.AppField name="firstAdmin.firstName">

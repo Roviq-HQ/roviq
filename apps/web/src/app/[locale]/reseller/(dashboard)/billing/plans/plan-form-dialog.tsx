@@ -14,14 +14,15 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldInfoPopover,
-  FieldLabel,
+  FieldHelpButton,
+  FieldLabelWithInfo,
   FieldLegend,
   FieldSet,
   I18nField,
   setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
+import { planFormHelp } from '@web/help/reseller-billing/plan-form.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -330,18 +331,9 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
 
               {isEditing ? (
                 <Field>
-                  <FieldLabel>
+                  <FieldLabelWithInfo help={planFormHelp.code}>
                     {t('plans.form.code')}
-                    <FieldInfoPopover
-                      title={t('plans.form.fieldHelp.codeTitle')}
-                      data-testid={resellerBillingPlans.codeInfoEdit}
-                    >
-                      <p>{t('plans.form.fieldHelp.codeBody')}</p>
-                      <p>
-                        <em>{t('plans.form.fieldHelp.codeExample')}</em>
-                      </p>
-                    </FieldInfoPopover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <p className="text-sm font-mono">{plan?.id}</p>
                   <FieldDescription>{t('plans.form.codeReadOnlyHint')}</FieldDescription>
                 </Field>
@@ -355,17 +347,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
                       testId="billing-plan-code-input"
                       inputRef={codeInputRef}
                       errorTestId="billing-plan-code-error"
-                      info={
-                        <FieldInfoPopover
-                          title={t('plans.form.fieldHelp.codeTitle')}
-                          data-testid={resellerBillingPlans.codeInfoCreate}
-                        >
-                          <p>{t('plans.form.fieldHelp.codeBody')}</p>
-                          <p>
-                            <em>{t('plans.form.fieldHelp.codeExample')}</em>
-                          </p>
-                        </FieldInfoPopover>
-                      }
+                      help={planFormHelp.code}
                     />
                   )}
                 </form.AppField>
@@ -389,14 +371,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
                   {(field) => (
                     <field.MoneyField
                       label={t('plans.form.amount')}
-                      info={
-                        <FieldInfoPopover
-                          title={t('plans.form.amountHelpAria')}
-                          data-testid={resellerBillingPlans.amountInfo}
-                        >
-                          <p>{t('plans.form.amountHelp')}</p>
-                        </FieldInfoPopover>
-                      }
+                      help={planFormHelp.amount}
                       description={t('plans.form.amountConstraint', {
                         max: currency(AMOUNT_MAX_RUPEES),
                       })}
@@ -420,15 +395,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
                         label: t(`plans.intervals.${interval}`),
                       }))}
                       testId="billing-plan-interval-select"
-                      info={
-                        <FieldInfoPopover
-                          title={t('plans.form.fieldHelp.intervalTitle')}
-                          data-testid={resellerBillingPlans.intervalInfo}
-                        >
-                          <p>{t('plans.form.fieldHelp.intervalBody')}</p>
-                          <p>{t('plans.form.fieldHelp.intervalOptions')}</p>
-                        </FieldInfoPopover>
-                      }
+                      help={planFormHelp.interval}
                     />
                   )}
                 </form.AppField>
@@ -457,14 +424,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
                       max={TRIAL_DAYS_MAX}
                       step={1}
                       testId="billing-plan-trial-days-input"
-                      info={
-                        <FieldInfoPopover
-                          title={t('plans.form.fieldHelp.trialDaysTitle')}
-                          data-testid={resellerBillingPlans.trialDaysInfo}
-                        >
-                          <p>{t('plans.form.fieldHelp.trialDaysBody')}</p>
-                        </FieldInfoPopover>
-                      }
+                      help={planFormHelp.trialDays}
                     />
                   )}
                 </form.AppField>
@@ -488,15 +448,10 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
             <FieldSet data-testid={resellerBillingPlans.sectionLimits}>
               <FieldLegend className="flex items-center gap-2">
                 {t('plans.form.sectionLimits')}
-                <FieldInfoPopover
-                  title={t('plans.form.fieldHelp.limitsTitle')}
-                  data-testid={resellerBillingPlans.limitsInfo}
-                >
-                  <p>{t('plans.form.fieldHelp.limitsBody')}</p>
-                  <p>
-                    <em>{t('plans.form.fieldHelp.limitsExample')}</em>
-                  </p>
-                </FieldInfoPopover>
+                <FieldHelpButton
+                  topic={planFormHelp.limits}
+                  fieldLabel={t('plans.form.sectionLimits')}
+                />
               </FieldLegend>
               <p className="text-xs text-muted-foreground">{t('plans.form.limitsHint')}</p>
 
