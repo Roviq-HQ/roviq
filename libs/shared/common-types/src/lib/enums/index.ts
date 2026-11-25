@@ -3,6 +3,7 @@ export * from './attendance';
 export * from './auth';
 export * from './billing';
 export * from './compliance-export';
+export * from './consent';
 export * from './examination';
 export * from './file';
 export * from './geography';

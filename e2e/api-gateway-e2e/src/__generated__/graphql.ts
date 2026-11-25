@@ -943,7 +943,7 @@ export type ConsentMyProfileQuery = { __typename?: 'Query', myProfile:
 export type MyConsentStatusQueryVariables = Types.Exact<{ [key: string]: never; }>;
 
 
-export type MyConsentStatusQuery = { __typename?: 'Query', myConsentStatus: Array<{ __typename?: 'ConsentStatus', studentProfileId: string, purpose: string, isGranted: boolean, lastUpdatedAt: string | null }> };
+export type MyConsentStatusQuery = { __typename?: 'Query', myConsentStatus: Array<{ __typename?: 'ConsentStatus', studentProfileId: string, purpose: Types.ConsentPurpose, isGranted: boolean, lastUpdatedAt: string | null }> };
 
 export type GrantConsentMutationVariables = Types.Exact<{
   input: Types.GrantConsentInput;

@@ -111,7 +111,7 @@ describe('Auth events E2E (ROV-96)', () => {
   it('records login_success with scope, tenant, auth method, ip and user agent', async () => {
     await teacherLogin();
 
-    const event = await findEvent('login_success');
+    const event = await findEvent('LOGIN_SUCCESS');
     expect(event.userId).toBe(SEED_IDS.USER_TEACHER);
     expect(event.portal).toBe('institute');
     expect(event.scope).toBe('institute');
@@ -132,7 +132,7 @@ describe('Auth events E2E (ROV-96)', () => {
     );
     expect(res.errors?.[0]?.extensions?.code).toBe('INVALID_CREDENTIALS');
 
-    const event = await findEvent('login_failed', 'UNKNOWN_USER');
+    const event = await findEvent('LOGIN_FAILED', 'UNKNOWN_USER');
     expect(event.userId).toBeNull();
     expect(event.portal).toBe('reseller');
     expect(event.scope).toBeNull();
@@ -152,7 +152,7 @@ describe('Auth events E2E (ROV-96)', () => {
     // Indistinguishable from a wrong password for the caller.
     expect(res.errors?.[0]?.extensions?.code).toBe('INVALID_CREDENTIALS');
 
-    const event = await findEvent('login_failed', 'NO_PORTAL_ACCESS');
+    const event = await findEvent('LOGIN_FAILED', 'NO_PORTAL_ACCESS');
     expect(event.userId).toBe(SEED_IDS.USER_TEACHER);
     expect(event.portal).toBe('platform');
     expect(event.scope).toBeNull();
@@ -164,7 +164,7 @@ describe('Auth events E2E (ROV-96)', () => {
     const login = await teacherLogin();
     const { membershipId } = claims(login.accessToken);
 
-    const loginEvent = await findEvent('login_success');
+    const loginEvent = await findEvent('LOGIN_SUCCESS');
     expect(loginEvent.membershipId).toBe(membershipId);
 
     const refreshRes = await request<{ refreshToken: Tokens }>(
@@ -175,7 +175,7 @@ describe('Auth events E2E (ROV-96)', () => {
     assert(refreshRes.data);
     const refreshed = refreshRes.data.refreshToken;
 
-    const refreshEvent = await findEvent('token_refresh');
+    const refreshEvent = await findEvent('TOKEN_REFRESH');
     expect(refreshEvent.userId).toBe(SEED_IDS.USER_TEACHER);
     expect(refreshEvent.scope).toBe('institute');
     expect(refreshEvent.tenantId).toBe(SEED_IDS.INSTITUTE_1);
@@ -190,7 +190,7 @@ describe('Auth events E2E (ROV-96)', () => {
     );
     expect(logoutRes.errors).toBeUndefined();
 
-    const logoutEvent = await findEvent('logout');
+    const logoutEvent = await findEvent('LOGOUT');
     expect(logoutEvent.userId).toBe(SEED_IDS.USER_TEACHER);
     expect(logoutEvent.scope).toBe('institute');
     expect(logoutEvent.tenantId).toBe(SEED_IDS.INSTITUTE_1);
@@ -225,7 +225,7 @@ describe('Auth events E2E (ROV-96)', () => {
     const impersonationToken = exchangeRes.data.exchangeImpersonationCode.accessToken;
     const { impersonationSessionId, impersonatorId } = claims(impersonationToken);
 
-    const startEvent = await findEvent('impersonation_start');
+    const startEvent = await findEvent('IMPERSONATION_START');
     expect(startEvent.userId).toBe(impersonatorId);
     // The impersonator's scope, not the target's.
     expect(startEvent.scope).toBe('platform');
@@ -244,7 +244,7 @@ describe('Auth events E2E (ROV-96)', () => {
     );
     expect(endRes.errors).toBeUndefined();
 
-    const endEvent = await findEvent('impersonation_end');
+    const endEvent = await findEvent('IMPERSONATION_END');
     expect(endEvent.userId).toBe(impersonatorId);
     expect(endEvent.scope).toBe('platform');
     expect(endEvent.metadata).toEqual({

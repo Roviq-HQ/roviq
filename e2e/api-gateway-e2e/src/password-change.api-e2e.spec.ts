@@ -179,14 +179,14 @@ describe('Password Change E2E (ROV-187)', () => {
           (e) => e.userId === SEED.GUARDIAN_USER.id && new Date(e.createdAt) >= suiteStartedAt,
         );
         expect(mine.map((e) => e.eventType)).toEqual(
-          expect.arrayContaining(['password_change', 'all_sessions_revoked']),
+          expect.arrayContaining(['PASSWORD_CHANGE', 'ALL_SESSIONS_REVOKED']),
         );
         return mine;
       },
       { timeout: 5_000, interval: 100 },
     );
 
-    const revoked = events.find((e) => e.eventType === 'all_sessions_revoked');
+    const revoked = events.find((e) => e.eventType === 'ALL_SESSIONS_REVOKED');
     expect(revoked?.metadata).toEqual({ reason: 'password_change' });
   });
 

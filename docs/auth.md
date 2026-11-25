@@ -43,7 +43,7 @@ Three separate login mutations, one per portal:
 ### Admin Portal: `adminLogin(username, password)`
 1. Verifies credentials
 2. Looks up `platform_memberships` for user
-3. No active membership → `INVALID_CREDENTIALS`, identical to a wrong password. A `login_failed` auth event with `failure_reason = NO_PORTAL_ACCESS` and the attempted `portal` records the real cause
+3. No active membership → `INVALID_CREDENTIALS`, identical to a wrong password. A `LOGIN_FAILED` auth event with `failure_reason = NO_PORTAL_ACCESS` and the attempted `portal` records the real cause
 4. Issues scope=platform access token (5min TTL) + refresh token
 
 ### Reseller Portal: `resellerLogin(username, password)`
@@ -60,7 +60,7 @@ Three separate login mutations, one per portal:
 5. User calls `selectInstitute(membershipId)` → issues scoped tokens
 
 ### Institute Switching
-- `switchInstitute(membershipId, currentRefreshToken)` — institute scope only, refused during impersonation. `currentRefreshToken` must be a live refresh token of the caller; that one row is revoked (reason `user_initiated`) and new tokens are issued. No re-auth. Every check runs before the revoke, so a rejected switch leaves the session usable.
+- `switchInstitute(membershipId, currentRefreshToken)` — institute scope only, refused during impersonation. `currentRefreshToken` must be a live refresh token of the caller; that one row is revoked (reason `USER_INITIATED`) and new tokens are issued. No re-auth. Every check runs before the revoke, so a rejected switch leaves the session usable.
 
 ## JWT Structure
 
@@ -74,16 +74,16 @@ All tokens are `type: 'access'` — no more separate 'platform' type.
 - **Refresh token:** `{ sub, tokenId, membershipId, type: 'refresh' }` — 7d TTL
 
 ### Token Refresh
-- Refresh token rotation: each use invalidates the old token and issues a new pair (reason `rotation`)
+- Refresh token rotation: each use invalidates the old token and issues a new pair (reason `ROTATION`)
 - Each refresh re-reads the user and the membership named in the token (`membershipId` claim). An inactive user gets `ACCOUNT_INACTIVE`; a missing, inactive or soft-deleted membership, a deleted institute or a suspended reseller gets `SESSION_EXPIRED`. A refresh never moves a session to a different membership. The old token is rotated only after these checks pass, so a rejected refresh does not arm reuse detection.
 - Reason-aware revocation: `refresh_tokens.revoked_reason` records why a row was revoked. Every revocation path tags itself so the reuse-detection cascade can tell a rotation-replay attack from a late client retry. Values:
-  - `rotation` — normal rotate-then-reuse signal. Replay triggers the cascade.
-  - `user_initiated` — `logout`, `revokeSession`, `revokeAllOtherSessions`, scope switch (`switchInstitute`).
-  - `password_change` — emitted by `changePassword` when it nukes every outstanding session.
-  - `admin_revoked` — admin-driven revocation from the admin UI.
-  - `NULL` — legacy rows from before the column existed. Treated like `rotation` (cascade) so older data drains out safely.
-- Reuse detection: if a revoked token is presented, the cascade (revoke every refresh token for the user) fires ONLY when `revoked_reason` is `rotation` or `NULL`. All other reasons raise `UnauthorizedException('Refresh token revoked')` and leave sibling sessions alive — replaying a logged-out/password-changed/admin-revoked token must not log the user out of every live device.
-- Password change invalidation: `password_changed_at > token.created_at` → reject + revoke (reason `password_change`).
+  - `ROTATION` — normal rotate-then-reuse signal. Replay triggers the cascade.
+  - `USER_INITIATED` — `logout`, `revokeSession`, `revokeAllOtherSessions`, scope switch (`switchInstitute`).
+  - `PASSWORD_CHANGE` — emitted by `changePassword` when it nukes every outstanding session.
+  - `ADMIN_REVOKED` — admin-driven revocation from the admin UI.
+  - A revoked row always has a reason (`chk_refresh_token_revoked_reason`). The code still treats a missing or unknown reason like `ROTATION`, so it cascades.
+- Reuse detection: if a revoked token is presented, the cascade (revoke every refresh token for the user) fires ONLY when `revoked_reason` is `ROTATION` (or missing). All other reasons raise `UnauthorizedException('Refresh token revoked')` and leave sibling sessions alive — replaying a logged-out/password-changed/admin-revoked token must not log the user out of every live device.
+- Password change invalidation: `password_changed_at > token.created_at` → reject + revoke (reason `PASSWORD_CHANGE`).
 - Scope-aware re-issue: checks the correct membership table based on stored `membership_scope`.
 
 `RefreshTokenRevokeReason` is exported from `apps/api-gateway/src/auth/repositories/refresh-token.repository.ts` — every `revoke`/`revokeAllForUser`/`revokeAllOtherForUser` call must pass one of the four values.
@@ -125,11 +125,11 @@ A missing, malformed, unknown, expired or reused ticket closes the socket with c
 
 ## Session Management
 
-- `logout(currentRefreshToken)` — ends only the session of that refresh token (reason `user_initiated`); other devices stay signed in. Succeeds if the session is already gone, rejects a token of another user with `SESSION_EXPIRED`, and is refused during impersonation. The access token stays valid until it expires.
+- `logout(currentRefreshToken)` — ends only the session of that refresh token (reason `USER_INITIATED`); other devices stay signed in. Succeeds if the session is already gone, rejects a token of another user with `SESSION_EXPIRED`, and is refused during impersonation. The access token stays valid until it expires.
 - `mySessions` query — returns active refresh tokens with device_info, ip, last_used_at
-- `revokeSession(sessionId)` — revoke a specific session (reason `user_initiated`)
-- `revokeAllOtherSessions` — revoke every refresh token for the user EXCEPT the caller's current one (reason `user_initiated`). The caller keeps working on the same token; crucially, the `user_initiated` reason means a stale client replaying one of the killed tokens will hit `Refresh token revoked` without triggering the rotation-reuse cascade (see [Token Refresh](#token-refresh)), so the caller's keep-alive session is not collaterally killed.
-- `changePassword` — in addition to clearing the password, revokes every refresh token for the user with reason `password_change`. Cascading is deliberately suppressed for the same reason: a late client retry after a password change should just fail, not replay-attack-cascade.
+- `revokeSession(sessionId)` — revoke a specific session (reason `USER_INITIATED`)
+- `revokeAllOtherSessions` — revoke every refresh token for the user EXCEPT the caller's current one (reason `USER_INITIATED`). The caller keeps working on the same token; crucially, the `USER_INITIATED` reason means a stale client replaying one of the killed tokens will hit `Refresh token revoked` without triggering the rotation-reuse cascade (see [Token Refresh](#token-refresh)), so the caller's keep-alive session is not collaterally killed.
+- `changePassword` — in addition to clearing the password, revokes every refresh token for the user with reason `PASSWORD_CHANGE`. Cascading is deliberately suppressed for the same reason: a late client retry after a password change should just fail, not replay-attack-cascade.
 
 ## Reseller suspension and deletion (ROV-97)
 
@@ -137,7 +137,7 @@ Platform admins suspend, unsuspend and delete resellers through `adminSuspendRes
 
 **Suspension** cuts off the reseller's staff at once:
 
-- The database does the revocation. The `resellers_revoke_sessions` trigger runs when a reseller leaves `ACTIVE`, whatever code changed it. It revokes every reseller-scope refresh token of the reseller's memberships with reason `admin_revoked`, and ends the impersonation sessions its staff opened as reseller with reason `revoked`. Tokens are matched by membership, so the same person's institute sessions are untouched. The reason is required (`chk_refresh_token_revoked_reason`): a revoked token without one would be treated as token theft and revoke every other session of the user.
+- The database does the revocation. The `resellers_revoke_sessions` trigger runs when a reseller leaves `ACTIVE`, whatever code changed it. It revokes every reseller-scope refresh token of the reseller's memberships with reason `ADMIN_REVOKED`, and ends the impersonation sessions its staff opened as reseller with reason `revoked`. Tokens are matched by membership, so the same person's institute sessions are untouched. The reason is required (`chk_refresh_token_revoked_reason`): a revoked token without one would be treated as token theft and revoke every other session of the user.
 - Access tokens already issued are rejected by `ResellerAccessGuard`, a global guard that checks the reseller's status on every reseller-scope request and answers `UNAUTHENTICATED`. The database cannot see an access token, so this check stays in the application. The guard caches the answer in Redis for 60 seconds; suspension writes a `blocked` marker that the guard checks first, so there is no wait for the cache to expire.
 - The service drops the Redis caches of the ended impersonation sessions, so `ImpersonationSessionGuard` rejects their tokens on the next request (`IMPERSONATION_ENDED`).
 - `resellerLogin` and `refreshToken` refuse a reseller that is not `ACTIVE`. Login answers `INVALID_CREDENTIALS`, the same as a wrong password, so it does not confirm the password. The database also refuses a new refresh token for such a reseller.
@@ -156,7 +156,7 @@ All three portals expose `/en/{scope}/settings/sessions` (`admin`, `reseller`, `
 
 `mySessions(currentRefreshToken: String!)` identifies the current session by comparing the refresh-token hash with the authenticated user's active sessions. It rejects a token outside that list and returns only session metadata; token hashes never appear in GraphQL. The UI marks the current session, hides its individual revoke button, and displays device, IP, last-active and creation timestamps.
 
-`revokeAllOtherSessions(currentRefreshToken: String!)` requires a token belonging to the authenticated user. The frontend sends the current token and refetches the list after success. The resolver uses `@NoAudit()` because the auth service emits `all_sessions_revoked` without including the refresh token; the generic mutation audit would serialize this sensitive argument. Load failures offer retry, mutation failures show translated feedback, and all session labels are available in English and Hindi.
+`revokeAllOtherSessions(currentRefreshToken: String!)` requires a token belonging to the authenticated user. The frontend sends the current token and refetches the list after success. The resolver uses `@NoAudit()` because the auth service emits `ALL_SESSIONS_REVOKED` without including the refresh token; the generic mutation audit would serialize this sensitive argument. Load failures offer retry, mutation failures show translated feedback, and all session labels are available in English and Hindi.
 
 The shared login form submits through `form.handleSubmit()` and prevents native navigation for both the submit button and Enter. It uses POST as a fallback and keeps credential fields and buttons disabled while auth restores, so credentials cannot be submitted in the page URL before hydration.
 
@@ -217,7 +217,7 @@ An email address typed by someone else does not prove who owns an account: the w
 
 Behaviour:
 
-- On the `MAX_LOGIN_ATTEMPTS`-th failure the service writes the lock key and emits an `account_locked` row into `auth_events`.
+- On the `MAX_LOGIN_ATTEMPTS`-th failure the service writes the lock key and emits an `ACCOUNT_LOCKED` row into `auth_events`.
 - A successful login clears `auth:failed-login:*` but **leaves any active lock in place** — a stale success cannot rescue a locked account, the lock TTL must elapse.
 - Locked-account login response:
 
@@ -342,17 +342,17 @@ E2E fixtures live in `libs/database/src/seed/e2e/impersonation.ts` (one active +
 
 | `event_type` | Emitted by | Columns and `metadata` |
 | --- | --- | --- |
-| `login_success` | `adminLogin`, `resellerLogin`, `instituteLogin`, `selectInstitute`, passkey sign-in (each also sends the new-login notification) | `portal`, `scope` (always equal), `tenant_id` or `reseller_id`, `membership_id`, `auth_method` (`password` / `passkey`), ip, user agent |
-| `login_failed` | every refused sign-in attempt | `portal`, `auth_method`, `failure_reason`; `scope`, `tenant_id`, `reseller_id` are always NULL; `user_id` is set when an account matched, otherwise `metadata.username_lower` |
-| `logout` | `logout` | `scope`, `tenant_id` or `reseller_id`, `membership_id` |
-| `token_refresh` | `refreshToken` | `scope`, `tenant_id` or `reseller_id`, `membership_id`, ip |
-| `institute_switch` | `switchInstitute` | `scope='institute'`, `membership_id` (the target), `metadata: { from_tenant_id, to_tenant_id }` |
-| `impersonation_start` | `exchangeImpersonationCode` | `user_id` and `scope` are the impersonator's, `tenant_id` the target institute, `metadata: { target_user_id, target_tenant_id, session_id }` |
-| `impersonation_end` | `endImpersonation` (all scopes), reseller suspension, expiry sweep | `user_id` and `scope` are the actor's (the impersonator's on expiry), `metadata: { session_id, ended_reason }` (`manual` / `revoked` / `expired`) |
-| `password_change` | `changePassword` | always followed by `all_sessions_revoked` |
-| `all_sessions_revoked` | `changePassword`, `revokeAllOtherSessions`, refresh-token reuse, reseller suspension | `metadata.reason`: `password_change`, `user_initiated`, `token_reuse`, `reseller_suspended` |
-| `account_locked` | `LoginLockoutService`, on the attempt that reaches the threshold | `portal`, `failure_reason = TOO_MANY_ATTEMPTS`, `metadata: { username_lower, attempts, lockout_seconds }` |
-| `passkey_register` | passkey registration | `metadata: { passkey_id, device_type, backed_up, aaguid }` |
+| `LOGIN_SUCCESS` | `adminLogin`, `resellerLogin`, `instituteLogin`, `selectInstitute`, passkey sign-in (each also sends the new-login notification) | `portal`, `scope` (always equal), `tenant_id` or `reseller_id`, `membership_id`, `auth_method` (`password` / `passkey`), ip, user agent |
+| `LOGIN_FAILED` | every refused sign-in attempt | `portal`, `auth_method`, `failure_reason`; `scope`, `tenant_id`, `reseller_id` are always NULL; `user_id` is set when an account matched, otherwise `metadata.username_lower` |
+| `LOGOUT` | `logout` | `scope`, `tenant_id` or `reseller_id`, `membership_id` |
+| `TOKEN_REFRESH` | `refreshToken` | `scope`, `tenant_id` or `reseller_id`, `membership_id`, ip |
+| `INSTITUTE_SWITCH` | `switchInstitute` | `scope='institute'`, `membership_id` (the target), `metadata: { from_tenant_id, to_tenant_id }` |
+| `IMPERSONATION_START` | `exchangeImpersonationCode` | `user_id` and `scope` are the impersonator's, `tenant_id` the target institute, `metadata: { target_user_id, target_tenant_id, session_id }` |
+| `IMPERSONATION_END` | `endImpersonation` (all scopes), reseller suspension, expiry sweep | `user_id` and `scope` are the actor's (the impersonator's on expiry), `metadata: { session_id, ended_reason }` (`manual` / `revoked` / `expired`) |
+| `PASSWORD_CHANGE` | `changePassword` | always followed by `ALL_SESSIONS_REVOKED` |
+| `ALL_SESSIONS_REVOKED` | `changePassword`, `revokeAllOtherSessions`, refresh-token reuse, reseller suspension | `metadata.reason`: `password_change`, `user_initiated`, `token_reuse`, `reseller_suspended` |
+| `ACCOUNT_LOCKED` | `LoginLockoutService`, on the attempt that reaches the threshold | `portal`, `failure_reason = TOO_MANY_ATTEMPTS`, `metadata: { username_lower, attempts, lockout_seconds }` |
+| `PASSKEY_REGISTER` | passkey registration | `metadata: { passkey_id, device_type, backed_up, aaguid }` |
 
 - **`membership_id`** is the membership of the session, in the table `scope` names (`memberships`, `reseller_memberships` or `platform_memberships`), so it has no foreign key; it is NULL for events with no session. `user_id` has no foreign key either: the log outlives the user row.
 - **Append-only.** No application role may change or remove a row: `roviq_admin` holds SELECT and INSERT only (policies `auth_events_admin_select`, `auth_events_admin_insert`), and the triggers `auth_events_append_only` and `auth_events_no_truncate` (function `forbid_row_change()`) refuse UPDATE, DELETE and TRUNCATE for every role, the owner included. Removing rows, for example for data erasure, needs the owner to disable the triggers in a migration.
@@ -368,10 +368,10 @@ E2E fixtures live in `libs/database/src/seed/e2e/impersonation.ts` (one active +
 | `NO_PORTAL_ACCESS` | Credentials valid, no usable membership in that portal |
 | `PASSKEY_UNKNOWN` | Passkey credential is not registered |
 | `PASSKEY_VERIFICATION_FAILED` | Registered passkey, signed response failed verification |
-| `TOO_MANY_ATTEMPTS` | On `account_locked`: the attempt that reached the lockout threshold |
+| `TOO_MANY_ATTEMPTS` | On `ACCOUNT_LOCKED`: the attempt that reached the lockout threshold |
 
-- Database guards on `auth_events`: `chk_auth_events_portal`, `chk_auth_events_scope` and `chk_auth_events_failure_reason` restrict the value sets; `chk_auth_events_login_portal` requires a portal on `login_success` / `login_failed` / `account_locked`; `chk_auth_events_login_success_scope` requires `scope = portal`; `chk_auth_events_refused_attempt` requires a failure reason and forbids scope, tenant and reseller on refused attempts.
-- Expiry: `ImpersonationExpirySweeper` runs `ImpersonationService.expireOverdueSessions()` every minute. It sets `ended_at = expires_at`, `ended_reason = 'expired'` on sessions past `expires_at` and writes `impersonation_end` with the impersonator as `user_id`. The claiming `UPDATE … RETURNING` is atomic, so several gateway replicas record each session once. Such a session still lists as `EXPIRED`, not `ENDED`.
+- Database guards on `auth_events`: `chk_auth_events_event_type`, `chk_auth_events_portal`, `chk_auth_events_scope` and `chk_auth_events_failure_reason` restrict the value sets; `chk_auth_events_login_portal` requires a portal on `LOGIN_SUCCESS` / `LOGIN_FAILED` / `ACCOUNT_LOCKED`; `chk_auth_events_login_success_scope` requires `scope = portal`; `chk_auth_events_refused_attempt` requires a failure reason and forbids scope, tenant and reseller on refused attempts.
+- Expiry: `ImpersonationExpirySweeper` runs `ImpersonationService.expireOverdueSessions()` every minute. It sets `ended_at = expires_at`, `ended_reason = 'expired'` on sessions past `expires_at` and writes `IMPERSONATION_END` with the impersonator as `user_id`. The claiming `UPDATE … RETURNING` is atomic, so several gateway replicas record each session once. Such a session still lists as `EXPIRED`, not `ENDED`.
 
 ## IdentityService Boundary (ROV-209)
 
@@ -493,7 +493,7 @@ A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (
   - A caller may assign only roles at or below their own, and at or below the reseller's tier (`RESELLER_TIER_ROLE`). `resellerAssignableTeamRoles` returns that list.
   - A caller may change only members whose role is at or below their own, and never themselves. So a reseller always keeps the admin who is acting.
 - **Invite** takes an email and a role. An existing account with that email (case-insensitive) is linked; otherwise a user is created with the email as Roviq ID and sent a temporary password. An address that belongs to a deleted account, to several accounts, or that is another account's Roviq ID is refused with `TEAM_MEMBER_EMAIL_UNAVAILABLE`, whatever the reason. `IdentityService.findOrCreateUserByEmail` holds this rule for both this resolver and `adminCreateReseller`.
-- **Deactivate** sets `is_active = false`. The `reseller_memberships_revoke_sessions` trigger revokes the member's refresh tokens (`admin_revoked`) and ends their reseller impersonation sessions; the user account and other memberships are untouched.
+- **Deactivate** sets `is_active = false`. The `reseller_memberships_revoke_sessions` trigger revokes the member's refresh tokens (`ADMIN_REVOKED`) and ends their reseller impersonation sessions; the user account and other memberships are untouched.
 - **Tokens issued before a change.** A reseller access token carries `roleId` and lives 10 minutes. After a role change, deactivation or tier change the service writes `auth:reseller-member-access:<membershipId>`; `ResellerAccessGuard` then answers `UNAUTHENTICATED` to a token whose role differs (or to every token of a deactivated member). The client refreshes and gets the new role, or is signed out.
 - **Tier change.** `adminChangeResellerTier` no longer puts every member on the tier's role. `resellerRoleAfterTierChange`: holders of the old tier's top role move to the new tier's top role; anyone still above the new tier is brought down to it; everyone else keeps their role.
 - **Member detail.** `resellerGetTeamMember` returns `sessions` (live refresh tokens, with IP and device) only to the member themselves or to a caller who may manage them (`canManage`); others get `null`, so a support admin does not see a full admin's sessions. Recent activity comes from `resellerAuditLogs(filter: { userId })`.

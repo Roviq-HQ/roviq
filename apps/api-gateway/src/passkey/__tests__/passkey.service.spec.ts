@@ -285,7 +285,7 @@ describe('PasskeyService', () => {
       expect(mockAuthEvent.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-1',
-          type: 'passkey_register',
+          type: 'PASSKEY_REGISTER',
           authMethod: 'passkey',
           metadata: expect.objectContaining({ passkey_id: 'ap-1' }),
         }),
@@ -378,7 +378,7 @@ describe('PasskeyService', () => {
       expect(failure.message).toBe('Invalid credentials');
       expect(mockAuthEvent.emit).toHaveBeenCalledWith({
         userId: undefined,
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'institute',
         authMethod: 'passkey',
         failureReason: 'PASSKEY_UNKNOWN',
@@ -435,7 +435,7 @@ describe('PasskeyService', () => {
       expect(mockAuth.instituteLoginByUserId).not.toHaveBeenCalled();
       expect(mockAuthEvent.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'institute',
         authMethod: 'passkey',
         failureReason: 'PASSKEY_VERIFICATION_FAILED',

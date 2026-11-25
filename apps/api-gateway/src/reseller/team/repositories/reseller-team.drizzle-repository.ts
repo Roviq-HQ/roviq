@@ -43,7 +43,7 @@ import {
 const CTX = 'repository:reseller-team';
 
 /** Same set as the admin user list: what counts as the person having been active. */
-const ACTIVITY_EVENT_TYPES = ['login_success', 'token_refresh', 'institute_switch'];
+const ACTIVITY_EVENT_TYPES = ['LOGIN_SUCCESS', 'TOKEN_REFRESH', 'INSTITUTE_SWITCH'];
 
 const memberColumns = {
   id: resellerMembershipsLive.id,

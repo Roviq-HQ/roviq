@@ -87,7 +87,7 @@ test.describe('Data Consent — guardian', () => {
     });
 
     const childCard = page.getByTestId(`consent-child-${SEED.STUDENT_PROFILE_1.id}`);
-    const toggle = childCard.getByTestId('consent-toggle-academic_data_processing');
+    const toggle = childCard.getByTestId('consent-toggle-ACADEMIC_DATA_PROCESSING');
     await expect(toggle).toBeVisible({ timeout: 10_000 });
 
     // Click to grant

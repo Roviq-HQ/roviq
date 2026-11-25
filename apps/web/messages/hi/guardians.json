@@ -165,17 +165,17 @@
     "empty": "अभी तक कोई सहमति रिकॉर्ड नहीं",
     "todoNotice": "प्रति-बच्चा सहमति मैट्रिक्स सहमति डैशबोर्ड पर दिखाया गया है",
     "purposes": {
-      "academic_data_processing": "शैक्षणिक डेटा",
-      "photo_video_marketing": "फ़ोटो/वीडियो",
-      "whatsapp_communication": "व्हाट्सएप",
-      "sms_communication": "एसएमएस",
-      "aadhaar_collection": "आधार",
-      "biometric_collection": "बायोमेट्रिक",
-      "third_party_edtech": "एडटेक",
-      "board_exam_registration": "बोर्ड परीक्षा",
-      "transport_tracking": "परिवहन",
-      "health_data_processing": "स्वास्थ्य",
-      "cctv_monitoring": "सीसीटीवी"
+      "ACADEMIC_DATA_PROCESSING": "शैक्षणिक डेटा",
+      "PHOTO_VIDEO_MARKETING": "फ़ोटो/वीडियो",
+      "WHATSAPP_COMMUNICATION": "व्हाट्सएप",
+      "SMS_COMMUNICATION": "एसएमएस",
+      "AADHAAR_COLLECTION": "आधार",
+      "BIOMETRIC_COLLECTION": "बायोमेट्रिक",
+      "THIRD_PARTY_EDTECH": "एडटेक",
+      "BOARD_EXAM_REGISTRATION": "बोर्ड परीक्षा",
+      "TRANSPORT_TRACKING": "परिवहन",
+      "HEALTH_DATA_PROCESSING": "स्वास्थ्य",
+      "CCTV_MONITORING": "सीसीटीवी"
     }
   },
   "educationLevels": {

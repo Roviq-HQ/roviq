@@ -241,7 +241,7 @@ describe('notification flow (integration)', () => {
       await superPool.query(
         `INSERT INTO consent_records
            (tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted)
-         VALUES ($1, $2, $3, 'whatsapp_communication', $4)`,
+         VALUES ($1, $2, $3, 'WHATSAPP_COMMUNICATION', $4)`,
         [tenantId, guardianProfileIds[index], studentProfileId, spec.consent ?? true],
       );
     }

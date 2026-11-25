@@ -1058,7 +1058,7 @@ describe('ImpersonationService', () => {
       await Promise.resolve();
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'imp-1',
-        type: 'impersonation_start',
+        type: 'IMPERSONATION_START',
         scope: 'reseller',
         tenantId: 'tenant-1',
         ip: '10.0.0.9',
@@ -1143,7 +1143,7 @@ describe('ImpersonationService', () => {
       await Promise.resolve();
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'imp-1',
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: 'reseller',
         tenantId: 'tenant-1',
         ip: '10.0.0.9',
@@ -1188,7 +1188,7 @@ describe('ImpersonationService', () => {
       await Promise.resolve();
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'someone-else',
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: 'platform',
         tenantId: 'tenant-1',
         ip: '10.0.0.9',
@@ -1287,14 +1287,14 @@ describe('ImpersonationService', () => {
       expect(authEventService.emit).toHaveBeenCalledTimes(2);
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'imp-1',
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: 'reseller',
         tenantId: 'tenant-1',
         metadata: { session_id: 'session-1', ended_reason: 'expired' },
       });
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'imp-2',
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: 'platform',
         tenantId: undefined,
         metadata: { session_id: 'session-2', ended_reason: 'expired' },

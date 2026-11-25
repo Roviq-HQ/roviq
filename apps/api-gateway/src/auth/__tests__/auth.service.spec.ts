@@ -437,7 +437,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'institute',
         authMethod: 'password',
         failureReason: 'NO_PORTAL_ACCESS',
@@ -461,7 +461,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'institute',
         authMethod: 'password',
         failureReason: 'NO_PORTAL_ACCESS',
@@ -661,7 +661,7 @@ describe('AuthService', () => {
       expect(result.requiresInstituteSelection).toBeUndefined();
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'login_success',
+        type: 'LOGIN_SUCCESS',
         portal: 'institute',
         scope: 'institute',
         tenantId: 'tenant-1',
@@ -717,7 +717,7 @@ describe('AuthService', () => {
       );
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: undefined,
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'institute',
         authMethod: 'passkey',
         failureReason: 'ACCOUNT_INACTIVE',
@@ -851,7 +851,7 @@ describe('AuthService', () => {
       // The method that opened the selection, not a hardcoded 'password'.
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'login_success',
+        type: 'LOGIN_SUCCESS',
         portal: 'institute',
         scope: 'institute',
         tenantId: 'tenant-1',
@@ -994,7 +994,7 @@ describe('AuthService', () => {
       expect(result.user?.id).toBe('user-1');
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'token_refresh',
+        type: 'TOKEN_REFRESH',
         scope: 'institute',
         tenantId: 'tenant-1',
         resellerId: undefined,
@@ -1005,7 +1005,7 @@ describe('AuthService', () => {
       });
       // Every successful refresh rotates — old token gets tagged `rotation`
       // so any subsequent use triggers the reuse-cascade.
-      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith(tokenId, 'rotation');
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith(tokenId, 'ROTATION');
     });
 
     it('should throw on invalid JWT', async () => {
@@ -1046,7 +1046,7 @@ describe('AuthService', () => {
         revokedAt: new Date(),
         // `rotation` (or null) triggers the family-kill cascade — the
         // attacker-replayed-after-rotation scenario this test guards.
-        revokedReason: 'rotation',
+        revokedReason: 'ROTATION',
         expiresAt: new Date(Date.now() + 86400000),
         createdAt: new Date(),
         deviceInfo: null,
@@ -1072,10 +1072,10 @@ describe('AuthService', () => {
       );
       expect(failure.message).toBe('Refresh token reuse detected');
 
-      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'rotation');
+      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'ROTATION');
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'all_sessions_revoked',
+        type: 'ALL_SESSIONS_REVOKED',
         ip: '10.0.0.1',
         userAgent: 'vitest',
         deviceInfo: undefined,
@@ -1104,7 +1104,7 @@ describe('AuthService', () => {
         userId: 'user-1',
         membershipScope: 'institute',
         revokedAt: new Date(),
-        revokedReason: 'user_initiated',
+        revokedReason: 'USER_INITIATED',
         expiresAt: new Date(Date.now() + 86_400_000),
         createdAt: new Date(),
         deviceInfo: null,
@@ -1154,7 +1154,7 @@ describe('AuthService', () => {
         userId: 'user-1',
         membershipScope: 'institute',
         revokedAt: new Date(),
-        revokedReason: 'password_change',
+        revokedReason: 'PASSWORD_CHANGE',
         expiresAt: new Date(Date.now() + 86_400_000),
         createdAt: new Date(),
         deviceInfo: null,
@@ -1202,7 +1202,7 @@ describe('AuthService', () => {
         userId: 'user-1',
         membershipScope: 'institute',
         revokedAt: new Date(),
-        revokedReason: 'admin_revoked',
+        revokedReason: 'ADMIN_REVOKED',
         expiresAt: new Date(Date.now() + 86_400_000),
         createdAt: new Date(),
         deviceInfo: null,
@@ -1277,7 +1277,7 @@ describe('AuthService', () => {
         ErrorCode.SESSION_EXPIRED,
       );
       expect(failure.message).toMatch(/reuse detected/i);
-      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'rotation');
+      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'ROTATION');
     });
 
     it('should throw when token not found in DB', async () => {
@@ -1529,7 +1529,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(tokenHash);
       expect(mockMembershipRepo.findByIdAndUser).toHaveBeenCalledWith('membership-2', 'user-1');
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(1);
-      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'user_initiated');
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'USER_INITIATED');
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
       expect(result.accessToken).toBe('new-jwt');
       expect(result.user?.tenantId).toBe('tenant-2');
@@ -1545,7 +1545,7 @@ describe('AuthService', () => {
 
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'institute_switch',
+        type: 'INSTITUTE_SWITCH',
         scope: 'institute',
         tenantId: 'tenant-2',
         membershipId: 'membership-2',
@@ -1634,7 +1634,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(tokenHash);
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(1);
       // Not `rotation`: replaying the token later must not trigger the reuse cascade.
-      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'user_initiated');
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'USER_INITIATED');
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
@@ -1649,7 +1649,7 @@ describe('AuthService', () => {
 
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
-        type: 'logout',
+        type: 'LOGOUT',
         scope: 'institute',
         tenantId: 'tenant-1',
         resellerId: undefined,
@@ -1769,7 +1769,7 @@ describe('AuthService', () => {
       expect(updatedHash).not.toBe(storedUser.passwordHash);
       expect(updatedHash.startsWith('$argon2id$')).toBe(true);
 
-      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith(userId, 'password_change');
+      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith(userId, 'PASSWORD_CHANGE');
     });
 
     it('publishes the new token version so older access tokens are refused at once', async () => {
@@ -1802,7 +1802,7 @@ describe('AuthService', () => {
       expect(mockAuthEventService.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
-          type: 'password_change',
+          type: 'PASSWORD_CHANGE',
           ip: '127.0.0.1',
           userAgent: 'jest',
         }),
@@ -1810,7 +1810,7 @@ describe('AuthService', () => {
       expect(mockAuthEventService.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
-          type: 'all_sessions_revoked',
+          type: 'ALL_SESSIONS_REVOKED',
           metadata: expect.objectContaining({ reason: 'password_change' }),
         }),
       );
@@ -1886,7 +1886,7 @@ describe('AuthService', () => {
       expect(mockUserRepo.findByUsername).not.toHaveBeenCalled();
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: undefined,
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'institute',
         authMethod: 'password',
         failureReason: 'ACCOUNT_LOCKED',
@@ -1911,7 +1911,7 @@ describe('AuthService', () => {
 
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId,
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: 'platform',
         authMethod: 'password',
         failureReason,
@@ -2035,7 +2035,7 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.revokeAllOtherForUser).toHaveBeenCalledWith(
         'user-1',
         'current',
-        'user_initiated',
+        'USER_INITIATED',
       );
     });
 

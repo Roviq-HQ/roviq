@@ -174,7 +174,7 @@ export class AuthService {
     this.authEventService
       .emit({
         userId: user.id,
-        type: 'login_success',
+        type: 'LOGIN_SUCCESS',
         portal: 'platform',
         scope: 'platform',
         membershipId: membership.id,
@@ -216,7 +216,7 @@ export class AuthService {
     this.authEventService
       .emit({
         userId: user.id,
-        type: 'login_success',
+        type: 'LOGIN_SUCCESS',
         portal: 'reseller',
         scope: 'reseller',
         resellerId: m.resellerId,
@@ -273,7 +273,7 @@ export class AuthService {
       this.authEventService
         .emit({
           userId: user.id,
-          type: 'login_success',
+          type: 'LOGIN_SUCCESS',
           portal: 'institute',
           scope: 'institute',
           tenantId: m.tenantId,
@@ -355,7 +355,7 @@ export class AuthService {
       this.authEventService
         .emit({
           userId: user.id,
-          type: 'login_success',
+          type: 'LOGIN_SUCCESS',
           portal: 'institute',
           scope: 'institute',
           tenantId: m.tenantId,
@@ -458,7 +458,7 @@ export class AuthService {
     this.authEventService
       .emit({
         userId: user.id,
-        type: 'login_success',
+        type: 'LOGIN_SUCCESS',
         portal: 'institute',
         scope: 'institute',
         tenantId: membership.tenantId,
@@ -518,7 +518,7 @@ export class AuthService {
 
     // Revoked only once the switch is certain, so a rejected switch keeps the
     // session. `user_initiated`: replaying the old token must not cascade.
-    await this.refreshTokenRepo.revoke(currentToken.id, 'user_initiated');
+    await this.refreshTokenRepo.revoke(currentToken.id, 'USER_INITIATED');
 
     const result = await this.issueTokens({
       user,
@@ -546,7 +546,7 @@ export class AuthService {
     this.authEventService
       .emit({
         userId,
-        type: 'institute_switch',
+        type: 'INSTITUTE_SWITCH',
         scope: 'institute',
         tenantId: membership.tenantId,
         membershipId: membership.id,
@@ -585,14 +585,14 @@ export class AuthService {
     // Rotated only after the membership check: a rejected refresh must not
     // leave a `rotation` row behind, or the client's retry would trip reuse
     // detection and revoke the user's sessions in other institutes.
-    await this.refreshTokenRepo.revoke(storedToken.id, 'rotation');
+    await this.refreshTokenRepo.revoke(storedToken.id, 'ROTATION');
 
     const result = await this.issueTokens({ user, ...membership, meta });
 
     this.authEventService
       .emit({
         userId: user.id,
-        type: 'token_refresh',
+        type: 'TOKEN_REFRESH',
         scope,
         tenantId: membership.tenantId,
         resellerId: scope === 'reseller' ? membership.resellerId : undefined,
@@ -621,13 +621,13 @@ export class AuthService {
       if (session.userId !== current.userId) {
         throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
       }
-      await this.refreshTokenRepo.revoke(session.id, 'user_initiated');
+      await this.refreshTokenRepo.revoke(session.id, 'USER_INITIATED');
     }
 
     this.authEventService
       .emit({
         userId: current.userId,
-        type: 'logout',
+        type: 'LOGOUT',
         scope: current.scope,
         tenantId: current.scope === 'institute' ? current.tenantId : undefined,
         resellerId: current.scope === 'reseller' ? current.resellerId : undefined,
@@ -659,7 +659,7 @@ export class AuthService {
     if (!session || session.userId !== userId) {
       throw new BusinessException(ErrorCode.SESSION_NOT_FOUND, 'Session not found');
     }
-    await this.refreshTokenRepo.revoke(sessionId, 'user_initiated');
+    await this.refreshTokenRepo.revoke(sessionId, 'USER_INITIATED');
   }
 
   async revokeAllOtherSessions(
@@ -672,12 +672,12 @@ export class AuthService {
     if (!currentToken || currentToken.userId !== userId) {
       throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
-    await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentToken.id, 'user_initiated');
+    await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentToken.id, 'USER_INITIATED');
 
     this.authEventService
       .emit({
         userId,
-        type: 'all_sessions_revoked',
+        type: 'ALL_SESSIONS_REVOKED',
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -753,14 +753,14 @@ export class AuthService {
 
     const newHash = await hash(newPassword);
     const tokenVersion = await this.userRepo.updatePassword(userId, newHash);
-    await this.refreshTokenRepo.revokeAllForUser(userId, 'password_change');
+    await this.refreshTokenRepo.revokeAllForUser(userId, 'PASSWORD_CHANGE');
     // Ends the access tokens already issued, on their next request.
     await recordTokenVersion(this.redis, userId, tokenVersion);
 
     this.authEventService
       .emit({
         userId,
-        type: 'password_change',
+        type: 'PASSWORD_CHANGE',
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -770,7 +770,7 @@ export class AuthService {
     this.authEventService
       .emit({
         userId,
-        type: 'all_sessions_revoked',
+        type: 'ALL_SESSIONS_REVOKED',
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -835,13 +835,13 @@ export class AuthService {
 
     if (storedToken.revokedAt) {
       const isRotationReuse =
-        storedToken.revokedReason === null || storedToken.revokedReason === 'rotation';
+        storedToken.revokedReason === null || storedToken.revokedReason === 'ROTATION';
       if (isRotationReuse) {
-        await this.refreshTokenRepo.revokeAllForUser(storedToken.userId, 'rotation');
+        await this.refreshTokenRepo.revokeAllForUser(storedToken.userId, 'ROTATION');
         this.authEventService
           .emit({
             userId: storedToken.userId,
-            type: 'all_sessions_revoked',
+            type: 'ALL_SESSIONS_REVOKED',
             ip: meta?.ip,
             userAgent: meta?.userAgent,
             deviceInfo: meta?.deviceInfo,
@@ -859,7 +859,7 @@ export class AuthService {
 
     const storedUser = storedToken.user;
     if (storedUser.passwordChangedAt && storedToken.createdAt < storedUser.passwordChangedAt) {
-      await this.refreshTokenRepo.revoke(storedToken.id, 'password_change');
+      await this.refreshTokenRepo.revoke(storedToken.id, 'PASSWORD_CHANGE');
       throw new BusinessException(
         ErrorCode.PASSWORD_CHANGED,
         'Password changed — please re-authenticate',
@@ -975,7 +975,7 @@ export class AuthService {
     this.authEventService
       .emit({
         userId: attempt.userId,
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         portal: attempt.portal,
         authMethod: attempt.authMethod,
         failureReason,

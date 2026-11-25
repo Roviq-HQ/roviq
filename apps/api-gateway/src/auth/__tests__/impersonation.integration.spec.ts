@@ -348,7 +348,7 @@ describe('Impersonation (integration)', () => {
               .from(authEvents)
               .where(
                 and(
-                  eq(authEvents.eventType, 'impersonation_end'),
+                  eq(authEvents.eventType, 'IMPERSONATION_END'),
                   sql`${authEvents.metadata}->>'session_id' = ${sessionId}`,
                 ),
               ),

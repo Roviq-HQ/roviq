@@ -15,47 +15,47 @@
     "marketing": "Marketing"
   },
   "purposes": {
-    "academic_data_processing": {
+    "ACADEMIC_DATA_PROCESSING": {
       "label": "Academic data processing",
       "description": "Required for grades, attendance, report cards, and academic records"
     },
-    "photo_video_marketing": {
+    "PHOTO_VIDEO_MARKETING": {
       "label": "Photos and videos for marketing",
       "description": "Use of your child's photo or video on the institute website, brochures, or social media"
     },
-    "whatsapp_communication": {
+    "WHATSAPP_COMMUNICATION": {
       "label": "WhatsApp messages",
       "description": "Sending notifications and updates over WhatsApp"
     },
-    "sms_communication": {
+    "SMS_COMMUNICATION": {
       "label": "SMS messages",
       "description": "Sending notifications and updates over SMS"
     },
-    "aadhaar_collection": {
+    "AADHAAR_COLLECTION": {
       "label": "Aadhaar collection",
       "description": "Collecting Aadhaar number for board exam registration or RTE compliance"
     },
-    "biometric_collection": {
+    "BIOMETRIC_COLLECTION": {
       "label": "Biometric collection",
       "description": "Fingerprint or facial recognition for attendance"
     },
-    "third_party_edtech": {
+    "THIRD_PARTY_EDTECH": {
       "label": "Third-party EdTech tools",
       "description": "Sharing academic data with EdTech learning platforms"
     },
-    "board_exam_registration": {
+    "BOARD_EXAM_REGISTRATION": {
       "label": "Board exam registration",
       "description": "Sharing data with state or national education boards for exam registration"
     },
-    "transport_tracking": {
+    "TRANSPORT_TRACKING": {
       "label": "Transport GPS tracking",
       "description": "Tracking your child's location during institute transport"
     },
-    "health_data_processing": {
+    "HEALTH_DATA_PROCESSING": {
       "label": "Health data processing",
       "description": "Recording health information, allergies, and medical history"
     },
-    "cctv_monitoring": {
+    "CCTV_MONITORING": {
       "label": "CCTV monitoring",
       "description": "Video surveillance on institute premises"
     }

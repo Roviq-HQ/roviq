@@ -13,6 +13,7 @@
  * guardian membership, so the type discriminator is the source of truth.
  */
 
+import { CONSENT_PURPOSE_VALUES, type ConsentPurpose } from '@roviq/common-types';
 import { gql, useMutation, useQuery } from '@roviq/graphql';
 import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
@@ -50,38 +51,17 @@ const { instituteConsent } = testIds;
 // ── Constants ─────────────────────────────────────────────────────────────
 
 /**
- * The 11 DPDP Act 2023 purposes for which consent must be collected from
- * a guardian. Source of truth is the `GrantConsentInput.purpose` description
- * in `libs/frontend/graphql/src/generated/schema.graphql`.
- */
-const DPDP_PURPOSES = [
-  'academic_data_processing',
-  'photo_video_marketing',
-  'whatsapp_communication',
-  'sms_communication',
-  'aadhaar_collection',
-  'biometric_collection',
-  'third_party_edtech',
-  'board_exam_registration',
-  'transport_tracking',
-  'health_data_processing',
-  'cctv_monitoring',
-] as const;
-
-type DpdpPurpose = (typeof DPDP_PURPOSES)[number];
-
-/**
  * Visual grouping for the dashboard. The DPDP Act doesn't define these
  * categories — they exist purely to make the toggle list scannable.
  */
-const PURPOSE_CATEGORIES: Record<string, DpdpPurpose[]> = {
-  academic: ['academic_data_processing'],
-  communication: ['whatsapp_communication', 'sms_communication'],
-  identity: ['aadhaar_collection', 'biometric_collection'],
-  health: ['health_data_processing'],
-  compliance: ['board_exam_registration', 'cctv_monitoring'],
-  external: ['third_party_edtech', 'transport_tracking'],
-  marketing: ['photo_video_marketing'],
+const PURPOSE_CATEGORIES: Record<string, ConsentPurpose[]> = {
+  academic: ['ACADEMIC_DATA_PROCESSING'],
+  communication: ['WHATSAPP_COMMUNICATION', 'SMS_COMMUNICATION'],
+  identity: ['AADHAAR_COLLECTION', 'BIOMETRIC_COLLECTION'],
+  health: ['HEALTH_DATA_PROCESSING'],
+  compliance: ['BOARD_EXAM_REGISTRATION', 'CCTV_MONITORING'],
+  external: ['THIRD_PARTY_EDTECH', 'TRANSPORT_TRACKING'],
+  marketing: ['PHOTO_VIDEO_MARKETING'],
 };
 
 // ── GraphQL ───────────────────────────────────────────────────────────────
@@ -317,7 +297,7 @@ function ChildConsentCard({
 
   const grantedCount = React.useMemo(() => {
     let n = 0;
-    for (const purpose of DPDP_PURPOSES) {
+    for (const purpose of CONSENT_PURPOSE_VALUES) {
       if (purposeStatus.get(purpose)?.isGranted) n += 1;
     }
     return n;
@@ -328,7 +308,7 @@ function ChildConsentCard({
       <CardHeader>
         <CardTitle>{fullName || t('child')}</CardTitle>
         <CardDescription>
-          {t('childSummary', { granted: grantedCount, total: DPDP_PURPOSES.length })}
+          {t('childSummary', { granted: grantedCount, total: CONSENT_PURPOSE_VALUES.length })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -367,7 +347,7 @@ function PurposeRow({
 }: {
   studentProfileId: string;
   childName: string;
-  purpose: DpdpPurpose;
+  purpose: ConsentPurpose;
   status: ConsentStatus | null;
   onChange: () => void;
 }) {

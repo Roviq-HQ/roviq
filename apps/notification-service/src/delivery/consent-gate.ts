@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { NotificationChannel, NotificationTypeKey } from '@roviq/common-types';
+import {
+  ConsentPurpose,
+  type NotificationChannel,
+  type NotificationTypeKey,
+} from '@roviq/common-types';
 import { ConsentReadRepository } from '../repositories/consent-read.repository';
 
 export interface ConsentQuery {
@@ -17,10 +21,10 @@ export abstract class ConsentGate {
 }
 
 /** `consent_records.purpose` that covers WhatsApp messages (DPDP purpose-specific consent). */
-export const WHATSAPP_CONSENT_PURPOSE = 'whatsapp_communication';
+export const WHATSAPP_CONSENT_PURPOSE = ConsentPurpose.WHATSAPP_COMMUNICATION;
 
 /**
- * A guardian gets WhatsApp only while their latest `whatsapp_communication` consent is granted
+ * A guardian gets WhatsApp only while their latest `WHATSAPP_COMMUNICATION` consent is granted
  * (ROV-269). Read on every send, with no cache, so a withdrawal applies to the next message.
  * Other channels, and recipients who are not guardians of the institute, are not gated here.
  */

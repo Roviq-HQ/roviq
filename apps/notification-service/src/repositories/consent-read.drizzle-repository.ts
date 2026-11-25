@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { ConsentPurpose } from '@roviq/common-types';
 import {
   consentRecords,
   DRIZZLE_DB,
@@ -24,7 +25,7 @@ export class ConsentReadDrizzleRepository extends ConsentReadRepository {
     tenantId: string;
     recipientUserId: string;
     studentMembershipId: string | null;
-    purpose: string;
+    purpose: ConsentPurpose;
   }): Promise<GuardianConsentState> {
     return withTenant(this.db, mkInstituteCtx(query.tenantId, ORIGIN), async (tx) => {
       const guardians = await tx

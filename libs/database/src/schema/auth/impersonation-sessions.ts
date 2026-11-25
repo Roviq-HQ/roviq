@@ -37,6 +37,7 @@ export const impersonationSessions = pgTable(
     otpVerifiedBy: uuid('otp_verified_by').references(() => users.id),
   },
   (table) => [
+    // auth scope: lowercase by exception (ROV-227)
     check(
       'chk_impersonator_scope',
       sql`${table.impersonatorScope} IN ('platform', 'reseller', 'institute')`,

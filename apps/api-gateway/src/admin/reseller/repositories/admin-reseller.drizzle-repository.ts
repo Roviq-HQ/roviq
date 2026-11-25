@@ -44,7 +44,7 @@ import type {
 } from './types';
 
 /** Activity events that count as the user being active — same set as the admin user list. */
-const ACTIVITY_EVENT_TYPES = ['login_success', 'token_refresh', 'institute_switch'];
+const ACTIVITY_EVENT_TYPES = ['LOGIN_SUCCESS', 'TOKEN_REFRESH', 'INSTITUTE_SWITCH'];
 
 function buildListConditions(query: AdminResellerListQuery): SQL[] {
   const { search, status, tier, isSystem, after } = query;

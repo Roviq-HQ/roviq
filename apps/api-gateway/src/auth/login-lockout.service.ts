@@ -100,7 +100,7 @@ export class LoginLockoutService {
 
       this.authEventService
         .emit({
-          type: 'account_locked',
+          type: 'ACCOUNT_LOCKED',
           portal,
           failureReason: 'TOO_MANY_ATTEMPTS',
           ip: meta?.ip,

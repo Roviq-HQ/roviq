@@ -297,13 +297,13 @@ describe('AdminResellerService', () => {
       expect(authEventService.emit).toHaveBeenCalledTimes(3);
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: ACTOR_ID,
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: 'platform',
         metadata: { session_id: 'session-1', ended_reason: 'revoked' },
       });
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'staff-1',
-        type: 'all_sessions_revoked',
+        type: 'ALL_SESSIONS_REVOKED',
         metadata: {
           reason: 'reseller_suspended',
           resellerId: NORMAL_RESELLER_ID,

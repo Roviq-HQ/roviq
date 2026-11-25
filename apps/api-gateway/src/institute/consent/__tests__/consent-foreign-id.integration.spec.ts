@@ -38,7 +38,7 @@ import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:consent-foreign-id';
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
-const PURPOSE = 'photo_video_marketing';
+const PURPOSE = 'PHOTO_VIDEO_MARKETING';
 
 const GRANT = /* GraphQL */ `
   mutation GrantConsent($studentProfileId: ID!) {

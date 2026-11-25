@@ -100,13 +100,7 @@ export interface RefreshTokenWithRelations {
   userId: string;
   membershipScope: string;
   revokedAt: Date | null;
-  /**
-   * Why `revokedAt` was set. `null` on live tokens and on legacy rows
-   * written before the column existed. Read by the refresh flow to
-   * distinguish genuine reuse (`rotation`) from deliberate revocation
-   * (`user_initiated`, `password_change`, `admin_revoked`) — only the
-   * rotation path triggers the "family kill" cascade.
-   */
+  /** Why `revokedAt` was set; null while the token is live. Only `ROTATION` triggers the reuse cascade. */
   revokedReason: RefreshTokenRevokeReason | null;
   expiresAt: Date;
   createdAt: Date;

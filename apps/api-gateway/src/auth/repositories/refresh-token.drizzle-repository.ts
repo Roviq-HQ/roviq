@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { REFRESH_TOKEN_REVOKE_REASON_VALUES } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -19,14 +20,11 @@ import type { CreateRefreshTokenData, RefreshTokenWithRelations } from './types'
  * Canonical set of revoke reasons. Used by {@link coerceRevokedReason} to
  * narrow the raw `varchar` coming out of Postgres (`string | null`) into the
  * domain-level {@link RefreshTokenRevokeReason} union the rest of the code
- * expects. Single source of truth — keep in sync with the union above.
+ * expects.
  */
-const VALID_REVOKE_REASONS: ReadonlySet<RefreshTokenRevokeReason> = new Set([
-  'rotation',
-  'user_initiated',
-  'password_change',
-  'admin_revoked',
-]);
+const VALID_REVOKE_REASONS: ReadonlySet<RefreshTokenRevokeReason> = new Set(
+  REFRESH_TOKEN_REVOKE_REASON_VALUES,
+);
 
 /**
  * Validate and narrow a raw DB value into `RefreshTokenRevokeReason | null`.

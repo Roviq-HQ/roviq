@@ -116,7 +116,7 @@ describe('M7: consent_records append-only enforcement', () => {
       const consentId = 'ffffffff-c001-0001-0001-000000000099';
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'academic_data_processing', true, now())`,
+         VALUES ($1, $2, $3, $4, 'ACADEMIC_DATA_PROCESSING', true, now())`,
         [consentId, SEED.INSTITUTE_1, guardianProfileId, studentProfileId],
       );
 
@@ -125,7 +125,7 @@ describe('M7: consent_records append-only enforcement', () => {
         [consentId],
       );
       expect(res.rows).toHaveLength(1);
-      expect(res.rows[0].purpose).toBe('academic_data_processing');
+      expect(res.rows[0].purpose).toBe('ACADEMIC_DATA_PROCESSING');
       expect(res.rows[0].is_granted).toBe(true);
     });
   });
@@ -159,7 +159,7 @@ describe('M7: consent_records append-only enforcement', () => {
       const consentId = 'ffffffff-c002-0001-0001-000000000099';
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'photo_video_marketing', true, now())`,
+         VALUES ($1, $2, $3, $4, 'PHOTO_VIDEO_MARKETING', true, now())`,
         [consentId, SEED.INSTITUTE_1, guardianProfileId, studentProfileId],
       );
 
@@ -207,7 +207,7 @@ describe('M7: consent_records append-only enforcement', () => {
       const consentId = 'ffffffff-c003-0001-0001-000000000099';
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'whatsapp_communication', true, now())`,
+         VALUES ($1, $2, $3, $4, 'WHATSAPP_COMMUNICATION', true, now())`,
         [consentId, SEED.INSTITUTE_1, guardianProfileId, studentProfileId],
       );
 
@@ -253,7 +253,7 @@ describe('M7: consent_records append-only enforcement', () => {
       // First row: grant consent
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'aadhaar_collection', true, now())`,
+         VALUES ($1, $2, $3, $4, 'AADHAAR_COLLECTION', true, now())`,
         [
           'ffffffff-c004-0001-0001-000000000091',
           SEED.INSTITUTE_1,
@@ -265,7 +265,7 @@ describe('M7: consent_records append-only enforcement', () => {
       // Second row: withdraw consent (same guardian, student, purpose)
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, withdrawn_at)
-         VALUES ($1, $2, $3, $4, 'aadhaar_collection', false, now())`,
+         VALUES ($1, $2, $3, $4, 'AADHAAR_COLLECTION', false, now())`,
         [
           'ffffffff-c004-0001-0001-000000000092',
           SEED.INSTITUTE_1,
@@ -276,7 +276,7 @@ describe('M7: consent_records append-only enforcement', () => {
 
       const res = await client.query(
         `SELECT id, is_granted FROM consent_records
-         WHERE guardian_profile_id = $1 AND student_profile_id = $2 AND purpose = 'aadhaar_collection'
+         WHERE guardian_profile_id = $1 AND student_profile_id = $2 AND purpose = 'AADHAAR_COLLECTION'
          ORDER BY created_at`,
         [guardianProfileId, studentProfileId],
       );

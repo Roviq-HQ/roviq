@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AuthFailureReason, AuthScope } from '@roviq/common-types';
+import type { AuthEventType, AuthFailureReason, AuthScope } from '@roviq/common-types';
 import { AuthEventRepository } from './repositories/auth-event.repository';
 
 interface AuthEventBase {
@@ -13,7 +13,7 @@ interface AuthEventBase {
 
 /** A session was issued: the portal signed in to and the scope granted are the same thing. */
 interface LoginSuccessEvent extends AuthEventBase {
-  type: 'login_success';
+  type: 'LOGIN_SUCCESS';
   portal: AuthScope;
   scope: AuthScope;
   tenantId?: string;
@@ -24,21 +24,21 @@ interface LoginSuccessEvent extends AuthEventBase {
 
 /** Nothing was granted, so there is no scope, tenant or reseller — only where it was tried and why it failed. */
 interface RefusedAttemptEvent extends AuthEventBase {
-  type: 'login_failed' | 'account_locked';
+  type: 'LOGIN_FAILED' | 'ACCOUNT_LOCKED';
   portal: AuthScope;
   failureReason: AuthFailureReason;
 }
 
 interface SessionEvent extends AuthEventBase {
   type:
-    | 'logout'
-    | 'token_refresh'
-    | 'institute_switch'
-    | 'impersonation_start'
-    | 'impersonation_end'
-    | 'all_sessions_revoked'
-    | 'password_change'
-    | 'passkey_register';
+    | 'LOGOUT'
+    | 'TOKEN_REFRESH'
+    | 'INSTITUTE_SWITCH'
+    | 'IMPERSONATION_START'
+    | 'IMPERSONATION_END'
+    | 'ALL_SESSIONS_REVOKED'
+    | 'PASSWORD_CHANGE'
+    | 'PASSKEY_REGISTER';
   scope?: AuthScope;
   tenantId?: string;
   resellerId?: string;
@@ -47,7 +47,10 @@ interface SessionEvent extends AuthEventBase {
 }
 
 export type AuthEventInput = LoginSuccessEvent | RefusedAttemptEvent | SessionEvent;
-export type AuthEventType = AuthEventInput['type'];
+// Every stored event type has a shape above, and every shape is a stored type.
+type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const _everyEventTypeHasAShape: Exact<AuthEventInput['type'], AuthEventType> = true;
+void _everyEventTypeHasAShape;
 
 @Injectable()
 export class AuthEventService {

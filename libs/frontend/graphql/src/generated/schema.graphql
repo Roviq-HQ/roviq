@@ -1623,6 +1623,23 @@ type ConnectionStats {
   websocket: Int!
 }
 
+"""
+What a guardian consents to; each purpose needs its own consent (DPDP Section 6).
+"""
+enum ConsentPurpose {
+  AADHAAR_COLLECTION
+  ACADEMIC_DATA_PROCESSING
+  BIOMETRIC_COLLECTION
+  BOARD_EXAM_REGISTRATION
+  CCTV_MONITORING
+  HEALTH_DATA_PROCESSING
+  PHOTO_VIDEO_MARKETING
+  SMS_COMMUNICATION
+  THIRD_PARTY_EDTECH
+  TRANSPORT_TRACKING
+  WHATSAPP_COMMUNICATION
+}
+
 """DPDP Act 2023 verifiable parental consent record (append-only)"""
 type ConsentRecordModel {
   """When this consent record was created"""
@@ -1634,16 +1651,8 @@ type ConsentRecordModel {
 
   """true = consent granted, false = consent withdrawn"""
   isGranted: Boolean!
-
-  """
-  Data processing purpose (e.g. academic_data_processing, photo_video_marketing)
-  """
-  purpose: String!
-
-  """
-  How the guardian was verified: digilocker_token, aadhaar_otp, in_person_id_check, signed_form_uploaded, school_erp_verified_account
-  """
-  verificationMethod: String
+  purpose: ConsentPurpose!
+  verificationMethod: ConsentVerificationMethod
 
   """Timestamp when consent was withdrawn (null for grants)"""
   withdrawnAt: DateTime
@@ -1656,12 +1665,19 @@ type ConsentStatus {
 
   """When the consent state last changed"""
   lastUpdatedAt: DateTime
-
-  """Data processing purpose (e.g. academic_data_processing)"""
-  purpose: String!
+  purpose: ConsentPurpose!
 
   """The student profile this consent applies to"""
   studentProfileId: String!
+}
+
+"""How the guardian's identity was checked for a consent action."""
+enum ConsentVerificationMethod {
+  AADHAAR_OTP
+  DIGILOCKER_TOKEN
+  INSTITUTE_ERP_VERIFIED_ACCOUNT
+  IN_PERSON_ID_CHECK
+  SIGNED_FORM_UPLOADED
 }
 
 """Geographic coordinates (WGS 84) for the institute location."""
@@ -3144,18 +3160,11 @@ type GradingSchemeModel {
 Input for granting parental consent for a specific data processing purpose
 """
 input GrantConsentInput {
-  """
-  Data processing purpose: academic_data_processing, photo_video_marketing, whatsapp_communication, sms_communication, aadhaar_collection, biometric_collection, third_party_edtech, board_exam_registration, transport_tracking, health_data_processing, cctv_monitoring
-  """
-  purpose: String!
+  purpose: ConsentPurpose!
 
   """The student profile to grant consent for"""
   studentProfileId: ID!
-
-  """
-  How the guardian was verified: digilocker_token, aadhaar_otp, in_person_id_check, signed_form_uploaded, school_erp_verified_account
-  """
-  verificationMethod: String
+  verificationMethod: ConsentVerificationMethod
 }
 
 """Filter for listing groups."""
@@ -8869,10 +8878,8 @@ enum Weekday {
 Input for withdrawing parental consent for a specific data processing purpose
 """
 input WithdrawConsentInput {
-  """
-  Data processing purpose to withdraw: academic_data_processing, photo_video_marketing, whatsapp_communication, sms_communication, aadhaar_collection, biometric_collection, third_party_edtech, board_exam_registration, transport_tracking, health_data_processing, cctv_monitoring
-  """
-  purpose: String!
+  """The purpose to withdraw consent for"""
+  purpose: ConsentPurpose!
 
   """The student profile to withdraw consent for"""
   studentProfileId: ID!

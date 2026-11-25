@@ -36,7 +36,7 @@ describe('GuardianConsentGate', () => {
       tenantId: 'tenant-1',
       recipientUserId: 'user-guardian-1',
       studentMembershipId: 'membership-student-1',
-      purpose: 'whatsapp_communication',
+      purpose: 'WHATSAPP_COMMUNICATION',
     });
   });
 

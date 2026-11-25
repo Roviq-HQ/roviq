@@ -189,7 +189,7 @@ describe('Admin user queries (integration)', () => {
         postalCode: '125001',
         ...audit,
       });
-      await tx.insert(authEvents).values({ userId, eventType: 'token_refresh' });
+      await tx.insert(authEvents).values({ userId, eventType: 'TOKEN_REFRESH' });
     });
   });
 
@@ -441,17 +441,17 @@ describe('Admin user queries (integration)', () => {
         tx.insert(authEvents).values([
           {
             userId: oldUser.id,
-            eventType: 'token_refresh',
+            eventType: 'TOKEN_REFRESH',
             createdAt: new Date('2001-01-01T00:00:00Z'),
           },
           {
             userId: newUser.id,
-            eventType: 'token_refresh',
+            eventType: 'TOKEN_REFRESH',
             createdAt: new Date('2000-11-01T00:00:00Z'),
           },
           {
             userId: newUser.id,
-            eventType: 'institute_switch',
+            eventType: 'INSTITUTE_SWITCH',
             createdAt: new Date('2001-02-01T00:00:00Z'),
           },
         ]),

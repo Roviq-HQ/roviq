@@ -387,7 +387,7 @@ export class ImpersonationService {
     this.authEventService
       .emit({
         userId: session.impersonatorId,
-        type: 'impersonation_start',
+        type: 'IMPERSONATION_START',
         scope: session.impersonatorScope as AuthScope,
         tenantId,
         ip: meta.ip,
@@ -454,7 +454,7 @@ export class ImpersonationService {
     this.authEventService
       .emit({
         userId: actor.userId,
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: actor.scope,
         tenantId: session.targetTenantId ?? undefined,
         ip: meta.ip,
@@ -479,7 +479,7 @@ export class ImpersonationService {
       this.authEventService
         .emit({
           userId: session.impersonatorId,
-          type: 'impersonation_end',
+          type: 'IMPERSONATION_END',
           scope: session.impersonatorScope as AuthScope,
           tenantId: session.targetTenantId ?? undefined,
           metadata: { session_id: session.id, ended_reason: 'expired' },

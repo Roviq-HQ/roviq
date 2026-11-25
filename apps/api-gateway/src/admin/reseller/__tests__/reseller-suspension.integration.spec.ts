@@ -258,7 +258,7 @@ describe('Reseller suspension and deletion (integration)', () => {
       const otherRow = rows.find((row) => row.id === otherSessionTokenId);
       assert(resellerRow && otherRow);
       expect(resellerRow.revokedAt).toBeInstanceOf(Date);
-      expect(resellerRow.revokedReason).toBe('admin_revoked');
+      expect(resellerRow.revokedReason).toBe('ADMIN_REVOKED');
       // Presenting the revoked token above must not have cascaded to this one.
       expect(otherRow.revokedAt).toBeNull();
     });

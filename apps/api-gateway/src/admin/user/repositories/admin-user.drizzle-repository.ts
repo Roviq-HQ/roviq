@@ -54,7 +54,7 @@ import type {
 } from './types';
 
 /** Auth events that prove the user was using the app at that moment. */
-const ACTIVITY_EVENT_TYPES = ['login_success', 'token_refresh', 'institute_switch'];
+const ACTIVITY_EVENT_TYPES = ['LOGIN_SUCCESS', 'TOKEN_REFRESH', 'INSTITUTE_SWITCH'];
 
 /** Encrypted identifier types: only the stored mask may leave the database. */
 const SENSITIVE_IDENTIFIER_TYPES = new Set(['AADHAAR', 'PAN']);

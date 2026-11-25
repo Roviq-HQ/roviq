@@ -570,7 +570,7 @@ describe('Auth events', () => {
     await asRole('roviq_admin', {}, async (client) => {
       const insertRes = await client.query(
         `INSERT INTO auth_events (user_id, event_type, portal, scope, created_at)
-         VALUES ($1, 'login_success', 'institute', 'institute', now()) RETURNING id`,
+         VALUES ($1, 'LOGIN_SUCCESS', 'institute', 'institute', now()) RETURNING id`,
         [SEED.USER_TEACHER],
       );
       expect(insertRes.rows).toHaveLength(1);
@@ -608,7 +608,7 @@ describe('Auth events', () => {
       await client.query('BEGIN');
       await client.query(
         `INSERT INTO auth_events (user_id, event_type, portal, scope)
-         VALUES ($1, 'login_success', 'institute', 'institute')`,
+         VALUES ($1, 'LOGIN_SUCCESS', 'institute', 'institute')`,
         [SEED.USER_TEACHER],
       );
       await expect(client.query(statement)).rejects.toThrow(
@@ -624,32 +624,32 @@ describe('Auth events', () => {
   it.each([
     [
       'a refused attempt that carries a scope',
-      `(event_type, portal, scope, failure_reason) VALUES ('login_failed', 'platform', 'platform', 'INVALID_PASSWORD')`,
+      `(event_type, portal, scope, failure_reason) VALUES ('LOGIN_FAILED', 'platform', 'platform', 'INVALID_PASSWORD')`,
       /chk_auth_events_refused_attempt/,
     ],
     [
       'a refused attempt with no failure reason',
-      `(event_type, portal) VALUES ('login_failed', 'platform')`,
+      `(event_type, portal) VALUES ('LOGIN_FAILED', 'platform')`,
       /chk_auth_events_refused_attempt/,
     ],
     [
       'a sign-in attempt with no portal',
-      `(event_type, failure_reason) VALUES ('login_failed', 'UNKNOWN_USER')`,
+      `(event_type, failure_reason) VALUES ('LOGIN_FAILED', 'UNKNOWN_USER')`,
       /chk_auth_events_login_portal/,
     ],
     [
       'a session granted for a different scope than the portal',
-      `(event_type, portal, scope) VALUES ('login_success', 'institute', 'platform')`,
+      `(event_type, portal, scope) VALUES ('LOGIN_SUCCESS', 'institute', 'platform')`,
       /chk_auth_events_login_success_scope/,
     ],
     [
       'an unknown failure reason',
-      `(event_type, portal, failure_reason) VALUES ('login_failed', 'platform', 'wrong_portal')`,
+      `(event_type, portal, failure_reason) VALUES ('LOGIN_FAILED', 'platform', 'wrong_portal')`,
       /chk_auth_events_failure_reason/,
     ],
     [
       'an unknown portal',
-      `(event_type, portal, failure_reason) VALUES ('login_failed', 'mobile', 'UNKNOWN_USER')`,
+      `(event_type, portal, failure_reason) VALUES ('LOGIN_FAILED', 'mobile', 'UNKNOWN_USER')`,
       /chk_auth_events_portal/,
     ],
   ])('20. auth_events rejects %s', async (_label, insert, constraint) => {
@@ -662,7 +662,7 @@ describe('Auth events', () => {
     await asRole('roviq_admin', {}, async (client) => {
       const res = await client.query(
         `INSERT INTO auth_events (event_type, portal, failure_reason)
-         VALUES ('login_failed', 'platform', 'NO_PORTAL_ACCESS') RETURNING scope`,
+         VALUES ('LOGIN_FAILED', 'platform', 'NO_PORTAL_ACCESS') RETURNING scope`,
       );
       expect(res.rows).toEqual([{ scope: null }]);
     });

@@ -361,7 +361,7 @@ export class AdminResellerService {
       this.authEventService
         .emit({
           userId: actorId,
-          type: 'impersonation_end',
+          type: 'IMPERSONATION_END',
           scope: 'platform',
           metadata: { session_id: sessionId, ended_reason: 'revoked' },
         })
@@ -371,7 +371,7 @@ export class AdminResellerService {
       this.authEventService
         .emit({
           userId,
-          type: 'all_sessions_revoked',
+          type: 'ALL_SESSIONS_REVOKED',
           metadata: { reason: 'reseller_suspended', resellerId, suspensionReason: reason },
         })
         .catch(() => {});
