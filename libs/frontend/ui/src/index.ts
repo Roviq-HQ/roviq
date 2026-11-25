@@ -287,6 +287,7 @@ export {
   HelpArticleBody,
   type HelpArticleSection,
   HelpArticleSheet,
+  type HelpSources,
   type HelpText,
   helpOptions,
   I18nField,

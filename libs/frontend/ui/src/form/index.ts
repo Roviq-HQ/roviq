@@ -30,6 +30,7 @@ export {
   HELP_LIMITS,
   type HelpArticle,
   type HelpArticleSection,
+  type HelpSources,
   type HelpText,
   helpOptions,
   resolveHelpText,
