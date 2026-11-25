@@ -72,6 +72,41 @@ Every Hindi string the app shows (message files, help topics, notification and e
 - Keep simple Hindi for ordinary words (नया, बदलें, चुनें, खाली छोड़ें, पहली बार, वापस).
 - Never use textbook words a reader would have to look up, such as पहचानकर्ता, अद्वितीय, अनुमोदन, रसीद, स्थानांतरण, प्रमाणपत्र, पार्श्व प्रवेश, प्रविष्टि, संशोधित.
 - No emoji in copy; icons come from the components.
+- One word for one concept, in every file. The words below are the ones the app uses; add a row when a new concept needs one.
+- Registered templates (WhatsApp, DLT SMS) keep the text they were approved with; a new Hindi text needs a new template name (`…_v2`).
+
+| Textbook word | Word to use |
+|---------------|-------------|
+| प्रवेश, प्रवेश संख्या | एडमिशन, एडमिशन नंबर |
+| सत्र, शैक्षणिक वर्ष | सेशन, एकेडमिक ईयर |
+| सत्रांश | टर्म |
+| कक्षा, मानक | क्लास |
+| अनुभाग | सेक्शन |
+| विद्यार्थी, छात्र | स्टूडेंट |
+| प्रमाणपत्र, जन्म प्रमाणपत्र | सर्टिफिकेट, बर्थ सर्टिफिकेट |
+| स्थानांतरण प्रमाणपत्र | TC |
+| स्थानांतरण, स्थानांतरित | ट्रांसफ़र |
+| रसीद | रिसीट |
+| शुल्क | फ़ीस |
+| चालान | इनवॉइस |
+| भुगतान | पेमेंट |
+| उपस्थिति, अनुपस्थित | अटेंडेंस, ऐब्सेंट |
+| कालांश, पाली | पीरियड, शिफ्ट |
+| समय-सारणी | टाइमटेबल |
+| कर्मचारी, शिक्षक | स्टाफ, टीचर |
+| अनुरोध, आवेदन | रिक्वेस्ट, ऐप्लिकेशन |
+| अनुमोदन, स्वीकृत, अस्वीकृत | अप्रूवल, अप्रूव, रिजेक्ट |
+| समूह, सदस्य | ग्रुप, मेंबर |
+| सदस्यता | सब्सक्रिप्शन (बिलिंग), मेंबरशिप (ग्रुप, रोल) |
+| उपयोगकर्ता, खाता | यूज़र, अकाउंट |
+| सूचना, संदेश | नोटिफ़िकेशन, मैसेज |
+| नामांकन | एनरोलमेंट |
+| पंजीकरण | रजिस्ट्रेशन |
+| निर्यात, आयात | एक्सपोर्ट, इम्पोर्ट |
+| सहेजें | सेव करें |
+| सक्रिय, निष्क्रिय | ऐक्टिव, इनऐक्टिव |
+| विफल, पुनः प्रयास | फ़ेल, दोबारा कोशिश |
+| अद्वितीय, पहचानकर्ता, प्रविष्टि | यूनिक, आईडी, एंट्री |
 
 ## Field help
 
@@ -101,7 +136,7 @@ Two forms that describe the same behaviour import one topic.
 - **Hindi** follows "Hindi copy" below; option labels too, because the table shows them.
 - No emoji in copy: the layout adds the icons.
 
-**Using a topic**: pass it as `help={<formHelp>.<key>}` to a shared field (`TextField`, `SelectField`, …), or to `FieldLabelWithInfo` beside a raw `FieldLabel`. The field renders the ⓘ button (its accessible name includes the field label), the hint under the label, per-option help under each `SelectField` choice, and links hint, description and error to the input through `aria-describedby` (`useFieldHelpIds`). `info={<FieldInfoPopover …/>}` with `fieldHelp.*` message keys is the older way, still used by forms not moved yet.
+**Using a topic**: pass it as `help={<formHelp>.<key>}` to a shared field (`TextField`, `SelectField`, …), or to `FieldLabelWithInfo` beside a raw `FieldLabel`. The field renders the ⓘ button (its accessible name includes the field label), the hint under the label, per-option help under each `SelectField` choice, and links hint, description and error to the input through `aria-describedby` (`useFieldHelpIds`).
 
 **Form help mode**: `ICON_AND_HINT` (default) or `ICON_ONLY`, supplied by `FormHelpModeProvider` and read with `useFormHelpMode()`. Without a provider fields use the default.
 
