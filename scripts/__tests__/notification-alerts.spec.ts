@@ -86,4 +86,28 @@ describe('notification alert files', () => {
 
     expect(alert.query_condition.promql).toContain(alert.stream_name);
   });
+
+  // A counter's series starts again at 1 with each process, and a series born at 1 has no
+  // increase: a rule on one event built that way misses the first event after a restart.
+  const singleEvent = files.filter((file) => {
+    const { promql_condition: c } = alertSchema.parse(
+      JSON.parse(readFileSync(path.join(ALERTS_DIR, file), 'utf8')),
+    ).query_condition;
+    return c.operator === '>' && c.value === 0;
+  });
+
+  it('should have rules that fire on one event', () => {
+    expect(singleEvent.sort()).toEqual([
+      'notification_breaker_opened.json',
+      'notification_dead_letters.json',
+      'notification_sender_blocked.json',
+      'notification_skips_rising.json',
+    ]);
+  });
+
+  it.each(singleEvent)('%s should read a gauge, not increase() or rate() of a counter', (file) => {
+    const alert = alertSchema.parse(JSON.parse(readFileSync(path.join(ALERTS_DIR, file), 'utf8')));
+
+    expect(alert.query_condition.promql).not.toMatch(/\b(increase|rate|irate|delta)\(/);
+  });
 });

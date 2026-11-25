@@ -1,13 +1,13 @@
 {
   "name": "notification_breaker_opened",
-  "description": "A provider or a WhatsApp sender kept failing (or was blocked) and its circuit breaker opened. Sends through it are held for a minute at a time and retried; nothing is lost, but nothing goes out through it either.",
+  "description": "A provider or a WhatsApp sender kept failing (or was blocked) and its circuit breaker is open. Sends through it are held for a minute at a time and retried; nothing is lost, but nothing goes out through it either. It clears when a send through it succeeds, or 10 minutes after it opened if nothing is sent through it.",
   "stream_type": "metrics",
-  "stream_name": "notification_breaker_opened",
+  "stream_name": "notification_breaker_open",
   "is_real_time": false,
   "enabled": true,
   "query_condition": {
     "type": "promql",
-    "promql": "sum by (channel, provider, reason) (increase(notification_breaker_opened[5m]))",
+    "promql": "max by (channel, provider) (notification_breaker_open)",
     "promql_condition": {
       "column": "value",
       "operator": ">",

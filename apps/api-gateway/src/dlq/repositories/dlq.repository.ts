@@ -1,9 +1,16 @@
 import type { DlqListQuery, DlqMessageRecord, DlqTransitionResult } from './types';
 
+export interface DlqStreamCount {
+  originStream: string;
+  count: number;
+}
+
 export abstract class DlqRepository {
   /** Matching rows newest first, and the count of every row the filters match. */
   abstract list(query: DlqListQuery): Promise<{ records: DlqMessageRecord[]; totalCount: number }>;
   abstract countPending(): Promise<number>;
+  /** Rows written since `since`, per origin stream. */
+  abstract countSinceByStream(since: Date): Promise<DlqStreamCount[]>;
   /**
    * In one transaction: reads the row, runs `beforeUpdate` (which may throw to
    * roll back), then marks it replayed. `beforeUpdate` holds the rule and the

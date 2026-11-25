@@ -467,7 +467,6 @@ export const testIds = {
     notificationsPanel: 'admin-monitoring-notifications-panel',
     notificationsError: 'admin-monitoring-notifications-error',
     notificationsRetryBtn: 'admin-monitoring-notifications-retry-btn',
-    notificationsMetricsUnavailable: 'admin-monitoring-notifications-metrics-unavailable',
     notificationsChannel: (channel: string) => `admin-monitoring-notifications-channel-${channel}`,
     notificationsSendersError: 'admin-monitoring-notifications-senders-error',
     notificationsSendersEmpty: 'admin-monitoring-notifications-senders-empty',

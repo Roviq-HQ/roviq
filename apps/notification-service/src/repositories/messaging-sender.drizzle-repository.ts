@@ -16,7 +16,7 @@ import {
 import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { MessagingSenderRepository } from './messaging-sender.repository';
 import { sameNumberSenderIds } from './same-number-senders';
-import type { MessagingSenderRecord, SenderSentCounts } from './types';
+import type { MessagingSenderRecord, SenderSentCounts, SenderStateRecord } from './types';
 
 const ORIGIN = 'repository:messaging-sender';
 
@@ -196,5 +196,18 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
         .returning({ id: messagingSenders.id });
       return rows.length > 0;
     });
+  }
+
+  async listStates(): Promise<SenderStateRecord[]> {
+    return withAdmin(this.db, mkAdminCtx(ORIGIN), (tx) =>
+      tx
+        .select({
+          id: messagingSendersLive.id,
+          channel: messagingSendersLive.channel,
+          provider: messagingSendersLive.provider,
+          status: messagingSendersLive.status,
+        })
+        .from(messagingSendersLive),
+    );
   }
 }

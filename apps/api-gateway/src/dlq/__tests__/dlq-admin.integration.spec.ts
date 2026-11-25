@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../app/app.module';
 import { DlqService } from '../dlq.service';
+import { DlqRepository } from '../repositories/dlq.repository';
 
 /** Superuser connection: dlq_messages rows are written by the DLQ consumer's own pool. */
 const SUPERUSER_URL =
@@ -40,18 +41,19 @@ describe('DLQ admin reader (integration)', () => {
   let superPool: pg.Pool;
   let token: string;
   const originStream = `ITEST_${randomUUID().slice(0, 8)}`;
+  const recentStream = `ITEST_RECENT_${randomUUID().slice(0, 8)}`;
   const seqBase = BigInt(Date.now()) * 1000n + 500n;
   const ids: string[] = [];
 
-  const insert = async (offset: bigint) => {
+  const insert = async (offset: bigint, stream = originStream, writtenAt = new Date()) => {
     const res = await superPool.query(
       `INSERT INTO dlq_messages
         (dlq_stream_seq, original_subject, origin_stream, payload, error,
-         retry_count, correlation_id, tenant_id, failed_at, status, replay_count)
+         retry_count, correlation_id, tenant_id, failed_at, status, replay_count, created_at)
        VALUES ($1, 'NOTIFICATION.user.created', $2, '{}'::jsonb, 'failure', 3, $3, NULL, NOW(),
-               'pending', 0)
+               'pending', 0, $4)
        RETURNING id`,
-      [(seqBase + offset).toString(), originStream, randomUUID()],
+      [(seqBase + offset).toString(), stream, randomUUID(), writtenAt],
     );
     const id = res.rows[0]?.id;
     assert(typeof id === 'string');
@@ -84,7 +86,9 @@ describe('DLQ admin reader (integration)', () => {
   });
 
   afterAll(async () => {
-    await superPool?.query('DELETE FROM dlq_messages WHERE origin_stream = $1', [originStream]);
+    await superPool?.query('DELETE FROM dlq_messages WHERE origin_stream = ANY($1)', [
+      [originStream, recentStream],
+    ]);
     await superPool?.end();
     await result?.close();
   });
@@ -102,6 +106,21 @@ describe('DLQ admin reader (integration)', () => {
     expect(page2.edges.map((e) => e.node.id)).toEqual([ids[0]]);
     expect(page2.pageInfo.hasNextPage).toBe(false);
     expect(page2.pageInfo.hasPreviousPage).toBe(true);
+  });
+
+  it('should count the rows written since the given time per origin stream, for the gauge', async () => {
+    await insert(101n, recentStream);
+    await insert(102n, recentStream);
+    await insert(103n, recentStream, new Date(Date.now() - 10 * 60_000));
+
+    const counts = await result.app
+      .get(DlqRepository)
+      .countSinceByStream(new Date(Date.now() - 5 * 60_000));
+
+    expect(counts.find((c) => c.originStream === recentStream)).toEqual({
+      originStream: recentStream,
+      count: 2,
+    });
   });
 
   it('should count pending messages', async () => {

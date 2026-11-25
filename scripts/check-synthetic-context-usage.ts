@@ -254,6 +254,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/__tests__/notification-flow.integration.spec.ts',
   // ROV-329: the canary's last success per channel seeds a gauge at start; no caller context
   'apps/notification-service/src/repositories/canary-read.drizzle-repository.ts',
+  // ROV-336: recent skips counted for a gauge on each metric export; no caller context
+  'apps/notification-service/src/repositories/delivery-stats.drizzle-repository.ts',
   // ROV-329 integration fixture: the platform's WhatsApp sender for the canary
   'apps/notification-service/src/__tests__/delivery-canary.integration.spec.ts',
   // ROV-330 integration fixtures: senders with a rate, read back after the provider blocks one

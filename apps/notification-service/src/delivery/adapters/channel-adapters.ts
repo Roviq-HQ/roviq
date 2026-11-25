@@ -32,6 +32,10 @@ export class ChannelAdapters {
   has(channel: NotificationChannel): boolean {
     return this.list(channel).length > 0;
   }
+
+  all(): readonly ChannelAdapter[] {
+    return [...this.byChannel.values()].flat();
+  }
 }
 
 /** Each `NOTIFICATION_<CHANNEL>_PROVIDER` is one name or a comma-separated ordered list. */

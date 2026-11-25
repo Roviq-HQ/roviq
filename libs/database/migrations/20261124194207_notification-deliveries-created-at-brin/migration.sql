@@ -1,0 +1,1 @@
+CREATE INDEX "notification_deliveries_created_at_idx" ON "notification_deliveries" USING brin ("created_at");

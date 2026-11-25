@@ -10,6 +10,8 @@ import { ContactReadDrizzleRepository } from './contact-read.drizzle-repository'
 import { ContactReadRepository } from './contact-read.repository';
 import { DeliveryReceiptDrizzleRepository } from './delivery-receipt.drizzle-repository';
 import { DeliveryReceiptRepository } from './delivery-receipt.repository';
+import { DeliveryStatsDrizzleRepository } from './delivery-stats.drizzle-repository';
+import { DeliveryStatsRepository } from './delivery-stats.repository';
 import { FlowArrivalDrizzleRepository } from './flow-arrival.drizzle-repository';
 import { FlowArrivalRepository } from './flow-arrival.repository';
 import { MessagingInboundDrizzleRepository } from './messaging-inbound.drizzle-repository';
@@ -31,6 +33,7 @@ const REPOSITORIES = [
   { provide: CanaryReadRepository, useClass: CanaryReadDrizzleRepository },
   { provide: ConsentReadRepository, useClass: ConsentReadDrizzleRepository },
   { provide: DeliveryReceiptRepository, useClass: DeliveryReceiptDrizzleRepository },
+  { provide: DeliveryStatsRepository, useClass: DeliveryStatsDrizzleRepository },
   { provide: FlowArrivalRepository, useClass: FlowArrivalDrizzleRepository },
   { provide: MessagingInboundRepository, useClass: MessagingInboundDrizzleRepository },
   { provide: MessagingSenderRepository, useClass: MessagingSenderDrizzleRepository },

@@ -22,7 +22,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { AlertTriangle, CheckCircle2, CloudOff, Pause, Pencil } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Pause, Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import {
@@ -88,15 +88,6 @@ function ChannelTable({ health }: { health: Health }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {health.metricsAvailable ? null : (
-        <p
-          className="flex items-start gap-2 text-sm text-muted-foreground"
-          data-testid={ids.notificationsMetricsUnavailable}
-        >
-          <CloudOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {t('metricsUnavailable')}
-        </p>
-      )}
       <Table>
         <TableHeader>
           <TableRow>
@@ -110,16 +101,14 @@ function ChannelTable({ health }: { health: Health }) {
           {health.channels.map((row) => (
             <TableRow key={row.channel} data-testid={ids.notificationsChannel(row.channel)}>
               <TableCell className="font-medium">{t(`channels.${row.channel}`)}</TableCell>
-              <TableCell className="text-end tabular-nums">
-                {row.sent24h === null ? '—' : format(row.sent24h)}
-              </TableCell>
+              <TableCell className="text-end tabular-nums">{format(row.sent24h)}</TableCell>
               <TableCell
                 className={cn(
                   'text-end tabular-nums',
                   row.failed24h ? 'font-semibold text-destructive' : undefined,
                 )}
               >
-                {row.failed24h === null ? '—' : format(row.failed24h)}
+                {format(row.failed24h)}
               </TableCell>
               <TableCell>
                 <CanaryCell lastSuccessAt={canary.get(row.channel) ?? null} checkedAt={checkedAt} />

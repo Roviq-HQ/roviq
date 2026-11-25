@@ -100,6 +100,24 @@ export class ProviderBreaker {
     await SUCCEED.run(this.redis, [keyOf(name)], []);
   }
 
+  /**
+   * The names among `names` whose breaker is open or letting one probe through. An open breaker
+   * stays so until a send through it succeeds or its key expires.
+   */
+  async openAmong(names: readonly string[]): Promise<Set<string>> {
+    const open = new Set<string>();
+    if (names.length === 0) return open;
+    const pipeline = this.redis.pipeline();
+    for (const name of names) pipeline.hget(keyOf(name), 'state');
+    const replies = (await pipeline.exec()) ?? [];
+    for (const [i, name] of names.entries()) {
+      const [err, state] = replies[i] ?? [null, null];
+      if (err) throw err;
+      if (state === 'open' || state === 'half_open') open.add(name);
+    }
+    return open;
+  }
+
   /** True when this failure opened the breaker. */
   failed(name: string): Promise<boolean> {
     return this.fail(name, false);

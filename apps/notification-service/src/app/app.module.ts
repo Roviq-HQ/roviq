@@ -41,6 +41,7 @@ import { SmsWebhookService } from '../services/sms-webhook.service';
 import { WhatsAppWebhookService } from '../services/whatsapp-webhook.service';
 import { NotificationGauges } from '../telemetry/notification-gauges';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
+import { NotificationStateGauges } from '../telemetry/notification-state-gauges';
 import { NotificationWorkerService } from '../workflows/notification.worker';
 
 @Module({
@@ -144,6 +145,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     NotificationWorkerHealthIndicator,
     NotificationMetrics,
     NotificationGauges,
+    NotificationStateGauges,
     DeliveryCanary,
   ],
 })

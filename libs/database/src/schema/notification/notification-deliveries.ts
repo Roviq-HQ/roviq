@@ -97,6 +97,9 @@ export const notificationDeliveries = pgTable(
     index('notification_deliveries_provider_message_id_idx')
       .using('btree', table.providerMessageId.asc().nullsLast())
       .where(sql`provider_message_id IS NOT NULL`),
+    // Rows are appended in time order: the platform's 24-hour counts and the skip gauge read
+    // the latest rows without scanning the whole table.
+    index('notification_deliveries_created_at_idx').using('brin', table.createdAt),
 
     pgPolicy('notification_deliveries_app_select', {
       for: 'select',

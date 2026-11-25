@@ -5,7 +5,6 @@ import { gql } from '@roviq/graphql';
 export const ADMIN_NOTIFICATION_HEALTH = gql`
   query AdminNotificationHealth {
     adminNotificationHealth {
-      metricsAvailable
       checkedAt
       channels {
         channel

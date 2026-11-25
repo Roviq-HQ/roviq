@@ -1,13 +1,13 @@
 {
   "name": "notification_dead_letters",
-  "description": "A NOTIFICATION event was dead-lettered: its notification was never sent. Inspect and replay it from the admin Dead Letter Queue tab.",
+  "description": "A NOTIFICATION event was dead-lettered in the last 5 minutes: its notification was never sent. Inspect and replay it from the admin Dead Letter Queue tab.",
   "stream_type": "metrics",
-  "stream_name": "nats_dlq_messages_total",
+  "stream_name": "nats_dlq_messages_recent",
   "is_real_time": false,
   "enabled": true,
   "query_condition": {
     "type": "promql",
-    "promql": "sum(increase(nats_dlq_messages_total{origin_stream=\"NOTIFICATION\"}[5m]))",
+    "promql": "max(nats_dlq_messages_recent{origin_stream=\"NOTIFICATION\"})",
     "promql_condition": {
       "column": "value",
       "operator": ">",
