@@ -461,7 +461,6 @@ export default function CreateInstitutePage() {
                             <p>{t('codeHelpBody')}</p>
                           </FieldInfoPopover>
                         </FieldLabel>
-                        <FieldDescription>{t('codeDescription')}</FieldDescription>
                         <Input
                           id={field.name}
                           name={field.name}
@@ -473,6 +472,7 @@ export default function CreateInstitutePage() {
                           maxLength={50}
                           aria-invalid={invalid || undefined}
                         />
+                        <FieldDescription>{t('codeDescription')}</FieldDescription>
                         {invalid && <FieldError errors={errors} />}
                       </Field>
                     );
@@ -530,7 +530,6 @@ export default function CreateInstitutePage() {
                               <p>{t('structureFrameworkHelpBody')}</p>
                             </FieldInfoPopover>
                           </FieldLabel>
-                          <FieldDescription>{t('structureFrameworkDescription')}</FieldDescription>
                           <Select
                             value={value}
                             onValueChange={(v) =>
@@ -551,6 +550,7 @@ export default function CreateInstitutePage() {
                               ))}
                             </SelectContent>
                           </Select>
+                          <FieldDescription>{t('structureFrameworkDescription')}</FieldDescription>
                         </Field>
                       );
                     }}
@@ -572,13 +572,13 @@ export default function CreateInstitutePage() {
                               <p>{t('fieldHelp.boardOptions')}</p>
                             </FieldInfoPopover>
                           </FieldLabel>
-                          <FieldDescription>{t('boardDescription')}</FieldDescription>
                           <BoardCombobox
                             value={value}
                             onChange={(next) => field.handleChange(next)}
                             selectedLabel={selected ? t(`boards.${selected}`) : undefined}
                             t={t}
                           />
+                          <FieldDescription>{t('boardDescription')}</FieldDescription>
                         </Field>
                       );
                     }}
@@ -586,7 +586,6 @@ export default function CreateInstitutePage() {
 
                   <Field>
                     <FieldLabel>{t('departments')}</FieldLabel>
-                    <FieldDescription>{t('departmentsDescription')}</FieldDescription>
                     <div className="flex flex-wrap gap-3">
                       {EDUCATION_LEVEL_VALUES.map((dept) => (
                         <FieldLabel
@@ -604,6 +603,7 @@ export default function CreateInstitutePage() {
                         </FieldLabel>
                       ))}
                     </div>
+                    <FieldDescription>{t('departmentsDescription')}</FieldDescription>
                   </Field>
                 </FieldSet>
               )}
@@ -633,7 +633,6 @@ export default function CreateInstitutePage() {
                             </p>
                           </FieldInfoPopover>
                         </FieldLabel>
-                        <FieldDescription>{t('resellerDescription')}</FieldDescription>
                         <ResellerCombobox
                           value={value}
                           onChange={(next) => field.handleChange(next)}
@@ -650,6 +649,7 @@ export default function CreateInstitutePage() {
                           required
                           data-testid={adminInstitutes.newResellerCombobox}
                         />
+                        <FieldDescription>{t('resellerDescription')}</FieldDescription>
                         {invalid && <FieldError errors={errors} />}
                       </Field>
                     );
@@ -673,12 +673,12 @@ export default function CreateInstitutePage() {
                             </p>
                           </FieldInfoPopover>
                         </FieldLabel>
-                        <FieldDescription>{t('groupDescription')}</FieldDescription>
                         <InstituteGroupCombobox
                           value={value}
                           onChange={(next) => field.handleChange(next)}
                           data-testid={adminInstitutes.newGroupCombobox}
                         />
+                        <FieldDescription>{t('groupDescription')}</FieldDescription>
                       </Field>
                     );
                   }}
@@ -1112,7 +1112,6 @@ export default function CreateInstitutePage() {
                     return (
                       <Field data-invalid={invalid || undefined}>
                         <FieldLabel htmlFor={field.name}>{t('postalCode')}</FieldLabel>
-                        <FieldDescription>{t('postalCodeDescription')}</FieldDescription>
                         <Input
                           id={field.name}
                           name={field.name}
@@ -1130,6 +1129,7 @@ export default function CreateInstitutePage() {
                           }}
                           data-testid={adminInstitutes.newPostalCodeInput}
                         />
+                        <FieldDescription>{t('postalCodeDescription')}</FieldDescription>
                         {invalid && <FieldError errors={errors} />}
                       </Field>
                     );

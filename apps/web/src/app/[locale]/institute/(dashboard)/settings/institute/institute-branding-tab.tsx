@@ -235,7 +235,6 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
                             </p>
                           </FieldInfoPopover>
                         </FieldLabel>
-                        <FieldDescription>{tb('primaryColorDescription')}</FieldDescription>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
@@ -255,11 +254,11 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
                             )}
                           </form.AppField>
                         </div>
+                        <FieldDescription>{tb('primaryColorDescription')}</FieldDescription>
                       </Field>
 
                       <Field>
                         <FieldLabel>{tb('secondaryColor')}</FieldLabel>
-                        <FieldDescription>{tb('secondaryColorDescription')}</FieldDescription>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
@@ -279,6 +278,7 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
                             )}
                           </form.AppField>
                         </div>
+                        <FieldDescription>{tb('secondaryColorDescription')}</FieldDescription>
                       </Field>
                     </div>
 

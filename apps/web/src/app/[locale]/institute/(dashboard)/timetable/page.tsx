@@ -606,7 +606,6 @@ function CreateTimetableWizard({
                 {/* Sections covered */}
                 <FieldSet>
                   <FieldLegend variant="label">{t('wizard.selectSections')}</FieldLegend>
-                  <FieldDescription>{t('wizard.selectSectionsHint')}</FieldDescription>
                   <form.Field name="sectionIds">
                     {(field) => (
                       <SectionPicker
@@ -631,6 +630,7 @@ function CreateTimetableWizard({
                       />
                     )}
                   </form.Field>
+                  <FieldDescription>{t('wizard.selectSectionsHint')}</FieldDescription>
                 </FieldSet>
               </div>
               <div className="space-y-6">
@@ -745,7 +745,6 @@ function CreateTimetableWizard({
                       )}
                     </form.Field>
                   </div>
-                  <FieldDescription>{t('wizard.lunchBreaksHint')}</FieldDescription>
                   <form.Field name="lunch" mode="array">
                     {(field) => {
                       const rows = (field.state.value as LunchRow[]) ?? [];
@@ -807,6 +806,7 @@ function CreateTimetableWizard({
                       );
                     }}
                   </form.Field>
+                  <FieldDescription>{t('wizard.lunchBreaksHint')}</FieldDescription>
                 </FieldSet>
 
                 {/* Extra classes */}
@@ -835,7 +835,6 @@ function CreateTimetableWizard({
                       )}
                     </form.Field>
                   </div>
-                  <FieldDescription>{t('wizard.extraClassesHint')}</FieldDescription>
                   <form.Field name="extraClass" mode="array">
                     {(field) => {
                       const rows = (field.state.value as ExtraRow[]) ?? [];
@@ -916,6 +915,7 @@ function CreateTimetableWizard({
                       );
                     }}
                   </form.Field>
+                  <FieldDescription>{t('wizard.extraClassesHint')}</FieldDescription>
                 </FieldSet>
               </div>
             </div>

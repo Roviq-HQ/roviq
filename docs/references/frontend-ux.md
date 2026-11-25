@@ -240,8 +240,9 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 **Rules:**
 
 - Use domain language: "Right to Education — Reserved Seats (25%)" not "RTE Quota %"
-- Add `text-muted-foreground` description via `<FieldDescription>` below every non-obvious label
-- `(i)` icon → popover with explanation + example for complex fields
+- An instruction the person needs to fill the field (format, limit, a warning about a consequential choice) goes in `description`, after the input, and is always shown
+- Explanation (what the field is, why it is asked, what each choice changes, an example) goes in the field's help topic and shows in the `(i)` popover; an optional one-sentence hint shows under the label in the "Help icon and short hints" mode
+- Nothing else sits between a label and its input: explanation text there makes forms long for clerks who already know them
 - Never abbreviate without expanding on first appearance
 - Map DB column names to human names in a shared `fieldLabels` map per module
 
@@ -1025,7 +1026,8 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 **Problem:** User encounters "UDISE+ Code" and has no idea what to enter.
 **Rules:**
 
-- Field-level `(i)` tooltip: "UDISE+ is a unique 11-digit code assigned by the government. Find yours at udiseplus.gov.in"
+- Field-level `(i)` popover: "UDISE+ is a unique 11-digit code assigned by the government. Find yours at udiseplus.gov.in"
+- A field whose effects need more than the popover gets a "Read more" article that opens over the form, so nothing typed is lost
 - Complex pages: collapsible "How this works" section at top with 2–3 sentence explanation
 - Link to video walkthrough for complex flows (Loom embed)
 - Never use guided tours that highlight elements one-by-one — universally hated and dismissed

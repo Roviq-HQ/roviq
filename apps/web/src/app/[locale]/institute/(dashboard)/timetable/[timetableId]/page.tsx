@@ -723,7 +723,6 @@ function AssignDialog({
         <div className="space-y-4">
           <Field>
             <FieldLabel>{t('assign.days')}</FieldLabel>
-            <p className="text-xs text-muted-foreground">{t('assign.daysHint')}</p>
             <div className="flex flex-wrap gap-2">
               {workingDays.map((day) => (
                 <Button
@@ -738,6 +737,7 @@ function AssignDialog({
                 </Button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">{t('assign.daysHint')}</p>
           </Field>
 
           <Separator />

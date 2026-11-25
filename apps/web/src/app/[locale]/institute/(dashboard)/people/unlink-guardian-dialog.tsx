@@ -153,7 +153,6 @@ function UnlinkGuardianDialog({
       {needsReplacement && (
         <Field>
           <FieldLabel htmlFor="unlink-replacement">{t('unlink.replacementLabel')}</FieldLabel>
-          <p className="text-sm text-muted-foreground">{t('unlink.primaryNotice', names)}</p>
           <Select value={replacementId} onValueChange={setReplacementId}>
             <SelectTrigger
               id="unlink-replacement"
@@ -169,6 +168,7 @@ function UnlinkGuardianDialog({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-sm text-muted-foreground">{t('unlink.primaryNotice', names)}</p>
         </Field>
       )}
     </div>

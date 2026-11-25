@@ -165,7 +165,6 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
           {tb(name)}
           {info}
         </FieldLabel>
-        <FieldDescription>{tb(`${name}Description`)}</FieldDescription>
         <div className="flex items-start gap-2">
           <input
             type="color"
@@ -201,6 +200,7 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
             {tb('useDefault')}
           </Button>
         </div>
+        <FieldDescription>{tb(`${name}Description`)}</FieldDescription>
       </Field>
     );
   };

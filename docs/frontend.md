@@ -52,11 +52,39 @@ and links there. Example: the alert card on the admin Monitoring page
 (`_components/alerts-panel.tsx`, copy in `adminMonitoring.alerts.rules`, screens in
 `_lib/alert-guide.ts`; `scripts/__tests__/alert-copy.spec.ts` fails for a rule without copy).
 
+## Field help
+
+Three kinds of text can sit around a form field. Forms stay short because only the instruction is always on screen.
+
+| Kind | Where | Shown |
+|------|-------|-------|
+| Instruction needed to fill the field: format, limit, a warning about a consequential choice, the error | `description` (or `<FieldDescription>`) and the error, **after** the input | Always |
+| Optional hint: one sentence, only where seeing it inline saves time | the topic's `hint`, under the label | Form help mode `ICON_AND_HINT` only |
+| Explanation: what the field is, why it is asked, what each choice changes | the topic's `body` in the ⓘ popover; an article for a field whose effects need more | On demand |
+
+A simple field (name, mobile) gets a clear label and nothing else.
+
+**Help topics** live in one module per form, `apps/web/src/help/<area>/<form>.help.ts`, made with `defineFieldHelp('<scope>', { <key>: { … } })` from `@roviq/ui`. A topic's id is `<scope>.<key>`. Every text is `{ en, hi }` (`HelpText`, typed by `Locale`, so a missing language does not build):
+
+- `title` and `body` (≤ `HELP_LIMITS.body` characters); `hint` (≤ `HELP_LIMITS.hint`) and `example` are optional.
+- `options` says what each choice changes, keyed by the real option value; `helpOptions<Enum>({ … })` types the keys.
+- `values` passes real shared constants, used as `{name}` in the copy, so a limit is never typed twice.
+- `article: () => import('./<form>.articles').then((m) => m.<key>)` loads a longer article (headings, paragraphs, steps, warnings) only when "Read more" is opened; `HelpArticleSheet` shows it over the form, which stays mounted.
+
+Two forms that describe the same behaviour import one topic.
+
+**Using a topic**: pass it as `help={<formHelp>.<key>}` to a shared field (`TextField`, `SelectField`, …), or to `FieldLabelWithInfo` beside a raw `FieldLabel`. The field renders the ⓘ button (its accessible name includes the field label), the hint under the label, per-option help under each `SelectField` choice, and links hint, description and error to the input through `aria-describedby` (`useFieldHelpIds`). `info={<FieldInfoPopover …/>}` with `fieldHelp.*` message keys is the older way, still used by forms not moved yet.
+
+**Form help mode**: `ICON_AND_HINT` (default) or `ICON_ONLY`, supplied by `FormHelpModeProvider` and read with `useFormHelpMode()`. Without a provider fields use the default.
+
+**`pnpm check:field-help`** (`scripts/check-field-help.ts`, in the pre-push gate) fails on a topic with a missing or empty language, a hint or body over the limit, a duplicate id, an article file that does not exist, a topic no field uses, `defineFieldHelp` outside `apps/web/src/help/`, and any `FieldDescription` or muted `<p>` between a field's label and its input. The script's header states exactly what counts as an input.
+
 ## Common components
 
 App-wide reusable components live in `apps/web/src/components/` (import via the `@web/components/*` alias) — prefer these over re-building per feature. Data-coupled ones fetch via `@roviq/graphql` (inline `gql`/`useQuery`) or reuse existing feature hooks through the `@web/*` alias; they must NOT live in `@roviq/ui` (a lib cannot import app code). **Add one concise line here per new common component.**
 
 - `hooks/useLocaleChange()` — topbar language switch handler wired into all three `(dashboard)/layout.tsx` (`LayoutConfig.onLocaleChange`): saves the account language, then navigates; navigates only when impersonating.
+- `FieldHelpButton` + `FieldLabelWithInfo` (`@roviq/ui`) — the ⓘ button and popover for a help topic, and a label with that button beside it plus the topic's hint; use `FieldLabelWithInfo help={…}` for a raw `FieldLabel` (see "Field help").
 - `setServerFieldError(form, field, message)` (`@roviq/ui`) — shows a server rejection under a form field; cleared when that field's value changes. Never hand-set `errorMap` with `setFieldMeta`: an `onChange` error sticks and keeps submit disabled.
 - `pickers/SectionPicker` — multi-select of class sections grouped by department → standard, with per-class / per-department / global "select all" and a live count.
 - `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
@@ -89,7 +117,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 shadcn/ui components + layout shell. Key exports:
 - All shadcn primitives (Button, Input, Card, Dialog, Select, etc.)
 - `AdminLayout` — sidebar + topbar + command palette shell (accepts `LayoutConfig`)
-- `OrgSwitcher` — dropdown in topbar for switching between institutes (visible when user has >1 membership)
+- `InstituteSwitcher` — dropdown for switching between institutes; the topbar renders its own when `LayoutConfig.instituteSwitcher` is set
 - `AbilityProvider`, `Can`, `useAbility` — CASL React integration
 - `RouteGuard` — page-level permission check with 403 fallback
 - `DataTable` — pass `expansion={{ render, canExpand?, labels }}` for expandable rows (a leading toggle column; the expanded content spans the full width). Pass `getRowId` with it whenever rows can change.
@@ -170,9 +198,10 @@ const config: LayoutConfig = {
       ],
     },
   ],
-  orgSwitcher: {
-    currentOrg: { tenantId, name, logoUrl },
-    otherOrgs: [...],
+  instituteSwitcher: {
+    currentTenantId,
+    currentInstituteName,
+    memberships: [{ tenantId, instituteName, instituteLogoUrl, roleName }],
     onSwitch: (tenantId) => switchInstitute(tenantId),
   },
 };
