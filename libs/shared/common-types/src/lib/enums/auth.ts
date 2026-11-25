@@ -71,9 +71,9 @@ export const RoleStatus = Object.fromEntries(ROLE_STATUS_VALUES.map((v) => [v, v
 
 // ─── AuthScope ──────────────────────────────────────────────────────────────
 // Three-scope auth model — determines which RLS context, DB role, JWT TTL,
-// guard, and module group a request uses. Casing is intentionally lowercase
-// to match the JWT `scope` claim and the audit_logs `scope` column already
-// in production.
+// guard, and module group a request uses.
+// Recorded exception to UPPER_SNAKE (ROV-227): this is the JWT scope claim, read by every guard
+// and five CHECK constraints.
 
 export const AUTH_SCOPE_VALUES = [
   // Roviq super-admin / platform ops — manages the SaaS itself across all tenants
@@ -136,7 +136,7 @@ export const AUTH_FAILURE_REASON_VALUES = [
   'PASSKEY_UNKNOWN',
   // The passkey is registered but its signed response failed verification
   'PASSKEY_VERIFICATION_FAILED',
-  // The failed attempt that reached the lockout threshold (on `account_locked` events)
+  // The failed attempt that reached the lockout threshold (on `ACCOUNT_LOCKED` events)
   'TOO_MANY_ATTEMPTS',
 ] as const;
 
@@ -144,6 +144,67 @@ export type AuthFailureReason = (typeof AUTH_FAILURE_REASON_VALUES)[number];
 export const AuthFailureReason = Object.fromEntries(
   AUTH_FAILURE_REASON_VALUES.map((v) => [v, v]),
 ) as { readonly [K in AuthFailureReason]: K };
+
+// ─── RefreshTokenRevokeReason ───────────────────────────────────────────────
+// Why a refresh token was revoked, stored in `refresh_tokens.revoked_reason`.
+
+export const REFRESH_TOKEN_REVOKE_REASON_VALUES = [
+  // Replaced by a successor during the refresh flow. Reusing such a token is the
+  // refresh-token-reuse signal: every other session of the user is revoked.
+  'ROTATION',
+  // Ended by the user (logout, revokeSession, revokeAllOtherSessions). Presenting it again
+  // is not evidence of theft, so the reuse cascade is skipped.
+  'USER_INITIATED',
+  // Ended because the user changed their password; no reuse cascade either
+  'PASSWORD_CHANGE',
+  // Ended by a platform or reseller admin, or by a reseller suspension
+  'ADMIN_REVOKED',
+] as const;
+
+export type RefreshTokenRevokeReason = (typeof REFRESH_TOKEN_REVOKE_REASON_VALUES)[number];
+export const RefreshTokenRevokeReason = Object.fromEntries(
+  REFRESH_TOKEN_REVOKE_REASON_VALUES.map((v) => [v, v]),
+) as { readonly [K in RefreshTokenRevokeReason]: K };
+
+// ─── AuthEventType ──────────────────────────────────────────────────────────
+// One step of the auth lifecycle, stored in `auth_events.event_type`.
+
+export const AUTH_EVENT_TYPE_VALUES = [
+  // A session was issued
+  'LOGIN_SUCCESS',
+  // A sign-in attempt was refused
+  'LOGIN_FAILED',
+  // The refused attempt that reached the lockout threshold
+  'ACCOUNT_LOCKED',
+  // The user ended their own session
+  'LOGOUT',
+  // An access token was renewed with a refresh token
+  'TOKEN_REFRESH',
+  // The user moved their session to another institute
+  'INSTITUTE_SWITCH',
+  // An impersonation session started (the code was exchanged)
+  'IMPERSONATION_START',
+  // An impersonation session ended, was revoked or expired
+  'IMPERSONATION_END',
+  // Every session of the user was revoked at once
+  'ALL_SESSIONS_REVOKED',
+  // The user changed their password
+  'PASSWORD_CHANGE',
+  // The user registered a passkey
+  'PASSKEY_REGISTER',
+] as const;
+
+export type AuthEventType = (typeof AUTH_EVENT_TYPE_VALUES)[number];
+export const AuthEventType = Object.fromEntries(AUTH_EVENT_TYPE_VALUES.map((v) => [v, v])) as {
+  readonly [K in AuthEventType]: K;
+};
+
+/** Auth events that prove the user was using the app at that moment ("last active"). */
+export const ACTIVITY_EVENT_TYPES = [
+  'LOGIN_SUCCESS',
+  'TOKEN_REFRESH',
+  'INSTITUTE_SWITCH',
+] as const satisfies readonly AuthEventType[];
 
 // ─── SignInStatus ───────────────────────────────────────────────────────────
 // Where a staff member or guardian stands with their first sign-in, as the institute sees it.

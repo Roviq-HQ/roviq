@@ -1,15 +1,14 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
 import { DateTimeScalar } from '@roviq/nestjs-graphql';
+import { ConsentPurpose, ConsentVerificationMethod } from '../dto/consent.enums';
 
 @ObjectType({ description: 'DPDP Act 2023 verifiable parental consent record (append-only)' })
 export class ConsentRecordModel {
   @Field(() => ID)
   id!: string;
 
-  @Field({
-    description: 'Data processing purpose (e.g. academic_data_processing, photo_video_marketing)',
-  })
-  purpose!: string;
+  @Field(() => ConsentPurpose)
+  purpose!: ConsentPurpose;
 
   @Field({ description: 'true = consent granted, false = consent withdrawn' })
   isGranted!: boolean;
@@ -26,12 +25,8 @@ export class ConsentRecordModel {
   })
   withdrawnAt?: Date | null;
 
-  @Field(() => String, {
-    nullable: true,
-    description:
-      'How the guardian was verified: digilocker_token, aadhaar_otp, in_person_id_check, signed_form_uploaded, school_erp_verified_account',
-  })
-  verificationMethod?: string | null;
+  @Field(() => ConsentVerificationMethod, { nullable: true })
+  verificationMethod?: ConsentVerificationMethod | null;
 
   @Field(() => DateTimeScalar, { description: 'When this consent record was created' })
   createdAt!: Date;

@@ -116,7 +116,7 @@ describe('M7: consent_records append-only enforcement', () => {
       const consentId = 'ffffffff-c001-0001-0001-000000000099';
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'academic_data_processing', true, now())`,
+         VALUES ($1, $2, $3, $4, 'ACADEMIC_DATA_PROCESSING', true, now())`,
         [consentId, SEED.INSTITUTE_1, guardianProfileId, studentProfileId],
       );
 
@@ -125,7 +125,7 @@ describe('M7: consent_records append-only enforcement', () => {
         [consentId],
       );
       expect(res.rows).toHaveLength(1);
-      expect(res.rows[0].purpose).toBe('academic_data_processing');
+      expect(res.rows[0].purpose).toBe('ACADEMIC_DATA_PROCESSING');
       expect(res.rows[0].is_granted).toBe(true);
     });
   });
@@ -159,7 +159,7 @@ describe('M7: consent_records append-only enforcement', () => {
       const consentId = 'ffffffff-c002-0001-0001-000000000099';
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'photo_video_marketing', true, now())`,
+         VALUES ($1, $2, $3, $4, 'PHOTO_VIDEO_MARKETING', true, now())`,
         [consentId, SEED.INSTITUTE_1, guardianProfileId, studentProfileId],
       );
 
@@ -207,7 +207,7 @@ describe('M7: consent_records append-only enforcement', () => {
       const consentId = 'ffffffff-c003-0001-0001-000000000099';
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'whatsapp_communication', true, now())`,
+         VALUES ($1, $2, $3, $4, 'WHATSAPP_COMMUNICATION', true, now())`,
         [consentId, SEED.INSTITUTE_1, guardianProfileId, studentProfileId],
       );
 
@@ -253,7 +253,7 @@ describe('M7: consent_records append-only enforcement', () => {
       // First row: grant consent
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at)
-         VALUES ($1, $2, $3, $4, 'aadhaar_collection', true, now())`,
+         VALUES ($1, $2, $3, $4, 'AADHAAR_COLLECTION', true, now())`,
         [
           'ffffffff-c004-0001-0001-000000000091',
           SEED.INSTITUTE_1,
@@ -265,7 +265,7 @@ describe('M7: consent_records append-only enforcement', () => {
       // Second row: withdraw consent (same guardian, student, purpose)
       await client.query(
         `INSERT INTO consent_records (id, tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, withdrawn_at)
-         VALUES ($1, $2, $3, $4, 'aadhaar_collection', false, now())`,
+         VALUES ($1, $2, $3, $4, 'AADHAAR_COLLECTION', false, now())`,
         [
           'ffffffff-c004-0001-0001-000000000092',
           SEED.INSTITUTE_1,
@@ -276,7 +276,7 @@ describe('M7: consent_records append-only enforcement', () => {
 
       const res = await client.query(
         `SELECT id, is_granted FROM consent_records
-         WHERE guardian_profile_id = $1 AND student_profile_id = $2 AND purpose = 'aadhaar_collection'
+         WHERE guardian_profile_id = $1 AND student_profile_id = $2 AND purpose = 'AADHAAR_COLLECTION'
          ORDER BY created_at`,
         [guardianProfileId, studentProfileId],
       );
@@ -284,6 +284,63 @@ describe('M7: consent_records append-only enforcement', () => {
       expect(res.rows).toHaveLength(2);
       expect(res.rows[0].is_granted).toBe(true);
       expect(res.rows[1].is_granted).toBe(false);
+    });
+  });
+
+  it('accepts only the upper snake purposes and verification methods (ROV-227)', async () => {
+    await inTransaction(async (client) => {
+      const testUser1 = await createTestUser(client, 'eeeeeeee-bc05-0001-0001-000000000001');
+      const testUser2 = await createTestUser(client, 'eeeeeeee-bc05-0001-0001-000000000002');
+      const roleId = await findRole(client, SEED.INSTITUTE_1);
+      const studentProfileId = await createStudentProfile(
+        client,
+        'ffffffff-c005-0001-0001-000000000001',
+        'ffffffff-c005-0001-0001-000000000010',
+        testUser1,
+        SEED.INSTITUTE_1,
+        roleId,
+        'CONSENT-S005',
+      );
+      const guardianProfileId = await createGuardianProfile(
+        client,
+        'ffffffff-c005-0001-0001-000000000002',
+        'ffffffff-c005-0001-0001-000000000020',
+        testUser2,
+        SEED.INSTITUTE_1,
+        roleId,
+      );
+      const insert = (purpose: string, method: string | null) =>
+        client.query(
+          `INSERT INTO consent_records (tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at, verification_method)
+           VALUES ($1, $2, $3, $4, true, now(), $5)`,
+          [SEED.INSTITUTE_1, guardianProfileId, studentProfileId, purpose, method],
+        );
+      // A refused statement aborts the transaction, so each attempt runs in a savepoint.
+      const refused = async (purpose: string, method: string | null, constraint: RegExp) => {
+        await client.query('SAVEPOINT attempt');
+        await expect(insert(purpose, method)).rejects.toThrow(constraint);
+        await client.query('ROLLBACK TO SAVEPOINT attempt');
+      };
+
+      await refused('academic_data_processing', null, /chk_consent_purpose/);
+      await refused(
+        'ACADEMIC_DATA_PROCESSING',
+        'school_erp_verified_account',
+        /chk_verification_method/,
+      );
+      await refused('ACADEMIC_DATA_PROCESSING', 'in_person_id_check', /chk_verification_method/);
+
+      await insert('ACADEMIC_DATA_PROCESSING', 'INSTITUTE_ERP_VERIFIED_ACCOUNT');
+      const res = await client.query(
+        'SELECT purpose, verification_method FROM consent_records WHERE guardian_profile_id = $1',
+        [guardianProfileId],
+      );
+      expect(res.rows).toEqual([
+        {
+          purpose: 'ACADEMIC_DATA_PROCESSING',
+          verification_method: 'INSTITUTE_ERP_VERIFIED_ACCOUNT',
+        },
+      ]);
     });
   });
 });

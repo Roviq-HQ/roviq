@@ -15,47 +15,47 @@
     "marketing": "विपणन"
   },
   "purposes": {
-    "academic_data_processing": {
+    "ACADEMIC_DATA_PROCESSING": {
       "label": "शैक्षणिक डेटा प्रसंस्करण",
       "description": "ग्रेड, उपस्थिति, रिपोर्ट कार्ड और शैक्षणिक रिकॉर्ड के लिए आवश्यक"
     },
-    "photo_video_marketing": {
+    "PHOTO_VIDEO_MARKETING": {
       "label": "मार्केटिंग के लिए फ़ोटो और वीडियो",
       "description": "इंस्टीट्यूट वेबसाइट, ब्रोशर या सोशल मीडिया पर आपके बच्चे की फ़ोटो या वीडियो का उपयोग"
     },
-    "whatsapp_communication": {
+    "WHATSAPP_COMMUNICATION": {
       "label": "व्हाट्सएप संदेश",
       "description": "व्हाट्सएप पर अधिसूचनाएँ और अपडेट भेजना"
     },
-    "sms_communication": {
+    "SMS_COMMUNICATION": {
       "label": "एसएमएस संदेश",
       "description": "एसएमएस पर अधिसूचनाएँ और अपडेट भेजना"
     },
-    "aadhaar_collection": {
+    "AADHAAR_COLLECTION": {
       "label": "आधार संग्रह",
       "description": "बोर्ड परीक्षा पंजीकरण या आरटीई अनुपालन के लिए आधार संख्या एकत्र करना"
     },
-    "biometric_collection": {
+    "BIOMETRIC_COLLECTION": {
       "label": "बायोमेट्रिक संग्रह",
       "description": "उपस्थिति के लिए फिंगरप्रिंट या चेहरा पहचान"
     },
-    "third_party_edtech": {
+    "THIRD_PARTY_EDTECH": {
       "label": "तृतीय-पक्ष एडटेक उपकरण",
       "description": "एडटेक लर्निंग प्लेटफ़ॉर्म के साथ शैक्षणिक डेटा साझा करना"
     },
-    "board_exam_registration": {
+    "BOARD_EXAM_REGISTRATION": {
       "label": "बोर्ड परीक्षा पंजीकरण",
       "description": "परीक्षा पंजीकरण के लिए राज्य या राष्ट्रीय शिक्षा बोर्डों के साथ डेटा साझा करना"
     },
-    "transport_tracking": {
+    "TRANSPORT_TRACKING": {
       "label": "परिवहन जीपीएस ट्रैकिंग",
       "description": "इंस्टीट्यूट परिवहन के दौरान आपके बच्चे का स्थान ट्रैक करना"
     },
-    "health_data_processing": {
+    "HEALTH_DATA_PROCESSING": {
       "label": "स्वास्थ्य डेटा प्रसंस्करण",
       "description": "स्वास्थ्य जानकारी, एलर्जी और चिकित्सा इतिहास रिकॉर्ड करना"
     },
-    "cctv_monitoring": {
+    "CCTV_MONITORING": {
       "label": "सीसीटीवी निगरानी",
       "description": "इंस्टीट्यूट परिसर में वीडियो निगरानी"
     }

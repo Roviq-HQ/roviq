@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  CONSENT_PURPOSE_VALUES,
   GUARDIAN_EDUCATION_LEVEL_VALUES,
   GUARDIAN_RELATIONSHIP_VALUES,
   GuardianEducationLevel,
@@ -106,26 +107,6 @@ import {
 } from '../use-guardians';
 
 const { instituteGuardians } = testIds;
-/**
- * DPDP Act 2023 consent purposes — mirrors the `chk_consent_purpose` check
- * constraint on `consent_records`. Listed in a stable display order so the
- * per-child mini-badge grid is deterministic across renders. Keep in sync
- * with the backend enum check if/when a new purpose is added.
- */
-const DPDP_CONSENT_PURPOSES = [
-  'academic_data_processing',
-  'photo_video_marketing',
-  'whatsapp_communication',
-  'sms_communication',
-  'aadhaar_collection',
-  'biometric_collection',
-  'third_party_edtech',
-  'board_exam_registration',
-  'transport_tracking',
-  'health_data_processing',
-  'cctv_monitoring',
-] as const;
-
 function buildGuardianProfileSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
   const firstNameSchema = buildI18nTextSchema(t('new.errors.firstNameRequired'), defaultLocale);
   const lastNameSchema = buildI18nTextSchema(t('new.errors.lastNameRequired'), defaultLocale);
@@ -1028,7 +1009,7 @@ function ChildConsentSummary({ studentProfileId }: { studentProfileId: string })
   for (const r of records) {
     stateByPurpose.set(r.purpose, r.isGranted);
   }
-  const grantedCount = DPDP_CONSENT_PURPOSES.filter((p) => stateByPurpose.get(p) === true).length;
+  const grantedCount = CONSENT_PURPOSE_VALUES.filter((p) => stateByPurpose.get(p) === true).length;
 
   return (
     <div className="border-t pt-3">
@@ -1039,12 +1020,12 @@ function ChildConsentSummary({ studentProfileId }: { studentProfileId: string })
         <span className="text-xs text-muted-foreground">
           {t('detail.children.consentSummary', {
             granted: grantedCount,
-            total: DPDP_CONSENT_PURPOSES.length,
+            total: CONSENT_PURPOSE_VALUES.length,
           })}
         </span>
       </div>
       <div className="flex flex-wrap gap-1">
-        {DPDP_CONSENT_PURPOSES.map((purpose) => {
+        {CONSENT_PURPOSE_VALUES.map((purpose) => {
           const granted = stateByPurpose.get(purpose) === true;
           const label = t(`consent.purposes.${purpose}`, { default: purpose });
           return (

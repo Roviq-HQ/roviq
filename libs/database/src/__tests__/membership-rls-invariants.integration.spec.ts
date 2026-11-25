@@ -363,7 +363,7 @@ describe('ROV-91 Invariant 5: auth_events INSERT-only for roviq_app', () => {
       // SELECT privilege on the returned column, which roviq_app must not have.
       const res = await client.query(
         `INSERT INTO auth_events (user_id, event_type, portal, scope, tenant_id)
-         VALUES ($1, 'login_success', 'institute', 'institute', $2)`,
+         VALUES ($1, 'LOGIN_SUCCESS', 'institute', 'institute', $2)`,
         [SEED.USER_ADMIN, SEED.INSTITUTE_1],
       );
       expect(res.rowCount).toBe(1);
@@ -567,7 +567,7 @@ describe('ROV-91 Invariant 9: auth_events table privileges', () => {
       async (client) => {
         const res = await client.query(
           `INSERT INTO auth_events (user_id, event_type, portal, scope, reseller_id)
-           VALUES ($1, 'login_success', 'reseller', 'reseller', $2)`,
+           VALUES ($1, 'LOGIN_SUCCESS', 'reseller', 'reseller', $2)`,
           [SEED.USER_ADMIN, SEED.RESELLER_DIRECT],
         );
         expect(res.rowCount).toBe(1);

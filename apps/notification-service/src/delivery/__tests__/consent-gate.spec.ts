@@ -28,7 +28,7 @@ describe('GuardianConsentGate', () => {
     gate = new GuardianConsentGate(consents);
   });
 
-  it('should ask for the whatsapp_communication purpose of the student the message is about', async () => {
+  it('should ask for the WHATSAPP_COMMUNICATION purpose of the student the message is about', async () => {
     withState('granted');
 
     await expect(gate.allows(query())).resolves.toBe(true);
@@ -36,7 +36,7 @@ describe('GuardianConsentGate', () => {
       tenantId: 'tenant-1',
       recipientUserId: 'user-guardian-1',
       studentMembershipId: 'membership-student-1',
-      purpose: 'whatsapp_communication',
+      purpose: 'WHATSAPP_COMMUNICATION',
     });
   });
 

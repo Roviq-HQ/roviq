@@ -383,11 +383,11 @@ export class ImpersonationService {
       readOnly,
     });
 
-    // Emit impersonation_start event
+    // Emit IMPERSONATION_START event
     this.authEventService
       .emit({
         userId: session.impersonatorId,
-        type: 'impersonation_start',
+        type: 'IMPERSONATION_START',
         scope: session.impersonatorScope as AuthScope,
         tenantId,
         ip: meta.ip,
@@ -450,11 +450,11 @@ export class ImpersonationService {
     await invalidateImpersonationSessions(this.redis, [sessionId]);
     this.emitSessionEnded(session.id, session.targetTenantId, session.impersonatorScope);
 
-    // Emit impersonation_end event
+    // Emit IMPERSONATION_END event
     this.authEventService
       .emit({
         userId: actor.userId,
-        type: 'impersonation_end',
+        type: 'IMPERSONATION_END',
         scope: actor.scope,
         tenantId: session.targetTenantId ?? undefined,
         ip: meta.ip,
@@ -467,7 +467,7 @@ export class ImpersonationService {
   // ── Expire overdue sessions ──────────────────────────────
 
   /**
-   * Closes sessions that ran past `expires_at` and records `impersonation_end`
+   * Closes sessions that ran past `expires_at` and records `IMPERSONATION_END`
    * for each. The UPDATE claims rows atomically, so concurrent gateway
    * replicas never record the same session twice.
    */
@@ -479,7 +479,7 @@ export class ImpersonationService {
       this.authEventService
         .emit({
           userId: session.impersonatorId,
-          type: 'impersonation_end',
+          type: 'IMPERSONATION_END',
           scope: session.impersonatorScope as AuthScope,
           tenantId: session.targetTenantId ?? undefined,
           metadata: { session_id: session.id, ended_reason: 'expired' },

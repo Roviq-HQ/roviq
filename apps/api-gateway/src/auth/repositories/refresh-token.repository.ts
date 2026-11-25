@@ -1,18 +1,12 @@
+import type { RefreshTokenRevokeReason } from '@roviq/common-types';
 import type { CreateRefreshTokenData, RefreshTokenWithRelations } from './types';
 
 /**
- * Audit tag on every revocation path. Read by the reuse-detection cascade
- * in `AuthService.refresh` — only `'rotation'` (or legacy NULL) fires the
- * "defence in depth, kill the whole family" behaviour. Every other reason
- * represents a legitimate user/admin-initiated revocation; presenting a
- * token revoked under those reasons must NOT cascade or we'd kill the
- * keep-alive session on every `revokeAllOtherSessions` call.
+ * Only `ROTATION` (or a missing reason) fires the reuse cascade in `AuthService.refresh`;
+ * a token revoked for any other reason was ended on purpose, and cascading would end the
+ * caller's own keep-alive session.
  */
-export type RefreshTokenRevokeReason =
-  | 'rotation'
-  | 'user_initiated'
-  | 'password_change'
-  | 'admin_revoked';
+export type { RefreshTokenRevokeReason } from '@roviq/common-types';
 
 export abstract class RefreshTokenRepository {
   abstract create(data: CreateRefreshTokenData): Promise<void>;

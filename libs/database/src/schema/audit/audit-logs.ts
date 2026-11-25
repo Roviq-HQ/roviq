@@ -83,6 +83,7 @@ export const auditLogs = pgTable(
     }),
 
     // CHECK: scope determines which FK columns must be set
+    // auth scope: lowercase by exception (ROV-227)
     check(
       'chk_audit_scope',
       sql`CASE "scope"

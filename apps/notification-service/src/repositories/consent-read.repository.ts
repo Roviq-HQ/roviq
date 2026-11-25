@@ -1,3 +1,5 @@
+import type { ConsentPurpose } from '@roviq/common-types';
+
 /**
  * `granted` / `withdrawn` / `missing` describe the latest consent row; `not_guardian` means the
  * recipient has no guardian profile in the institute, so guardian consent does not apply.
@@ -15,6 +17,6 @@ export abstract class ConsentReadRepository {
     recipientUserId: string;
     /** Membership id of the student the message is about, when it is about one. */
     studentMembershipId: string | null;
-    purpose: string;
+    purpose: ConsentPurpose;
   }): Promise<GuardianConsentState>;
 }

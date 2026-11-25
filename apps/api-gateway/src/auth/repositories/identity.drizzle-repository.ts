@@ -211,7 +211,7 @@ export class IdentityDrizzleRepository extends IdentityRepository {
       if (!row) return null;
       await tx
         .update(refreshTokens)
-        .set({ revokedAt: new Date(), revokedReason: 'password_change' })
+        .set({ revokedAt: new Date(), revokedReason: 'PASSWORD_CHANGE' })
         .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
       return row.tokenVersion;
     });

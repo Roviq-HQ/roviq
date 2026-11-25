@@ -49,7 +49,7 @@ describe('Consent E2E', () => {
   // enumeration — timestamped variants are rejected by the DB. Use a
   // canonical value; append-only semantics handle repeated test runs
   // by stacking rows (myConsentStatus returns the latest).
-  const purpose = 'whatsapp_communication';
+  const purpose = 'WHATSAPP_COMMUNICATION';
 
   beforeAll(async () => {
     guardianToken = (await loginAsGuardian()).accessToken;
@@ -71,7 +71,7 @@ describe('Consent E2E', () => {
           input: {
             studentProfileId,
             purpose,
-            verificationMethod: 'in_person_id_check',
+            verificationMethod: 'IN_PERSON_ID_CHECK',
           },
         },
         guardianToken,
@@ -85,7 +85,7 @@ describe('Consent E2E', () => {
       expect(record.isGranted).toBe(true);
       expect(record.grantedAt).toBeTruthy();
       expect(record.withdrawnAt).toBeNull();
-      expect(record.verificationMethod).toBe('in_person_id_check');
+      expect(record.verificationMethod).toBe('IN_PERSON_ID_CHECK');
     });
 
     it('rejects admin token — membership has no guardian profile', async () => {
@@ -96,8 +96,8 @@ describe('Consent E2E', () => {
         {
           input: {
             studentProfileId,
-            purpose: `admin_reject_${Date.now()}`,
-            verificationMethod: 'in_person_id_check',
+            purpose,
+            verificationMethod: 'IN_PERSON_ID_CHECK',
           },
         },
         adminToken,

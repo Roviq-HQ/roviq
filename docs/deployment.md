@@ -38,6 +38,7 @@ Consequences for operations:
 - **Deactivating a reseller team member depends on the trigger.** `resellerDeactivateTeamMember` only flips `is_active`; `reseller_memberships_revoke_sessions` ends the sessions.
 - **A migration that narrows a role takes effect up to 5 minutes later.** Role rules are cached for 5 minutes in `casl:role:<id>` and a migration does not clear that cache, so the older, wider rules stay in force until it expires. Delete the `casl:role:*` keys right after any migration that narrows a role.
 - **Online invoice payment needs the gateway's checkout domains.** The institute portal loads `https://checkout.razorpay.com/v1/checkout.js` or `https://sdk.cashfree.com/js/v3/cashfree.js` in the browser; a Content-Security-Policy must allow them. Cashfree production also requires the institute portal domain to be whitelisted in the Cashfree dashboard, and its return URL is derived from the origin of `BILLING_RETURN_URL`.
+- **The upper snake case migration (ROV-227) and the API change together.** Stop the API, run the migration, then start the new API, with no rolling overlap: the old code writes lowercase values the new checks refuse, and a token revoked with a reason the old code does not know is read as token reuse and ends every session of its user.
 - **A refresh token can be inserted only for an active membership.** Data imports that create `refresh_tokens` rows directly will be refused for memberships that do not exist or are not active.
 
 The full list of database-enforced rules and the tests that prove them is in `docs/testing.md` → "Security invariants".
@@ -241,12 +242,12 @@ Each channel needs a provider; a channel with none records every send as skipped
 
 **WhatsApp needs the guardian's consent as well as a provider** (ROV-269, DPDP purpose-specific
 consent). A guardian of the institute gets a WhatsApp message only while the latest
-`consent_records` row with purpose `whatsapp_communication` is granted, for the student the
+`consent_records` row with purpose `WHATSAPP_COMMUNICATION` is granted, for the student the
 message is about (for a message that names no student: for every student linked to them). No row counts as
 no consent. The row is read on every send and nothing is cached, so a withdrawal applies to the
 next message. A refused send is recorded as skipped (`no_consent`) and logged with the reason
 (`consent_missing` or `consent_withdrawn`) and ids only. Other channels, and recipients who are
-not guardians (staff), are not gated by this consent; SMS consent (`sms_communication`) is not
+not guardians (staff), are not gated by this consent; SMS consent (`SMS_COMMUNICATION`) is not
 enforced yet.
 
 - **Email**: `NOTIFICATION_EMAIL_PROVIDER=smtp`, `SMTP_URL` (`smtps://user:pass@host:465`) and

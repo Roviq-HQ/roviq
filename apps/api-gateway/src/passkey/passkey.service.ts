@@ -157,7 +157,7 @@ export class PasskeyService {
     this.authEventService
       .emit({
         userId,
-        type: 'passkey_register',
+        type: 'PASSKEY_REGISTER',
         authMethod: 'passkey',
         metadata: {
           passkey_id: record.id,
@@ -286,7 +286,7 @@ export class PasskeyService {
     this.authEventService
       .emit({
         userId,
-        type: 'login_failed',
+        type: 'LOGIN_FAILED',
         // Passkey sign-in exists on the institute portal only.
         portal: 'institute',
         authMethod: 'passkey',

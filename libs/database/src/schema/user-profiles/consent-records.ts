@@ -1,3 +1,9 @@
+import {
+  CONSENT_PURPOSE_VALUES,
+  CONSENT_VERIFICATION_METHOD_VALUES,
+  type ConsentPurpose,
+  type ConsentVerificationMethod,
+} from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -17,6 +23,11 @@ import { institutes } from '../tenant/institutes';
 import { guardianProfiles } from './guardian-profiles';
 import { privacyNotices } from './privacy-notices';
 import { studentProfiles } from './student-profiles';
+
+const PURPOSES = sql.raw(CONSENT_PURPOSE_VALUES.map((v) => `'${v}'`).join(', '));
+const VERIFICATION_METHODS = sql.raw(
+  CONSENT_VERIFICATION_METHOD_VALUES.map((v) => `'${v}'`).join(', '),
+);
 
 /**
  * DPDP Act 2023 verifiable parental consent tracking — APPEND-ONLY.
@@ -42,21 +53,8 @@ export const consentRecords = pgTable(
       .notNull()
       .references(() => studentProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
 
-    /**
-     * Data processing purpose — each requires separate, specific consent (DPDP Section 6):
-     * - `academic_data_processing`: grades, attendance, enrollment (Fourth Schedule exempt)
-     * - `photo_video_marketing`: website, social media, brochures (requires explicit consent)
-     * - `whatsapp_communication`: WhatsApp messages to parent
-     * - `sms_communication`: SMS alerts to parent
-     * - `aadhaar_collection`: collecting and storing Aadhaar number (sensitive data)
-     * - `biometric_collection`: fingerprint/face recognition (highest sensitivity)
-     * - `third_party_edtech`: sharing data with EdTech tools (cross-entity sharing)
-     * - `board_exam_registration`: sharing with CBSE/BSEH/RBSE (regulatory compliance)
-     * - `transport_tracking`: GPS tracking during school commute (child safety)
-     * - `health_data_processing`: medical records and health data
-     * - `cctv_monitoring`: campus CCTV surveillance
-     */
-    purpose: varchar('purpose', { length: 50 }).notNull(),
+    /** What the consent covers: one of `CONSENT_PURPOSE_VALUES` (DPDP Section 6). */
+    purpose: varchar('purpose', { length: 50 }).$type<ConsentPurpose>().notNull(),
 
     /** true = consent granted, false = consent withdrawn */
     isGranted: boolean('is_granted').notNull(),
@@ -65,15 +63,10 @@ export const consentRecords = pgTable(
     /** Timestamp when consent was withdrawn (NULL for grant rows) */
     withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
 
-    /**
-     * How the guardian's identity was verified for this consent action:
-     * - `digilocker_token`: guardian authenticated via DigiLocker
-     * - `aadhaar_otp`: verified via UIDAI Aadhaar OTP
-     * - `in_person_id_check`: school admin verified physical ID (Aadhaar/PAN/Voter ID)
-     * - `signed_form_uploaded`: scanned physical consent form uploaded
-     * - `school_erp_verified_account`: guardian has verified phone via OTP in the system
-     */
-    verificationMethod: varchar('verification_method', { length: 30 }),
+    /** How the guardian's identity was checked: one of `CONSENT_VERIFICATION_METHOD_VALUES`. */
+    verificationMethod: varchar('verification_method', {
+      length: 30,
+    }).$type<ConsentVerificationMethod>(),
     /** DigiLocker token ID, Aadhaar OTP transaction ID, etc. */
     verificationReference: varchar('verification_reference', { length: 100 }),
     /** IP address of the device used for consent action */
@@ -93,21 +86,10 @@ export const consentRecords = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
 
-    check(
-      'chk_consent_purpose',
-      sql`${table.purpose} IN (
-        'academic_data_processing', 'photo_video_marketing', 'whatsapp_communication',
-        'sms_communication', 'aadhaar_collection', 'biometric_collection',
-        'third_party_edtech', 'board_exam_registration', 'transport_tracking',
-        'health_data_processing', 'cctv_monitoring'
-      )`,
-    ),
+    check('chk_consent_purpose', sql`${table.purpose} IN (${PURPOSES})`),
     check(
       'chk_verification_method',
-      sql`${table.verificationMethod} IS NULL OR ${table.verificationMethod} IN (
-        'digilocker_token', 'aadhaar_otp', 'in_person_id_check',
-        'signed_form_uploaded', 'school_erp_verified_account'
-      )`,
+      sql`${table.verificationMethod} IS NULL OR ${table.verificationMethod} IN (${VERIFICATION_METHODS})`,
     ),
 
     index('idx_consent_guardian').on(table.guardianProfileId, table.purpose),

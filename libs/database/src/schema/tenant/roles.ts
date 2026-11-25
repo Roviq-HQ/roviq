@@ -53,6 +53,7 @@ export const roles = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
     // ELSE FALSE: a CASE with no match yields NULL, which a CHECK accepts
+    // auth scope: lowercase by exception (ROV-227)
     check(
       'chk_role_scope',
       sql`CASE ${table.scope}

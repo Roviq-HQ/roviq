@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  ACTIVITY_EVENT_TYPES,
   BusinessException,
   ErrorCode,
   ResellerStatus,
@@ -42,9 +43,6 @@ import type {
   ResellerUnsuspendResult,
   ResellerUpdateResult,
 } from './types';
-
-/** Activity events that count as the user being active — same set as the admin user list. */
-const ACTIVITY_EVENT_TYPES = ['login_success', 'token_refresh', 'institute_switch'];
 
 function buildListConditions(query: AdminResellerListQuery): SQL[] {
   const { search, status, tier, isSystem, after } = query;

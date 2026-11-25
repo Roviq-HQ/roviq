@@ -186,9 +186,15 @@ describe('refresh tokens', () => {
         'UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1',
         [id],
       );
+      await expectRefused(
+        client,
+        /chk_refresh_token_revoked_reason/,
+        `UPDATE refresh_tokens SET revoked_at = now(), revoked_reason = 'rotation' WHERE id = $1`,
+        [id],
+      );
 
       await client.query(
-        `UPDATE refresh_tokens SET revoked_at = now(), revoked_reason = 'user_initiated' WHERE id = $1`,
+        `UPDATE refresh_tokens SET revoked_at = now(), revoked_reason = 'USER_INITIATED' WHERE id = $1`,
         [id],
       );
       await expectRefused(
@@ -200,7 +206,7 @@ describe('refresh tokens', () => {
       await expectRefused(
         client,
         /stays revoked/,
-        `UPDATE refresh_tokens SET revoked_reason = 'rotation' WHERE id = $1`,
+        `UPDATE refresh_tokens SET revoked_reason = 'ROTATION' WHERE id = $1`,
         [id],
       );
     });
@@ -256,7 +262,7 @@ describe('reseller suspension', () => {
         'SELECT id, revoked_reason FROM refresh_tokens WHERE id = ANY($1)',
         [[tokenId, otherTokenId]],
       );
-      expect(tokens.rows.find((t) => t.id === tokenId)?.revoked_reason).toBe('admin_revoked');
+      expect(tokens.rows.find((t) => t.id === tokenId)?.revoked_reason).toBe('ADMIN_REVOKED');
       expect(tokens.rows.find((t) => t.id === otherTokenId)?.revoked_reason).toBeNull();
 
       const sessions = await client.query<{ id: string; ended_reason: string | null }>(
@@ -361,7 +367,7 @@ describe('reseller member deactivation (ROV-185)', () => {
         [adminToken, memberToken],
         [adminSession, memberSession],
       );
-      expect(after.token(memberToken)).toBe('admin_revoked');
+      expect(after.token(memberToken)).toBe('ADMIN_REVOKED');
       expect(after.session(memberSession)).toBe('revoked');
       expect(after.token(adminToken)).toBeNull();
       expect(after.session(adminSession)).toBeNull();
@@ -381,7 +387,7 @@ describe('reseller member deactivation (ROV-185)', () => {
       );
 
       const after = await readBack(client, [memberToken], [memberSession]);
-      expect(after.token(memberToken)).toBe('admin_revoked');
+      expect(after.token(memberToken)).toBe('ADMIN_REVOKED');
       expect(after.session(memberSession)).toBe('revoked');
     });
   });
@@ -576,7 +582,7 @@ describe('password change', () => {
         [id],
       );
       expect(token.rows[0].revoked_at).toBeInstanceOf(Date);
-      expect(token.rows[0].revoked_reason).toBe('password_change');
+      expect(token.rows[0].revoked_reason).toBe('PASSWORD_CHANGE');
     });
   });
 

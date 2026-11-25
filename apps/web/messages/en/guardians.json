@@ -165,17 +165,17 @@
     "empty": "No consent records yet",
     "todoNotice": "Per-child consent matrix is shown on the consent dashboard",
     "purposes": {
-      "academic_data_processing": "Academic data",
-      "photo_video_marketing": "Photo/video",
-      "whatsapp_communication": "WhatsApp",
-      "sms_communication": "SMS",
-      "aadhaar_collection": "Aadhaar",
-      "biometric_collection": "Biometric",
-      "third_party_edtech": "EdTech",
-      "board_exam_registration": "Board exam",
-      "transport_tracking": "Transport",
-      "health_data_processing": "Health",
-      "cctv_monitoring": "CCTV"
+      "ACADEMIC_DATA_PROCESSING": "Academic data",
+      "PHOTO_VIDEO_MARKETING": "Photo/video",
+      "WHATSAPP_COMMUNICATION": "WhatsApp",
+      "SMS_COMMUNICATION": "SMS",
+      "AADHAAR_COLLECTION": "Aadhaar",
+      "BIOMETRIC_COLLECTION": "Biometric",
+      "THIRD_PARTY_EDTECH": "EdTech",
+      "BOARD_EXAM_REGISTRATION": "Board exam",
+      "TRANSPORT_TRACKING": "Transport",
+      "HEALTH_DATA_PROCESSING": "Health",
+      "CCTV_MONITORING": "CCTV"
     }
   },
   "educationLevels": {

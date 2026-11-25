@@ -115,7 +115,7 @@ describe('LoginLockoutService', () => {
       // Allow the fire-and-forget emit promise to settle.
       await Promise.resolve();
       expect(authEvents.emit).toHaveBeenCalledWith({
-        type: 'account_locked',
+        type: 'ACCOUNT_LOCKED',
         portal: 'platform',
         failureReason: 'TOO_MANY_ATTEMPTS',
         ip: '10.0.0.1',
@@ -195,7 +195,7 @@ describe('LoginLockoutService', () => {
       await Promise.resolve();
       expect(authEvents.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'account_locked',
+          type: 'ACCOUNT_LOCKED',
           metadata: expect.objectContaining({ attempts: 3 }),
         }),
       );
