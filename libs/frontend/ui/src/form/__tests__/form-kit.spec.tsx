@@ -492,4 +492,58 @@ describe('SubmitButton', () => {
     await waitFor(() => expect(btn).not.toBeDisabled());
     expect(btn).toHaveTextContent('Save');
   });
+
+  it('stays enabled while invalid; a submit shows every error, focuses the first and sends nothing', async () => {
+    const onSubmit = vi.fn();
+    const schema = z.object({
+      name: z.string().min(1, 'Enter a name.'),
+      email: z.string().email('Enter an email address.'),
+    });
+    function InvalidForm() {
+      const form = useAppForm({
+        defaultValues: { name: '', email: '' },
+        validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
+        onSubmit,
+      });
+      return (
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+        >
+          <form.AppField name="name">
+            {(field) => <field.TextField label="Name" testId="name" />}
+          </form.AppField>
+          <form.AppField name="email">
+            {(field) => <field.TextField label="Email" testId="email" />}
+          </form.AppField>
+          <form.AppForm>
+            <form.SubmitButton testId="submit-btn">Save</form.SubmitButton>
+          </form.AppForm>
+        </form>
+      );
+    }
+
+    render(<InvalidForm />);
+    // Untouched fields show nothing yet.
+    expect(screen.queryByText('Enter a name.')).not.toBeInTheDocument();
+    const btn = screen.getByTestId('submit-btn');
+    expect(btn).toBeEnabled();
+
+    await userEvent.click(btn);
+
+    expect(await screen.findByText('Enter a name.')).toBeInTheDocument();
+    expect(screen.getByText('Enter an email address.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveFocus());
+    expect(btn).toBeEnabled();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // Fixing the first field moves the next submit's focus to the one still wrong.
+    await userEvent.type(screen.getByTestId('name'), 'Asha');
+    await userEvent.click(btn);
+    await waitFor(() => expect(screen.getByTestId('email')).toHaveFocus());
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

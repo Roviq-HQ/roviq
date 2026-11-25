@@ -156,7 +156,7 @@ test.describe('Students — create page', () => {
     });
   });
 
-  test('submit button stays disabled while required UUID fields are missing (kit canSubmit gate)', async ({
+  test('a submit with the required standard and section missing is refused at the first', async ({
     page,
   }) => {
     const firstName = `Preserve ${Date.now()}`;
@@ -168,13 +168,14 @@ test.describe('Students — create page', () => {
     await page.getByTestId('students-new-gender-select').click();
     await page.getByRole('option', { name: 'Male', exact: true }).click();
 
-    // TanStack Form's `state.canSubmit` is false while required UUID fields
-    // (standardId + sectionId) are empty, so the kit's SubmitButton renders
-    // disabled until those are filled. This replaces the old behaviour of
-    // "click submit to surface errors" — users see each field's inline Zod
-    // error the moment they touch it, no submit-click needed.
+    // Save stays enabled while standard and section are empty; pressing it marks the
+    // first missing field and moves focus to it.
     const submitBtn = page.getByTestId('students-new-submit-btn');
-    await expect(submitBtn).toBeDisabled();
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
+    const firstInvalid = page.locator('form [aria-invalid="true"]').first();
+    await expect(firstInvalid).toBeVisible();
+    await expect(firstInvalid).toBeFocused();
 
     // URL stays on the form and filled values persist (no premature reset).
     await expect(page).toHaveURL(/\/people\/students\/new/);

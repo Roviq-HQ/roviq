@@ -248,7 +248,18 @@ describe('NotificationsPanel', () => {
       await user.type(input, typed);
 
       expect(await screen.findByText('Enter a whole number from 1 to 1000.')).toBeInTheDocument();
-      expect(screen.getByTestId(ids.senderRateSave)).toBeDisabled();
+      const save = screen.getByTestId(ids.senderRateSave);
+      expect(save).toBeEnabled();
+      toast.success.mockClear();
+      toast.error.mockClear();
+
+      await user.click(save);
+
+      await waitFor(() => expect(input).toHaveFocus());
+      expect(screen.getByText('Enter a whole number from 1 to 1000.')).toBeInTheDocument();
+      expect(screen.getByTestId(ids.senderRateDialog)).toBeInTheDocument();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
     });
 
     it.each([

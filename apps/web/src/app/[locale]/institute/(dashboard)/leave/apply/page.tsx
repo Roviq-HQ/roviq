@@ -180,6 +180,7 @@ export default function ApplyLeavePage() {
                         </FieldLabel>
                         <ApplicantPicker
                           id="leave-apply-user-picker"
+                          invalid={field.state.meta.isTouched && field.state.meta.errors.length > 0}
                           value={field.state.value || null}
                           onChange={(v) => field.handleChange(v ?? '')}
                           onlyApplicable={applicantMode === 'children'}
@@ -193,20 +194,14 @@ export default function ApplyLeavePage() {
                         {applicantMode === 'children' && !field.state.value ? (
                           <PreselectOnlyChild onPick={(v) => field.handleChange(v)} />
                         ) : null}
-                        {/* The picker cannot be "touched" without choosing someone, so the message
-                            follows the form: otherwise the disabled Submit goes unexplained. */}
-                        <form.Subscribe selector={(state) => state.isTouched}>
-                          {(formTouched) =>
-                            (field.state.meta.isTouched || formTouched) &&
-                            field.state.meta.errors.length > 0 ? (
-                              <FieldError
-                                errors={collectMessages(field.state.meta.errors).map((m) => ({
-                                  message: m,
-                                }))}
-                              />
-                            ) : null
-                          }
-                        </form.Subscribe>
+                        {/* The picker is touched only by choosing someone or by a submit attempt. */}
+                        {field.state.meta.isTouched && field.state.meta.errors.length > 0 ? (
+                          <FieldError
+                            errors={collectMessages(field.state.meta.errors).map((m) => ({
+                              message: m,
+                            }))}
+                          />
+                        ) : null}
                       </Field>
                     )
                   }

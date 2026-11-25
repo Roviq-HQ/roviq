@@ -32,7 +32,7 @@ export const { fieldContext, formContext, useFieldContext, useFormContext } =
  * cannot read sibling field state directly. The kit deliberately does not
  * abstract this; it is already idiomatic TanStack Form.
  */
-export const { useAppForm, withForm } = createFormHook({
+const { useAppForm: useBaseAppForm, withForm } = createFormHook({
   fieldContext,
   formContext,
   fieldComponents: {
@@ -51,3 +51,39 @@ export const { useAppForm, withForm } = createFormHook({
     SubmitButton,
   },
 });
+
+/**
+ * After a refused submit, moves focus to the first field showing an error, in page order.
+ * Runs on the next frame: the errors render only once the submit has marked every field touched.
+ */
+function focusFirstInvalidField(fieldNames: string[]): void {
+  if (typeof window === 'undefined') return;
+  const returnFocus = document.activeElement;
+  window.requestAnimationFrame(() => {
+    const fieldElement = fieldNames
+      .map((name) => document.getElementById(name))
+      .find((el): el is HTMLElement => el !== null);
+    const root =
+      fieldElement?.closest('form') ??
+      (returnFocus instanceof HTMLElement ? returnFocus.closest('form') : null);
+    const target = root?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    target?.focus();
+  });
+}
+
+export const useAppForm: typeof useBaseAppForm = (options) =>
+  useBaseAppForm({
+    ...options,
+    onSubmitInvalid: (props) => {
+      options.onSubmitInvalid?.(props);
+      const fieldMeta = props.formApi.state.fieldMeta as Record<
+        string,
+        { errors?: ReadonlyArray<unknown> } | undefined
+      >;
+      focusFirstInvalidField(
+        Object.keys(fieldMeta).filter((name) => (fieldMeta[name]?.errors?.length ?? 0) > 0),
+      );
+    },
+  });
+
+export { withForm };

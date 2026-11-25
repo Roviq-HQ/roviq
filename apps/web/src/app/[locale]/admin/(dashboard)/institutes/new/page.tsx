@@ -640,7 +640,7 @@ export default function CreateInstitutePage() {
                             // dontValidate is required alongside dontUpdateMeta because
                             // TanStack Form's validateField marks the field touched
                             // unconditionally before it runs, so skipping meta updates alone
-                            // still flips canSubmit to false on a pristine form.
+                            // would still show errors on a pristine form.
                             form.setFieldValue('resellerId', id, {
                               dontUpdateMeta: true,
                               dontValidate: true,

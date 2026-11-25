@@ -93,7 +93,15 @@ describe('ResellerBrandingPage', () => {
     expect(
       await screen.findByText('Enter a six-digit hex colour, such as #1677FF.'),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled();
+    vi.mocked(toast.error).mockClear();
+    const save = screen.getByTestId('reseller-settings-branding-save-btn');
+    expect(save).toBeEnabled();
+    await user.click(save);
+
+    await waitFor(() => expect(secondary).toHaveFocus());
+    expect(screen.getByText('Enter a six-digit hex colour, such as #1677FF.')).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('names the forbidden construct in a stylesheet and keeps it out of the preview', async () => {
@@ -113,7 +121,13 @@ describe('ResellerBrandingPage', () => {
     expect(
       screen.getByTestId('reseller-settings-branding-preview').getAttribute('srcdoc'),
     ).not.toContain('evil.example');
-    expect(screen.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled();
+    vi.mocked(toast.error).mockClear();
+    await user.click(screen.getByTestId('reseller-settings-branding-save-btn'));
+
+    await waitFor(() => expect(css).toHaveFocus());
+    expect(screen.getByTestId('reseller-settings-custom-css-error')).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('saves the edited values under the loaded version, sending null for a cleared colour', async () => {

@@ -18,7 +18,8 @@ export interface SubmitButtonProps extends VariantProps<typeof buttonVariants> {
 }
 
 /**
- * Submit button bound to the form's `isSubmitting` and `canSubmit` state.
+ * Submit button bound to the form's `isSubmitting` state. It stays enabled while the form is
+ * invalid: pressing it shows every field's error and focuses the first one.
  * Subscribes via `form.Subscribe` so the surrounding form does not re-render
  * on every keystroke.
  *
@@ -35,18 +36,13 @@ export function SubmitButton({
 }: SubmitButtonProps) {
   const form = useFormContext();
   return (
-    <form.Subscribe
-      selector={(state) => ({
-        isSubmitting: state.isSubmitting,
-        canSubmit: state.canSubmit,
-      })}
-    >
-      {({ isSubmitting, canSubmit }) => (
+    <form.Subscribe selector={(state) => state.isSubmitting}>
+      {(isSubmitting) => (
         <Button
           type="submit"
           variant={variant}
           size={size}
-          disabled={disabled || isSubmitting || !canSubmit}
+          disabled={disabled || isSubmitting}
           data-testid={testId}
           className={className}
         >

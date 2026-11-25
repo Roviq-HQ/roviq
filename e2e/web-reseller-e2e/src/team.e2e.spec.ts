@@ -47,7 +47,12 @@ test.describe('ROV-185 reseller — team', () => {
     await expect(page.getByTestId(resellerTeam.inviteDialog)).toContainText(
       'Invalid email address',
     );
-    await expect(page.getByTestId(resellerTeam.inviteSubmitBtn)).toBeDisabled();
+    // Invite stays enabled; pressing it keeps the dialog open and moves focus to the email.
+    await page.getByTestId(resellerTeam.inviteSubmitBtn).click();
+    await expect(page.getByTestId(resellerTeam.inviteEmailInput)).toBeFocused();
+    await expect(page.getByTestId(resellerTeam.inviteDialog)).toContainText(
+      'Invalid email address',
+    );
   });
 
   test('invite, change role, deactivate, filter and reactivate a member', async ({ page }) => {

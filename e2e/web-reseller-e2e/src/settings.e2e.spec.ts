@@ -181,7 +181,11 @@ test.describe('ROV-186 reseller — settings', () => {
     await expect(page.getByTestId('reseller-settings-custom-css-error')).toContainText(
       'Remove "url(".',
     );
-    await expect(page.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled();
+    // Save stays enabled; pressing it sends nothing and moves focus back to the stylesheet.
+    await page.getByTestId('reseller-settings-branding-save-btn').click();
+    await expect(css).toBeFocused();
+    await expect(page.getByTestId('reseller-settings-custom-css-error')).toBeVisible();
+    await expect(page.getByText(SAVED)).toHaveCount(0);
 
     await css.fill('.brand-header { letter-spacing: 6px; }');
     await expect(

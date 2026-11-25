@@ -231,7 +231,12 @@ describe('ApplyLeavePage', () => {
         'Leaves longer than 2 days require at least one supporting document.',
       );
     });
-    expect(screen.getByTestId('leave-apply-submit-btn')).toBeDisabled();
+    const submit = screen.getByTestId('leave-apply-submit-btn');
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+    expect(screen.getByTestId('file-upload-leave-apply')).toHaveTextContent(
+      'Leaves longer than 2 days require at least one supporting document.',
+    );
     expect(applyMock).not.toHaveBeenCalled();
   });
 
@@ -459,7 +464,10 @@ describe('ApplyLeavePage', () => {
       await user.tab();
 
       expect(await screen.findByText('Enter a reason.')).toBeInTheDocument();
-      expect(screen.getByTestId('leave-apply-submit-btn')).toBeDisabled();
+      const submit = screen.getByTestId('leave-apply-submit-btn');
+      expect(submit).toBeEnabled();
+      await user.click(submit);
+      await waitFor(() => expect(screen.getByTestId('leave-apply-reason')).toHaveFocus());
       expect(applyMock).not.toHaveBeenCalled();
     });
 
@@ -477,9 +485,13 @@ describe('ApplyLeavePage', () => {
       });
 
       await fillValidLeave(user);
+      // Not chosen yet, so not touched: no message before a submit attempt.
+      expect(screen.queryByText('Choose who the leave is for.')).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId('leave-apply-submit-btn'));
 
       expect(await screen.findByText('Choose who the leave is for.')).toBeInTheDocument();
-      expect(screen.getByTestId('leave-apply-submit-btn')).toBeDisabled();
+      await waitFor(() => expect(screen.getByTestId('leave-apply-user-picker')).toHaveFocus());
       expect(applyMock).not.toHaveBeenCalled();
     });
   });

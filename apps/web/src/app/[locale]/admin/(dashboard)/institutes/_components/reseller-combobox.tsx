@@ -52,10 +52,10 @@ export interface ResellerComboboxProps {
    * Programmatic default setter used by the auto-default effect. Forms back
    * this with
    * `form.setFieldValue(name, id, { dontUpdateMeta: true, dontValidate: true })`
-   * so the pre-fill does not mark the field touched — `canSubmit` stays true on
-   * a pristine form. BOTH flags are mandatory: TanStack Form's `validateField`
-   * marks the field touched unconditionally before running, so `dontUpdateMeta`
-   * alone still flips the form to a touched state. Falls back to `onChange`
+   * so the pre-fill does not mark the field touched, which would show the form's
+   * errors before anyone acts. BOTH flags are mandatory: TanStack Form's
+   * `validateField` marks the field touched unconditionally before running, so
+   * `dontUpdateMeta` alone still flips the form to a touched state. Falls back to `onChange`
    * when omitted (non-form callers, e.g. filters, where touched-state is
    * irrelevant).
    */
@@ -94,7 +94,7 @@ export function ResellerCombobox({
 
   // Default to Roviq Direct on first load if no value set. The setter
   // is the form-provided `onDefault` when present (writes without marking
-  // the field touched, so a pristine form stays `canSubmit=true`); else
+  // the field touched, so a pristine form shows no errors); else
   // `onChange` for non-form callers (filters, etc.) where touched-state is
   // irrelevant.
   React.useEffect(() => {
