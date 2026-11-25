@@ -258,6 +258,7 @@ describe('CertificateService (unit)', () => {
         name: 'Bonafide',
         templateContent: null,
         approvalChain: [],
+        isActive: true,
       });
       vi.mocked(certificates.findStudent).mockResolvedValue({
         admissionNumber: 'ADM-7',
