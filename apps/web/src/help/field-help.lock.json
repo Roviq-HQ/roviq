@@ -40,11 +40,177 @@
       "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d"
     }
   },
+  "admission.convert.academicYear": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/admission/admission.service.ts#AdmissionService.convertEnquiryToApplication": "de582f94e5b9564e"
+    }
+  },
+  "admission.enquiry.followUpDate": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/admission/admission-read.repository.ts#AdmissionReadRepository.listEnquiries": "3e5bce015de8e8a5",
+      "apps/web/src/app/[locale]/institute/(dashboard)/admission/enquiries/page.tsx": "91ec52343bd26f51"
+    }
+  },
+  "admission.enquiry.source": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/admission/admission-read.repository.ts#AdmissionReadRepository.statistics": "2df724dec10bcd44",
+      "libs/shared/common-types/src/lib/enums/admission.ts#ENQUIRY_SOURCE_VALUES": "7e885313268486ed"
+    }
+  },
+  "certificates.other.purpose": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#DEFAULT_CERTIFICATE_BODY": "ffcb189bbff27afb",
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate": "b454bc5aa519d948"
+    }
+  },
+  "certificates.other.template": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.getCertificateTemplateFields": "c5d678f40776bdb1",
+      "libs/database/src/schema/admission/certificate-templates.ts#certificateTemplates": "b4567a4fa5a7b696"
+    }
+  },
+  "certificates.tc.duplicateReason": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestDuplicateTC": "958119c6a9186332",
+      "apps/api-gateway/src/institute/certificate/repositories/tc.drizzle-repository.ts#TcDrizzleRepository.createDuplicateRequest": "2997b1e4b8f7b6cd",
+      "apps/api-gateway/src/pdf/templates/tc.template.ts": "97ccce15844364f0"
+    }
+  },
+  "certificates.tc.rejectReason": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.rejectTC": "8e9b6ba7ef56b347",
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC": "b3c5aff810240284"
+    }
+  },
+  "certificates.tc.requestAcademicYear": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#TC_FIELDS": "4a93f2c1934ca571",
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC": "b3c5aff810240284",
+      "apps/api-gateway/src/institute/certificate/exports/tc-register.export.ts": "efc64565ea30a055"
+    }
+  },
+  "certificates.tc.requestReason": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#TC_FIELDS": "4a93f2c1934ca571",
+      "apps/api-gateway/src/institute/certificate/exports/tc-register.export.ts#buildTcRegister": "e707a5e160a0ad05"
+    }
+  },
   "displaySettings.sampleAdmissionNumber": {
     "reviewedReason": "Sample topic checked against admitStudent and nextAdmissionNumber: a blank admission number takes the next in the series",
     "targets": {
       "apps/api-gateway/src/institute/student/admission-number.sequence.ts#nextAdmissionNumber": "cfc6226e1dea1d9d",
       "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "c6e093d7e143fac5"
+    }
+  },
+  "groups.new.memberTypes": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput": "31a986e62a3a5a46",
+      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "43636c6bebadf043"
+    }
+  },
+  "groups.new.membershipType": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput": "31a986e62a3a5a46",
+      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.resolveMembers": "3696fcd2a6247735"
+    }
+  },
+  "groups.new.type": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput": "31a986e62a3a5a46",
+      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.resolveMembers": "3696fcd2a6247735",
+      "apps/web/src/app/[locale]/institute/(dashboard)/groups/page.tsx#GROUP_TYPE_ICON": "ada2a24cbffbb484"
+    }
+  },
+  "guardians.new.educationLevel": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/guardian/guardian-read.repository.ts": "2767003b5bccc811",
+      "libs/shared/common-types/src/lib/enums/user-profile.ts#GUARDIAN_EDUCATION_LEVEL_VALUES": "bb2b7af5a999fd28"
+    }
+  },
+  "instituteSettings.address.stateFiltered": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/web/src/app/[locale]/institute/(dashboard)/settings/institute/components/address-form.tsx#AddressForm": "3675ea414dc994a8"
+    }
+  },
+  "instituteSettings.branding.primaryColor": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/web/src/app/[locale]/institute/(dashboard)/tenant-theme-provider.tsx#applyTenantTheme": "0f051a5237dbdd80"
+    }
+  },
+  "instituteSettings.branding.theme": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "25eeac3f0b1c08b1",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/branding-display.tsx": "b95107c9e72b9df1"
+    }
+  },
+  "instituteSettings.config.attendanceType": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/attendance/attendance.service.ts": "a7facc1ee717268b",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/config-display.tsx": "0d2100322767a143"
+    }
+  },
+  "instituteSettings.config.exemptionAllowed": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity": "dbb5877bc751e14e"
+    }
+  },
+  "instituteSettings.config.gradingSystem": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "25eeac3f0b1c08b1"
+    }
+  },
+  "instituteSettings.config.hardMax": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.previewRollover": "f39ab29dea991fca",
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity": "dbb5877bc751e14e"
+    }
+  },
+  "instituteSettings.config.optimalStrength": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll": "1efb2382ce0ea70b"
+    }
+  },
+  "instituteSettings.config.shifts": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "25eeac3f0b1c08b1",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/config-display.tsx": "0d2100322767a143"
+    }
+  },
+  "instituteSettings.info.affiliations": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts": "8217b416122df17d",
+      "apps/api-gateway/src/institute/certificate/repositories/tc.drizzle-repository.ts#TcDrizzleRepository.findLetterhead": "f870506c3682ffd7",
+      "libs/shared/common-types/src/lib/compliance/export-eligibility.ts#eligibleComplianceReportTypes": "cc7d735fbadbdf21"
+    }
+  },
+  "instituteSettings.info.identifiers": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts": "d3fb24649fabde8c",
+      "libs/shared/common-types/src/lib/compliance/export-eligibility.ts#eligibleComplianceReportTypes": "cc7d735fbadbdf21"
     }
   },
   "staff.new.department": {
@@ -97,6 +263,29 @@
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.socialCategory": "dedf1ebf4ff4ed89",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#SOCIAL_CATEGORY_VALUES": "bbeddad581aafbe2"
+    }
+  },
+  "students.new.academicYear": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/students/new/page.tsx#StudentForm": "10dcffcc87ead517"
+    }
+  },
+  "students.new.admissionType": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/awr.export.ts": "70fe5ba515c3e4ec",
+      "apps/api-gateway/src/institute/student/student.service.ts#StudentService.create": "c55917b38d373b40",
+      "libs/shared/common-types/src/lib/enums/user-profile.ts#ADMISSION_TYPE_VALUES": "9a09ce5f6d345b29"
+    }
+  },
+  "students.new.socialCategory": {
+    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#TC_FIELDS": "4a93f2c1934ca571",
+      "apps/api-gateway/src/institute/certificate/exports/awr.export.ts": "70fe5ba515c3e4ec",
+      "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts": "d3fb24649fabde8c",
+      "apps/api-gateway/src/institute/certificate/exports/udise-dcf.export.ts": "c20f0f38195205a1"
     }
   }
 }

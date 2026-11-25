@@ -1,3 +1,6 @@
+import type { HelpSources } from '@roviq/ui';
+import type { studentNewHelp } from './student-new.help';
+
 export const studentNewHelpSources = {
   socialCategory: [
     'apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#TC_FIELDS',
@@ -13,4 +16,4 @@ export const studentNewHelpSources = {
     'apps/api-gateway/src/institute/certificate/exports/awr.export.ts',
     'libs/shared/common-types/src/lib/enums/user-profile.ts#ADMISSION_TYPE_VALUES',
   ],
-} as const;
+} satisfies HelpSources<typeof studentNewHelp>;

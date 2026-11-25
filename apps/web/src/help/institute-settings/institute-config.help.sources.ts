@@ -1,3 +1,6 @@
+import type { HelpSources } from '@roviq/ui';
+import type { instituteConfigHelp } from './institute-config.help';
+
 export const instituteConfigHelpSources = {
   attendanceType: [
     'apps/api-gateway/src/institute/attendance/attendance.service.ts',
@@ -20,4 +23,4 @@ export const instituteConfigHelpSources = {
   exemptionAllowed: [
     'apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity',
   ],
-} as const;
+} satisfies HelpSources<typeof instituteConfigHelp>;

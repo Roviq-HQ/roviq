@@ -1,3 +1,6 @@
+import type { HelpSources } from '@roviq/ui';
+import type { tcHelp } from './tc.help';
+
 export const tcHelpSources = {
   requestAcademicYear: [
     'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC',
@@ -17,4 +20,4 @@ export const tcHelpSources = {
     'apps/api-gateway/src/institute/certificate/repositories/tc.drizzle-repository.ts#TcDrizzleRepository.createDuplicateRequest',
     'apps/api-gateway/src/pdf/templates/tc.template.ts',
   ],
-} as const;
+} satisfies HelpSources<typeof tcHelp>;

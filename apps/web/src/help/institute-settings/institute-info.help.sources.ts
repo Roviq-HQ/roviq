@@ -1,3 +1,6 @@
+import type { HelpSources } from '@roviq/ui';
+import type { instituteInfoHelp } from './institute-info.help';
+
 export const instituteInfoHelpSources = {
   identifiers: [
     'libs/shared/common-types/src/lib/compliance/export-eligibility.ts#eligibleComplianceReportTypes',
@@ -8,4 +11,4 @@ export const instituteInfoHelpSources = {
     'apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts',
     'apps/api-gateway/src/institute/certificate/repositories/tc.drizzle-repository.ts#TcDrizzleRepository.findLetterhead',
   ],
-} as const;
+} satisfies HelpSources<typeof instituteInfoHelp>;

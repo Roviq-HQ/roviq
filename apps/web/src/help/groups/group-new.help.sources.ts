@@ -1,3 +1,6 @@
+import type { HelpSources } from '@roviq/ui';
+import type { groupNewHelp } from './group-new.help';
+
 export const groupNewHelpSources = {
   type: [
     'apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput',
@@ -12,4 +15,4 @@ export const groupNewHelpSources = {
     'apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput',
     'apps/api-gateway/src/institute/group/group.service.ts#GroupService.create',
   ],
-} as const;
+} satisfies HelpSources<typeof groupNewHelp>;
