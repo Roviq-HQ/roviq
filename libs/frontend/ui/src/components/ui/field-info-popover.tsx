@@ -10,6 +10,13 @@ type FieldInfoPopoverProps = {
   align?: React.ComponentProps<typeof PopoverContent>['align'];
   iconClassName?: string;
   contentClassName?: string;
+  /** Translated accessible name of the trigger. */
+  triggerLabel?: string;
+  /** Controlled open state; omit to let the popover manage it. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Lets a caller return focus to the trigger after a sheet it opened closes. */
+  triggerRef?: React.Ref<HTMLButtonElement>;
   'data-testid'?: string;
 };
 
@@ -24,10 +31,9 @@ const HOVER_OPEN_DELAY_MS = 250;
 const HOVER_CLOSE_DELAY_MS = 300;
 
 /**
- * Contextual field-help affordance. Opens on hover (after a short intent
- * delay) OR click — click is important for touch/keyboard users and for
- * mouse users who want the popover to stay open while they read. Click
- * also bypasses the hover delay for power users. Outside-click closes.
+ * Contextual field-help affordance. Opens on hover after a short delay, or on
+ * click, tap or keyboard. Opened by click or keyboard it stays open until
+ * Escape or an outside click, so the reader can move the cursor away.
  */
 function FieldInfoPopover({
   title,
@@ -36,9 +42,23 @@ function FieldInfoPopover({
   align = 'start',
   iconClassName,
   contentClassName,
+  triggerLabel = 'More info',
+  open: controlledOpen,
+  onOpenChange,
+  triggerRef,
   'data-testid': testId,
 }: FieldInfoPopoverProps) {
-  const [open, setOpen] = React.useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const pinnedRef = React.useRef(false);
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (!next) pinnedRef.current = false;
+      setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [onOpenChange],
+  );
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelTimer = React.useCallback(() => {
@@ -51,26 +71,47 @@ function FieldInfoPopover({
   const scheduleOpen = React.useCallback(() => {
     cancelTimer();
     timerRef.current = setTimeout(() => setOpen(true), HOVER_OPEN_DELAY_MS);
-  }, [cancelTimer]);
+  }, [cancelTimer, setOpen]);
 
   const scheduleClose = React.useCallback(() => {
+    if (pinnedRef.current) return;
     cancelTimer();
     timerRef.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY_MS);
-  }, [cancelTimer]);
+  }, [cancelTimer, setOpen]);
 
   React.useEffect(() => cancelTimer, [cancelTimer]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        cancelTimer();
+        pinnedRef.current = next;
+        setOpen(next);
+      }}
+    >
       <PopoverTrigger
+        ref={triggerRef}
         type="button"
-        aria-label="More info"
+        aria-label={triggerLabel}
         data-testid={testId ?? 'field-info-trigger'}
         data-slot="field-info-trigger"
-        onMouseEnter={scheduleOpen}
+        onMouseEnter={() => {
+          if (!open) scheduleOpen();
+        }}
         onMouseLeave={scheduleClose}
+        onClick={(e) => {
+          // Hover already opened it: a click keeps it open instead of toggling it shut.
+          if (open && !pinnedRef.current) {
+            e.preventDefault();
+            cancelTimer();
+            pinnedRef.current = true;
+          }
+        }}
         className={cn(
-          'inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full',
+          'relative inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full',
+          // A 40px tap area around the 16px icon.
+          "after:absolute after:-inset-3 after:content-['']",
           'text-muted-foreground/70 transition-colors',
           'hover:text-foreground focus-visible:text-foreground',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',

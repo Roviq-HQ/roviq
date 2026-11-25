@@ -64,7 +64,7 @@ export class UpdateStaffInput {
   @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(50)
   department?: string;
 
   @Field(() => EmploymentType, { nullable: true })

@@ -1002,19 +1002,15 @@ export const testIds = {
     academicYearLabel: 'academic-year-label',
     // Create dialog
     createDialog: 'academic-years-create-dialog',
-    createLabelInfo: 'academic-years-create-label-info',
-    createTermStructureInfo: 'academic-years-create-term-structure-info',
     // Edit sheet
     editBtn: 'academic-years-edit-btn',
     editSheet: 'academic-years-edit-sheet',
     editLabelInput: 'academic-years-edit-label-input',
-    editLabelInfo: 'academic-years-edit-label-info',
     editLabelError: 'academic-years-edit-label-error',
     editStartDateInput: 'academic-years-edit-start-date-input',
     editStartDateError: 'academic-years-edit-start-date-error',
     editEndDateInput: 'academic-years-edit-end-date-input',
     editEndDateError: 'academic-years-edit-end-date-error',
-    editTermStructureInfo: 'academic-years-edit-term-structure-info',
     editAddTermBtn: 'academic-years-edit-add-term-btn',
     editSaveBtn: 'academic-years-edit-save-btn',
     editCancelBtn: 'academic-years-edit-cancel-btn',
@@ -1480,11 +1476,6 @@ export const testIds = {
     newTitle: 'staff-new-title',
     newBackBtn: 'staff-new-back-btn',
     newCancelBtn: 'staff-new-cancel-btn',
-    newDepartmentInfo: 'staff-new-department-info',
-    newDesignationInfo: 'staff-new-designation-info',
-    newEmployeeIdInfo: 'staff-new-employee-id-info',
-    newEmploymentTypeInfo: 'staff-new-employment-type-info',
-    newSocialCategoryInfo: 'staff-new-social-category-info',
   },
 
   // ── Institute: profile page ────────────────────────────────────────────

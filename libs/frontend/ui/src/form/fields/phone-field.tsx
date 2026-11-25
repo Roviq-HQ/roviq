@@ -4,6 +4,8 @@ import { Field, FieldDescription, FieldError } from '@roviq/ui/components/ui/fie
 import { Input } from '@roviq/ui/components/ui/input';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
 import { FieldLabelWithInfo } from '@roviq/ui/form/fields/field-label-with-info';
+import type { FieldHelpTopic } from '@roviq/ui/form/help/field-help';
+import { useFieldHelpIds } from '@roviq/ui/form/help/use-field-help-ids';
 import { useFieldContext } from '@roviq/ui/form/use-app-form';
 import type { ReactNode } from 'react';
 
@@ -15,6 +17,8 @@ export interface PhoneFieldProps {
    * `<FieldInfoPopover>` but any `ReactNode` is accepted.
    */
   info?: ReactNode;
+  /** Help topic from `apps/web/src/help`; replaces `info`. */
+  help?: FieldHelpTopic;
   placeholder?: string;
   testId?: string;
   disabled?: boolean;
@@ -31,6 +35,7 @@ export function PhoneField({
   label,
   description,
   info,
+  help,
   placeholder,
   testId,
   disabled,
@@ -40,9 +45,15 @@ export function PhoneField({
   const errors = fieldErrorMessages(field);
   const invalid = errors.length > 0;
   const value = typeof field.state.value === 'string' ? field.state.value : '';
+  const ids = useFieldHelpIds({
+    name: field.name,
+    help,
+    hasDescription: Boolean(description),
+    invalid,
+  });
   return (
     <Field data-invalid={invalid || undefined}>
-      <FieldLabelWithInfo htmlFor={field.name} info={info}>
+      <FieldLabelWithInfo htmlFor={field.name} info={info} help={help} hintId={ids.hintId}>
         {label}
       </FieldLabelWithInfo>
       <div className="flex items-center gap-2">
@@ -67,11 +78,12 @@ export function PhoneField({
           disabled={disabled}
           required={required}
           aria-invalid={invalid || undefined}
+          aria-describedby={ids.describedBy}
           data-testid={testId}
         />
       </div>
-      {description && <FieldDescription>{description}</FieldDescription>}
-      {invalid && <FieldError errors={errors} />}
+      {description && <FieldDescription id={ids.descriptionId}>{description}</FieldDescription>}
+      {invalid && <FieldError id={ids.errorId} errors={errors} />}
     </Field>
   );
 }

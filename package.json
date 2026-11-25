@@ -21,6 +21,7 @@
     "check:live-views": "pnpx tsx scripts/check-live-views.ts",
     "check:live-views-coverage": "pnpx tsx scripts/check-live-views-coverage.ts",
     "check:testids": "pnpx tsx scripts/check-testid-literals.ts",
+    "check:field-help": "pnpx tsx scripts/check-field-help.ts",
     "check:rls-coverage": "pnpx tsx scripts/check-rls-coverage.ts",
     "check:synthetic-context-usage": "pnpx tsx scripts/check-synthetic-context-usage.ts",
     "check:admin-context-reach": "pnpx tsx scripts/check-admin-context-reach.ts",

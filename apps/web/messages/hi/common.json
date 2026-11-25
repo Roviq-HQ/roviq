@@ -26,5 +26,15 @@
     "REGULAR": "नियमित",
     "EXTENSION_PENDING": "विस्तार लंबित",
     "REVOKED": "रद्द"
+  },
+  "fieldHelp": {
+    "moreAbout": "{label} के बारे में और जानें",
+    "example": "उदाहरण:",
+    "readMore": "और पढ़ें",
+    "loading": "लोड हो रहा है…",
+    "articleTitle": "सहायता",
+    "articleDescription": "इस फ़ील्ड के बारे में और जानकारी",
+    "articleFailed": "यह सहायता लोड नहीं हो सकी। अपना इंटरनेट कनेक्शन जाँचें और फिर से कोशिश करें।",
+    "retry": "फिर से कोशिश करें"
   }
 }

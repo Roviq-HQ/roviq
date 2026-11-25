@@ -4,6 +4,8 @@ import { Checkbox } from '@roviq/ui/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError } from '@roviq/ui/components/ui/field';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
 import { FieldLabelWithInfo } from '@roviq/ui/form/fields/field-label-with-info';
+import type { FieldHelpTopic } from '@roviq/ui/form/help/field-help';
+import { useFieldHelpIds } from '@roviq/ui/form/help/use-field-help-ids';
 import { useFieldContext } from '@roviq/ui/form/use-app-form';
 import type { ReactNode } from 'react';
 
@@ -15,15 +17,30 @@ export interface CheckboxFieldProps {
    * `<FieldInfoPopover>` but any `ReactNode` is accepted.
    */
   info?: ReactNode;
+  /** Help topic from `apps/web/src/help`; replaces `info`. */
+  help?: FieldHelpTopic;
   testId?: string;
   disabled?: boolean;
 }
 
-export function CheckboxField({ label, description, info, testId, disabled }: CheckboxFieldProps) {
+export function CheckboxField({
+  label,
+  description,
+  info,
+  help,
+  testId,
+  disabled,
+}: CheckboxFieldProps) {
   const field = useFieldContext<boolean | undefined>();
   const errors = fieldErrorMessages(field);
   const invalid = errors.length > 0;
   const checked = field.state.value === true;
+  const ids = useFieldHelpIds({
+    name: field.name,
+    help,
+    hasDescription: Boolean(description),
+    invalid,
+  });
   return (
     <Field orientation="horizontal" data-invalid={invalid || undefined}>
       <Checkbox
@@ -34,14 +51,15 @@ export function CheckboxField({ label, description, info, testId, disabled }: Ch
         onBlur={field.handleBlur}
         disabled={disabled}
         aria-invalid={invalid || undefined}
+        aria-describedby={ids.describedBy}
         data-testid={testId}
       />
       <FieldContent>
-        <FieldLabelWithInfo htmlFor={field.name} info={info}>
+        <FieldLabelWithInfo htmlFor={field.name} info={info} help={help} hintId={ids.hintId}>
           {label}
         </FieldLabelWithInfo>
-        {description && <FieldDescription>{description}</FieldDescription>}
-        {invalid && <FieldError errors={errors} />}
+        {description && <FieldDescription id={ids.descriptionId}>{description}</FieldDescription>}
+        {invalid && <FieldError id={ids.errorId} errors={errors} />}
       </FieldContent>
     </Field>
   );

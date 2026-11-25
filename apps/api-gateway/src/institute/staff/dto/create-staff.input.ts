@@ -69,7 +69,7 @@ export class CreateStaffInput {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(50)
   department?: string;
 
   @Field(() => String, { nullable: true, description: 'Date of joining (YYYY-MM-DD)' })

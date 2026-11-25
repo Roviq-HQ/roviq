@@ -5,6 +5,8 @@ import { Field, FieldDescription, FieldError } from '@roviq/ui/components/ui/fie
 import { Input } from '@roviq/ui/components/ui/input';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
 import { FieldLabelWithInfo } from '@roviq/ui/form/fields/field-label-with-info';
+import type { FieldHelpTopic } from '@roviq/ui/form/help/field-help';
+import { useFieldHelpIds } from '@roviq/ui/form/help/use-field-help-ids';
 import { useFieldContext } from '@roviq/ui/form/use-app-form';
 import type { ReactNode } from 'react';
 
@@ -16,6 +18,8 @@ export interface MoneyFieldProps {
    * `<FieldInfoPopover>` but any `ReactNode` is accepted.
    */
   info?: ReactNode;
+  /** Help topic from `apps/web/src/help`; replaces `info`. */
+  help?: FieldHelpTopic;
   placeholder?: string;
   /** Inclusive lower bound in rupees. Defaults to 0 (no negatives per [YPQTF]). */
   min?: number;
@@ -43,6 +47,7 @@ export function MoneyField({
   label,
   description,
   info,
+  help,
   placeholder,
   min = 0,
   max,
@@ -62,9 +67,15 @@ export function MoneyField({
     showFormattedPreview && typeof raw === 'number' && !Number.isNaN(raw) && raw >= 0
       ? formatter.currency(raw, currency)
       : null;
+  const ids = useFieldHelpIds({
+    name: field.name,
+    help,
+    hasDescription: Boolean(description || preview),
+    invalid,
+  });
   return (
     <Field data-invalid={invalid || undefined}>
-      <FieldLabelWithInfo htmlFor={field.name} info={info}>
+      <FieldLabelWithInfo htmlFor={field.name} info={info} help={help} hintId={ids.hintId}>
         {label}
       </FieldLabelWithInfo>
       <div className="flex items-center gap-2">
@@ -94,17 +105,18 @@ export function MoneyField({
           disabled={disabled}
           required={required}
           aria-invalid={invalid || undefined}
+          aria-describedby={ids.describedBy}
           data-testid={testId}
         />
       </div>
       {(description || preview) && (
-        <FieldDescription>
+        <FieldDescription id={ids.descriptionId}>
           {description}
           {description && preview ? ' · ' : null}
           {preview}
         </FieldDescription>
       )}
-      {invalid && <FieldError errors={errors} />}
+      {invalid && <FieldError id={ids.errorId} errors={errors} />}
     </Field>
   );
 }

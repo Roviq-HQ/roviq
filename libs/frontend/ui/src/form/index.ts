@@ -20,6 +20,26 @@ export { SwitchField, type SwitchFieldProps } from './fields/switch-field';
 export { TextField, type TextFieldProps } from './fields/text-field';
 export { TextareaField, type TextareaFieldProps } from './fields/textarea-field';
 export { SubmitButton, type SubmitButtonProps } from './form-components';
+export {
+  DEFAULT_FORM_HELP_MODE,
+  defineFieldHelp,
+  type FieldHelpTopic,
+  type FieldHelpTopicInput,
+  FORM_HELP_MODES,
+  type FormHelpMode,
+  HELP_LIMITS,
+  type HelpArticle,
+  type HelpArticleSection,
+  type HelpText,
+  helpOptions,
+  resolveHelpText,
+} from './help/field-help';
+export { FieldHelpButton, type FieldHelpButtonProps } from './help/field-help-button';
+export { FieldHint } from './help/field-hint';
+export { FormHelpModeProvider, useFormHelpMode } from './help/form-help-mode';
+export { HelpArticleBody, HelpArticleSheet } from './help/help-article';
+export { useFieldHelpIds } from './help/use-field-help-ids';
+export { useHelpText } from './help/use-help-text';
 export { setServerFieldError } from './server-field-error';
 export {
   fieldContext,

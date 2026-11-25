@@ -393,7 +393,6 @@ export default function NewGroupPage() {
                               <p>{t('new.basics.fieldHelp.memberTypesBody')}</p>
                             </FieldInfoPopover>
                           </FieldLabel>
-                          <FieldDescription>{t('new.basics.memberTypesHelp')}</FieldDescription>
                           <div className="flex flex-wrap gap-4 pt-1">
                             {MEMBER_TYPES.map((mt) => {
                               const checked = value.includes(mt);
@@ -413,6 +412,7 @@ export default function NewGroupPage() {
                               );
                             })}
                           </div>
+                          <FieldDescription>{t('new.basics.memberTypesHelp')}</FieldDescription>
                           {invalid && <FieldError errors={errors} />}
                         </Field>
                       );

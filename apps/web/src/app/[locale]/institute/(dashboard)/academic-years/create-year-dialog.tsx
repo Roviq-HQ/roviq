@@ -16,8 +16,10 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldInfoPopover,
-  FieldLabel,
+  FieldHelpButton,
+  type FieldHelpTopic,
+  FieldHint,
+  FieldLabelWithInfo,
   FieldLegend,
   FieldSet,
   Input,
@@ -26,7 +28,9 @@ import {
   PopoverTrigger,
   setServerFieldError,
   useAppForm,
+  useFieldHelpIds,
 } from '@roviq/ui';
+import { academicYearHelp } from '@web/help/academic-years/academic-year.help';
 import { parseISO } from 'date-fns';
 import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -209,22 +213,12 @@ export function CreateYearDialog() {
               {(field) => (
                 <field.TextField
                   label={t('label')}
-                  description={`${t('labelDescription')} ${t('labelFormatHint')}`}
+                  description={t('labelFormatHint')}
                   placeholder={t('labelPlaceholder')}
                   autoComplete="off"
                   maxLength={LABEL_MAX_LENGTH}
                   testId="academic-years-create-label-input"
-                  info={
-                    <FieldInfoPopover
-                      title={t('fieldHelp.labelTitle')}
-                      data-testid={instituteAcademicYears.createLabelInfo}
-                    >
-                      <p>{t('fieldHelp.labelBody')}</p>
-                      <p>
-                        <em>{t('fieldHelp.labelExample')}</em>
-                      </p>
-                    </FieldInfoPopover>
-                  }
+                  help={academicYearHelp.label}
                 />
               )}
             </form.AppField>
@@ -238,7 +232,8 @@ export function CreateYearDialog() {
                     onChange={(v) => field.handleChange(v)}
                     onBlur={field.handleBlur}
                     label={t('startDate')}
-                    description={`${t('startDateDescription')} ${t('dateFormatHint')}`}
+                    help={academicYearHelp.startDate}
+                    description={t('dateFormatHint')}
                     placeholder={t('dateFormatHint')}
                     formatLocalized={formatLocalized}
                     isTouched={field.state.meta.isTouched}
@@ -256,7 +251,8 @@ export function CreateYearDialog() {
                     onChange={(v) => field.handleChange(v)}
                     onBlur={field.handleBlur}
                     label={t('endDate')}
-                    description={`${t('endDateDescription')} ${t('dateFormatHint')}`}
+                    help={academicYearHelp.endDate}
+                    description={t('dateFormatHint')}
                     placeholder={t('dateFormatHint')}
                     formatLocalized={formatLocalized}
                     isTouched={field.state.meta.isTouched}
@@ -272,13 +268,10 @@ export function CreateYearDialog() {
             <div className="flex items-center justify-between gap-3">
               <FieldLegend variant="label" className="flex items-center gap-2">
                 {t('termStructure')}
-                <FieldInfoPopover
-                  title={t('fieldHelp.termStructureTitle')}
-                  data-testid={instituteAcademicYears.createTermStructureInfo}
-                >
-                  <p>{t('fieldHelp.termStructureBody')}</p>
-                  <p>{t('fieldHelp.termStructureCommonChoices')}</p>
-                </FieldInfoPopover>
+                <FieldHelpButton
+                  topic={academicYearHelp.termStructure}
+                  fieldLabel={t('termStructure')}
+                />
               </FieldLegend>
               <form.Field name="terms" mode="array">
                 {(field) => (
@@ -296,7 +289,7 @@ export function CreateYearDialog() {
                 )}
               </form.Field>
             </div>
-            <FieldDescription>{t('termStructureDescription')}</FieldDescription>
+            <FieldHint topic={academicYearHelp.termStructure} />
 
             <form.Field name="terms" mode="array">
               {(field) => {
@@ -377,6 +370,8 @@ interface DatePickerFieldProps {
   onChange: (value: string) => void;
   onBlur: () => void;
   label: string;
+  help?: FieldHelpTopic;
+  /** Instruction always shown after the control, e.g. the date format. */
   description?: string;
   placeholder: string;
   formatLocalized: (date: Date, pattern: string) => string;
@@ -391,6 +386,7 @@ function DatePickerField({
   onChange,
   onBlur,
   label,
+  help,
   description,
   placeholder,
   formatLocalized,
@@ -405,11 +401,18 @@ function DatePickerField({
   // that tests (and real users) expect to see.
   const visibleErrors = isTouched || errors.length > 0 ? errors : [];
   const invalid = visibleErrors.length > 0;
-  const descriptionId = `${fieldName}-description`;
+  const ids = useFieldHelpIds({
+    name: fieldName,
+    help,
+    hasDescription: Boolean(description),
+    invalid,
+  });
 
   return (
     <Field data-invalid={invalid || undefined}>
-      <FieldLabel htmlFor={fieldName}>{label}</FieldLabel>
+      <FieldLabelWithInfo htmlFor={fieldName} help={help} hintId={ids.hintId}>
+        {label}
+      </FieldLabelWithInfo>
       <Popover onOpenChange={(open) => !open && onBlur()}>
         <PopoverTrigger asChild>
           <Button
@@ -418,7 +421,7 @@ function DatePickerField({
             variant="outline"
             className="w-full justify-start text-start font-normal h-9"
             aria-invalid={invalid || undefined}
-            aria-describedby={descriptionId}
+            aria-describedby={ids.describedBy}
             data-invalid={invalid || undefined}
             data-testid={testId}
           >
@@ -442,8 +445,10 @@ function DatePickerField({
           />
         </PopoverContent>
       </Popover>
-      {description && <FieldDescription id={descriptionId}>{description}</FieldDescription>}
-      {invalid && <FieldError errors={visibleErrors.map((message) => ({ message }))} />}
+      {description && <FieldDescription id={ids.descriptionId}>{description}</FieldDescription>}
+      {invalid && (
+        <FieldError id={ids.errorId} errors={visibleErrors.map((message) => ({ message }))} />
+      )}
 
       {/* Hidden input mirrors the field value so screen readers can read the
           ISO date when the popover trigger only shows a localized display.

@@ -26,5 +26,15 @@
     "REGULAR": "Regular",
     "EXTENSION_PENDING": "Extension pending",
     "REVOKED": "Revoked"
+  },
+  "fieldHelp": {
+    "moreAbout": "More about {label}",
+    "example": "Example:",
+    "readMore": "Read more",
+    "loading": "Loading…",
+    "articleTitle": "Help",
+    "articleDescription": "More about this field",
+    "articleFailed": "This help could not be loaded. Check your connection and try again.",
+    "retry": "Try again"
   }
 }
