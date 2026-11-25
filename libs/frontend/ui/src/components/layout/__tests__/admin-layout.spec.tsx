@@ -224,6 +224,7 @@ describe('AdminLayout', () => {
       expect(within(palette).getByTestId('quick-action-display-settings')).toBeInTheDocument();
       expect(within(palette).getByTestId('quick-action-attendance')).toBeInTheDocument();
       expect(within(palette).queryByTestId('quick-action-add-student')).not.toBeInTheDocument();
+      expect(within(palette).getByRole('combobox', { name: 'placeholder' })).toBeInTheDocument();
     });
 
     it('shows the action when the role has its ability', async () => {
