@@ -64,6 +64,12 @@ const MOVE = `
   mutation Move($input: UpdateStudentSectionInput!) { updateStudentSection(input: $input) }`;
 const CHANGE_CLASS = `
   mutation ChangeClass($input: ChangeStudentClassInput!) { changeStudentClass(input: $input) }`;
+const TRANSITION = `
+  mutation Transition($id: ID!, $newStatus: AcademicStatus!) {
+    transitionStudentStatus(id: $id, newStatus: $newStatus) { id }
+  }`;
+const UPDATE_STUDENT = `
+  mutation Update($id: ID!, $input: UpdateStudentInput!) { updateStudent(id: $id, input: $input) { id } }`;
 const CREATE_STUDENT = `
   mutation CreateStudent($input: CreateStudentInput!) { createStudent(input: $input) { id } }`;
 
@@ -98,9 +104,10 @@ describe('section capacity warning at the optimal crossing (ROV-361)', () => {
     });
   }
 
-  /** An enrolled student, placed in the section when one is given. */
+  /** A student (enrolled unless said otherwise), placed in the section when one is given. */
   async function addStudent(
     sectionId?: string,
+    academicStatus: AcademicStatus = AcademicStatus.ENROLLED,
   ): Promise<{ profileId: string; academicId: string | null }> {
     return asAdmin(async (tx) => {
       const suffix = randomUUID().slice(0, 8);
@@ -137,7 +144,7 @@ describe('section capacity warning at the optimal crossing (ROV-361)', () => {
           admissionNumber: `CAP-${suffix}`,
           admissionDate: '2026-04-01',
           admissionType: AdmissionType.NEW,
-          academicStatus: AcademicStatus.ENROLLED,
+          academicStatus,
           socialCategory: SocialCategory.GENERAL,
           ...BY,
         })
@@ -336,6 +343,63 @@ describe('section capacity warning at the optimal crossing (ROV-361)', () => {
     expect(responses.map((r) => r.errors)).toEqual([undefined, undefined]);
     expect(await strengthOf(sectionId)).toBe(OPTIMAL);
     expectOneWarning(emit.mock.calls, sectionId);
+  });
+
+  it('should warn when reinstating a suspended student takes the section to its optimal strength', async () => {
+    const sectionId = await sectionWith(OPTIMAL - 1);
+    const suspended = await addStudent(sectionId, AcademicStatus.SUSPENDED);
+    expect(await strengthOf(sectionId)).toBe(OPTIMAL - 1);
+
+    const res = await gqlRequest<{ transitionStudentStatus: { id: string } }>(result.httpServer, {
+      query: TRANSITION,
+      variables: { id: suspended.profileId, newStatus: AcademicStatus.ENROLLED },
+      token,
+    });
+
+    expect(res.errors).toBeUndefined();
+    expect(await strengthOf(sectionId)).toBe(OPTIMAL);
+    expectOneWarning(emit.mock.calls, sectionId);
+  });
+
+  it('should warn when updateStudent re-enrols a student into a section at the crossing', async () => {
+    const sectionId = await sectionWith(OPTIMAL - 1);
+    const returning = await addStudent(sectionId, AcademicStatus.RE_ENROLLED);
+    const [profile] = await asAdmin((tx) =>
+      tx
+        .select({ version: studentProfiles.version })
+        .from(studentProfiles)
+        .where(eq(studentProfiles.id, returning.profileId)),
+    );
+
+    const res = await gqlRequest<{ updateStudent: { id: string } }>(result.httpServer, {
+      query: UPDATE_STUDENT,
+      variables: {
+        id: returning.profileId,
+        input: { academicStatus: AcademicStatus.ENROLLED, version: profile.version },
+      },
+      token,
+    });
+
+    expect(res.errors).toBeUndefined();
+    expect(await strengthOf(sectionId)).toBe(OPTIMAL);
+    expectOneWarning(emit.mock.calls, sectionId);
+  });
+
+  it('should not warn when a status change takes a student out of a full section', async () => {
+    const sectionId = await sectionWith(OPTIMAL);
+    const leaving = await addStudent(sectionId);
+
+    const res = await gqlRequest<{ transitionStudentStatus: { id: string } }>(result.httpServer, {
+      query: TRANSITION,
+      variables: { id: leaving.profileId, newStatus: AcademicStatus.SUSPENDED },
+      token,
+    });
+
+    expect(res.errors).toBeUndefined();
+    expect(await strengthOf(sectionId)).toBe(OPTIMAL);
+    expect(warnings(emit.mock.calls, EVENT_PATTERNS.SECTION.capacity_warning, sectionId)).toEqual(
+      [],
+    );
   });
 
   it('should warn when a class change takes the new section to its optimal strength', async () => {

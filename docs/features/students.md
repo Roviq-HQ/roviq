@@ -127,16 +127,21 @@ up into Class 1 like any other level. A section that still has students cannot b
 
 ## Section capacity warning
 
-Every path that places a student in a section can send it:
+Every path that places a student in a section, or makes a placed student count again, can send it:
 
 - `enrollStudent`, `updateStudentSection` and `changeStudentClass` (`StudentAcademicService`);
 - `createStudent` (`StudentService.create`);
+- a status change back to `ENROLLED` (`transitionStudentStatus`, or `updateStudent` with
+  `academicStatus`), for each section the student is placed in;
 - the admission workflow (`admitStudent` activity);
 - bulk import (`insertBatch` activity), once per row.
 
-The placement's own transaction locks the section row (`FOR NO KEY UPDATE`, as the
-`refresh_section_strength` trigger does), reads `current_strength` and the optimal norm (the
+The write's own transaction locks the section rows (`FOR NO KEY UPDATE` in ascending id order, as
+the `refresh_section_strength` trigger does), reads `current_strength` and the optimal norm (the
 institute's capacity norms, default 40) before the write, and `current_strength` again after it.
+A write that changes an existing placement or a status locks the student's `student_academics`
+rows first, then the sections. The emit after the commit is best effort: a worker that stops
+between the two loses the warning.
 The trigger counts only `ENROLLED` students. Only when `before < optimal <= after` are
 `SECTION.capacity_warning` and `NOTIFICATION.section.capacity_warning` emitted, after the
 transaction commits (`section-norms.ts`). Concurrent placements take turns on the lock, so exactly

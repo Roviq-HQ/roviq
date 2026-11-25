@@ -132,6 +132,12 @@ export interface SectionStrengthChange {
   norms: SectionStrengthNorms | null;
 }
 
+/** A write to a student profile. */
+export interface ProfileWriteResult {
+  /** One per section of the student, when the write changed the status; otherwise empty. */
+  strength: SectionStrengthChange[];
+}
+
 export interface PlacementResult {
   id: string;
   /** Null when the section was deleted before the insert. */

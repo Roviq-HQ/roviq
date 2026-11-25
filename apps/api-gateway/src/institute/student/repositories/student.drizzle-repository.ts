@@ -38,6 +38,7 @@ import {
 import { studentReadPredicate } from '../student-read-predicate';
 import { type AdmitStudentData, type AdmitStudentResult, admitStudent } from './admit-student';
 import { findYearAndClass } from './class-lookup';
+import { lockStudentSections, strengthChanges } from './section-strength';
 import { StudentRepository } from './student.repository';
 import type {
   AdmissionClassData,
@@ -45,6 +46,7 @@ import type {
   DeletedStudentRecord,
   FileRecord,
   NewStudentDocumentData,
+  ProfileWriteResult,
   RestoreStudentResult,
   StudentStatusRecord,
   UserDocumentRecord,
@@ -201,9 +203,10 @@ export class StudentDrizzleRepository extends StudentRepository {
     id: string,
     expectedVersion: number,
     updates: Record<string, unknown>,
-  ): Promise<boolean> {
-    const updated = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      return tx
+  ): Promise<ProfileWriteResult | null> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const locked = 'academicStatus' in updates ? await lockStudentSections(tx, id) : [];
+      const updated = await tx
         .update(studentProfiles)
         .set({
           ...updates,
@@ -217,23 +220,26 @@ export class StudentDrizzleRepository extends StudentRepository {
           ),
         )
         .returning({ id: studentProfiles.id });
+      if (updated.length === 0) return null;
+      return { strength: await strengthChanges(tx, locked) };
     });
-    return updated.length > 0;
   }
 
   async setStatus(
     tenantId: string,
     id: string,
-    updates: Record<string, unknown>,
-  ): Promise<boolean> {
-    const updated = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      return tx
+    updates: Record<string, unknown> & { academicStatus: AcademicStatus },
+  ): Promise<ProfileWriteResult | null> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const locked = await lockStudentSections(tx, id);
+      const updated = await tx
         .update(studentProfiles)
         .set({ ...updates, version: sql`${studentProfiles.version} + 1` })
         .where(and(eq(studentProfiles.id, id), isNull(studentProfiles.deletedAt)))
         .returning({ id: studentProfiles.id });
+      if (updated.length === 0) return null;
+      return { strength: await strengthChanges(tx, locked) };
     });
-    return updated.length > 0;
   }
 
   async updateTenantProfile(

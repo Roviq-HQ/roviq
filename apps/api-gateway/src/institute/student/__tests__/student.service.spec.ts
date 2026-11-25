@@ -96,7 +96,7 @@ describe('StudentService (unit)', () => {
 
   describe('update', () => {
     it('rejects with CONCURRENT_MODIFICATION on version mismatch', async () => {
-      repository.updateProfile.mockResolvedValue(false);
+      repository.updateProfile.mockResolvedValue(null);
       repository.exists.mockResolvedValue(true);
 
       await expect(
@@ -110,7 +110,7 @@ describe('StudentService (unit)', () => {
     });
 
     it('rejects when the student does not exist', async () => {
-      repository.updateProfile.mockResolvedValue(false);
+      repository.updateProfile.mockResolvedValue(null);
       repository.exists.mockResolvedValue(false);
 
       await expect(
@@ -124,7 +124,7 @@ describe('StudentService (unit)', () => {
         academicStatus: AcademicStatus.ENROLLED,
         tcIssued: true,
       });
-      repository.updateProfile.mockResolvedValue(true);
+      repository.updateProfile.mockResolvedValue({ strength: [] });
       readRepository.findForMutation.mockResolvedValue(
         buildStudent({ academicStatus: AcademicStatus.TRANSFERRED_OUT }),
       );
@@ -149,7 +149,7 @@ describe('StudentService (unit)', () => {
         academicStatus: AcademicStatus.ENROLLED,
         tcIssued: false,
       });
-      repository.updateProfile.mockResolvedValue(true);
+      repository.updateProfile.mockResolvedValue({ strength: [] });
       readRepository.findForMutation.mockResolvedValue(
         buildStudent({ academicStatus: AcademicStatus.GRADUATED }),
       );

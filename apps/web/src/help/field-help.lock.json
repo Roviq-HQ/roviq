@@ -187,10 +187,11 @@
     }
   },
   "instituteSettings.config.optimalStrength": {
-    "reviewedReason": "The warning is now decided from the counts read under the section lock and is sent from every placement path; copy lists adding, admitting and importing too",
+    "reviewedReason": "status changes back to ENROLLED now warn; copy names reinstating",
     "targets": {
       "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "75c109359de80d4f",
-      "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockSectionForPlacement": "a6bc331d60be191b",
+      "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockSectionForPlacement": "37ca1a64a2a1d924",
+      "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockStudentSections": "f4a41d4fe6a7c2f9",
       "apps/api-gateway/src/institute/student/section-norms.ts#sectionCapacityWarning": "8674a3b46ed2f6e6",
       "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll": "57d9771a6c4ce57d",
       "apps/notification-service/src/listeners/section.listener.ts#SectionListener.handleCapacityWarning": "d6576d020dd30c7a",
@@ -283,10 +284,10 @@
     }
   },
   "students.new.admissionType": {
-    "reviewedReason": "create now also sends the section capacity warning; admission type handling is unchanged",
+    "reviewedReason": "create only routes its capacity warning through a shared helper; admission type unchanged",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/awr.export.ts": "70fe5ba515c3e4ec",
-      "apps/api-gateway/src/institute/student/student.service.ts#StudentService.create": "0e60b6a209567ce7",
+      "apps/api-gateway/src/institute/student/student.service.ts#StudentService.create": "26b14d1d4baaf533",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#ADMISSION_TYPE_VALUES": "9a09ce5f6d345b29"
     }
   },
