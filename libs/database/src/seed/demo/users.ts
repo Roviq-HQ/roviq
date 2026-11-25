@@ -23,7 +23,7 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
-import { SEED_ADMIN_PHONE, SEED_CREDENTIALS } from '../fixtures';
+import { SEED_ADMIN_PHONE, SEED_ADMISSIONS, SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { seedTenantUserProfile } from '../tenant-user-profile';
 
@@ -348,12 +348,18 @@ export async function seedUsersAndMemberships(
       userId: student.id,
       membershipId: SEED_IDS.MEMBERSHIP_STUDENT_INST1,
       tenantId: inst1Id,
-      admissionNumber: 'S-2026/0001',
-      admissionDate: '2026-04-01',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_1.admissionNumber,
+      admissionDate: SEED_ADMISSIONS.STUDENT_1.admissionDate,
       admissionClass: 'Nursery',
       ...BY,
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: studentProfiles.id,
+      set: {
+        admissionNumber: SEED_ADMISSIONS.STUDENT_1.admissionNumber,
+        admissionDate: SEED_ADMISSIONS.STUDENT_1.admissionDate,
+      },
+    });
 
   // Guardian profile for guardian1
   await tx

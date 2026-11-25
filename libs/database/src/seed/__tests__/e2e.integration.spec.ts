@@ -8,7 +8,11 @@ import {
 } from '../../schema';
 import { seedE2e } from '../e2e';
 import { SEED_IDS } from '../ids';
-import { makeSeedTestDb, SEED_HOOK_TIMEOUT_MS } from './seed-test-helpers';
+import {
+  expectSeededAdmissionsMatchSeries,
+  makeSeedTestDb,
+  SEED_HOOK_TIMEOUT_MS,
+} from './seed-test-helpers';
 
 const SEEDED_STUDENT_PROFILE_IDS = [
   SEED_IDS.STUDENT_PROFILE_1,
@@ -55,6 +59,18 @@ describe('seedE2e', () => {
 
     expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_STUDENT_PROFILE_IDS].sort());
     expect(rows.every((row) => row.tenantId === SEED_IDS.INSTITUTE_1)).toBe(true);
+  });
+
+  it('numbers every seeded student from its series and sets each counter past them (ROV-276)', async () => {
+    await expectSeededAdmissionsMatchSeries(db, [
+      'STUDENT_1',
+      'STUDENT_2',
+      'STUDENT_3',
+      'STUDENT_4',
+      'STUDENT_5',
+      'STUDENT_6',
+      'STUDENT_7',
+    ]);
   });
 
   it('creates the seed-owned staff_profiles in Institute 1', async () => {

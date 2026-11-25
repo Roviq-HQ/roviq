@@ -14,7 +14,7 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
-import { SEED_CREDENTIALS } from '../fixtures';
+import { SEED_ADMISSIONS, SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { seedTenantUserProfile } from '../tenant-user-profile';
 
@@ -33,6 +33,7 @@ interface StudentFixture {
   firstName: { en: string; hi: string };
   lastName: { en: string; hi: string };
   admissionNumber: string;
+  admissionDate: string;
   academicStatus: 'ENROLLED' | 'GRADUATED' | 'TRANSFERRED_OUT';
   socialCategory: 'GENERAL' | 'OBC' | 'SC' | 'ST';
   isRteAdmitted: boolean;
@@ -87,7 +88,8 @@ export async function seedE2eStudents(
       email: 'student2@svm-ggn.edu.in',
       firstName: { en: 'Priya', hi: 'प्रिया' },
       lastName: { en: 'Patel', hi: 'पटेल' },
-      admissionNumber: '2025/0002',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_2.admissionNumber,
+      admissionDate: SEED_ADMISSIONS.STUDENT_2.admissionDate,
       academicStatus: 'ENROLLED',
       socialCategory: 'OBC',
       isRteAdmitted: false,
@@ -101,7 +103,8 @@ export async function seedE2eStudents(
       email: 'student3@svm-ggn.edu.in',
       firstName: { en: 'Rahul', hi: 'राहुल' },
       lastName: { en: 'Verma', hi: 'वर्मा' },
-      admissionNumber: '2025/0003',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_3.admissionNumber,
+      admissionDate: SEED_ADMISSIONS.STUDENT_3.admissionDate,
       academicStatus: 'ENROLLED',
       socialCategory: 'SC',
       isRteAdmitted: true,
@@ -115,7 +118,8 @@ export async function seedE2eStudents(
       email: 'student4@svm-ggn.edu.in',
       firstName: { en: 'Kavya', hi: 'काव्या' },
       lastName: { en: 'Singh', hi: 'सिंह' },
-      admissionNumber: '2025/0004',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_4.admissionNumber,
+      admissionDate: SEED_ADMISSIONS.STUDENT_4.admissionDate,
       academicStatus: 'GRADUATED',
       socialCategory: 'GENERAL',
       isRteAdmitted: false,
@@ -129,7 +133,8 @@ export async function seedE2eStudents(
       email: 'student5@svm-ggn.edu.in',
       firstName: { en: 'Amit', hi: 'अमित' },
       lastName: { en: 'Kumar', hi: 'कुमार' },
-      admissionNumber: '2025/0005',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_5.admissionNumber,
+      admissionDate: SEED_ADMISSIONS.STUDENT_5.admissionDate,
       academicStatus: 'TRANSFERRED_OUT',
       socialCategory: 'ST',
       isRteAdmitted: false,
@@ -209,7 +214,7 @@ export async function seedE2eStudents(
         membershipId: s.membershipId,
         tenantId: instituteId,
         admissionNumber: s.admissionNumber,
-        admissionDate: '2025-04-01',
+        admissionDate: s.admissionDate,
         admissionType: 'NEW' as const,
         academicStatus: s.academicStatus,
         socialCategory: s.socialCategory,
@@ -217,7 +222,14 @@ export async function seedE2eStudents(
         ...BY,
       })),
     )
-    .onConflictDoNothing({ target: studentProfiles.id });
+    .onConflictDoUpdate({
+      target: studentProfiles.id,
+      // The seed owns these rows: a re-run brings their numbers in line with the series.
+      set: {
+        admissionNumber: sql`excluded.admission_number`,
+        admissionDate: sql`excluded.admission_date`,
+      },
+    });
 
   await tx
     .insert(studentAcademics)

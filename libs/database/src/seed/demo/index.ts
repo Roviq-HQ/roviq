@@ -1,6 +1,8 @@
 import type { DrizzleDB } from '../../providers';
 import { mkAdminCtx, withAdmin } from '../../tenant-db';
+import { seedAdmissionSequences } from '../admission-sequences';
 import { seedEssential } from '../essential';
+import { SEED_ADMISSION_NUMBER_CONFIG, SEED_ADMISSIONS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { linkSubjectsToStructure, seedAcademicStructure, seedSubjects } from './academics';
 import { seedAttendanceAndLeaves } from './attendance';
@@ -68,6 +70,11 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
 
     await seedAttendanceAndLeaves(tx, inst1.id);
     await seedDemoMultiChildGuardian(tx, inst1.id, roleIds);
+    await seedAdmissionSequences(tx, inst1.id, SEED_ADMISSION_NUMBER_CONFIG.INST1, [
+      SEED_ADMISSIONS.STUDENT_1,
+      SEED_ADMISSIONS.STUDENT_6,
+      SEED_ADMISSIONS.STUDENT_7,
+    ]);
     // Config (schemes/terms/co-scholastic) seeds for both institutes; the graded
     // exam chain only for inst1 (the institute with enrolled demo students).
     if (ay1) await seedExaminations(tx, inst1.id, ay1.id, true);

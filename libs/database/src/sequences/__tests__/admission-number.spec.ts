@@ -1,5 +1,5 @@
-import type { AdmissionNumberConfig } from '@roviq/database';
 import { describe, expect, it } from 'vitest';
+import type { AdmissionNumberConfig } from '../../schema/tenant/institute-configs';
 import {
   admissionSeriesName,
   formatSequenceValue,

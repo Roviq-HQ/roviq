@@ -214,6 +214,8 @@ The seeders in `libs/database/src/seed/` use deterministic UUIDs (`SEED_IDS` in 
 | Free plan | `00000000-0000-7000-a000-000000000001` | — |
 | Pro plan | `00000000-0000-7000-a000-000000000002` | — |
 
+Seeded students' admission numbers (`SEED_ADMISSIONS` in `libs/database/src/seed/fixtures.ts`) are built by the runtime's formatter from each institute's `admission_number_config`, the student's class and admission date, and the seed sets the counter of each series that holds a seeded student (`adm_no:N-`, `adm_no:`) to the highest seeded value. The next generated number in any class therefore never repeats a seeded one. A re-seed rewrites the seeded students' numbers and never lowers a counter, so a dev database that admitted Nursery students before this seed numbered its own needs `pnpm tilt trigger db-clean`: the rewrite would hit the unique admission-number index.
+
 ### What Goes Where
 
 | Test type | Tool | Location | Tests what |

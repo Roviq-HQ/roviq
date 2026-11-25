@@ -5,7 +5,7 @@
  * based on the standard's numeric_order. Pre-primary classes (-3, -2, -1)
  * get prefixes like N-, L-, U-. From Class 2 onwards, no prefix by default.
  */
-import type { AdmissionNumberConfig } from '@roviq/database';
+import type { AdmissionNumberConfig } from '../schema/tenant/institute-configs';
 
 /**
  * Resolve the admission number prefix for a given standard.

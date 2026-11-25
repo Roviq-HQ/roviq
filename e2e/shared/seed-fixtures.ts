@@ -23,6 +23,7 @@
  *     as a literal constant below — kept honest by the runtime guard.
  */
 import {
+  SEED_ADMISSIONS,
   SEED_CREDENTIALS,
   SEED_NAMES,
   SEED_PERSON_NAMES,
@@ -31,7 +32,7 @@ import {
 import { SEED_IDS } from '../../libs/database/src/seed/ids';
 
 // Re-export so `import { SEED_IDS } from '.../seed-fixtures'` works.
-export { SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_PERSON_NAMES, SEED_SLUGS };
+export { SEED_ADMISSIONS, SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_PERSON_NAMES, SEED_SLUGS };
 
 // Mirrors `NEW_PASSWORD_MIN_LENGTH` from
 // `libs/shared/common-types/src/lib/policy/password-policy.ts`. Duplicated
@@ -143,7 +144,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT,
       username: 'student1',
       name: 'Priya Singh',
-      admissionNumber: 'S-2026/0001',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_1.admissionNumber,
       academicStatus: 'ENROLLED',
       socialCategory: 'GENERAL',
       rte: false,
@@ -152,7 +153,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT_2,
       username: 'student2',
       name: 'Priya Patel',
-      admissionNumber: '2025/0002',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_2.admissionNumber,
       academicStatus: 'ENROLLED',
       socialCategory: 'OBC',
       rte: false,
@@ -161,7 +162,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT_3,
       username: 'student3',
       name: 'Rahul Verma',
-      admissionNumber: '2025/0003',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_3.admissionNumber,
       academicStatus: 'ENROLLED',
       socialCategory: 'SC',
       rte: true,
@@ -170,7 +171,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT_4,
       username: 'student4',
       name: 'Kavya Singh',
-      admissionNumber: '2025/0004',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_4.admissionNumber,
       academicStatus: 'GRADUATED',
       socialCategory: 'GENERAL',
       rte: false,
@@ -179,7 +180,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT_5,
       username: 'student5',
       name: 'Amit Kumar',
-      admissionNumber: '2025/0005',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_5.admissionNumber,
       academicStatus: 'TRANSFERRED_OUT',
       socialCategory: 'ST',
       rte: false,
@@ -188,7 +189,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT_6,
       username: SEED_CREDENTIALS.STUDENT_6.username,
       name: fullName(SEED_PERSON_NAMES.STUDENT_6),
-      admissionNumber: 'S-2026/0006',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_6.admissionNumber,
       academicStatus: 'ENROLLED',
       socialCategory: 'GENERAL',
       rte: false,
@@ -197,7 +198,7 @@ export const SEED_PEOPLE = {
       id: SEED_IDS.USER_STUDENT_7,
       username: SEED_CREDENTIALS.STUDENT_7.username,
       name: fullName(SEED_PERSON_NAMES.STUDENT_7),
-      admissionNumber: 'S-2026/0007',
+      admissionNumber: SEED_ADMISSIONS.STUDENT_7.admissionNumber,
       academicStatus: 'ENROLLED',
       socialCategory: 'GENERAL',
       rte: false,

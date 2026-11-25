@@ -10,7 +10,7 @@ import {
   SYSTEM_USER_ID,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
-import { SEED_NAMES, SEED_SLUGS } from '../fixtures';
+import { SEED_ADMISSION_NUMBER_CONFIG, SEED_NAMES, SEED_SLUGS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -178,12 +178,7 @@ export async function seedBrandingAndConfigs(tx: DrizzleDB, inst1Id: string, ins
         ],
       },
       sectionStrengthNorms: { optimal: 40, hardMax: 45, exemptionAllowed: true },
-      admissionNumberConfig: {
-        format: '{prefix}{year}/{value:04d}',
-        year_format: 'YYYY',
-        prefixes: { '-3': 'N-', '-2': 'L-', '-1': 'U-', '1': 'A-' },
-        no_prefix_from_class: 2,
-      },
+      admissionNumberConfig: SEED_ADMISSION_NUMBER_CONFIG.INST1,
       ...BY,
     })
     .onConflictDoNothing();
@@ -207,12 +202,7 @@ export async function seedBrandingAndConfigs(tx: DrizzleDB, inst1Id: string, ins
       ],
       gradingSystem: { type: 'PERCENTAGE', passingPercent: 33 },
       sectionStrengthNorms: { optimal: 45, hardMax: 50, exemptionAllowed: false },
-      admissionNumberConfig: {
-        format: 'RPS/{year}/{value:04d}',
-        year_format: 'YY-YY',
-        prefixes: {},
-        no_prefix_from_class: 1,
-      },
+      admissionNumberConfig: SEED_ADMISSION_NUMBER_CONFIG.INST2,
       ...BY,
     })
     .onConflictDoNothing();

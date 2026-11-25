@@ -1,19 +1,17 @@
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   type AdmissionNumberConfig,
+  admissionSeriesName,
   type DrizzleDB,
+  formatSequenceValue,
   instituteConfigsLive,
+  LEGACY_ADMISSION_SEQUENCE,
+  resolveAdmissionPrefix,
+  resolveAdmissionYear,
   standardsLive,
   tenantSequences,
 } from '@roviq/database';
 import { and, eq, sql } from 'drizzle-orm';
-import {
-  admissionSeriesName,
-  formatSequenceValue,
-  LEGACY_ADMISSION_SEQUENCE,
-  resolveAdmissionPrefix,
-  resolveAdmissionYear,
-} from './admission-number';
 
 const DEFAULT_ADMISSION_NUMBER_CONFIG: AdmissionNumberConfig = {
   format: '{prefix}{value:04d}',

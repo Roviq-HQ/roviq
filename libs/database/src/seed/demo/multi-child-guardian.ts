@@ -18,7 +18,7 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
-import { SEED_CREDENTIALS, SEED_PERSON_NAMES } from '../fixtures';
+import { SEED_ADMISSIONS, SEED_CREDENTIALS, SEED_PERSON_NAMES } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { seedTenantUserProfile } from '../tenant-user-profile';
 
@@ -37,7 +37,7 @@ const CHILDREN = [
     credentials: SEED_CREDENTIALS.STUDENT_6,
     names: SEED_PERSON_NAMES.STUDENT_6,
     gender: 'MALE',
-    admissionNumber: 'S-2026/0006',
+    admission: SEED_ADMISSIONS.STUDENT_6,
     rollNumber: '02',
   },
   {
@@ -49,7 +49,7 @@ const CHILDREN = [
     credentials: SEED_CREDENTIALS.STUDENT_7,
     names: SEED_PERSON_NAMES.STUDENT_7,
     gender: 'FEMALE',
-    admissionNumber: 'S-2026/0007',
+    admission: SEED_ADMISSIONS.STUDENT_7,
     rollNumber: '03',
   },
 ] as const;
@@ -170,15 +170,21 @@ export async function seedDemoMultiChildGuardian(
         userId: c.userId,
         membershipId: c.membershipId,
         tenantId: inst1Id,
-        admissionNumber: c.admissionNumber,
-        admissionDate: '2026-04-01',
+        admissionNumber: c.admission.admissionNumber,
+        admissionDate: c.admission.admissionDate,
         admissionType: 'NEW',
         academicStatus: 'ENROLLED',
         socialCategory: 'GENERAL',
         isRteAdmitted: false,
         ...BY,
       })
-      .onConflictDoNothing({ target: studentProfiles.id });
+      .onConflictDoUpdate({
+        target: studentProfiles.id,
+        set: {
+          admissionNumber: c.admission.admissionNumber,
+          admissionDate: c.admission.admissionDate,
+        },
+      });
 
     await tx
       .insert(studentAcademics)

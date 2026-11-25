@@ -1,5 +1,13 @@
 // Canonical seed literals shared by seed implementations and e2e fixtures.
 // Keep this file free of @roviq/* imports so test projects can resolve it directly.
+import type { AdmissionNumberConfig } from '../schema/tenant/institute-configs';
+import {
+  admissionSeriesName,
+  formatSequenceValue,
+  resolveAdmissionPrefix,
+  resolveAdmissionYear,
+} from '../sequences/admission-number';
+
 export const SEED_NAMES = {
   RESELLER_DIRECT: 'Roviq Direct',
   INSTITUTE_1: { en: 'Saraswati Vidya Mandir', hi: 'सरस्वती विद्या मंदिर' },
@@ -51,4 +59,64 @@ export const SEED_PERSON_NAMES = {
     firstName: { en: 'Meher', hi: 'मेहर' },
     lastName: { en: 'Kapoor', hi: 'कपूर' },
   },
+} as const;
+
+export const SEED_ADMISSION_NUMBER_CONFIG = {
+  INST1: {
+    format: '{prefix}{year}/{value:04d}',
+    year_format: 'YYYY',
+    prefixes: { '-3': 'N-', '-2': 'L-', '-1': 'U-', '1': 'A-' },
+    no_prefix_from_class: 2,
+  },
+  INST2: {
+    format: 'RPS/{year}/{value:04d}',
+    year_format: 'YY-YY',
+    prefixes: {},
+    no_prefix_from_class: 1,
+  },
+} as const satisfies Record<string, AdmissionNumberConfig>;
+
+/** A seeded admission, numbered the way the runtime would have numbered it on that date. */
+export interface SeedAdmission {
+  numericOrder: number;
+  value: number;
+  /** `YYYY-MM-DD`, stored as `student_profiles.admission_date`. */
+  admissionDate: string;
+  prefix: string;
+  series: string;
+  admissionNumber: string;
+}
+
+function seedAdmission(
+  config: AdmissionNumberConfig,
+  numericOrder: number,
+  value: number,
+  admissionDate: string,
+): SeedAdmission {
+  const [y, m, d] = admissionDate.split('-').map(Number);
+  // Built from parts: `new Date('YYYY-MM-DD')` is UTC midnight and can fall in March locally.
+  const year = resolveAdmissionYear(config, new Date(y, m - 1, d));
+  const prefix = resolveAdmissionPrefix(config, numericOrder);
+  return {
+    numericOrder,
+    value,
+    admissionDate,
+    prefix,
+    series: admissionSeriesName(prefix),
+    admissionNumber: formatSequenceValue(config.format, { prefix, year, value: BigInt(value) }),
+  };
+}
+
+const NURSERY = -3;
+const CLASS_5 = 5;
+
+/** Institute 1's seeded students: three in Nursery (demo seed), four in Class 5 (e2e seed). */
+export const SEED_ADMISSIONS = {
+  STUDENT_1: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, NURSERY, 1, '2026-04-01'),
+  STUDENT_6: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, NURSERY, 2, '2026-04-01'),
+  STUDENT_7: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, NURSERY, 3, '2026-04-01'),
+  STUDENT_2: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, CLASS_5, 1, '2025-04-01'),
+  STUDENT_3: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, CLASS_5, 2, '2025-04-01'),
+  STUDENT_4: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, CLASS_5, 3, '2025-04-01'),
+  STUDENT_5: seedAdmission(SEED_ADMISSION_NUMBER_CONFIG.INST1, CLASS_5, 4, '2025-04-01'),
 } as const;
