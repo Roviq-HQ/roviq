@@ -262,17 +262,9 @@ export class IdentityService {
       email: input.email,
       username: input.username,
       passwordHash,
+      phone: input.phone ?? null,
       actorId: input.actorId,
     });
-
-    if (input.phone) {
-      await this.repo.insertPrimaryPhone({
-        userId,
-        countryCode: input.phone.countryCode,
-        number: input.phone.number,
-        actorId: input.actorId,
-      });
-    }
 
     return { userId, tempPassword };
   }

@@ -31,7 +31,6 @@ import type {
   NewInstituteMembership,
   NewPlatformMembership,
   NewResellerMembership,
-  NewUserPhone,
   NewUserProfile,
   NewUserRecord,
   UserContactRow,
@@ -239,8 +238,8 @@ export class IdentityDrizzleRepository extends IdentityRepository {
   }
 
   async insertUser(user: NewUserRecord): Promise<string> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-      return tx
+    return withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
+      const [row] = await tx
         .insert(users)
         .values({
           createdBy: user.actorId,
@@ -251,25 +250,19 @@ export class IdentityDrizzleRepository extends IdentityRepository {
           mustChangePassword: true,
         })
         .returning({ id: users.id });
-    }).catch(mapUniqueViolation(EMAIL_TAKEN));
-    return row.id;
-  }
-
-  async insertPrimaryPhone(phone: NewUserPhone): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-      await tx
-        .insert(phoneNumbers)
-        .values({
-          createdBy: phone.actorId,
-          updatedBy: phone.actorId,
-          userId: phone.userId,
-          countryCode: phone.countryCode,
-          number: phone.number,
+      if (user.phone) {
+        await tx.insert(phoneNumbers).values({
+          createdBy: user.actorId,
+          updatedBy: user.actorId,
+          userId: row.id,
+          countryCode: user.phone.countryCode,
+          number: user.phone.number,
           isPrimary: true,
           label: 'personal',
-        })
-        .onConflictDoNothing();
-    });
+        });
+      }
+      return row.id;
+    }).catch(mapUniqueViolation(EMAIL_TAKEN));
   }
 
   async insertInstituteMembership(input: NewInstituteMembership): Promise<string> {

@@ -41,15 +41,16 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 | `resendStaffSignInDetails` | Mutation | `Boolean` | `update Staff` |
 | `resendGuardianSignInDetails` | Mutation | `Boolean` | `update Guardian` |
 
-`createStaffMember` writes the account (user, its profile and phone) first, then the membership,
-the institute's profile copy and the staff profile in one institute transaction. Refusals in this
-order:
+`createStaffMember` writes the account first (the user and its phone in one transaction, then its
+profile), then the membership, the institute's profile copy and the staff profile in one institute
+transaction. Refusals in this order:
 
 1. A typed `employeeId` a current staff member of the institute holds: `EMPLOYEE_ID_DUPLICATE`.
 2. No Teacher role in the institute: `ROLE_NOT_FOUND`.
 3. An email that is already an account's: `EMAIL_TAKEN`.
 
-All three are checked before anything is written. When the institute transaction fails, or a
+The first two are checked before anything is written. `EMAIL_TAKEN` comes from the account
+insert itself, whose transaction then writes nothing. When the institute transaction fails, or a
 create racing this one took the typed ID in the meantime (the partial unique index
 `uq_staff_profiles_tenant_employee_id` refuses the insert, again `EMPLOYEE_ID_DUPLICATE`), the
 account is removed (`IdentityService.discardNewUser`), so a retry with the same email works.
