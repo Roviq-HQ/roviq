@@ -12,5 +12,6 @@ export {
   extractGraphQLErrorCode,
   isNetworkError,
 } from './lib/extract-graphql-error';
+export { NetworkFetchError } from './lib/network-fetch';
 export { GraphQLProvider } from './lib/provider';
 export { useEdition } from './lib/use-edition';

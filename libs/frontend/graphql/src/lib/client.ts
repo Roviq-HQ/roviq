@@ -10,6 +10,7 @@ import { getMainDefinition, relayStylePagination } from '@apollo/client/utilitie
 import { OperationTypeNode } from 'graphql';
 import { createClient } from 'graphql-ws';
 import { from, type Observable, switchMap } from 'rxjs';
+import { tagNetworkFailures } from './network-fetch';
 
 export interface ApolloClientConfig {
   httpUrl: string;
@@ -119,7 +120,11 @@ export function filterCursorPagination(): FieldPolicy<CursorConnection> {
 }
 
 export function createApolloClient(config: ApolloClientConfig) {
-  const httpLink = new HttpLink({ uri: config.httpUrl });
+  const httpLink = new HttpLink({
+    uri: config.httpUrl,
+    // Late-bound like Apollo's own default, so a replaced global fetch is still used.
+    fetch: tagNetworkFailures((input, init) => fetch(input, init)),
+  });
 
   const authLink = new SetContextLink((prevContext) => {
     const token = config.getAccessToken();

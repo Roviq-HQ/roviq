@@ -1,4 +1,5 @@
 import { CombinedGraphQLErrors, ServerError } from '@apollo/client/errors';
+import { NetworkFetchError } from '@roviq/graphql';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
 import { describe, expect, it } from 'vitest';
@@ -46,7 +47,12 @@ describe('useErrorCopy', () => {
   });
 
   it('shows the network message when the request never reached the server', () => {
-    renderWithProviders(<Copy err={new TypeError('Failed to fetch')} fallback="Could not save" />);
+    renderWithProviders(
+      <Copy
+        err={new NetworkFetchError(new TypeError('Failed to fetch'))}
+        fallback="Could not save"
+      />,
+    );
     expect(screen.getByText(enError.network)).toBeInTheDocument();
   });
 
@@ -65,7 +71,9 @@ describe('useErrorCopy', () => {
   });
 
   it('answers in Hindi', () => {
-    renderWithProviders(<Copy err={new TypeError('Failed to fetch')} />, { locale: 'hi' });
+    renderWithProviders(<Copy err={new NetworkFetchError(new TypeError('Failed to fetch'))} />, {
+      locale: 'hi',
+    });
     expect(screen.getByText(hiError.network)).toBeInTheDocument();
   });
 });
