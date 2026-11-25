@@ -125,6 +125,7 @@ export default function EnquiriesPage() {
           <div className="space-y-0.5">
             <p className="font-medium">{row.original.studentName}</p>
             <p className="text-xs text-muted-foreground">
+              {row.original.enquiryNumber ? `${row.original.enquiryNumber} · ` : ''}
               {row.original.classRequested}
               {row.original.gender ? ` · ${t(`genders.${row.original.gender}`)}` : ''}
             </p>

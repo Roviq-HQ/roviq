@@ -96,6 +96,7 @@ vi.mock('../../use-admission', () => ({
   useStandardsForAdmission: () => ({ data: { standards: [] }, loading: false }),
 }));
 
+import { EnquiriesKanban } from '../enquiries-kanban';
 import EnquiriesPage from '../page';
 
 function renderPage(abilityRules?: RawRuleOf<AppAbility>[]) {
@@ -118,6 +119,11 @@ describe('EnquiriesPage (component)', () => {
     expect(screen.getByText('+91 9876543210')).toBeInTheDocument();
   });
 
+  it('shows the enquiry number on the row', () => {
+    renderPage();
+    expect(screen.getByText(/ENQ-000001 ·/)).toBeInTheDocument();
+  });
+
   it('shows the source badge', () => {
     renderPage();
     expect(screen.getByTestId('enquiry-source-enq-1')).toHaveTextContent(
@@ -130,6 +136,13 @@ describe('EnquiriesPage (component)', () => {
     expect(screen.getByTestId('enquiry-status-enq-1')).toHaveTextContent(
       messagesEn.enquiryStatuses.NEW,
     );
+  });
+
+  it('shows the enquiry number on the kanban card', async () => {
+    renderWithProviders(<EnquiriesKanban enquiries={listed.enquiries} />, {
+      messages: { admission: messagesEn },
+    });
+    expect(await screen.findByTestId('enquiry-card-enq-1')).toHaveTextContent('ENQ-000001 ·');
   });
 
   it('exposes both view-mode toggles (table + kanban)', () => {
