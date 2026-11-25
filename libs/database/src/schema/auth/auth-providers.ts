@@ -29,4 +29,4 @@ export const authProviders = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

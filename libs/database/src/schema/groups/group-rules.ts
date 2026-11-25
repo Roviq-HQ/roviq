@@ -47,4 +47,4 @@ export const groupRules = pgTable(
 
     ...tenantPolicies('group_rules'),
   ],
-).enableRLS();
+);

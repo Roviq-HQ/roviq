@@ -127,4 +127,4 @@ export const userIdentifiers = pgTable(
     index('idx_user_identifiers_user_id').on(table.userId),
     ...userScopedPolicies('user_identifiers'),
   ],
-).enableRLS();
+);

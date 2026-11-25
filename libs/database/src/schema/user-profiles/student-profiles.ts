@@ -204,4 +204,4 @@ export const studentProfiles = pgTable(
     // ── RLS policies ───────────────────────────────────
     ...tenantPolicies('student_profiles'),
   ],
-).enableRLS();
+);

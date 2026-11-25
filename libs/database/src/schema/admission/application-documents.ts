@@ -43,4 +43,4 @@ export const applicationDocuments = pgTable(
 
     ...tenantPolicies('application_documents'),
   ],
-).enableRLS();
+);

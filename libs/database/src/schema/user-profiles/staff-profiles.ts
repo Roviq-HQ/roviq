@@ -95,4 +95,4 @@ export const staffProfiles = pgTable(
 
     ...tenantPolicies('staff_profiles'),
   ],
-).enableRLS();
+);

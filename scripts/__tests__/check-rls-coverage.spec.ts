@@ -2,7 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { findMissingRls, hasPgTable, hasRls, RLS_EXEMPT_BASENAMES } from '../check-rls-coverage';
+import {
+  findDeprecatedEnableRls,
+  findMissingRls,
+  hasPgTable,
+  hasRls,
+  RLS_EXEMPT_BASENAMES,
+} from '../check-rls-coverage';
 
 describe('hasPgTable', () => {
   it('returns true for a pgTable definition', () => {
@@ -35,8 +41,16 @@ describe('hasRls', () => {
     expect(hasRls("pgPolicy('foo', { ... })")).toBe(true);
   });
 
-  it('detects .enableRLS()', () => {
-    expect(hasRls(').enableRLS();')).toBe(true);
+  it('detects userScopedPolicies', () => {
+    expect(hasRls("...userScopedPolicies('user_profiles'),")).toBe(true);
+  });
+
+  it('detects filePolicies', () => {
+    expect(hasRls("...filePolicies('files'),")).toBe(true);
+  });
+
+  it('does not count the deprecated .enableRLS() alone (ROV-218)', () => {
+    expect(hasRls(').enableRLS();')).toBe(false);
   });
 
   it('returns false when no indicator is present', () => {
@@ -69,7 +83,7 @@ describe('findMissingRls', () => {
   it('returns empty when all pgTables have RLS', () => {
     writeFileSync(
       join(dir, 'subjects.ts'),
-      `export const subjects = pgTable('subjects', {}, t => [...tenantPolicies('subjects')]).enableRLS();`,
+      `export const subjects = pgTable('subjects', {}, t => [...tenantPolicies('subjects')]);`,
     );
     expect(findMissingRls(dir)).toEqual([]);
   });
@@ -108,5 +122,49 @@ describe('findMissingRls', () => {
   it('skips index.ts and other SKIP_BASENAMES files', () => {
     writeFileSync(join(dir, 'index.ts'), `export const ghost = pgTable('ghost', {});`);
     expect(findMissingRls(dir)).toEqual([]);
+  });
+});
+
+describe('findDeprecatedEnableRls', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'rlscov-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('flags a schema file that still calls .enableRLS()', () => {
+    const file = join(dir, 'groups.ts');
+    writeFileSync(
+      file,
+      `export const g = pgTable('g', {}, () => [pgPolicy('p', {})]).enableRLS();`,
+    );
+    expect(findDeprecatedEnableRls(dir)).toEqual([file]);
+  });
+
+  it('flags the call when it is chained on its own line', () => {
+    const file = join(dir, 'groups.ts');
+    writeFileSync(
+      file,
+      `export const g = pgTable('g', {}, () => [pgPolicy('p', {})])\n  .enableRLS();`,
+    );
+    expect(findDeprecatedEnableRls(dir)).toEqual([file]);
+  });
+
+  it('leaves a table whose only marker is .enableRLS() to findMissingRls', () => {
+    const file = join(dir, 'orphan.ts');
+    writeFileSync(file, `export const orphan = pgTable('orphan', {}).enableRLS();`);
+    expect(findMissingRls(dir)).toEqual([{ file }]);
+  });
+
+  it('returns empty when no file calls it', () => {
+    writeFileSync(
+      join(dir, 'groups.ts'),
+      `export const g = pgTable('g', {}, () => [pgPolicy('p', {})]);`,
+    );
+    expect(findDeprecatedEnableRls(dir)).toEqual([]);
   });
 });

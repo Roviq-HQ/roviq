@@ -166,4 +166,4 @@ export const tcRegister = pgTable(
 
     ...tenantPolicies('tc_register'),
   ],
-).enableRLS();
+);

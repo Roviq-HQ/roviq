@@ -37,4 +37,4 @@ export const userDocumentFiles = pgTable(
     uniqueIndex('user_document_files_file_id_key').on(table.fileId).where(sql`deleted_at IS NULL`),
     ...userScopedPolicies('user_document_files'),
   ],
-).enableRLS();
+);

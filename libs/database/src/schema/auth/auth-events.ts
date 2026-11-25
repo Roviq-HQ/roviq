@@ -88,4 +88,4 @@ export const authEvents = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

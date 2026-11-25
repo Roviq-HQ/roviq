@@ -32,4 +32,4 @@ export const platformMemberships = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

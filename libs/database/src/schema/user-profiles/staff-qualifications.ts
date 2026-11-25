@@ -60,4 +60,4 @@ export const staffQualifications = pgTable(
 
     ...tenantPolicies('staff_qualifications'),
   ],
-).enableRLS();
+);

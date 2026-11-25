@@ -38,4 +38,4 @@ export const applicationDocumentFiles = pgTable(
       .where(sql`deleted_at IS NULL`),
     ...tenantPolicies('application_document_files'),
   ],
-).enableRLS();
+);

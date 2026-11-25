@@ -79,4 +79,4 @@ export const resellers = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

@@ -45,4 +45,4 @@ export const groupChildren = pgTable(
 
     ...tenantPolicies('group_children'),
   ],
-).enableRLS();
+);

@@ -107,4 +107,4 @@ export const userProfiles = pgTable(
     index('idx_user_profiles_search').using('gin', sql`search_vector`),
     ...userScopedPolicies('user_profiles'),
   ],
-).enableRLS();
+);

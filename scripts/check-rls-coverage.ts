@@ -1,10 +1,10 @@
 /**
- * CI guard — every pgTable definition must opt into RLS (or be on the
- * exempt list of platform-level user tables whose access is governed by
- * DB-role GRANTs + CASL rather than per-row RLS).
+ * CI guard — every pgTable definition must opt into RLS.
  *
- * Detects RLS via any of: `tenantPolicies(`,
- * `entityPolicies(`, `immutableEntityPolicies(`, `pgPolicy(`, `.enableRLS()`.
+ * Detects RLS via any of: `tenantPolicies(`, `entityPolicies(`,
+ * `immutableEntityPolicies(`, `filePolicies(`, `userScopedPolicies(`, `pgPolicy(`.
+ * drizzle-kit enables row security on any table with a policy, so the deprecated
+ * `.enableRLS()` is refused rather than counted.
  *
  * Companion to `scripts/check-live-views-coverage.ts`.
  */
@@ -36,8 +36,8 @@ const RLS_INDICATORS = [
   'entityPolicies(',
   'immutableEntityPolicies(',
   'filePolicies(',
+  'userScopedPolicies(',
   'pgPolicy(',
-  '.enableRLS()',
 ];
 
 export function hasPgTable(text: string): boolean {
@@ -89,14 +89,31 @@ export function findMissingRls(schemaRoot: string): Missing[] {
   return missing;
 }
 
+export function findDeprecatedEnableRls(schemaRoot: string): string[] {
+  const files: string[] = [];
+  walk(schemaRoot, files);
+  return files.filter((file) => readFileSync(file, 'utf8').includes('.enableRLS('));
+}
+
 function main(): number {
+  const deprecated = [
+    ...findDeprecatedEnableRls(SCHEMA_ROOT),
+    ...findDeprecatedEnableRls(EE_SCHEMA_ROOT),
+  ];
+  if (deprecated.length > 0) {
+    process.stderr.write(
+      `check:rls-coverage — ${deprecated.length} file(s) call the deprecated .enableRLS(); a table's policies enable row security. Remove the call:\n\n`,
+    );
+    for (const file of deprecated) process.stderr.write(`  ${relative(ROOT, file)}\n`);
+    return 1;
+  }
   const missing = [...findMissingRls(SCHEMA_ROOT), ...findMissingRls(EE_SCHEMA_ROOT)];
   if (missing.length === 0) {
     process.stdout.write('check:rls-coverage — every non-exempt pgTable opts into RLS.\n');
     return 0;
   }
   process.stderr.write(
-    `check:rls-coverage — ${missing.length} pgTable(s) missing RLS policies. Add tenantPolicies()/entityPolicies()/pgPolicy() + .enableRLS(), or add the file to RLS_EXEMPT_BASENAMES with a justification:\n\n`,
+    `check:rls-coverage — ${missing.length} pgTable(s) missing RLS policies. Add tenantPolicies()/entityPolicies()/userScopedPolicies()/pgPolicy(), or add the file to RLS_EXEMPT_BASENAMES with a justification:\n\n`,
   );
   for (const m of missing) {
     process.stderr.write(`  ${relative(ROOT, m.file)}\n`);

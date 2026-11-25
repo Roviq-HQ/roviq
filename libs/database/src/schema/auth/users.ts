@@ -76,4 +76,4 @@ export const users = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

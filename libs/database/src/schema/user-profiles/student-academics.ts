@@ -79,4 +79,4 @@ export const studentAcademics = pgTable(
 
     ...tenantPolicies('student_academics'),
   ],
-).enableRLS();
+);
