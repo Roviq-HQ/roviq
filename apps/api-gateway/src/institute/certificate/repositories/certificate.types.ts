@@ -11,6 +11,13 @@ export interface CertificateTemplateRow {
   approvalChain: Array<{ role: string }> | null;
 }
 
+/** An active template as the issue dialog lists it. */
+export interface CertificateTemplateSummaryRow {
+  id: string;
+  type: CertificateTemplateType;
+  name: string;
+}
+
 /** A student with the name fields a certificate prints. */
 export interface CertificateStudentRow {
   admissionNumber: string;

@@ -13,6 +13,7 @@ import {
   AcademicStatus,
   BusinessException,
   CertificateStatus,
+  type CertificateTemplateType,
   ErrorCode,
   type InstituteContext,
   TC_STATE_MACHINE,
@@ -24,7 +25,11 @@ import { TemporalClientService } from '@roviq/temporal';
 import { CertificatePdfService } from './certificate-pdf.service';
 import type { ClearanceEntryObject } from './models/tc.model';
 import { CertificateRepository } from './repositories/certificate.repository';
-import type { CertificateListFilter, IssuedCertificateRow } from './repositories/certificate.types';
+import type {
+  CertificateListFilter,
+  CertificateTemplateSummaryRow,
+  IssuedCertificateRow,
+} from './repositories/certificate.types';
 import { TcRepository } from './repositories/tc.repository';
 import type { TcDetailsRow, TcListFilter, TcRow } from './repositories/tc.types';
 import { DEFAULT_TC_TASK_QUEUE } from './workflows/tc-issuance.types';
@@ -356,6 +361,13 @@ export class CertificateService {
     const row = await this.certificates.findById(ctx, id);
     if (!row) throw new BusinessException(ErrorCode.CERTIFICATE_NOT_FOUND, 'Certificate not found');
     return row;
+  }
+
+  listCertificateTemplates(
+    ctx: InstituteContext,
+    type?: CertificateTemplateType,
+  ): Promise<CertificateTemplateSummaryRow[]> {
+    return this.certificates.listActiveTemplates(ctx, type);
   }
 
   /**

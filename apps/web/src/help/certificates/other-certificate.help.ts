@@ -2,10 +2,10 @@ import { defineFieldHelp } from '@roviq/ui';
 
 export const otherCertificateHelp = defineFieldHelp('certificates.other', {
   template: {
-    title: { en: 'Template ID', hi: 'टेम्पलेट आईडी' },
+    title: { en: 'Template', hi: 'टेम्पलेट' },
     body: {
-      en: "The ID of one of your institute's certificate templates. It sets the certificate type and wording, and which details are filled in from the student's record; they are listed below once the template is found. Templates cannot be changed here.",
-      hi: 'आपके संस्थान के किसी प्रमाणपत्र टेम्पलेट की ID। इससे प्रमाणपत्र का प्रकार और शब्द तय होते हैं, और विद्यार्थी के रिकॉर्ड से कौन से विवरण भरे जाएँगे; टेम्पलेट मिलने पर वे नीचे दिखते हैं। टेम्पलेट यहाँ नहीं बदले जा सकते।',
+      en: "Your institute's active templates for this certificate type, by name. The template sets the certificate's wording and which details are filled in from the student's record; they are listed below once you choose one. Templates cannot be added or changed here.",
+      hi: 'इस प्रमाणपत्र प्रकार के आपके संस्थान के सक्रिय टेम्पलेट, नाम से। टेम्पलेट से प्रमाणपत्र के शब्द तय होते हैं, और विद्यार्थी के रिकॉर्ड से कौन से विवरण भरे जाएँगे; टेम्पलेट चुनने पर वे नीचे दिखते हैं। टेम्पलेट यहाँ जोड़े या बदले नहीं जा सकते।',
     },
   },
   purpose: {

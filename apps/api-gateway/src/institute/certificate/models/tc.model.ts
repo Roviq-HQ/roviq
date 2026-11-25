@@ -1,5 +1,5 @@
 import { Field, ID, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { CertificateStatus, TcStatus } from '@roviq/common-types';
+import { CertificateStatus, type CertificateTemplateType, TcStatus } from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
 import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import GraphQLJSON from 'graphql-type-json';
@@ -136,4 +136,16 @@ export class CertificateModel {
 
   @Field(() => DateTimeScalar)
   createdAt!: Date;
+}
+
+@ObjectType({ description: 'A certificate template staff pick by name when issuing a certificate' })
+export class CertificateTemplateModel {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: 'Name shown in the picker, e.g. "Bonafide (CBSE)"' })
+  name!: string;
+
+  @Field(() => String, { description: 'Certificate type, e.g. BONAFIDE_CERTIFICATE' })
+  type!: CertificateTemplateType;
 }

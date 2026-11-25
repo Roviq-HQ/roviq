@@ -1,8 +1,9 @@
-import type { InstituteContext } from '@roviq/common-types';
+import type { CertificateTemplateType, InstituteContext } from '@roviq/common-types';
 import type {
   CertificateListFilter,
   CertificateStudentRow,
   CertificateTemplateRow,
+  CertificateTemplateSummaryRow,
   CreateIssuedCertificateData,
   IssuedCertificateRow,
   MarkCertificateIssuedData,
@@ -14,6 +15,11 @@ export abstract class CertificateRepository {
     ctx: InstituteContext,
     templateId: string,
   ): Promise<CertificateTemplateRow | null>;
+  /** The institute's active templates, by name; of one type when `type` is given. */
+  abstract listActiveTemplates(
+    ctx: InstituteContext,
+    type?: CertificateTemplateType,
+  ): Promise<CertificateTemplateSummaryRow[]>;
   abstract staffExists(ctx: InstituteContext, staffProfileId: string): Promise<boolean>;
   abstract findStudent(
     ctx: InstituteContext,

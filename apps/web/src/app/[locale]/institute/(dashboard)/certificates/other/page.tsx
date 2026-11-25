@@ -1,6 +1,6 @@
 'use client';
 
-import { AcademicStatus } from '@roviq/common-types';
+import { AcademicStatus, type CertificateStatus } from '@roviq/common-types';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -44,6 +44,7 @@ import {
   type CertificateNode,
   useCertificates,
   useCertificateTemplateFields,
+  useCertificateTemplates,
   useIssueCertificate,
   usePreviewCertificate,
   useRequestCertificate,
@@ -65,17 +66,19 @@ const CERTIFICATE_TYPES = [
 ] as const;
 type CertificateType = (typeof CERTIFICATE_TYPES)[number];
 
-const STATUS_CLASS: Record<string, string> = {
-  REQUESTED: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+const STATUS_CLASS: Record<CertificateStatus, string> = {
+  DRAFT: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  PENDING_APPROVAL: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+  APPROVED: 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300',
   ISSUED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-  REJECTED: 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300',
   CANCELLED: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
 };
 
-const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  REQUESTED: Clock,
+const STATUS_ICON: Record<CertificateStatus, React.ComponentType<{ className?: string }>> = {
+  DRAFT: Clock,
+  PENDING_APPROVAL: Clock,
+  APPROVED: CheckCircle2,
   ISSUED: CheckCircle2,
-  REJECTED: XCircle,
   CANCELLED: XCircle,
 };
 
@@ -201,15 +204,15 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
         accessorKey: 'status',
         header: t('columns.status'),
         cell: ({ row }) => {
-          const status = row.original.status.toUpperCase();
-          const Icon = STATUS_ICON[status] ?? Clock;
+          const status = row.original.status;
+          const Icon = STATUS_ICON[status];
           return (
             <Badge
               variant="secondary"
-              className={`inline-flex items-center gap-1 ${STATUS_CLASS[status] ?? ''}`}
+              className={`inline-flex items-center gap-1 ${STATUS_CLASS[status]}`}
             >
               <Icon className="size-3.5" />
-              {t(`certificateStatuses.${status}`, { default: status })}
+              {t(`certificateStatuses.${status}`)}
             </Badge>
           );
         },
@@ -269,12 +272,14 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
 
 // ─── Issue Certificate Dialog ───────────────────────────────────────────────
 
-const issueCertSchema = z.object({
-  templateId: z.string().min(1, 'Template is required'),
-  studentProfileId: z.string().min(1, 'Student is required'),
-  purpose: z.string().min(3, 'Purpose is required'),
-});
-type IssueCertFormValues = z.input<typeof issueCertSchema>;
+function buildIssueCertSchema(t: ReturnType<typeof useTranslations<'certificates'>>) {
+  return z.object({
+    templateId: z.string().min(1, t('other.dialog.errors.templateRequired')),
+    studentProfileId: z.string().min(1, t('other.dialog.errors.studentRequired')),
+    purpose: z.string().trim().min(3, t('other.dialog.errors.purposeRequired')),
+  });
+}
+type IssueCertFormValues = z.input<ReturnType<typeof buildIssueCertSchema>>;
 
 const ISSUE_CERT_DEFAULTS: IssueCertFormValues = {
   templateId: '',
@@ -303,6 +308,9 @@ function IssueCertificateDialog({
   const [previewHtml, setPreviewHtml] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [runPreview, { loading: previewLoading }] = usePreviewCertificate();
+  const { data: templatesData, loading: templatesLoading } = useCertificateTemplates(defaultType);
+  const templates = templatesData?.listCertificateTemplates ?? [];
+  const issueCertSchema = React.useMemo(() => buildIssueCertSchema(t), [t]);
 
   const form = useAppForm({
     defaultValues: ISSUE_CERT_DEFAULTS,
@@ -400,6 +408,21 @@ function IssueCertificateDialog({
     }
   };
 
+  const templateOptions = React.useMemo(() => {
+    if (templates.length === 0 && !templatesLoading) {
+      return [
+        {
+          value: '__none__',
+          label: t('other.dialog.noTemplates', {
+            type: t(`types.${defaultType}`, { default: defaultType }),
+          }),
+          disabled: true,
+        },
+      ];
+    }
+    return templates.map((template) => ({ value: template.id, label: template.name }));
+  }, [templates, templatesLoading, t, defaultType]);
+
   const studentOptions = React.useMemo(() => {
     const opts: Array<{ value: string; label: string; disabled?: boolean }> = [];
     if (students.length === 0) {
@@ -437,10 +460,17 @@ function IssueCertificateDialog({
             <FieldGroup>
               <form.AppField name="templateId">
                 {(field) => (
-                  <field.TextField
+                  <field.SelectField
                     label={t('other.dialog.templateLabel')}
-                    placeholder={t('other.dialog.templatePlaceholder')}
+                    options={templateOptions}
+                    placeholder={
+                      templatesLoading
+                        ? t('other.dialog.templatesLoading')
+                        : t('other.dialog.templatePlaceholder')
+                    }
+                    optional={false}
                     help={otherCertificateHelp.template}
+                    testId={instituteCertificatesOther.templateSelect}
                   />
                 )}
               </form.AppField>

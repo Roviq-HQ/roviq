@@ -1263,6 +1263,7 @@ export const testIds = {
   // ── Institute: certificates → other ───────────────────────────────────
   instituteCertificatesOther: {
     title: 'other-certs-title',
+    templateSelect: 'other-certs-template-select',
   },
 
   // ── Institute: groups ─────────────────────────────────────────────────
