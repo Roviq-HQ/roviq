@@ -60,12 +60,6 @@ export interface AddPeriodServiceInput {
   session?: 'MORNING' | 'MAIN' | 'EVENING';
 }
 
-function isNameDuplicate(err: unknown): boolean {
-  return String((err as { message?: string })?.message ?? err).includes(
-    'timetables_tenant_year_name_key',
-  );
-}
-
 @Injectable()
 export class TimetableService {
   constructor(
@@ -106,32 +100,21 @@ export class TimetableService {
       extraClass: input.extraClass,
     });
 
-    let timetable: TimetableRecord;
-    try {
-      // Atomic: timetable + sections + period grid in one transaction.
-      timetable = await this.repo.createWithGrid(
-        {
-          academicYearId,
-          name: input.name,
-          description: input.description ?? null,
-          effectiveFrom: input.effectiveFrom,
-          effectiveTo: input.effectiveTo,
-          workingDays: input.workingDays,
-          dayStartTime: input.dayStartTime,
-          defaultPeriodDurationMins: input.defaultPeriodDurationMins,
-        },
-        input.sectionIds,
-        periods,
-      );
-    } catch (err) {
-      if (isNameDuplicate(err)) {
-        throw new BusinessException(
-          ErrorCode.TIMETABLE_NAME_DUPLICATE,
-          'A timetable with this name already exists in this academic year.',
-        );
-      }
-      throw err;
-    }
+    // Atomic: timetable + sections + period grid in one transaction.
+    const timetable = await this.repo.createWithGrid(
+      {
+        academicYearId,
+        name: input.name,
+        description: input.description ?? null,
+        effectiveFrom: input.effectiveFrom,
+        effectiveTo: input.effectiveTo,
+        workingDays: input.workingDays,
+        dayStartTime: input.dayStartTime,
+        defaultPeriodDurationMins: input.defaultPeriodDurationMins,
+      },
+      input.sectionIds,
+      periods,
+    );
 
     this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.created, {
       timetableId: timetable.id,
@@ -191,18 +174,7 @@ export class TimetableService {
         'Timetable end date must be on or after the start date.',
       );
     }
-    let updated: TimetableRecord;
-    try {
-      updated = await this.repo.updateTimetable(id, input);
-    } catch (err) {
-      if (isNameDuplicate(err)) {
-        throw new BusinessException(
-          ErrorCode.TIMETABLE_NAME_DUPLICATE,
-          'A timetable with this name already exists in this academic year.',
-        );
-      }
-      throw err;
-    }
+    const updated = await this.repo.updateTimetable(id, input);
     this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.updated, {
       timetableId: updated.id,
       tenantId: updated.tenantId,
@@ -215,17 +187,7 @@ export class TimetableService {
   async activate(id: string): Promise<TimetableRecord> {
     const current = await this.findById(id);
     TIMETABLE_STATE_MACHINE.assertTransition(current.status, 'ACTIVE');
-    let result: { timetable: TimetableRecord; previousActiveId: string | null };
-    try {
-      result = await this.repo.activateExclusive(id, current.academicYearId);
-    } catch (err) {
-      // Partial-unique backstop — should be unreachable given the swap, but
-      // surface a clean business error if a race slips through.
-      throw new BusinessException(
-        ErrorCode.TIMETABLE_ALREADY_ACTIVE,
-        `Another timetable is already active for this academic year: ${String(err)}`,
-      );
-    }
+    const result = await this.repo.activateExclusive(id, current.academicYearId);
     this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.activated, {
       timetableId: result.timetable.id,
       tenantId: result.timetable.tenantId,

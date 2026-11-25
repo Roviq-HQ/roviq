@@ -6,6 +6,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   i18nDisplay,
+  mapUniqueViolation,
   membershipsLive,
   mkInstituteCtx,
   sectionsLive,
@@ -24,6 +25,7 @@ import {
   timetableSectionsLive,
   timetables,
   timetablesLive,
+  type UniqueViolationErrors,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -213,6 +215,23 @@ const overrideWriteReturning = {
   updatedAt: timetableDayOverrides.updatedAt,
 } as const;
 
+const NAME_TAKEN: UniqueViolationErrors = {
+  timetables_tenant_year_name_key: () =>
+    new BusinessException(
+      ErrorCode.TIMETABLE_NAME_DUPLICATE,
+      'A timetable with this name already exists in this academic year.',
+    ),
+};
+
+// The swap demotes the old ACTIVE row first; only a second activation running at once gets here.
+const ALREADY_ACTIVE: UniqueViolationErrors = {
+  timetables_active_per_year_key: () =>
+    new BusinessException(
+      ErrorCode.TIMETABLE_ALREADY_ACTIVE,
+      'Another timetable is already active for this academic year.',
+    ),
+};
+
 @Injectable()
 export class TimetableDrizzleRepository extends TimetableRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -309,7 +328,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         );
       }
       return timetable;
-    });
+    }).catch(mapUniqueViolation(NAME_TAKEN));
   }
 
   async findTimetableById(id: string): Promise<TimetableRecord | null> {
@@ -379,7 +398,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
       return rows[0] as TimetableRecord;
-    });
+    }).catch(mapUniqueViolation(NAME_TAKEN));
   }
 
   async setStatus(id: string, status: TimetableRecord['status']): Promise<TimetableRecord> {
@@ -429,7 +448,7 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         timetable: rows[0] as TimetableRecord,
         previousActiveId: demoted[0]?.id ?? null,
       };
-    });
+    }).catch(mapUniqueViolation(ALREADY_ACTIVE));
   }
 
   async findActiveTimetable(academicYearId: string): Promise<TimetableRecord | null> {
