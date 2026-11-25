@@ -10,6 +10,7 @@ import {
   staffProfilesLive,
   tenantSequences,
   tenantUserProfilesLive,
+  uniqueViolationConstraint,
   withTenant,
 } from '@roviq/database';
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
@@ -25,7 +26,9 @@ import { StaffRepository } from './staff.repository';
 import type {
   CreateStaffMembershipData,
   CreateStaffProfileData,
+  CreateStaffProfileResult,
   DeletedStaffRecord,
+  RestoreStaffResult,
   StaffListQuery,
   StaffProfileRow,
   StaffStatistics,
@@ -35,6 +38,9 @@ import type {
 } from './staff.types';
 
 const ORIGIN = 'service:staff';
+const EMPLOYEE_ID_UNIQUE = 'uq_staff_profiles_tenant_employee_id';
+/** Values of the series skipped because a typed ID already holds them, before giving up. */
+const MAX_SEQUENCE_SKIPS = 1000;
 
 /**
  * Projection for the staff list and detail: `staff_profiles_live` joined with the institute's
@@ -174,34 +180,62 @@ export class StaffDrizzleRepository extends StaffRepository {
         })
         .onConflictDoNothing();
 
-      const result = await tx.execute(
-        sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'employee_id')`,
-      );
-      const row = result.rows[0] as { next_val: string; formatted: string };
-      return row.formatted || `EMP-${row.next_val}`;
+      for (let attempt = 0; attempt < MAX_SEQUENCE_SKIPS; attempt++) {
+        const result = await tx.execute(
+          sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'employee_id')`,
+        );
+        const row = result.rows[0] as { next_val: string; formatted: string };
+        const candidate = row.formatted || `EMP-${row.next_val}`;
+        const [taken] = await tx
+          .select({ id: staffProfilesLive.id })
+          .from(staffProfilesLive)
+          .where(eq(staffProfilesLive.employeeId, candidate))
+          .limit(1);
+        if (!taken) return candidate;
+      }
+      throw new Error(`employee_id series of ${tenantId} has no free value`);
     });
   }
 
-  async createProfile(data: CreateStaffProfileData): Promise<StaffProfileRow> {
-    return withTenant(this.db, mkInstituteCtx(data.tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .insert(staffProfiles)
-        .values({
-          userId: data.userId,
-          membershipId: data.membershipId,
-          tenantId: data.tenantId,
-          employeeId: data.employeeId,
-          designation: data.designation,
-          department: data.department,
-          dateOfJoining: data.dateOfJoining,
-          employmentType: data.employmentType,
-          specialization: data.specialization,
-          createdBy: data.actorId,
-          updatedBy: data.actorId,
-        })
-        .returning();
-      return rows[0];
+  async isEmployeeIdTaken(tenantId: string, employeeId: string): Promise<boolean> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const [row] = await tx
+        .select({ id: staffProfilesLive.id })
+        .from(staffProfilesLive)
+        .where(eq(staffProfilesLive.employeeId, employeeId))
+        .limit(1);
+      return Boolean(row);
     });
+  }
+
+  async createProfile(data: CreateStaffProfileData): Promise<CreateStaffProfileResult> {
+    try {
+      return await withTenant(this.db, mkInstituteCtx(data.tenantId, ORIGIN), async (tx) => {
+        const rows = await tx
+          .insert(staffProfiles)
+          .values({
+            userId: data.userId,
+            membershipId: data.membershipId,
+            tenantId: data.tenantId,
+            employeeId: data.employeeId,
+            designation: data.designation,
+            department: data.department,
+            dateOfJoining: data.dateOfJoining,
+            employmentType: data.employmentType,
+            specialization: data.specialization,
+            socialCategory: data.socialCategory,
+            createdBy: data.actorId,
+            updatedBy: data.actorId,
+          })
+          .returning();
+        return { kind: 'ok' as const, row: rows[0] };
+      });
+    } catch (err) {
+      if (uniqueViolationConstraint(err) === EMPLOYEE_ID_UNIQUE) {
+        return { kind: 'employee_id_taken' };
+      }
+      throw err;
+    }
   }
 
   async findSignInTarget(tenantId: string, id: string): Promise<SignInTarget | null> {
@@ -296,16 +330,21 @@ export class StaffDrizzleRepository extends StaffRepository {
     });
   }
 
-  async restore(tenantId: string, id: string, actorId: string): Promise<boolean> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .update(staffProfiles)
-        // delete() stamps the leaving date, so restore has to clear it again.
-        .set({ deletedAt: null, deletedBy: null, dateOfLeaving: null, updatedBy: actorId })
-        .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
-        .returning({ id: staffProfiles.id });
-      return rows.length > 0;
-    });
+  async restore(tenantId: string, id: string, actorId: string): Promise<RestoreStaffResult> {
+    try {
+      return await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+        const rows = await tx
+          .update(staffProfiles)
+          // delete() stamps the leaving date, so restore has to clear it again.
+          .set({ deletedAt: null, deletedBy: null, dateOfLeaving: null, updatedBy: actorId })
+          .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
+          .returning({ id: staffProfiles.id });
+        return rows.length > 0 ? 'restored' : 'not_found';
+      });
+    } catch (err) {
+      if (uniqueViolationConstraint(err) === EMPLOYEE_ID_UNIQUE) return 'employee_id_taken';
+      throw err;
+    }
   }
 
   async statistics(tenantId: string): Promise<StaffStatistics> {

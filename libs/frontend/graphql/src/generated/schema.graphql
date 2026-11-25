@@ -2116,6 +2116,11 @@ input CreateStaffInput {
 
   """Email address"""
   email: String
+
+  """
+  The institute's own employee ID, up to 30 characters. Unique among current staff of the institute (EMPLOYEE_ID_DUPLICATE); when omitted the next number of the institute's employee ID series is used.
+  """
+  employeeId: String
   employmentType: EmploymentType
 
   """First name of the staff member"""
@@ -2125,6 +2130,9 @@ input CreateStaffInput {
 
   """10-digit Indian mobile number"""
   phone: String
+
+  """Social category, printed in UDISE+ and board staff reports"""
+  socialCategory: SocialCategory
 
   """Subject specialization (coaching-specific)"""
   specialization: String
@@ -4521,7 +4529,9 @@ type Mutation {
   """
   createSection(input: CreateSectionInput!): SectionModel!
 
-  """Create a new staff member"""
+  """
+  Create a new staff member. Fails with EMPLOYEE_ID_DUPLICATE when a typed employee ID is already used by a current staff member.
+  """
   createStaffMember(input: CreateStaffInput!): StaffModel!
 
   """Add a qualification record to a staff profile"""
@@ -4816,7 +4826,7 @@ type Mutation {
   restorePlan(id: ID!): SubscriptionPlanModel!
 
   """
-  Restore a soft-deleted staff member and clear the leaving date that delete set.
+  Restore a soft-deleted staff member and clear the leaving date that delete set. Fails with EMPLOYEE_ID_DUPLICATE when a current staff member now has its employee ID.
   """
   restoreStaffMember(id: ID!): Boolean!
 

@@ -34,7 +34,10 @@ export class StaffResolver {
     return this.staffService.statistics() as Promise<StaffStatistics>;
   }
 
-  @Mutation(() => StaffModel, { description: 'Create a new staff member' })
+  @Mutation(() => StaffModel, {
+    description:
+      'Create a new staff member. Fails with EMPLOYEE_ID_DUPLICATE when a typed employee ID is already used by a current staff member.',
+  })
   @CheckAbility({ action: 'create', subject: 'Staff' })
   async createStaffMember(@Args('input') input: CreateStaffInput): Promise<StaffModel> {
     return this.staffService.create(input) as Promise<StaffModel>;
@@ -69,7 +72,8 @@ export class StaffResolver {
   }
 
   @Mutation(() => Boolean, {
-    description: 'Restore a soft-deleted staff member and clear the leaving date that delete set.',
+    description:
+      'Restore a soft-deleted staff member and clear the leaving date that delete set. Fails with EMPLOYEE_ID_DUPLICATE when a current staff member now has its employee ID.',
   })
   @CheckAbility({ action: 'restore', subject: 'Staff' })
   async restoreStaffMember(@Args('id', { type: () => ID }) id: string): Promise<boolean> {

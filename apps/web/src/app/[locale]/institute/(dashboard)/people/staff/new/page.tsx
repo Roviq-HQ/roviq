@@ -1,7 +1,7 @@
 'use client';
 
 import { EMPLOYMENT_TYPE_VALUES, GENDER_VALUES, SOCIAL_CATEGORY_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
 import {
   buildI18nTextSchema,
   dateSchema,
@@ -104,6 +104,8 @@ export default function CreateStaffPage() {
               dateOfJoining: parsed.dateOfJoining,
               employmentType: parsed.employmentType,
               specialization: parsed.specialization,
+              employeeId: parsed.employeeId,
+              socialCategory: parsed.socialCategory,
             },
           },
         });
@@ -112,6 +114,11 @@ export default function CreateStaffPage() {
         const id = result.data?.createStaffMember.id;
         router.push(id ? `/institute/people/staff/${id}` : '/institute/people/staff');
       } catch (err) {
+        if (extractGraphQLErrorCode(err) === 'EMPLOYEE_ID_DUPLICATE') {
+          setServerFieldError(form, 'employeeId', t('new.errors.employeeIdDuplicate'));
+          toast.error(t('new.errors.employeeIdDuplicate'));
+          return;
+        }
         const message = extractGraphQLError(err, t('new.errors.generic'));
         if (message.includes('DUPLICATE') || message.includes('already exists')) {
           setServerFieldError(form, 'email', t('new.errors.duplicate'));

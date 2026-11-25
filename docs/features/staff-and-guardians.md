@@ -41,6 +41,13 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 | `resendStaffSignInDetails` | Mutation | `Boolean` | `update Staff` |
 | `resendGuardianSignInDetails` | Mutation | `Boolean` | `update Guardian` |
 
+`createStaffMember` takes an optional `employeeId`. A typed one is checked before the account is
+created and refused with `EMPLOYEE_ID_DUPLICATE` when a current staff member of the institute has
+it (the partial unique index `uq_staff_profiles_tenant_employee_id` backs this; a deleted row frees
+its ID, and restoring it after the ID was reused answers the same code). A blank one takes the next
+value of the institute's `employee_id` series (`EMP-0001`, …) that no current staff member holds.
+`socialCategory` is saved with the profile.
+
 `createGuardian` with a `studentProfileId` reads the student under the caller's institute before
 it creates the account: an unknown student answers `STUDENT_NOT_FOUND` and nothing is created
 or sent.

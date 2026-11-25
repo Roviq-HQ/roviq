@@ -8,7 +8,8 @@
  *   - locale-aware router: cancel/back trigger `@roviq/i18n` `useRouter.push`
  *   - i18n bundle hygiene: per-namespace draft keys removed
  */
-import { screen } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -64,6 +65,8 @@ interface CreateStaffCall {
       dateOfJoining?: string;
       employmentType?: string;
       specialization?: string;
+      employeeId?: string;
+      socialCategory?: string;
     };
   };
 }
@@ -132,6 +135,32 @@ describe('CreateStaffPage (component)', () => {
     ]) {
       expect(screen.getByTestId(testId)).toBeInTheDocument();
     }
+  });
+
+  it('sends a typed employee ID', async () => {
+    renderPage();
+    await userEvent.type(screen.getByTestId('staff-new-first-name-en'), 'Kiran');
+    await userEvent.type(screen.getByTestId('staff-new-employee-id-input'), 'T-101');
+    await userEvent.click(screen.getByTestId('staff-new-submit-btn'));
+    await waitFor(() => expect(createStaffMock).toHaveBeenCalledTimes(1));
+    expect(createStaffMock.mock.calls[0][0].variables.input.employeeId).toBe('T-101');
+  });
+
+  it('shows the translated duplicate message on the employee ID field', async () => {
+    createStaffMock.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'raw server text', extensions: { code: 'EMPLOYEE_ID_DUPLICATE' } }],
+      }),
+    );
+    renderPage();
+    await userEvent.type(screen.getByTestId('staff-new-first-name-en'), 'Kiran');
+    await userEvent.type(screen.getByTestId('staff-new-employee-id-input'), 'T-101');
+    await userEvent.click(screen.getByTestId('staff-new-submit-btn'));
+    const message = staffMessages.new.errors.employeeIdDuplicate;
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(toastError).toHaveBeenCalledWith(message);
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   // ── Shared DraftBanner (common.draft.*, not per-namespace keys) ──────

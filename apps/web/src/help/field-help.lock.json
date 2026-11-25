@@ -233,34 +233,39 @@
     }
   },
   "staff.new.employeeId": {
-    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "reviewedReason": "ROV-349: the form now sends both fields and they are saved; a typed ID must be unique among current staff, a blank one gets the next free number; copy updated",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
-      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.nextEmployeeId": "2495666d6de5f979",
-      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "78dfdec2b894ed29",
+      "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.employeeId": "641f121582967b66",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.isEmployeeIdTaken": "bc568858ff5191e4",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.nextEmployeeId": "3ff8fb26937368fa",
+      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "35db1182432ebd42",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employeeId": "f9e8a61520422893",
+      "libs/database/migrations/20261125103827_staff-employee-id-unique/migration.sql": "39095d7d920e7ed1",
       "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.employeeId": "e7eb23b0b39dcabe"
     }
   },
   "staff.new.employmentType": {
-    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "reviewedReason": "ROV-349 changed StaffService.create for employee ID only; a blank employment type still saves REGULAR",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#employmentTypeLabel": "77f867f8fc3f9ec3",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#natureOfAppointment": "258551f6a99f01be",
-      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "78dfdec2b894ed29",
+      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "35db1182432ebd42",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employmentType": "475b302d88f226a3",
       "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.employmentType": "10cdeeee06753925",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#EMPLOYMENT_TYPE_VALUES": "94efbeee1c41000e"
     }
   },
   "staff.new.socialCategory": {
-    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "reviewedReason": "ROV-349: the form now sends both fields and they are saved; a typed ID must be unique among current staff, a blank one gets the next free number; copy updated",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#socialCategoryLabel": "3bbe711f064dffa2",
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
+      "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.socialCategory": "2b09f0b294718d21",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.createProfile": "2a2193b8875090a5",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.socialCategory": "dedf1ebf4ff4ed89",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#SOCIAL_CATEGORY_VALUES": "bbeddad581aafbe2"
     }

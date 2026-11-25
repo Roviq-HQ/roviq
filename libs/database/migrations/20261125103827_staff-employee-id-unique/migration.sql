@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "uq_staff_profiles_tenant_employee_id" ON "staff_profiles" ("tenant_id","employee_id") WHERE "deleted_at" IS NULL;

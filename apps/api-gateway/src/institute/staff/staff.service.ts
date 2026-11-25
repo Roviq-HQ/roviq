@@ -70,6 +70,12 @@ export class StaffService {
       }
     }
 
+    // Checked before the account exists, so a refused ID leaves nothing behind.
+    const typedEmployeeId = input.employeeId?.trim();
+    if (typedEmployeeId && (await this.repo.isEmployeeIdTaken(tenantId, typedEmployeeId))) {
+      throw employeeIdDuplicate(typedEmployeeId);
+    }
+
     const suffix = crypto.randomUUID().slice(0, 12);
     const email = input.email ?? `staff-${suffix}@roviq.placeholder`;
     const username = `staff-${tenantId.slice(0, 8)}-${suffix}`;
@@ -112,9 +118,9 @@ export class StaffService {
       },
     });
 
-    const employeeId = await this.repo.nextEmployeeId(tenantId);
+    const employeeId = typedEmployeeId || (await this.repo.nextEmployeeId(tenantId));
 
-    const profile = await this.repo.createProfile({
+    const created = await this.repo.createProfile({
       tenantId,
       userId: newUser.id,
       membershipId: newMembership.id,
@@ -124,8 +130,12 @@ export class StaffService {
       dateOfJoining: input.dateOfJoining ?? new Date().toISOString().split('T')[0],
       employmentType: input.employmentType ?? EmploymentType.REGULAR,
       specialization: input.specialization ?? null,
+      socialCategory: input.socialCategory ?? null,
       actorId,
     });
+    // Another create took the same ID between the check and the insert.
+    if (created.kind === 'employee_id_taken') throw employeeIdDuplicate(employeeId);
+    const profile = created.row;
 
     this.eventBus.emit(EVENT_PATTERNS.STAFF.joined, {
       staffProfileId: profile.id,
@@ -227,8 +237,14 @@ export class StaffService {
     const actorId = this.userId;
 
     const restored = await this.repo.restore(tenantId, id, actorId);
-    if (!restored) {
+    if (restored === 'not_found') {
       throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, 'Deleted staff member not found');
+    }
+    if (restored === 'employee_id_taken') {
+      throw new BusinessException(
+        ErrorCode.EMPLOYEE_ID_DUPLICATE,
+        'A current staff member now has this employee ID; change theirs before restoring',
+      );
     }
 
     this.eventBus.emit(EVENT_PATTERNS.STAFF.joined, { staffProfileId: id, tenantId });
@@ -238,4 +254,11 @@ export class StaffService {
   async statistics() {
     return this.repo.statistics(this.tenantId);
   }
+}
+
+function employeeIdDuplicate(employeeId: string): BusinessException {
+  return new BusinessException(
+    ErrorCode.EMPLOYEE_ID_DUPLICATE,
+    `Employee ID ${employeeId} is already used by a current staff member`,
+  );
 }
