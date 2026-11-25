@@ -28,6 +28,8 @@ pnpm test:e2e:ui                  # Playwright UI tests across 3 portals plus cr
 # Full pipeline
 pnpm test:all                     # unit + int + e2e:api + e2e:ui
 pnpm ci:check                     # lint/typecheck/test/e2e gate, run by .husky/pre-push (see "CI and pre-push")
+pnpm ci:queue                     # whether a gate is running on this machine, and whose
+pnpm check:migration-chain        # each migration's parent is the one before it (no fork after a rebase)
 
 # Coverage
 pnpm test:coverage                # unit-node + unit-dom with v8 coverage
