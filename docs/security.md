@@ -50,7 +50,8 @@ Detail: [Auth](auth.md#impersonation).
 - Every change is recorded with who, what and when, for all three scopes. The institute and
   reseller database roles can add entries and cannot change or delete them.
 - An institute sees its own entries and the actions that resellers and platform staff took on it.
-- Sign-ins, failed sign-ins, lockouts and session endings are recorded separately.
+- Sign-ins, failed sign-ins, lockouts and session endings are recorded separately, and no database
+  role, the platform's included, can change or delete those records.
 
 Detail: [Audit logging](features/audit-logging.md), [Auth](auth.md#auth-events-rov-96).
 
