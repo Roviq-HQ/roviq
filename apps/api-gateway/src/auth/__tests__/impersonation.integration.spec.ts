@@ -66,7 +66,7 @@ const IMPERSONATE_USER = `
 const MY_INSTITUTE = `query { myInstitute { id } }`;
 const SESSION = `
   query($sessionId: String!) {
-    adminImpersonationSessions(sessionId: $sessionId) { id status endedReason otpVerified }
+    adminImpersonationSessions(sessionId: $sessionId) { id status endedReason otpVerifiedAt }
   }
 `;
 
@@ -201,7 +201,7 @@ describe('Impersonation (integration)', () => {
         id: claims.impersonationSessionId,
         status: 'ACTIVE',
         endedReason: null,
-        otpVerified: null,
+        otpVerifiedAt: null,
       });
     });
 
@@ -657,6 +657,35 @@ describe('Impersonation (integration)', () => {
       });
       expect(end.errors).toBeUndefined();
       expect(end.data?.endImpersonation).toBe(true);
+    });
+
+    it('records when the code was verified and by whom (ROV-285)', async () => {
+      const before = Date.now();
+      const { claims } = await impersonateAs('reseller_full_admin');
+
+      const response = await gqlRequest(result.httpServer, {
+        query: `query($sessionId: String!) {
+          adminImpersonationSessions(sessionId: $sessionId) { otpVerifiedAt otpVerifiedByName }
+        }`,
+        variables: { sessionId: claims.impersonationSessionId },
+        token: platformAdminToken,
+      });
+      expect(response.errors).toBeUndefined();
+      const row = response.data?.adminImpersonationSessions[0];
+      const verifiedAt = new Date(row.otpVerifiedAt).getTime();
+      expect(verifiedAt).toBeGreaterThanOrEqual(before - 1000);
+      expect(verifiedAt).toBeLessThanOrEqual(Date.now());
+      expect(row.otpVerifiedByName).toBe(owned.username);
+    });
+
+    it('no longer answers the old otpVerified field (ROV-285)', async () => {
+      // gqlRequest throws on the HTTP 400 that a validation error returns.
+      await expect(
+        gqlRequest(result.httpServer, {
+          query: `query { adminImpersonationSessions(first: 1) { otpVerified } }`,
+          token: platformAdminToken,
+        }),
+      ).rejects.toThrow(/Cannot query field \\"otpVerified\\".*GRAPHQL_VALIDATION_FAILED/);
     });
 
     it('a reseller full admin session is not view-only', async () => {

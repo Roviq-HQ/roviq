@@ -104,7 +104,7 @@
     "expiresAt": "Expires at",
     "endedAt": "Ended at",
     "endedReason": "Ended reason",
-    "otpVerified": "OTP verified at",
+    "otpVerifiedAt": "OTP verified at",
     "otpVerifiedBy": "OTP verified by",
     "auditEntries": "{count, plural, =1 {1 audit entry} other {# audit entries}} during this session",
     "noAuditEntries": "No audit entries recorded during this session.",

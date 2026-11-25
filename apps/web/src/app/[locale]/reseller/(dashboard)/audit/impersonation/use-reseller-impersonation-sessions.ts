@@ -26,7 +26,7 @@ const RESELLER_IMPERSONATION_SESSIONS_QUERY = gql`
       expiresAt
       endedAt
       endedReason
-      otpVerified
+      otpVerifiedAt
       status
     }
   }

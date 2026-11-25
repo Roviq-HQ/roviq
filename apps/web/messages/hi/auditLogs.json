@@ -104,7 +104,7 @@
     "expiresAt": "समाप्ति समय",
     "endedAt": "समाप्त समय",
     "endedReason": "समाप्ति कारण",
-    "otpVerified": "OTP सत्यापित समय",
+    "otpVerifiedAt": "OTP सत्यापित समय",
     "otpVerifiedBy": "OTP सत्यापनकर्ता",
     "auditEntries": "इस सत्र के दौरान {count, plural, =1 {1 ऑडिट प्रविष्टि} other {# ऑडिट प्रविष्टियाँ}}",
     "noAuditEntries": "इस सत्र के दौरान कोई ऑडिट प्रविष्टि दर्ज नहीं।",

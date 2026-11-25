@@ -104,7 +104,7 @@ export function ImpersonationSessionPanel({
                 <Field label={t('session.expiresAt')} value={fmt(session.expiresAt)} />
                 <Field label={t('session.endedAt')} value={fmt(session.endedAt)} />
                 <Field label={t('session.endedReason')} value={session.endedReason} />
-                <Field label={t('session.otpVerified')} value={fmt(session.otpVerified)} />
+                <Field label={t('session.otpVerifiedAt')} value={fmt(session.otpVerifiedAt)} />
                 <Field label={t('session.otpVerifiedBy')} value={session.otpVerifiedByName} />
               </dl>
 

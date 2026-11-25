@@ -30,7 +30,7 @@ export async function seedE2eImpersonationSessions(tx: DrizzleDB): Promise<void>
         userAgent: 'Mozilla/5.0 (seed)',
         startedAt: new Date(now),
         expiresAt: new Date(now + 55 * MINUTE),
-        otpVerified: new Date(now),
+        otpVerifiedAt: new Date(now),
         otpVerifiedBy: SEED_IDS.USER_ADMIN,
       },
       {
@@ -46,7 +46,7 @@ export async function seedE2eImpersonationSessions(tx: DrizzleDB): Promise<void>
         expiresAt: new Date(now - 105 * MINUTE),
         endedAt: new Date(now - 110 * MINUTE),
         endedReason: 'manual',
-        otpVerified: new Date(now - 120 * MINUTE),
+        otpVerifiedAt: new Date(now - 120 * MINUTE),
         otpVerifiedBy: SEED_IDS.USER_ADMIN,
       },
       {

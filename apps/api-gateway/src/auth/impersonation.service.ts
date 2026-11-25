@@ -719,7 +719,7 @@ export class ImpersonationService {
       userAgent: request.userAgent,
       startedAt: now,
       expiresAt: new Date(now.getTime() + MAX_SESSION_DURATION_MS),
-      otpVerified: otpVerifiedBy ? now : null,
+      otpVerifiedAt: otpVerifiedBy ? now : null,
       otpVerifiedBy,
     });
     this.eventBus.emit(EVENT_PATTERNS.IMPERSONATION.session_started, {

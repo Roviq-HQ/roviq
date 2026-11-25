@@ -1,0 +1,1 @@
+ALTER TABLE "impersonation_sessions" RENAME COLUMN "otp_verified" TO "otp_verified_at";
