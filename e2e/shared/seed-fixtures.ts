@@ -32,7 +32,7 @@ import {
 import { SEED_IDS } from '../../libs/database/src/seed/ids';
 
 // Re-export so `import { SEED_IDS } from '.../seed-fixtures'` works.
-export { SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_PERSON_NAMES, SEED_SLUGS };
+export { SEED_ADMISSIONS, SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_PERSON_NAMES, SEED_SLUGS };
 
 // Mirrors `NEW_PASSWORD_MIN_LENGTH` from
 // `libs/shared/common-types/src/lib/policy/password-policy.ts`. Duplicated

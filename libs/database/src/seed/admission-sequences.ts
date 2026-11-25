@@ -1,5 +1,3 @@
-// libs/database/src/seed/admission-sequences.ts
-//
 // Seeded students carry admission numbers from the runtime's series. Each series counter
 // is set to the highest seeded value so the first generated number follows them (ROV-276).
 import { sql } from 'drizzle-orm';

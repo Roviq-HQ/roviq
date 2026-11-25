@@ -28,7 +28,7 @@ import type {
 } from '@roviq/graphql/generated';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { SEED_IDS, SEED_PEOPLE } from '../../shared/seed-fixtures';
+import { SEED_ADMISSIONS, SEED_IDS, SEED_PEOPLE } from '../../shared/seed-fixtures';
 import { loginAsInstituteAdmin, loginAsInstituteAdminSecondInstitute } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
@@ -673,15 +673,17 @@ describe('Student E2E', () => {
       return student.admissionNumber;
     }
 
+    // Highest seeded serial per series; a series with no seeded student starts at 0.
     it.each([
-      ['Nursery', -3],
-      ['LKG', -2],
-      ['UKG', -1],
-      ['Class 1', 1],
-      ['Class 5', 5],
-    ])('admits into %s of Institute 1 with a number no seeded student holds', async (_label, order) => {
+      ['Nursery', -3, SEED_ADMISSIONS.STUDENT_7.value],
+      ['LKG', -2, 0],
+      ['UKG', -1, 0],
+      ['Class 1', 1, 0],
+      ['Class 5', 5, SEED_ADMISSIONS.STUDENT_5.value],
+    ])('admits into %s of Institute 1 past every seeded number', async (_label, order, seededMax) => {
       const number = await admitAndDelete(accessToken, SEED_IDS.ACADEMIC_YEAR_INST1, order);
       expect(seededNumbers.has(number)).toBe(false);
+      expect(Number(/(\d+)$/.exec(number)?.[1])).toBeGreaterThan(seededMax);
     });
 
     it('admits into Institute 2 with a number no seeded student holds', async () => {

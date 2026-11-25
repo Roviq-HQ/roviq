@@ -42,11 +42,7 @@ const SEEDED_ADMISSION_PROFILE_IDS = {
   STUDENT_7: SEED_IDS.STUDENT_PROFILE_7,
 } as const satisfies Record<keyof typeof SEED_ADMISSIONS, string>;
 
-/**
- * Every seeded student whose profile exists carries the number the runtime series would
- * have issued for its class and admission date, and that series' counter is at least its
- * value, so the next generated number cannot repeat it (ROV-276).
- */
+/** Seeded numbers match their series and each counter is past them, so none repeats (ROV-276). */
 export async function expectSeededAdmissionsMatchSeries(
   db: DrizzleDB,
   keys: readonly (keyof typeof SEED_ADMISSIONS)[],

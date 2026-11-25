@@ -1,9 +1,4 @@
-/**
- * ROV-276: after the e2e seed, the next admission number in every class of every seeded
- * institute is free. Seeded students carry numbers from the runtime series and each
- * series counter starts past them. Every issue is rolled back so the shared database
- * keeps its counters.
- */
+/** ROV-276: after the seed, the next number in every seeded class is free; issues roll back. */
 import {
   type DrizzleDB,
   mkAdminCtx,
