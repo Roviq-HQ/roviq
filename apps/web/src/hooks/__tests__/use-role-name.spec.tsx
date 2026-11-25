@@ -18,7 +18,7 @@ describe('useRoleName', () => {
   it('translates a system role key into Hindi', () => {
     renderWithProviders(<RoleLabel name={{ en: 'institute_admin' }} />, { locale: 'hi' });
 
-    expect(screen.getByText('संस्थान व्यवस्थापक')).toBeInTheDocument();
+    expect(screen.getByText('संस्थान एडमिन')).toBeInTheDocument();
   });
 
   it('shows a role the institute named itself as written, in the current language', () => {
