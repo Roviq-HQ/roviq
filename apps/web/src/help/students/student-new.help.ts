@@ -3,17 +3,30 @@ import { defineFieldHelp, helpOptions } from '@roviq/ui';
 
 export const studentNewHelp = defineFieldHelp('students.new', {
   socialCategory: {
-    title: { en: 'Social category', hi: 'सामाजिक श्रेणी' },
+    title: { en: 'Social category', hi: 'कैटेगरी (सामाजिक वर्ग)' },
     body: {
-      en: "The student's government classification. It is printed on the transfer certificate and in the UDISE+, Shala Darpan and admission register exports. Pick the category on the student's certificate; leave it blank if you do not know it yet.",
-      hi: 'विद्यार्थी का सरकारी वर्गीकरण। यह स्थानांतरण प्रमाणपत्र पर और UDISE+, शाला दर्पण व प्रवेश रजिस्टर एक्सपोर्ट में छपता है। विद्यार्थी के प्रमाणपत्र वाली श्रेणी चुनें; पता न हो तो अभी खाली छोड़ें।',
+      en: "The student's government category. It is printed on the TC and in the UDISE+, Shala Darpan and admission register exports.",
+      hi: 'स्टूडेंट की सरकारी कैटेगरी। यह TC पर और UDISE+, शाला दर्पण व एडमिशन रजिस्टर के एक्सपोर्ट में छपती है।',
     },
+    points: [
+      {
+        en: "Pick what is written on the student's caste certificate.",
+        hi: 'स्टूडेंट के कास्ट सर्टिफिकेट पर जो लिखा है, वही चुनें।',
+      },
+      {
+        en: 'Not sure? Leave it blank and fill it in later.',
+        hi: 'पता नहीं है? खाली छोड़ दें, बाद में भर सकते हैं।',
+      },
+    ],
     options: helpOptions<SocialCategory>({
-      GENERAL: { en: 'No reservation category.', hi: 'कोई आरक्षण श्रेणी नहीं।' },
-      OBC: { en: 'Other Backward Class.', hi: 'अन्य पिछड़ा वर्ग।' },
-      SC: { en: 'Scheduled Caste.', hi: 'अनुसूचित जाति।' },
-      ST: { en: 'Scheduled Tribe.', hi: 'अनुसूचित जनजाति।' },
-      EWS: { en: 'Economically Weaker Section.', hi: 'आर्थिक रूप से कमज़ोर वर्ग।' },
+      GENERAL: { en: 'No reserved category', hi: 'कोई रिज़र्वेशन नहीं' },
+      OBC: { en: 'Other Backward Class', hi: 'अन्य पिछड़ा वर्ग' },
+      SC: { en: 'Scheduled Caste', hi: 'अनुसूचित जाति' },
+      ST: { en: 'Scheduled Tribe', hi: 'अनुसूचित जनजाति' },
+      EWS: {
+        en: 'Economically Weaker Section (General category, low family income)',
+        hi: 'आर्थिक रूप से कमज़ोर वर्ग (General कैटेगरी, कम आय वाला परिवार)',
+      },
     }),
   },
   academicYear: {
@@ -28,25 +41,31 @@ export const studentNewHelp = defineFieldHelp('students.new', {
     },
   },
   admissionType: {
-    title: { en: 'Admission type', hi: 'प्रवेश प्रकार' },
-    hint: { en: 'Left blank, New is saved.', hi: 'खाली छोड़ने पर नया सहेजा जाता है।' },
+    title: { en: 'Admission type', hi: 'एडमिशन टाइप' },
+    hint: { en: 'Left blank, New is saved.', hi: 'खाली छोड़ने पर नया एडमिशन सेव होता है।' },
     body: {
-      en: 'How the student joined your institute. It is printed in the admission register export. Pick the route the student actually came by.',
-      hi: 'विद्यार्थी आपके संस्थान में कैसे आया। यह प्रवेश रजिस्टर एक्सपोर्ट में छपता है। वही मार्ग चुनें जिससे विद्यार्थी वास्तव में आया।',
+      en: 'How the student joined your institute. It is printed in the admission register export.',
+      hi: 'स्टूडेंट आपके संस्थान में कैसे आया। यह एडमिशन रजिस्टर के एक्सपोर्ट में छपता है।',
     },
+    points: [
+      {
+        en: 'Pick the way the student actually came.',
+        hi: 'स्टूडेंट जिस तरह सच में आया, वही चुनें।',
+      },
+    ],
     options: helpOptions<AdmissionType>({
-      NEW: { en: 'Joining your institute for the first time.', hi: 'आपके संस्थान में पहली बार प्रवेश।' },
+      NEW: { en: 'First time at your institute', hi: 'आपके संस्थान में पहली बार' },
       LATERAL_ENTRY: {
-        en: 'Joining mid-session from another institute.',
-        hi: 'किसी अन्य संस्थान से सत्र के बीच में प्रवेश।',
+        en: 'Joining in the middle of the session, from another institute',
+        hi: 'सेशन के बीच में दूसरे संस्थान से आया',
       },
       RE_ADMISSION: {
-        en: 'A student who left your institute and is coming back.',
-        hi: 'आपका संस्थान छोड़ चुका विद्यार्थी, जो वापस आ रहा है।',
+        en: 'Left your institute earlier and is now coming back',
+        hi: 'पहले आपका संस्थान छोड़ चुका था, अब वापस आ रहा है',
       },
       TRANSFER: {
-        en: 'Joining with a transfer certificate from another institute.',
-        hi: 'किसी अन्य संस्थान के स्थानांतरण प्रमाणपत्र के साथ प्रवेश।',
+        en: 'Coming from another institute with a TC',
+        hi: 'दूसरे संस्थान से TC लेकर आया',
       },
     }),
   },

@@ -2,9 +2,9 @@
 //
 // 1. Help topics. Every `defineFieldHelp(scope, { … })` lives under `apps/web/src/help/`. In it:
 //    - each topic id (`<scope>.<key>`) is unique across all help files;
-//    - each help text (`title`, `body`, `hint`, `example`, every `options` entry) is an object
-//      literal with a non-empty string literal for every UI locale (`en`, `hi`), so the copy can
-//      be read here and by the drift check;
+//    - each help text (`title`, `body`, `hint`, `example`, `avoid`, every `points` and `options`
+//      entry) is an object literal with a non-empty string literal for every UI locale (`en`,
+//      `hi`), so the copy can be read here and by the drift check;
 //    - `hint` is at most HELP_LIMITS.hint characters and `body` at most HELP_LIMITS.body, per locale;
 //    - `article` is a function returning `import('./<file>')` of a file that exists;
 //    - each topic is used (`<exportName>.<key>`) somewhere in `apps/web/src` outside the help folder.
@@ -48,7 +48,7 @@ const ROOT = process.cwd();
 const WEB_SRC = 'apps/web/src';
 const HELP_DIR = 'apps/web/src/help';
 const LOCALES = ['en', 'hi'] as const;
-const HELP_TEXT_KEYS = ['title', 'body', 'hint', 'example'] as const;
+const HELP_TEXT_KEYS = ['title', 'body', 'hint', 'example', 'avoid'] as const;
 
 export const INPUT_TAGS: ReadonlySet<string> = new Set([
   'input',
@@ -212,6 +212,21 @@ function topicFields(topic: ts.ObjectLiteralExpression): Map<string, ts.Expressi
   return fields;
 }
 
+function checkPoints(ctx: TopicContext, points: ts.Expression): Problem[] {
+  if (!ts.isArrayLiteralExpression(points)) {
+    return [
+      {
+        file: ctx.source.fileName,
+        line: lineOf(ctx.source, points),
+        message: `${ctx.id}.points: must be an array literal`,
+      },
+    ];
+  }
+  return points.elements.flatMap((point, i) =>
+    checkHelpText(ctx.source, point, `${ctx.id}.points[${i}]`, HELP_LIMITS.body),
+  );
+}
+
 function checkOptions(ctx: TopicContext, options: ts.Expression): Problem[] {
   const optionsObj = objectLiteral(options);
   if (!optionsObj) {
@@ -273,6 +288,8 @@ function checkTopic(
   }
   const options = fields.get('options');
   if (options) problems.push(...checkOptions(ctx, options));
+  const points = fields.get('points');
+  if (points) problems.push(...checkPoints(ctx, points));
   const article = fields.get('article');
   if (article) problems.push(...checkArticle(ctx, article));
   return problems;

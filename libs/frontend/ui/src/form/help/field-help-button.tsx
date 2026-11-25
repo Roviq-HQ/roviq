@@ -2,6 +2,7 @@
 
 import { Button } from '@roviq/ui/components/ui/button';
 import { FieldInfoPopover } from '@roviq/ui/components/ui/field-info-popover';
+import { CircleCheck, TriangleAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
 import type { FieldHelpTopic, HelpArticle } from './field-help';
@@ -61,20 +62,36 @@ export function FieldHelpButton({
         triggerRef={triggerRef}
         data-testid={testId ?? `field-help-${topic.id}`}
       >
-        <p>{text(topic.body, topic.values)}</p>
-        {options.length > 0 && (
-          <ul>
-            {options.map((option) => (
-              <li key={option.value}>
-                <em>{option.label}</em>: {option.help}
-              </li>
-            ))}
-          </ul>
-        )}
-        {topic.example && (
-          <p>
-            <em>{t('example')}</em> {text(topic.example, topic.values)}
-          </p>
+        {topic.points ? (
+          <RichHelpContent
+            lead={text(topic.body, topic.values)}
+            points={topic.points.map((point) => text(point, topic.values))}
+            options={options}
+            optionHeading={t('optionHeading')}
+            meaningHeading={t('meaningHeading')}
+            good={topic.example ? text(topic.example, topic.values) : undefined}
+            goodLabel={t('good')}
+            avoid={topic.avoid ? text(topic.avoid, topic.values) : undefined}
+            avoidLabel={t('avoid')}
+          />
+        ) : (
+          <>
+            <p>{text(topic.body, topic.values)}</p>
+            {options.length > 0 && (
+              <ul>
+                {options.map((option) => (
+                  <li key={option.value}>
+                    <em>{option.label}</em>: {option.help}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {topic.example && (
+              <p>
+                <em>{t('example')}</em> {text(topic.example, topic.values)}
+              </p>
+            )}
+          </>
         )}
         {loadArticle && (
           <p>
@@ -109,5 +126,92 @@ export function FieldHelpButton({
         />
       )}
     </>
+  );
+}
+
+interface RichHelpContentProps {
+  lead: string;
+  points: readonly string[];
+  options: readonly { value: string; label: string; help: string }[];
+  optionHeading: string;
+  meaningHeading: string;
+  good?: string;
+  goodLabel: string;
+  avoid?: string;
+  avoidLabel: string;
+}
+
+/** The rich layout: bold lead, bulleted rules, options table, then good and avoid lines. */
+function RichHelpContent({
+  lead,
+  points,
+  options,
+  optionHeading,
+  meaningHeading,
+  good,
+  goodLabel,
+  avoid,
+  avoidLabel,
+}: RichHelpContentProps) {
+  return (
+    <div className="space-y-2.5">
+      <p className="font-medium leading-snug text-foreground">{lead}</p>
+      {points.length > 0 && (
+        <ul className="list-disc space-y-1 ps-4 marker:text-muted-foreground">
+          {points.map((point) => (
+            <li key={point}>{point}</li>
+          ))}
+        </ul>
+      )}
+      {options.length > 0 && (
+        <table className="w-full border-collapse text-start text-[13px]">
+          <thead>
+            <tr className="border-b border-border/60 text-xs text-muted-foreground">
+              <th scope="col" className="py-1 pe-3 text-start font-medium">
+                {optionHeading}
+              </th>
+              <th scope="col" className="py-1 text-start font-medium">
+                {meaningHeading}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {options.map((option) => (
+              <tr key={option.value} className="border-b border-border/40 last:border-0">
+                <th
+                  scope="row"
+                  className="py-1.5 pe-3 text-start align-top font-semibold whitespace-nowrap text-foreground"
+                >
+                  {option.label}
+                </th>
+                <td className="py-1.5 align-top">{option.help}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {good && (
+        <p className="flex items-start gap-2 rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-foreground">
+          <CircleCheck
+            className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+            aria-hidden="true"
+          />
+          <span>
+            <span className="font-semibold">{goodLabel}</span> {good}
+          </span>
+        </p>
+      )}
+      {avoid && (
+        <p className="flex items-start gap-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-foreground">
+          <TriangleAlert
+            className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+            aria-hidden="true"
+          />
+          <span>
+            <span className="font-semibold">{avoidLabel}</span> {avoid}
+          </span>
+        </p>
+      )}
+    </div>
   );
 }

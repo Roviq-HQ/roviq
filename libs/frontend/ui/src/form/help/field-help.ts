@@ -31,8 +31,15 @@ export interface FieldHelpTopicInput {
   body: HelpText;
   /** One sentence shown under the label in `ICON_AND_HINT` mode. */
   hint?: HelpText;
-  /** An institute example. */
+  /** An institute example; shown as the "Good" line when the topic has `points`. */
   example?: HelpText;
+  /**
+   * Short rules shown as a bulleted list. A topic with points is shown in the rich layout: the
+   * body as a bold lead line, the points, the options as a table, then the good and avoid lines.
+   */
+  points?: readonly HelpText[];
+  /** What not to enter and why; shown with a warning icon in the rich layout. */
+  avoid?: HelpText;
   /** What each choice changes, keyed by the real option value. */
   options?: Readonly<Partial<Record<string, HelpText>>>;
   /** Real shared constants, used as `{name}` in the copy so limits cannot drift. */

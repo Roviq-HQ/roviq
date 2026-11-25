@@ -59,11 +59,11 @@
       "OTHER": "अन्य"
     },
     "socialCategories": {
-      "GENERAL": "सामान्य",
-      "OBC": "ओबीसी",
-      "SC": "एससी",
-      "ST": "एसटी",
-      "EWS": "ईडब्ल्यूएस"
+      "GENERAL": "General",
+      "OBC": "OBC",
+      "SC": "SC",
+      "ST": "ST",
+      "EWS": "EWS"
     },
     "employmentTypes": {
       "REGULAR": "नियमित",
