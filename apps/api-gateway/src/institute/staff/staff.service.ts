@@ -5,7 +5,7 @@
  * Queries live in `StaffRepository`, which runs them under the institute's RLS context.
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { BusinessException, EmploymentType, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
@@ -17,9 +17,12 @@ import type { CreateStaffInput } from './dto/create-staff.input';
 import type { ListStaffFilterInput } from './dto/list-staff-filter.input';
 import type { UpdateStaffInput } from './dto/update-staff.input';
 import { StaffRepository } from './repositories/staff.repository';
+import type { CreateStaffResult } from './repositories/staff.types';
 
 @Injectable()
 export class StaffService {
+  private readonly logger = new Logger(StaffService.name);
+
   constructor(
     private readonly repo: StaffRepository,
     private readonly eventBus: EventBusService,
@@ -70,10 +73,17 @@ export class StaffService {
       }
     }
 
-    // Checked before the account exists, so a refused ID leaves nothing behind.
-    const typedEmployeeId = input.employeeId?.trim();
+    // Both checked before the account exists, so these refusals write nothing.
+    const typedEmployeeId = input.employeeId?.trim() || null;
     if (typedEmployeeId && (await this.repo.isEmployeeIdTaken(tenantId, typedEmployeeId))) {
       throw employeeIdDuplicate(typedEmployeeId);
+    }
+    const staffRoleId = await this.repo.findTeacherRoleId(tenantId);
+    if (staffRoleId === null) {
+      throw new BusinessException(
+        ErrorCode.ROLE_NOT_FOUND,
+        'Teacher role not found for this institute',
+      );
     }
 
     const suffix = crypto.randomUUID().slice(0, 12);
@@ -89,64 +99,50 @@ export class StaffService {
       phone,
       actorId,
     });
-    const newUser = { id: newUserId };
 
-    await this.identityService.ensureUserProfile(
-      newUser.id,
-      { firstName: input.firstName, lastName: input.lastName },
-      actorId,
-    );
-
-    const staffRoleId = await this.repo.findTeacherRoleId(tenantId);
-
-    if (staffRoleId === null)
-      throw new BusinessException(
-        ErrorCode.ROLE_NOT_FOUND,
-        'Teacher role not found for this institute',
-      );
-
-    const newMembership = await this.repo.createMembership({
-      tenantId,
-      userId: newUser.id,
-      roleId: staffRoleId,
-      actorId,
-      profile: {
-        firstName: input.firstName,
-        lastName: input.lastName,
-        gender: input.gender,
-        dateOfBirth: input.dateOfBirth,
-      },
-    });
-
-    const employeeId = typedEmployeeId || (await this.repo.nextEmployeeId(tenantId));
-
-    const created = await this.repo.createProfile({
-      tenantId,
-      userId: newUser.id,
-      membershipId: newMembership.id,
-      employeeId,
-      designation: input.designation ?? null,
-      department: input.department ?? null,
-      dateOfJoining: input.dateOfJoining ?? new Date().toISOString().split('T')[0],
-      employmentType: input.employmentType ?? EmploymentType.REGULAR,
-      specialization: input.specialization ?? null,
-      socialCategory: input.socialCategory ?? null,
-      actorId,
-    });
-    // Another create took the same ID between the check and the insert.
-    if (created.kind === 'employee_id_taken') throw employeeIdDuplicate(employeeId);
+    // The account is platform-level and written first; every institute row is one transaction.
+    // A create refused there (a typed ID taken meanwhile) or failing removes the account again.
+    const name = { firstName: input.firstName, lastName: input.lastName };
+    let created: CreateStaffResult;
+    try {
+      await this.identityService.ensureUserProfile(newUserId, name, actorId);
+      created = await this.repo.create({
+        tenantId,
+        userId: newUserId,
+        roleId: staffRoleId,
+        actorId,
+        employeeId: typedEmployeeId,
+        tenantProfile: { ...name, gender: input.gender, dateOfBirth: input.dateOfBirth },
+        staff: {
+          designation: input.designation ?? null,
+          department: input.department ?? null,
+          dateOfJoining: input.dateOfJoining ?? new Date().toISOString().split('T')[0],
+          employmentType: input.employmentType ?? EmploymentType.REGULAR,
+          specialization: input.specialization ?? null,
+          socialCategory: input.socialCategory ?? null,
+        },
+      });
+    } catch (error) {
+      await this.discardAccount(newUserId);
+      throw error;
+    }
+    if (created.kind === 'employee_id_taken') {
+      await this.discardAccount(newUserId);
+      // Only a typed ID is refused: a blank one moves on to the next value of the series.
+      throw employeeIdDuplicate(typedEmployeeId ?? '');
+    }
     const profile = created.row;
 
     this.eventBus.emit(EVENT_PATTERNS.STAFF.joined, {
       staffProfileId: profile.id,
-      membershipId: newMembership.id,
+      membershipId: profile.membershipId,
       department: input.department,
       tenantId,
     });
 
     this.signInDetails.sendOnCreate({
       tenantId,
-      userId: newUser.id,
+      userId: newUserId,
       username,
       email: input.email,
       phone,
@@ -159,6 +155,17 @@ export class StaffService {
     // joined name + photo from the institute's profile copy (StaffModel.firstName is now
     // i18nText and required).
     return this.findById(profile.id);
+  }
+
+  /** A failed create must not leave the account it made behind. */
+  private async discardAccount(userId: string): Promise<void> {
+    try {
+      if (!(await this.identityService.discardNewUser(userId))) {
+        this.logger.warn(`Kept account ${userId} of a failed staff create: it is in use`);
+      }
+    } catch (error) {
+      this.logger.error(`Could not remove account ${userId} of a failed staff create`, error);
+    }
   }
 
   /** New temporary password for a staff member of this institute who has not signed in yet. */

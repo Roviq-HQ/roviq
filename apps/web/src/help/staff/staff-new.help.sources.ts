@@ -12,7 +12,7 @@ export const staffNewHelpSources = {
     `${ENUMS}#SOCIAL_CATEGORY_VALUES`,
     `${FORM}#buildSchema.socialCategory`,
     `${STAFF}/dto/create-staff.input.ts#CreateStaffInput.socialCategory`,
-    `${STAFF}/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.createProfile`,
+    `${STAFF}/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.create`,
     `${EXPORTS}/export-helpers.ts#socialCategoryLabel`,
     `${EXPORTS}/bseh-staff-statement.export.ts#buildBsehStaffStatement`,
     `${EXPORTS}/shala-darpan.export.ts#buildShalaDarpanExport`,
@@ -20,7 +20,7 @@ export const staffNewHelpSources = {
   employeeId: [
     `${FORM}#buildSchema.employeeId`,
     `${STAFF}/staff.service.ts#StaffService.create`,
-    `${STAFF}/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.nextEmployeeId`,
+    `${STAFF}/repositories/staff.drizzle-repository.ts#insertWithSeriesId`,
     `${STAFF}/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.isEmployeeIdTaken`,
     `${STAFF}/dto/create-staff.input.ts#CreateStaffInput.employeeId`,
     'libs/database/migrations/20261125103827_staff-employee-id-unique/migration.sql',
