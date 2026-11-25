@@ -140,10 +140,15 @@ describe('ResellerProfilePage', () => {
     await user.clear(name);
     await user.type(name, 'A');
 
-    await waitFor(() =>
-      expect(screen.getByTestId('reseller-settings-profile-save-btn')).toBeDisabled(),
-    );
-    expect(name).toHaveAttribute('aria-invalid', 'true');
+    await waitFor(() => expect(name).toHaveAttribute('aria-invalid', 'true'));
+    vi.mocked(toast.error).mockClear();
+    const save = screen.getByTestId('reseller-settings-profile-save-btn');
+    expect(save).toBeEnabled();
+    await user.click(save);
+
+    await waitFor(() => expect(name).toHaveFocus());
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('shows translated copy when the server refuses the change', async () => {

@@ -155,7 +155,7 @@ test.describe('Guardians — create page', () => {
     await expect(page.locator('[data-slot="field-error"]').first()).toBeVisible();
   });
 
-  test('submitting with only Hindi first name keeps the button disabled (English required)', async ({
+  test('submitting with only Hindi first name is refused at the English name (English required)', async ({
     page,
   }) => {
     const create = new GuardianCreatePage(page);
@@ -164,8 +164,11 @@ test.describe('Guardians — create page', () => {
     await create.firstNameHindi().fill('संजय');
     await create.firstNameHindi().blur();
 
-    // Submit button stays disabled because English first name is required.
-    await expect(create.submitButton()).toBeDisabled();
+    // Save stays enabled; pressing it marks the missing English name and moves focus to it.
+    await expect(create.submitButton()).toBeEnabled();
+    await create.submit();
+    await expect(create.firstNameEnglish()).toHaveAttribute('aria-invalid', 'true');
+    await expect(create.firstNameEnglish()).toBeFocused();
     await create.expectOnNewPage();
   });
 
@@ -176,13 +179,16 @@ test.describe('Guardians — create page', () => {
     const create = new GuardianCreatePage(page);
     await create.goto('en');
 
-    // Fill optional fields without the required firstName — button stays disabled.
+    // Fill optional fields without the required firstName — the submit is refused.
     await create.emailInput().fill(email);
     await create.phoneInput().fill('12345'); // invalid phone
     await create.occupationInput().fill(occupation);
     await create.occupationInput().blur();
 
-    await expect(create.submitButton()).toBeDisabled();
+    await expect(create.submitButton()).toBeEnabled();
+    await create.submit();
+    await expect(create.firstNameEnglish()).toHaveAttribute('aria-invalid', 'true');
+    await expect(create.firstNameEnglish()).toBeFocused();
     await create.expectOnNewPage();
 
     // Fields must retain their values despite invalid state

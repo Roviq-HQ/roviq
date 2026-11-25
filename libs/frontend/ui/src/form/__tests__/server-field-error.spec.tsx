@@ -137,10 +137,10 @@ describe.each(configs)('$name', (config) => {
 
     it(
       sticks
-        ? 'keeps the error and the disabled submit after the field is edited'
+        ? 'keeps the error and refuses every submit after the field is edited'
         : 'drops the error once the field is edited',
       async () => {
-        await rejected((form) =>
+        const onAccepted = await rejected((form) =>
           form.setFieldMeta('profile.code', (prev) => ({
             ...prev,
             isTouched: true,
@@ -152,7 +152,9 @@ describe.each(configs)('$name', (config) => {
 
         if (sticks) {
           expect(screen.getByTestId('code-error')).toBeInTheDocument();
-          expect(screen.getByTestId('submit')).toBeDisabled();
+          await userEvent.click(screen.getByTestId('submit'));
+          expect(screen.getByTestId('code-error')).toBeInTheDocument();
+          expect(onAccepted).not.toHaveBeenCalled();
         } else {
           await waitFor(() => expect(screen.queryByTestId('code-error')).not.toBeInTheDocument());
         }

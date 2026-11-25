@@ -57,15 +57,18 @@ test.describe('My Profile', () => {
     await phoneInput.fill('1234');
     await phoneInput.blur();
 
-    // The form uses onChange zodValidator — canSubmit flips false the moment
-    // an invalid value is typed, so the submit button stays disabled. Assert
-    // the inline invalid state surfaces on the Field directly.
     const phoneField = page
       .getByTestId('profile-editable-section')
       .locator('[data-invalid="true"]')
       .first();
     await expect(phoneField).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId('profile-save-btn')).toBeDisabled();
+
+    // Save stays enabled; pressing it keeps the error and moves focus to the phone.
+    const save = page.getByTestId('profile-save-btn');
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(phoneInput).toBeFocused();
+    await expect(phoneInput).toHaveAttribute('aria-invalid', 'true');
   });
 
   test('saves profile with valid phone and shows success toast', async ({ page }, testInfo) => {

@@ -142,15 +142,14 @@ describe('EnquiriesPage (component)', () => {
     await userEvent.type(screen.getByTestId('enquiry-parent-phone-input'), '9876543210');
 
     const submit = screen.getByTestId('enquiry-form-submit-btn');
-    expect(submit).toBeDisabled();
+    expect(submit).toBeEnabled();
     await userEvent.click(submit);
-    expect(createEnquiry).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByTestId('enquiry-relation-select'));
-    await userEvent.click(
-      await screen.findByRole('option', { name: messagesEn.relationships.FATHER }),
-    );
-    await waitFor(() => expect(screen.getByTestId('enquiry-form-submit-btn')).toBeEnabled());
+    expect(
+      await screen.findByText(messagesEn.enquiries.newForm.errors.parentRelationRequired),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('enquiry-relation-select')).toHaveFocus());
+    expect(createEnquiry).not.toHaveBeenCalled();
   });
 
   it('marks the relationship as required and says so once it is left empty', async () => {

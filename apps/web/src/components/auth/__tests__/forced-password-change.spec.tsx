@@ -88,7 +88,7 @@ describe('ForcedPasswordChange', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('keeps submit disabled and names the missing rule for a password without a digit', async () => {
+  it('refuses to submit and names the missing rule for a password without a digit', async () => {
     storeSession(true);
     const { changePassword } = renderScreen();
     await screen.findByTestId(ids.title);
@@ -104,7 +104,13 @@ describe('ForcedPasswordChange', () => {
     );
 
     const submit = screen.getByRole('button', { name: messagesEn.passwordChange.submit });
-    await waitFor(() => expect(submit).toBeDisabled());
+    expect(submit).toBeEnabled();
+    await userEvent.click(submit);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(messagesEn.passwordChange.newPassword)).toHaveFocus(),
+    );
+    expect(changePassword).not.toHaveBeenCalled();
     expect(screen.getByText(messagesEn.passwordChange.numberError)).toBeInTheDocument();
     expect(screen.getByText(messagesEn.passwordChange.reqNumber).closest('li')).toHaveAttribute(
       'data-met',

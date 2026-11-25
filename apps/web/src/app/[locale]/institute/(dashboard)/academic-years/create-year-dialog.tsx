@@ -395,11 +395,8 @@ function DatePickerField({
   testId,
 }: DatePickerFieldProps) {
   const selected = value ? parseISO(value) : undefined;
-  // Surface validation errors on first render when they arrive via `onChange` /
-  // `onSubmit` validators — the DatePicker button is untouched at that point,
-  // so gating on `isTouched` suppressed the submit-time "required" message
-  // that tests (and real users) expect to see.
-  const visibleErrors = isTouched || errors.length > 0 ? errors : [];
+  // Touched once the picker closes, and every field is touched by a submit attempt.
+  const visibleErrors = isTouched ? errors : [];
   const invalid = visibleErrors.length > 0;
   const ids = useFieldHelpIds({
     name: fieldName,

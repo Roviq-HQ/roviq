@@ -40,6 +40,8 @@ interface ApplicantPickerProps {
   /** Offers the signed-in person first, so someone who files for others can return to themself. */
   includeSelf?: boolean;
   id?: string;
+  /** Marks the trigger invalid, so a refused submit can focus it. */
+  invalid?: boolean;
   testIds: ApplicantPickerTestIds;
 }
 
@@ -54,6 +56,7 @@ export function ApplicantPicker({
   onlyApplicable,
   includeSelf,
   id,
+  invalid,
   testIds,
 }: ApplicantPickerProps) {
   const t = useTranslations('leave');
@@ -111,6 +114,7 @@ export function ApplicantPicker({
       <PopoverTrigger asChild>
         <Button
           id={id}
+          aria-invalid={invalid || undefined}
           variant="outline"
           role="combobox"
           aria-expanded={open}

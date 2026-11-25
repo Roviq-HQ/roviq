@@ -91,9 +91,7 @@ test.describe('Staff — create page', () => {
     });
   });
 
-  test('submit button stays disabled while required firstName is empty (kit canSubmit gate)', async ({
-    page,
-  }) => {
+  test('a submit with the required firstName empty is refused at that field', async ({ page }) => {
     const email = `preserve.${Date.now()}@example.test`;
     const designation = 'Senior Teacher';
 
@@ -103,10 +101,15 @@ test.describe('Staff — create page', () => {
     await page.getByTestId('staff-new-phone-input').fill('9876543210');
     await page.getByTestId('staff-new-designation-input').fill(designation);
 
-    // TanStack Form's `canSubmit` is false while required i18nText firstName
-    // is empty, so the kit's SubmitButton renders disabled. User sees each
-    // field's inline Zod error on touch — no submit-click needed.
-    await expect(page.getByTestId('staff-new-submit-btn')).toBeDisabled();
+    // Save stays enabled; pressing it marks the missing first name and moves focus to it.
+    const submit = page.getByTestId('staff-new-submit-btn');
+    await expect(submit).toBeEnabled();
+    await submit.click();
+    await expect(page.getByTestId('staff-new-first-name-en')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    await expect(page.getByTestId('staff-new-first-name-en')).toBeFocused();
 
     // URL stays on the form and filled values persist.
     await expect(page).toHaveURL(/\/people\/staff\/new/);

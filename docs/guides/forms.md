@@ -202,7 +202,7 @@ Must be wrapped in `<form.AppForm>`:
 </form.AppForm>
 ```
 
-Internally subscribes to `isSubmitting` + `canSubmit` via `form.Subscribe` so the surrounding form does not re-render per keystroke.
+It is disabled only while submitting (or by `disabled`, for "no changes yet"), never because the form is invalid. A submit attempt marks every field touched, so each field shows its error, and `useAppForm` moves focus to the first field showing one (`[aria-invalid="true"]`, in page order). A field shows its error once it is touched or after a submit attempt, never before. A custom field that should take that focus sets `aria-invalid` on its control. It subscribes to `isSubmitting` only, so the surrounding form does not re-render per keystroke.
 
 ## Testing
 
