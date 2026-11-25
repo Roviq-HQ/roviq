@@ -56,8 +56,8 @@ read it, run it and change it.
 | **Resellers** | A portal to create and support their institutes, with plans, subscriptions and invoices (Enterprise) and their own team |
 | **Platform operators** | A portal for institutes and resellers, system health, audit and supervised support access |
 
-The full list, and what is **not** built yet (student fee collection, online exams, SMS and
-WhatsApp delivery), is in the [product overview](docs/product.md).
+The full list, and what is **not** built yet (student fee collection, online exams), is in the
+[product overview](docs/product.md).
 
 ## Quick start
 
