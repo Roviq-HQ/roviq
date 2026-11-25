@@ -170,8 +170,8 @@
     "dialog": {
       "title": "Issue {type} Certificate",
       "description": "Select the template, student, and purpose for this certificate.",
-      "templateLabel": "Template ID",
-      "templatePlaceholder": "Paste template UUID",
+      "templateLabel": "Template",
+      "templatePlaceholder": "Select a template",
       "studentLabel": "Student",
       "studentSearchPlaceholder": "Search by name or admission number…",
       "studentSelectPlaceholder": "Select a student",
@@ -198,6 +198,13 @@
         "section": "Section",
         "dateOfIssue": "Date of issue",
         "purpose": "Purpose"
+      },
+      "templatesLoading": "Loading templates…",
+      "noTemplates": "Your institute has no active {type} templates. Contact Roviq support to have one set up.",
+      "errors": {
+        "templateRequired": "Choose a template.",
+        "studentRequired": "Choose a student.",
+        "purposeRequired": "Enter the purpose, at least 3 characters."
       }
     },
     "errors": {

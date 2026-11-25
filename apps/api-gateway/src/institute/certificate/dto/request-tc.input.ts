@@ -1,7 +1,13 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
-import { CertificateStatus, CertificateTemplateType, TcStatus } from '@roviq/common-types';
+import {
+  CERTIFICATE_TEMPLATE_TYPE_VALUES,
+  CertificateStatus,
+  CertificateTemplateType,
+  TcStatus,
+} from '@roviq/common-types';
 import {
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -138,4 +144,15 @@ export class ListCertificateFilterInput {
   @IsOptional()
   @IsUUID()
   studentProfileId?: string;
+}
+
+@InputType({ description: 'Filter for listing certificate templates.' })
+export class ListCertificateTemplatesFilterInput {
+  @Field(() => String, {
+    nullable: true,
+    description: 'Only templates of this certificate type, e.g. BONAFIDE_CERTIFICATE.',
+  })
+  @IsOptional()
+  @IsIn(CERTIFICATE_TEMPLATE_TYPE_VALUES)
+  type?: CertificateTemplateType;
 }

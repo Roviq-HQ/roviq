@@ -1476,6 +1476,19 @@ enum CertificateStatus {
   PENDING_APPROVAL
 }
 
+"""A certificate template staff pick by name when issuing a certificate"""
+type CertificateTemplateModel {
+  id: ID!
+
+  """
+  Name shown in the picker, e.g. "Bonafide (CBSE)"
+  """
+  name: String!
+
+  """Certificate type, e.g. BONAFIDE_CERTIFICATE"""
+  type: String!
+}
+
 input ChangePlanInput {
   newPlanId: ID!
   subscriptionId: ID!
@@ -4088,6 +4101,12 @@ input ListCertificateFilterInput {
   type: String
 }
 
+"""Filter for listing certificate templates."""
+input ListCertificateTemplatesFilterInput {
+  """Only templates of this certificate type, e.g. BONAFIDE_CERTIFICATE."""
+  type: String
+}
+
 """Filter for listing guardians in an institute"""
 input ListGuardiansFilterInput {
   """
@@ -5740,6 +5759,11 @@ type Query {
   """List applications with filters"""
   listApplications(filter: ApplicationFilterInput): ApplicationConnection!
   listBots: [BotModel!]!
+
+  """
+  The institute's active certificate templates, by name, to pick one when issuing.
+  """
+  listCertificateTemplates(filter: ListCertificateTemplatesFilterInput): [CertificateTemplateModel!]!
 
   """List certificates with optional filters"""
   listCertificates(filter: ListCertificateFilterInput): [CertificateModel!]!

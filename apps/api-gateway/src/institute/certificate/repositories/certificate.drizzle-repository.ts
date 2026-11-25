@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CertificateStatus, type InstituteContext } from '@roviq/common-types';
+import {
+  CertificateStatus,
+  type CertificateTemplateType,
+  type InstituteContext,
+} from '@roviq/common-types';
 import {
   certificateTemplatesLive,
   DRIZZLE_DB,
@@ -12,13 +16,14 @@ import {
   tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import { markFilesReady } from '../../../files/file-attachment';
 import { CertificateRepository } from './certificate.repository';
 import type {
   CertificateListFilter,
   CertificateStudentRow,
   CertificateTemplateRow,
+  CertificateTemplateSummaryRow,
   CreateIssuedCertificateData,
   IssuedCertificateRow,
   MarkCertificateIssuedData,
@@ -48,6 +53,25 @@ export class CertificateDrizzleRepository extends CertificateRepository {
         .limit(1),
     );
     return row ?? null;
+  }
+
+  async listActiveTemplates(
+    ctx: InstituteContext,
+    type?: CertificateTemplateType,
+  ): Promise<CertificateTemplateSummaryRow[]> {
+    const conditions: SQL[] = [eq(certificateTemplatesLive.isActive, true)];
+    if (type) conditions.push(eq(certificateTemplatesLive.type, type));
+    return withTenant(this.db, ctx, (tx) =>
+      tx
+        .select({
+          id: certificateTemplatesLive.id,
+          type: certificateTemplatesLive.type,
+          name: certificateTemplatesLive.name,
+        })
+        .from(certificateTemplatesLive)
+        .where(and(...conditions))
+        .orderBy(asc(certificateTemplatesLive.name)),
+    );
   }
 
   async staffExists(ctx: InstituteContext, staffProfileId: string): Promise<boolean> {

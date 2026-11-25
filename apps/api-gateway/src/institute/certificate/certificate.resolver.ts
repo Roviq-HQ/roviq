@@ -10,8 +10,12 @@ import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CertificateService } from './certificate.service';
 import { PreviewCertificateInput } from './dto/preview-certificate.input';
-import { ListCertificateFilterInput, RequestCertificateInput } from './dto/request-tc.input';
-import { CertificateModel } from './models/tc.model';
+import {
+  ListCertificateFilterInput,
+  ListCertificateTemplatesFilterInput,
+  RequestCertificateInput,
+} from './dto/request-tc.input';
+import { CertificateModel, CertificateTemplateModel } from './models/tc.model';
 
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => CertificateModel)
@@ -72,6 +76,18 @@ export class CertificateResolver {
   ): Promise<CertificateModel> {
     assertTenantContext(user);
     return this.certService.findCertificateById(user, id);
+  }
+
+  @Query(() => [CertificateTemplateModel], {
+    description: "The institute's active certificate templates, by name, to pick one when issuing.",
+  })
+  @CheckAbility({ action: 'read', subject: 'Certificate' })
+  async listCertificateTemplates(
+    @CurrentUser() user: AuthUser,
+    @Args('filter', { nullable: true }) filter?: ListCertificateTemplatesFilterInput,
+  ): Promise<CertificateTemplateModel[]> {
+    assertTenantContext(user);
+    return this.certService.listCertificateTemplates(user, filter?.type);
   }
 
   @Query(() => [String], {

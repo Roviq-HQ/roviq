@@ -3,6 +3,7 @@ import type { otherCertificateHelp } from './other-certificate.help';
 
 export const otherCertificateHelpSources = {
   template: [
+    'apps/api-gateway/src/institute/certificate/repositories/certificate.drizzle-repository.ts#CertificateDrizzleRepository.listActiveTemplates',
     'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.getCertificateTemplateFields',
     'libs/database/src/schema/admission/certificate-templates.ts#certificateTemplates',
   ],

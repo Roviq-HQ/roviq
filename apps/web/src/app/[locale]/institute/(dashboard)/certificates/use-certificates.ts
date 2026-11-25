@@ -4,6 +4,7 @@ import { gql, useLazyQuery, useMutation, useQuery } from '@roviq/graphql';
 import type {
   AcademicYearModel,
   CertificateModel,
+  CertificateTemplateModel,
   ListCertificateFilterInput,
   ListTcFilterInput,
   PreviewCertificateInput,
@@ -299,6 +300,23 @@ export function useIssueCertificate() {
 }
 
 // ─── Template field auto-populate + preview ─────────────────────────────────
+
+const CERTIFICATE_TEMPLATES_QUERY = gql`
+  query ListCertificateTemplates($filter: ListCertificateTemplatesFilterInput) {
+    listCertificateTemplates(filter: $filter) {
+      id
+      name
+      type
+    }
+  }
+`;
+
+/** The institute's active templates of one certificate type, for the issue dialog's picker. */
+export function useCertificateTemplates(type: string) {
+  return useQuery<{
+    listCertificateTemplates: Pick<CertificateTemplateModel, 'id' | 'name' | 'type'>[];
+  }>(CERTIFICATE_TEMPLATES_QUERY, { variables: { filter: { type } } });
+}
 
 const CERTIFICATE_TEMPLATE_FIELDS_QUERY = gql`
   query GetCertificateTemplateFields($templateId: ID!) {

@@ -170,8 +170,8 @@
     "dialog": {
       "title": "{type} प्रमाण पत्र जारी करें",
       "description": "इस प्रमाण पत्र के लिए टेम्पलेट, छात्र और उद्देश्य चुनें।",
-      "templateLabel": "टेम्पलेट आईडी",
-      "templatePlaceholder": "टेम्पलेट UUID पेस्ट करें",
+      "templateLabel": "टेम्पलेट",
+      "templatePlaceholder": "टेम्पलेट चुनें",
       "studentLabel": "छात्र",
       "studentSearchPlaceholder": "नाम या प्रवेश संख्या से खोजें…",
       "studentSelectPlaceholder": "छात्र चुनें",
@@ -198,6 +198,13 @@
         "section": "अनुभाग",
         "dateOfIssue": "जारी करने की तारीख",
         "purpose": "उद्देश्य"
+      },
+      "templatesLoading": "टेम्पलेट लोड हो रहे हैं…",
+      "noTemplates": "आपके संस्थान में {type} का कोई सक्रिय टेम्पलेट नहीं है। इसे बनवाने के लिए Roviq सहायता से संपर्क करें।",
+      "errors": {
+        "templateRequired": "एक टेम्पलेट चुनें।",
+        "studentRequired": "एक विद्यार्थी चुनें।",
+        "purposeRequired": "उद्देश्य लिखें, कम से कम 3 अक्षर।"
       }
     },
     "errors": {

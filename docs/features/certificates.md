@@ -25,6 +25,7 @@ The certificates module (Linear issue **ROV-170**) provides the institute-scoped
 | `issueTC` | Mutation | `TC` | `update TC` |
 | `listCertificates` | Query | `CertificateConnection` | `read Certificate` |
 | `getCertificate` | Query | `Certificate` | `read Certificate` |
+| `listCertificateTemplates` | Query | `[CertificateTemplateModel]` | `read Certificate` |
 | `requestCertificate` | Mutation | `Certificate` | `create Certificate` |
 | `issueCertificate` | Mutation | `Certificate` | `update Certificate` |
 
@@ -34,7 +35,7 @@ Resolvers live under [apps/api-gateway/src/institute/certificate/](<../../apps/a
 
 - [`tc_register`](<../../libs/database/src/schema/admission/tc-register.ts>) — TC serial number, student FK, reason, status enum, issue date, duplicate flag. Serials are `TC/{academic year label}/NNNN` (for example `TC/2025-26/0001`). The counter restarts each academic year, and the year label keeps serials unique per tenant ([tc-serial.ts](<../../apps/api-gateway/src/institute/certificate/tc-serial.ts>)). The issued PDF is `pdf_file_id`; `verification_token` (unique) is the token in the QR code.
 - [`issued_certificates`](<../../libs/database/src/schema/admission/issued-certificates.ts>) — certificate instances with template FK, serial number and `pdf_file_id` (the rendered PDF in the `files` table; there is no URL column).
-- [`certificate_templates`](<../../libs/database/src/schema/admission/certificate-templates.ts>) — tenant-configurable templates (bonafide, character, migration).
+- [`certificate_templates`](<../../libs/database/src/schema/admission/certificate-templates.ts>) — tenant-configurable templates (bonafide, character, migration). The issue dialog lists the institute's active templates of the chosen type by name (`listCertificateTemplates`); no screen creates or edits templates.
 - [`groups`](<../../libs/database/src/schema/groups/groups.ts>) — dynamic student cohort definitions (API in `apps/api-gateway/src/institute/group/`).
 - [`group_rules`](<../../libs/database/src/schema/groups/group-rules.ts>) — JsonLogic rule rows per group.
 - [`group_members`](<../../libs/database/src/schema/groups/group-members.ts>) — materialized membership rows.
@@ -51,7 +52,7 @@ All tables spread `tenantColumns` and use `tenantPolicies()` for RLS.
 
 ## Multi-language names
 
-Certificate templates and student name snapshots are stored as `i18nText` jsonb (`{ "en": "Bonafide", "hi": "मूल निवास" }`). The TC PDF renderer picks the tenant's default locale for the issued copy and falls back through `current → en → first available`. Forms use `<I18nInput>` + `i18nTextSchema`. Searching the TC register by student name uses `search_vector @@ plainto_tsquery('simple', query)` joined onto the student profile row.
+Student name snapshots are stored as `i18nText` jsonb; a template's `name` is plain text. The TC PDF renderer picks the tenant's default locale for the issued copy and falls back through `current → en → first available`. Forms use `<I18nInput>` + `i18nTextSchema`. Searching the TC register by student name uses `search_vector @@ plainto_tsquery('simple', query)` joined onto the student profile row.
 
 ## Frontend patterns
 

@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../messages/en/certificates.json';
+import messagesHi from '../../../../../../../messages/hi/certificates.json';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
 
 vi.mock('next/navigation', () => ({
@@ -20,12 +21,26 @@ const mutationResult: [ReturnType<typeof vi.fn>, { loading: boolean }] = [
 ];
 const emptyQuery = { data: undefined };
 const useStudentPickerMock = vi.fn((_search: string, _filter?: unknown) => emptyQuery);
+const templatesResult = {
+  data: {
+    listCertificateTemplates: [
+      { id: 'tpl-1', name: 'Bonafide (CBSE)', type: 'BONAFIDE_CERTIFICATE' },
+      { id: 'tpl-2', name: 'Bonafide (short)', type: 'BONAFIDE_CERTIFICATE' },
+    ],
+  },
+  loading: false,
+};
+const noTemplatesResult = { data: { listCertificateTemplates: [] }, loading: false };
+const useCertificateTemplatesMock = vi.fn(
+  (_type: string): typeof templatesResult | typeof noTemplatesResult => templatesResult,
+);
 vi.mock('../use-certificates', () => ({
   useCertificates: () => certificatesResult,
   useIssueCertificate: () => mutationResult,
   useRequestCertificate: () => mutationResult,
   usePreviewCertificate: () => mutationResult,
   useCertificateTemplateFields: () => emptyQuery,
+  useCertificateTemplates: (type: string) => useCertificateTemplatesMock(type),
   useStudentPicker: (search: string, filter?: unknown) => useStudentPickerMock(search, filter),
 }));
 
@@ -35,17 +50,64 @@ vi.mock('sonner', () => ({
 
 import OtherCertificatesPage from '../other/page';
 
+async function openBonafideDialog(messages: typeof messagesEn) {
+  await userEvent.click(
+    screen.getByRole('button', {
+      name: messages.other.issueButton.replace('{type}', messages.types.BONAFIDE_CERTIFICATE),
+    }),
+  );
+  return screen.findByRole('dialog');
+}
+
 describe('OtherCertificatesPage — issue dialog', () => {
+  it("offers the institute's templates of the dialog's type by name", async () => {
+    renderWithProviders(<OtherCertificatesPage />, { messages: { certificates: messagesEn } });
+    await openBonafideDialog(messagesEn);
+
+    expect(useCertificateTemplatesMock).toHaveBeenCalledWith('BONAFIDE_CERTIFICATE');
+    expect(screen.getByText(messagesEn.other.dialog.templateLabel)).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'Bonafide (CBSE)', hidden: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'Bonafide (short)', hidden: true }),
+    ).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Paste template UUID')).not.toBeInTheDocument();
+  });
+
+  it('says so when the institute has no template of this type', async () => {
+    useCertificateTemplatesMock.mockImplementation(() => noTemplatesResult);
+    renderWithProviders(<OtherCertificatesPage />, { messages: { certificates: messagesEn } });
+    await openBonafideDialog(messagesEn);
+
+    const empty = messagesEn.other.dialog.noTemplates.replace(
+      '{type}',
+      messagesEn.types.BONAFIDE_CERTIFICATE,
+    );
+    expect(screen.getByRole('option', { name: empty, hidden: true })).toBeDisabled();
+    useCertificateTemplatesMock.mockImplementation(() => templatesResult);
+  });
+
+  it('shows the purpose rule in Hindi', async () => {
+    renderWithProviders(<OtherCertificatesPage />, {
+      locale: 'hi',
+      messages: { certificates: messagesHi },
+    });
+    await openBonafideDialog(messagesHi);
+
+    const purpose = screen.getByLabelText(messagesHi.other.dialog.purposeLabel);
+    await userEvent.type(purpose, 'ab');
+    await userEvent.tab();
+
+    expect(
+      await screen.findByText(messagesHi.other.dialog.errors.purposeRequired),
+    ).toBeInTheDocument();
+  });
+
   it('offers only enrolled students, as the TC dialog does', async () => {
     renderWithProviders(<OtherCertificatesPage />, { messages: { certificates: messagesEn } });
 
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: messagesEn.other.issueButton.replace('{type}', messagesEn.types.BONAFIDE_CERTIFICATE),
-      }),
-    );
-
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(await openBonafideDialog(messagesEn)).toBeInTheDocument();
     expect(useStudentPickerMock).toHaveBeenCalledWith('', {
       academicStatus: [AcademicStatus.ENROLLED],
     });

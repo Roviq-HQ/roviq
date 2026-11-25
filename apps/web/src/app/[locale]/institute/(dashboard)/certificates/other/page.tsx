@@ -44,6 +44,7 @@ import {
   type CertificateNode,
   useCertificates,
   useCertificateTemplateFields,
+  useCertificateTemplates,
   useIssueCertificate,
   usePreviewCertificate,
   useRequestCertificate,
@@ -269,12 +270,14 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
 
 // ─── Issue Certificate Dialog ───────────────────────────────────────────────
 
-const issueCertSchema = z.object({
-  templateId: z.string().min(1, 'Template is required'),
-  studentProfileId: z.string().min(1, 'Student is required'),
-  purpose: z.string().min(3, 'Purpose is required'),
-});
-type IssueCertFormValues = z.input<typeof issueCertSchema>;
+function buildIssueCertSchema(t: ReturnType<typeof useTranslations<'certificates'>>) {
+  return z.object({
+    templateId: z.string().min(1, t('other.dialog.errors.templateRequired')),
+    studentProfileId: z.string().min(1, t('other.dialog.errors.studentRequired')),
+    purpose: z.string().trim().min(3, t('other.dialog.errors.purposeRequired')),
+  });
+}
+type IssueCertFormValues = z.input<ReturnType<typeof buildIssueCertSchema>>;
 
 const ISSUE_CERT_DEFAULTS: IssueCertFormValues = {
   templateId: '',
@@ -303,6 +306,9 @@ function IssueCertificateDialog({
   const [previewHtml, setPreviewHtml] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [runPreview, { loading: previewLoading }] = usePreviewCertificate();
+  const { data: templatesData, loading: templatesLoading } = useCertificateTemplates(defaultType);
+  const templates = templatesData?.listCertificateTemplates ?? [];
+  const issueCertSchema = React.useMemo(() => buildIssueCertSchema(t), [t]);
 
   const form = useAppForm({
     defaultValues: ISSUE_CERT_DEFAULTS,
@@ -400,6 +406,21 @@ function IssueCertificateDialog({
     }
   };
 
+  const templateOptions = React.useMemo(() => {
+    if (templates.length === 0 && !templatesLoading) {
+      return [
+        {
+          value: '__none__',
+          label: t('other.dialog.noTemplates', {
+            type: t(`types.${defaultType}`, { default: defaultType }),
+          }),
+          disabled: true,
+        },
+      ];
+    }
+    return templates.map((template) => ({ value: template.id, label: template.name }));
+  }, [templates, templatesLoading, t, defaultType]);
+
   const studentOptions = React.useMemo(() => {
     const opts: Array<{ value: string; label: string; disabled?: boolean }> = [];
     if (students.length === 0) {
@@ -437,10 +458,17 @@ function IssueCertificateDialog({
             <FieldGroup>
               <form.AppField name="templateId">
                 {(field) => (
-                  <field.TextField
+                  <field.SelectField
                     label={t('other.dialog.templateLabel')}
-                    placeholder={t('other.dialog.templatePlaceholder')}
+                    options={templateOptions}
+                    placeholder={
+                      templatesLoading
+                        ? t('other.dialog.templatesLoading')
+                        : t('other.dialog.templatePlaceholder')
+                    }
+                    optional={false}
                     help={otherCertificateHelp.template}
+                    testId={instituteCertificatesOther.templateSelect}
                   />
                 )}
               </form.AppField>

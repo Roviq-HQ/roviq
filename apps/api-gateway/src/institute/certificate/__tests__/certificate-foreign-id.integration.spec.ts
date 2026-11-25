@@ -143,6 +143,15 @@ const TEMPLATE_FIELDS = /* GraphQL */ `
     getCertificateTemplateFields(templateId: $templateId)
   }
 `;
+const LIST_TEMPLATES = /* GraphQL */ `
+  query ListCertificateTemplates($filter: ListCertificateTemplatesFilterInput) {
+    listCertificateTemplates(filter: $filter) {
+      id
+      name
+      type
+    }
+  }
+`;
 const PREVIEW = /* GraphQL */ `
   query PreviewCertificate($input: PreviewCertificateInput!) {
     previewCertificate(input: $input)
@@ -617,6 +626,54 @@ describe('certificates and TCs: another institute id (ROV-293)', () => {
       expect(
         await query(LIST_CERTIFICATES, { filter: { studentProfileId: b.studentIds[0] } }),
       ).toEqual({ listCertificates: [] });
+    });
+
+    it('listCertificateTemplates should list its own active templates and none of another institute', async () => {
+      type Rows = { listCertificateTemplates: { id: string; name: string; type: string }[] };
+      const [character, inactive] = await asAdmin((tx) =>
+        tx
+          .insert(certificateTemplates)
+          .values([
+            {
+              tenantId: instA.tenantId,
+              type: 'CHARACTER_CERTIFICATE',
+              name: 'Character',
+              fieldsSchema: {},
+              ...BY,
+            },
+            {
+              tenantId: instA.tenantId,
+              type: 'BONAFIDE_CERTIFICATE',
+              name: 'Bonafide (retired)',
+              fieldsSchema: {},
+              isActive: false,
+              ...BY,
+            },
+          ])
+          .returning({ id: certificateTemplates.id }),
+      );
+
+      const all = await query<Rows>(LIST_TEMPLATES, {});
+      expect(all?.listCertificateTemplates).toEqual([
+        { id: a.templateId, name: 'Bonafide', type: 'BONAFIDE_CERTIFICATE' },
+        { id: character.id, name: 'Character', type: 'CHARACTER_CERTIFICATE' },
+      ]);
+      expect(ids(all?.listCertificateTemplates)).not.toContain(b.templateId);
+      expect(ids(all?.listCertificateTemplates)).not.toContain(inactive.id);
+
+      const bonafide = await query<Rows>(LIST_TEMPLATES, {
+        filter: { type: 'BONAFIDE_CERTIFICATE' },
+      });
+      expect(ids(bonafide?.listCertificateTemplates)).toEqual([a.templateId]);
+    });
+
+    it('listCertificateTemplates should refuse an unknown certificate type', async () => {
+      const res = await gqlRequest(result.httpServer, {
+        query: LIST_TEMPLATES,
+        variables: { filter: { type: 'NOT_A_TYPE' } },
+        token: tokenA,
+      });
+      expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.VALIDATION_FAILED);
     });
 
     it('getCertificateTemplateFields should read its own template', async () => {
