@@ -13,6 +13,7 @@ import {
   mkAdminCtx,
   SYSTEM_USER_ID,
   standards,
+  tenantSequences,
   withAdmin,
 } from '@roviq/database';
 import {
@@ -23,7 +24,9 @@ import {
   gqlRequest,
   type IntegrationAppResult,
   RESELLER_DIRECT_ID,
+  type TestInstitute,
 } from '@roviq/testing/integration';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 
@@ -351,5 +354,97 @@ describe('Admission enquiries (integration)', () => {
     });
     expect(response.errors).toBeDefined();
     expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+  });
+});
+
+describe('Enquiry numbers (integration)', () => {
+  const CREATE_NUMBERED = /* GraphQL */ `
+    mutation CreateEnquiry($input: CreateEnquiryInput!) {
+      createEnquiry(input: $input) {
+        enquiryNumber
+      }
+    }
+  `;
+
+  let result: IntegrationAppResult;
+  let first: TestInstitute;
+  let second: TestInstitute;
+
+  const tokenOf = (inst: TestInstitute) =>
+    createInstituteToken({
+      sub: inst.userId,
+      tenantId: inst.tenantId,
+      membershipId: inst.membershipId,
+      roleId: inst.roleId,
+    });
+
+  async function enquire(inst: TestInstitute, n: number): Promise<string> {
+    const response = await gqlRequest<{ createEnquiry: { enquiryNumber: string } }>(
+      result.httpServer,
+      {
+        query: CREATE_NUMBERED,
+        token: tokenOf(inst),
+        variables: {
+          input: {
+            studentName: `Numbered ${n}`,
+            classRequested: 'Class 1',
+            parentName: 'Parent',
+            parentPhone: `98765${String(n).padStart(5, '0')}`,
+            parentRelation: 'FATHER',
+            source: EnquirySource.WALK_IN,
+          },
+        },
+      },
+    );
+    expect(response.errors).toBeUndefined();
+    return response.data?.createEnquiry.enquiryNumber as string;
+  }
+
+  async function counter(tenantId: string) {
+    return withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx
+        .select({ value: tenantSequences.currentValue, format: tenantSequences.formatTemplate })
+        .from(tenantSequences)
+        .where(
+          and(eq(tenantSequences.tenantId, tenantId), eq(tenantSequences.sequenceName, 'enq_no')),
+        ),
+    );
+  }
+
+  beforeAll(async () => {
+    result = await createIntegrationApp({ modules: [AppModule] });
+    first = await createTestInstitute(result.db);
+    second = await createTestInstitute(result.db);
+  });
+
+  afterAll(async () => {
+    await result?.close();
+  });
+
+  it('a new institute needs no seeded series: its first enquiries are ENQ-000001 and ENQ-000002', async () => {
+    expect(await counter(first.tenantId)).toEqual([]);
+
+    expect(await enquire(first, 1)).toBe('ENQ-000001');
+    expect(await enquire(first, 2)).toBe('ENQ-000002');
+
+    expect(await counter(first.tenantId)).toEqual([{ value: 2n, format: 'ENQ-{value:06d}' }]);
+  });
+
+  it('another institute keeps its own counter', async () => {
+    expect(await enquire(second, 3)).toBe('ENQ-000001');
+    expect(await counter(second.tenantId)).toEqual([{ value: 1n, format: 'ENQ-{value:06d}' }]);
+  });
+
+  it('enquiries created at the same time on a new institute get ENQ-000001 to ENQ-000005', async () => {
+    const third = await createTestInstitute(result.db);
+    const numbers = await Promise.all([4, 5, 6, 7, 8].map((n) => enquire(third, n)));
+    expect([...numbers].sort()).toEqual([
+      'ENQ-000001',
+      'ENQ-000002',
+      'ENQ-000003',
+      'ENQ-000004',
+      'ENQ-000005',
+    ]);
+    expect(await counter(third.tenantId)).toEqual([{ value: 5n, format: 'ENQ-{value:06d}' }]);
   });
 });
