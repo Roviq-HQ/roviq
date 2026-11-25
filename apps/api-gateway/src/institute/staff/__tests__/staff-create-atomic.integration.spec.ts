@@ -1,7 +1,7 @@
 /**
- * ROV-362: adding a staff member is one unit of work. A refused create leaves no account,
- * membership or profile behind, a blank employee ID never answers EMPLOYEE_ID_DUPLICATE, and a
- * missing Teacher role is refused before anything is written.
+ * ROV-362: adding a staff member is one unit of work. A refused or failed create leaves no
+ * account, membership or profile behind, blank employee IDs never answer EMPLOYEE_ID_DUPLICATE
+ * (not even two at once), and a missing Teacher role is refused before anything is written.
  */
 import { randomUUID } from 'node:crypto';
 import { DefaultRoles, ErrorCode } from '@roviq/common-types';
@@ -218,6 +218,36 @@ describe('createStaffMember: one unit of work (ROV-362)', () => {
 
     expect(blank.errors).toBeUndefined();
     expect(blank.data?.createStaffMember.employeeId).toBe('EMP-0003');
+  });
+
+  it('should give two concurrent blank-ID creates distinct series values', async () => {
+    const inst = await setUpInstitute(true);
+
+    const [a, b] = await Promise.all([create(inst, {}), create(inst, {})]);
+
+    expect(a.errors).toBeUndefined();
+    expect(b.errors).toBeUndefined();
+    expect(
+      [a.data?.createStaffMember.employeeId, b.data?.createStaffMember.employeeId].sort(),
+    ).toEqual(['EMP-0001', 'EMP-0002']);
+  });
+
+  it('should discard the new account when the institute transaction fails for another reason', async () => {
+    const inst = await setUpInstitute(true);
+    const before = await written(inst);
+    const email = `fail_${randomUUID().slice(0, 8)}@test.local`;
+
+    // PostgreSQL refuses a NUL byte in text: the staff profile insert fails inside the
+    // institute transaction, after the membership and the profile copy were written in it.
+    const res = await create(inst, { email, designation: 'PGT\u0000Physics' });
+
+    expect(res.errors).toBeDefined();
+    expect(res.errors?.[0]?.extensions?.code).not.toBe(ErrorCode.EMPLOYEE_ID_DUPLICATE);
+    expect(await written(inst)).toEqual(before);
+    const accounts = await asAdmin((tx) =>
+      tx.select({ id: users.id }).from(users).where(eq(users.email, email)),
+    );
+    expect(accounts).toEqual([]);
   });
 
   it('should refuse a create when the institute has no Teacher role, writing nothing', async () => {
