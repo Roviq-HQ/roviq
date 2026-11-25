@@ -54,6 +54,7 @@ import { NotificationWriteDrizzleRepository } from '../repositories/notification
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import type { Audience } from '../repositories/types';
 import { FlowArrivals } from '../services/flow-arrivals.service';
+import type { TemplateSyncStarter } from '../services/template-sync-starter.service';
 import {
   AUTO_REPLY,
   START_CONFIRMATION,
@@ -382,6 +383,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       }),
     );
     const senders = new MessagingSenderDrizzleRepository(db);
+    const templateRows = new MessagingTemplateDrizzleRepository(db);
     sender = new ChannelSender(
       new ChannelAdapters([new WhatsAppCloudAdapter(cloud)]),
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
@@ -405,6 +407,9 @@ describe('WhatsApp delivery and webhook (integration)', () => {
         clock,
         new FlowArrivals(temporal),
         new NotificationMetrics(),
+        templateRows,
+        new TemplateSendability(templateRows),
+        createMock<TemplateSyncStarter>(),
       ),
     );
   }, PLATFORM_SENDER_LOCK_WAIT_MS);
