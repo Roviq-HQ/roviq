@@ -2,12 +2,14 @@ import { ConfigService } from '@nestjs/config';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { ChannelAdapterError } from '../../delivery/adapters/channel-adapter';
+import { TemplateSendability } from '../../delivery/whatsapp/template-sendability';
 import type { InboundBatch } from '../../delivery/whatsapp/webhook-payload';
 import { WhatsAppCloud } from '../../delivery/whatsapp/whatsapp-cloud';
 import type { WhatsAppCloudClient } from '../../delivery/whatsapp/whatsapp-cloud.client';
 import { Clock } from '../../delivery/whatsapp/whatsapp-route';
 import { MessagingInboundRepository } from '../../repositories/messaging-inbound.repository';
 import { MessagingSenderRepository } from '../../repositories/messaging-sender.repository';
+import { MessagingTemplateRepository } from '../../repositories/messaging-template.repository';
 import type {
   MessagingSenderRecord,
   ReceiptResult,
@@ -60,6 +62,8 @@ describe('WhatsAppWebhookService', () => {
   let arrivals: ReturnType<typeof createMock<FlowArrivals>>;
   let metrics: ReturnType<typeof createMock<NotificationMetrics>>;
   let service: WhatsAppWebhookService;
+  let templates: ReturnType<typeof createMock<MessagingTemplateRepository>>;
+  let sendability: TemplateSendability;
 
   beforeEach(() => {
     cloud = new WhatsAppCloud(cloudConfig());
@@ -87,7 +91,20 @@ describe('WhatsAppWebhookService', () => {
     vi.spyOn(clock, 'now').mockReturnValue(new Date('2026-11-23T10:00:00.000Z'));
     arrivals = createMock<FlowArrivals>({ arrived: vi.fn().mockResolvedValue(undefined) });
     metrics = createMock<NotificationMetrics>();
-    service = new WhatsAppWebhookService(senders, inbound, cloud, clock, arrivals, metrics);
+    templates = createMock<MessagingTemplateRepository>({
+      applyEvent: vi.fn().mockResolvedValue(true),
+    });
+    sendability = new TemplateSendability(templates);
+    service = new WhatsAppWebhookService(
+      senders,
+      inbound,
+      cloud,
+      clock,
+      arrivals,
+      metrics,
+      templates,
+      sendability,
+    );
   });
 
   it('should record nothing and send nothing for a number that is no sender here', async () => {

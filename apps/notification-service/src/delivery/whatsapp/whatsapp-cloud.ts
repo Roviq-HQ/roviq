@@ -4,6 +4,7 @@ import { MessagingTokenCipher } from '@roviq/crypto';
 import { providersOf } from '../../config/channel-providers';
 import type { MessagingSenderRecord } from '../../repositories/types';
 import { type CloudSender, WhatsAppCloudClient } from './whatsapp-cloud.client';
+import { WhatsAppTemplateClient } from './whatsapp-template.client';
 
 /**
  * What the WhatsApp provider needs, built only when `NOTIFICATION_WHATSAPP_PROVIDER` names `cloud`
@@ -15,6 +16,7 @@ export class WhatsAppCloud {
   readonly enabled: boolean;
   private readonly parts: {
     client: WhatsAppCloudClient;
+    templates: WhatsAppTemplateClient;
     cipher: MessagingTokenCipher;
     appSecret: string;
     verifyToken: string;
@@ -28,6 +30,7 @@ export class WhatsAppCloud {
     this.parts = this.enabled
       ? {
           client: new WhatsAppCloudClient(config.getOrThrow<string>('WHATSAPP_API_BASE_URL')),
+          templates: new WhatsAppTemplateClient(config.getOrThrow<string>('WHATSAPP_API_BASE_URL')),
           cipher: new MessagingTokenCipher(config.getOrThrow<string>('MESSAGING_ENCRYPTION_KEY')),
           appSecret: config.getOrThrow<string>('WHATSAPP_APP_SECRET'),
           verifyToken: config.getOrThrow<string>('WHATSAPP_WEBHOOK_VERIFY_TOKEN'),
@@ -42,6 +45,11 @@ export class WhatsAppCloud {
 
   get client(): WhatsAppCloudClient {
     return this.on.client;
+  }
+
+  /** The provider's template endpoints (ROV-333). */
+  get templates(): WhatsAppTemplateClient {
+    return this.on.templates;
   }
 
   get cipher(): MessagingTokenCipher {

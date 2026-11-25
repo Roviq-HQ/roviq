@@ -71,6 +71,7 @@ const PLATFORM_SENDER: AdminMonitoringSendersQuery['adminMessagingSenders'][numb
   scope: 'platform',
   tenantId: null,
   displayNumber: '+919800000001',
+  providerAccountId: 'acct-1',
   status: 'ACTIVE',
   messagesPerSecond: 10,
 };
@@ -80,6 +81,7 @@ const BLOCKED_SENDER: AdminMonitoringSendersQuery['adminMessagingSenders'][numbe
   scope: 'institute',
   tenantId: 'inst-1',
   displayNumber: '+919800000002',
+  providerAccountId: null,
   status: 'BLOCKED',
   messagesPerSecond: 1,
 };

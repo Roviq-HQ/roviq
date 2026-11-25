@@ -1,8 +1,10 @@
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessagingSenderRepository } from '../../../repositories/messaging-sender.repository';
+import { MessagingTemplateRepository } from '../../../repositories/messaging-template.repository';
 import { RecipientReadRepository } from '../../../repositories/recipient-read.repository';
 import type { MessagingSenderRecord } from '../../../repositories/types';
+import { TemplateSendability } from '../template-sendability';
 import { CAP_RETRY_MS, Clock, WhatsAppRoute } from '../whatsapp-route';
 
 const TENANT = '019a0000-0000-7000-8000-000000000001';
@@ -18,6 +20,7 @@ const PLATFORM_SENDER: MessagingSenderRecord = {
   tenantId: null,
   status: 'ACTIVE',
   providerNumberId: 'fake-number-id-1',
+  providerAccountId: 'acct-1',
   dailyCap: 100,
   instituteDailyCap: 10,
   messagesPerSecond: 10,
@@ -31,11 +34,27 @@ const INSTITUTE_SENDER: MessagingSenderRecord = {
   tenantId: TENANT,
 };
 
+const APPROVED_ROW = {
+  providerAccountId: 'acct-1',
+  name: 'attendance_absent_v1',
+  language: 'en',
+  declaredCategory: 'UTILITY' as const,
+  approvedCategory: 'UTILITY' as const,
+  contentHash: 'h',
+  providerTemplateId: 't-1',
+  status: 'APPROVED' as const,
+  rejectedReason: null,
+  quality: null,
+  suggestedCategory: null,
+  outOfStep: false,
+};
+
 describe('WhatsAppRoute', () => {
   let senders: ReturnType<typeof createMock<MessagingSenderRepository>>;
   let recipients: ReturnType<typeof createMock<RecipientReadRepository>>;
   let clock: Clock;
   let route: WhatsAppRoute;
+  let templateRows: ReturnType<typeof createMock<MessagingTemplateRepository>>;
 
   const setNow = (at: Date) => vi.spyOn(clock, 'now').mockReturnValue(at);
 
@@ -52,7 +71,10 @@ describe('WhatsAppRoute', () => {
     });
     clock = new Clock();
     setNow(IST_NIGHT);
-    route = new WhatsAppRoute(senders, recipients, clock);
+    templateRows = createMock<MessagingTemplateRepository>({
+      find: vi.fn().mockResolvedValue(APPROVED_ROW),
+    });
+    route = new WhatsAppRoute(senders, recipients, clock, new TemplateSendability(templateRows));
   });
 
   describe('resolveSender', () => {

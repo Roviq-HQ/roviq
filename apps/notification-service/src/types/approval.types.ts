@@ -2,6 +2,7 @@ import { MessageTemplateCategory } from '@roviq/common-types';
 import { buttonPathOf, clipVariable } from '../delivery/whatsapp/template-variables';
 import {
   cleanVariable,
+  OPEN_ROVIQ,
   renderTemplate,
   type WhatsAppTemplate,
 } from '../delivery/whatsapp/whatsapp-template';
@@ -48,6 +49,13 @@ const requestedWhatsApp: WhatsAppTemplate<ApprovalRequestedParams> = {
     freeText(p.summary, locale),
   ],
   buttonPath: (p) => buttonPathOf(approvalPath(p.approvalType)),
+  buttonLabel: OPEN_ROVIQ,
+  example: {
+    approvalType: 'LEAVE',
+    requesterName: 'Meera Nair',
+    summary: 'Two days of leave',
+    entityId: 'leave-1',
+  },
 };
 
 export const approvalRequestedWhatsApp: TypeTemplates<ApprovalRequestedParams> = {
@@ -119,6 +127,13 @@ const resolvedWhatsApp: WhatsAppTemplate<ApprovalResolvedParams> = {
     freeText(p.remarks, locale),
   ],
   buttonPath: (p) => buttonPathOf(approvalPath(p.approvalType)),
+  buttonLabel: OPEN_ROVIQ,
+  example: {
+    approvalType: 'LEAVE',
+    status: 'APPROVED',
+    reviewerName: 'Rahul Verma',
+    remarks: 'Enjoy the break',
+  },
 };
 
 export const approvalResolvedWhatsApp: TypeTemplates<ApprovalResolvedParams> = {

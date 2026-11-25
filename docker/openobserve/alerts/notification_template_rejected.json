@@ -1,0 +1,32 @@
+{
+  "name": "notification_template_rejected",
+  "description": "A WhatsApp template was rejected, paused or switched off by the provider on an account, so the alerts that use it are skipped as no_template there.",
+  "stream_type": "metrics",
+  "stream_name": "notification_template_problems",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "max by (reason) (notification_template_problems{reason=~\"REJECTED|PAUSED|DISABLED\"})",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 240
+  },
+  "pending_period_sec": 0,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "ticket",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#template-rejected"
+  }
+}

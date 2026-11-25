@@ -18,6 +18,7 @@ import {
   type SkippedCount,
 } from '../repositories/delivery-stats.repository';
 import { MessagingSenderRepository } from '../repositories/messaging-sender.repository';
+import { MessagingTemplateRepository } from '../repositories/messaging-template.repository';
 import type { SenderStateRecord } from '../repositories/types';
 import {
   NOTIFICATION_METRIC_LABELS as L,
@@ -136,23 +137,42 @@ export class NotificationStateGauges implements OnModuleInit, OnModuleDestroy {
     { description: 'Deliveries skipped in the last 15 minutes' },
   );
   private readonly skippedSeen = new Set<string>();
+  private readonly templateProblems: ObservableGauge = this.meter.createObservableGauge(
+    NOTIFICATION_INSTRUMENTS.templateProblems.name,
+    { description: 'WhatsApp templates that cannot be sent as defined, per reason (ROV-333)' },
+  );
 
   constructor(
     private readonly adapters: ChannelAdapters,
     private readonly breaker: ProviderBreaker,
     private readonly senders: MessagingSenderRepository,
     private readonly stats: DeliveryStatsRepository,
+    private readonly templates: MessagingTemplateRepository,
   ) {}
 
   onModuleInit(): void {
     this.meter.addBatchObservableCallback(this.observe, [this.breakerOpen, this.senderBlocked]);
     this.skippedRecent.addCallback(this.observeSkipped);
+    this.templateProblems.addCallback(this.observeTemplates);
   }
 
   onModuleDestroy(): void {
     this.meter.removeBatchObservableCallback(this.observe, [this.breakerOpen, this.senderBlocked]);
     this.skippedRecent.removeCallback(this.observeSkipped);
+    this.templateProblems.removeCallback(this.observeTemplates);
   }
+
+  /** Every reason is reported, 0 included, so an alert on it clears on the next reading. */
+  private readonly observeTemplates = async (result: ObservableResult): Promise<void> => {
+    let counts: Array<{ problem: string; count: number }>;
+    try {
+      counts = await this.templates.countProblems();
+    } catch (err) {
+      this.logger.warn({ err }, 'Could not count WhatsApp template problems');
+      return;
+    }
+    for (const { problem, count } of counts) result.observe(count, { [L.REASON]: problem });
+  };
 
   private readonly observeSkipped = async (result: ObservableResult): Promise<void> => {
     let counts: SkippedCount[];

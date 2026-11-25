@@ -15,6 +15,7 @@ import {
   messagingSenderSecrets,
   messagingSenders,
   messagingSendersLive,
+  messagingTemplates,
   notificationDeliveries,
   softDelete,
   uniqueViolationConstraint,
@@ -29,6 +30,7 @@ import {
 import { AdminMessagingRepository } from './admin-messaging.repository';
 import type {
   MessagingSenderRecord,
+  MessagingTemplateRecord,
   RegisterMessagingSenderData,
   RegisterMessagingSenderResult,
   SmsUsageRecord,
@@ -48,6 +50,7 @@ const senderColumns = {
   scope: messagingSenders.scope,
   tenantId: messagingSenders.tenantId,
   providerNumberId: messagingSenders.providerNumberId,
+  providerAccountId: messagingSenders.providerAccountId,
   displayNumber: messagingSenders.displayNumber,
   status: messagingSenders.status,
   dailyCap: messagingSenders.dailyCap,
@@ -62,6 +65,7 @@ const liveColumns = {
   scope: messagingSendersLive.scope,
   tenantId: messagingSendersLive.tenantId,
   providerNumberId: messagingSendersLive.providerNumberId,
+  providerAccountId: messagingSendersLive.providerAccountId,
   displayNumber: messagingSendersLive.displayNumber,
   status: messagingSendersLive.status,
   dailyCap: messagingSendersLive.dailyCap,
@@ -153,6 +157,7 @@ export class AdminMessagingDrizzleRepository extends AdminMessagingRepository {
             channel: MESSAGING_SENDER_CHANNEL,
             provider: WHATSAPP_CLOUD_PROVIDER,
             providerNumberId: data.providerNumberId,
+            providerAccountId: data.providerAccountId,
             displayNumber: data.displayNumber,
             dailyCap: data.dailyCap,
             instituteDailyCap: data.instituteDailyCap,
@@ -187,6 +192,9 @@ export class AdminMessagingDrizzleRepository extends AdminMessagingRepository {
         .update(messagingSenders)
         .set({
           ...(data.displayNumber !== undefined && { displayNumber: data.displayNumber }),
+          ...(data.providerAccountId !== undefined && {
+            providerAccountId: data.providerAccountId,
+          }),
           ...(data.dailyCap !== undefined && { dailyCap: data.dailyCap }),
           ...(data.instituteDailyCap !== undefined && {
             instituteDailyCap: data.instituteDailyCap,
@@ -294,6 +302,45 @@ export class AdminMessagingDrizzleRepository extends AdminMessagingRepository {
         .where(sentInMonth(NotificationChannel.SMS, month))
         .groupBy(d.tenantId, d.type)
         .orderBy(sql`${d.tenantId} NULLS FIRST`, asc(d.type)),
+    );
+  }
+
+  async findTokenEncrypted(ctx: PlatformContext, id: string): Promise<Buffer | null> {
+    const [row] = await withAdmin(this.db, ctx, (tx) =>
+      tx
+        .select({ token: messagingSenderSecrets.accessTokenEncrypted })
+        .from(messagingSenderSecrets)
+        .innerJoin(
+          messagingSendersLive,
+          eq(messagingSendersLive.id, messagingSenderSecrets.senderId),
+        )
+        .where(eq(messagingSenderSecrets.senderId, id)),
+    );
+    return row?.token ?? null;
+  }
+
+  async listTemplates(
+    ctx: PlatformContext,
+    providerAccountId: string,
+  ): Promise<MessagingTemplateRecord[]> {
+    const t = messagingTemplates;
+    return withAdmin(this.db, ctx, (tx) =>
+      tx
+        .select({
+          name: t.name,
+          language: t.language,
+          status: t.status,
+          declaredCategory: t.declaredCategory,
+          approvedCategory: t.approvedCategory,
+          rejectedReason: t.rejectedReason,
+          quality: t.quality,
+          suggestedCategory: t.suggestedCategory,
+          outOfStep: t.outOfStep,
+          updatedAt: t.updatedAt,
+        })
+        .from(t)
+        .where(eq(t.providerAccountId, providerAccountId))
+        .orderBy(t.name, t.language),
     );
   }
 }

@@ -26,6 +26,7 @@ const senderColumns = {
   tenantId: messagingSendersLive.tenantId,
   status: messagingSendersLive.status,
   providerNumberId: messagingSendersLive.providerNumberId,
+  providerAccountId: messagingSendersLive.providerAccountId,
   dailyCap: messagingSendersLive.dailyCap,
   instituteDailyCap: messagingSendersLive.instituteDailyCap,
   messagesPerSecond: messagingSendersLive.messagesPerSecond,
@@ -195,6 +196,31 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
         )
         .returning({ id: messagingSenders.id });
       return rows.length > 0;
+    });
+  }
+
+  async findForAccount(providerAccountId: string): Promise<MessagingSenderRecord | null> {
+    return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const rows = await tx
+        .select(senderColumns)
+        .from(messagingSendersLive)
+        .innerJoin(
+          messagingSenderSecrets,
+          eq(messagingSenderSecrets.senderId, messagingSendersLive.id),
+        )
+        .where(eq(messagingSendersLive.providerAccountId, providerAccountId))
+        .orderBy(messagingSendersLive.createdAt);
+      return rows.find((r) => r.status === 'ACTIVE') ?? rows[0] ?? null;
+    });
+  }
+
+  async listAccounts(): Promise<string[]> {
+    return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const rows = await tx
+        .selectDistinct({ account: messagingSendersLive.providerAccountId })
+        .from(messagingSendersLive)
+        .where(isNotNull(messagingSendersLive.providerAccountId));
+      return rows.flatMap((r) => (r.account === null ? [] : [r.account]));
     });
   }
 

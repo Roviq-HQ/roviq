@@ -9,18 +9,24 @@ import { ChannelSender } from '../delivery/channel-sender';
 import { ConsentGate } from '../delivery/consent-gate';
 import { ProviderBreaker } from '../delivery/rate/provider-breaker';
 import { SenderRateLimiter } from '../delivery/rate/sender-rate-limiter';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
+import { TemplateSync } from '../delivery/whatsapp/template-sync';
+import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { DeliveryCanary } from '../services/delivery-canary.service';
+import { TemplateSyncStarter } from '../services/template-sync-starter.service';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { createCanaryActivities } from './canary.activities';
 import { CANARY_SCHEDULE_ID, syncCanarySchedule } from './canary.schedule';
 import { createNotificationActivities } from './notification.activities';
 import { notificationWorkflowsPath } from './notification.workflows-path';
 import { NOTIFICATION_TASK_QUEUE } from './notification-workflow.types';
+import { createTemplateSyncActivities } from './template-sync.activities';
 
 /**
  * Runs the flow and digest workflows (ROV-314, ROV-332) in notification-service when
@@ -39,6 +45,9 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
     private readonly canary: DeliveryCanary,
     private readonly rate: SenderRateLimiter,
     private readonly breaker: ProviderBreaker,
+    private readonly templates: TemplateSendability,
+    private readonly cloud: WhatsAppCloud,
+    private readonly templateSyncStarter: TemplateSyncStarter,
   ) {
     super(config, {
       flag: 'NOTIFICATION_WORKER_ENABLED',
@@ -51,13 +60,14 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
 
   protected createActivities(db: DrizzleDB) {
     const recipients = new RecipientReadDrizzleRepository(db);
+    const senders = new MessagingSenderDrizzleRepository(db);
     const writes = new NotificationWriteDrizzleRepository(db);
     const sender = new ChannelSender(
       this.adapters,
       this.consent,
       new ContactReadDrizzleRepository(db),
       writes,
-      new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
+      new WhatsAppRoute(senders, recipients, new Clock(), this.templates),
       this.metrics,
       this.rate,
       this.breaker,
@@ -65,6 +75,19 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
     return {
       ...createNotificationActivities({ sender, recipients, writes }),
       ...createCanaryActivities(this.eventBus, this.canary.settings?.userId ?? null),
+      ...createTemplateSyncActivities(
+        this.cloud.enabled
+          ? new TemplateSync(
+              senders,
+              new MessagingTemplateDrizzleRepository(db),
+              this.templates,
+              this.cloud.templates,
+              (sender) => this.cloud.open(sender),
+              this.breaker,
+              this.config.get<string>('INSTITUTE_PORTAL_URL'),
+            )
+          : null,
+      ),
     };
   }
 
@@ -88,5 +111,9 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
     } finally {
       await connection.close();
     }
+    // A failed start-up sync is retried at the next start; sends do not depend on it.
+    await this.templateSyncStarter.startIfRegistryChanged().catch((err: unknown) => {
+      this.logger.warn({ err }, 'WhatsApp template sync could not be started');
+    });
   }
 }

@@ -166,7 +166,11 @@ export class ChannelSender {
       hasTemplate: needsTemplate
         ? async () => {
             const locale = await loadLocale();
-            found.template = anyRouted ? (a.template?.(locale) ?? null) : null;
+            const declared = anyRouted ? (a.template?.(locale) ?? null) : null;
+            found.template =
+              declared !== null && found.sender !== null
+                ? await this.whatsapp.approvedTemplate(found.sender, declared)
+                : null;
             const draft = adapters.some((ad) => ad.resolveSmsTemplate)
               ? smsDraftOf(a, locale)
               : null;
@@ -284,7 +288,10 @@ export class ChannelSender {
     // One official provider: the platform's number is the failover for an institute's own.
     const platform = await this.whatsapp.fallbackFor(sender);
     if (platform === null || !(await this.senderUsable(platform, phone, a, false))) return tried;
-    return this.sendViaSender(adapter, message, a, platform, template, phone);
+    // The platform's account approves its own copy of the template.
+    const approved = await this.whatsapp.approvedTemplate(platform, template);
+    if (approved === null) return tried;
+    return this.sendViaSender(adapter, message, a, platform, approved, phone);
   }
 
   /** A sender reached by failover passes the same per-sender rules the gate applies. */

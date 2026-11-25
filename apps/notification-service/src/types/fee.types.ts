@@ -2,6 +2,7 @@ import { MessageTemplateCategory, type NotificationChannel } from '@roviq/common
 import { buttonPathOf, nameList } from '../delivery/whatsapp/template-variables';
 import {
   cleanVariable,
+  OPEN_ROVIQ,
   renderTemplate,
   type WhatsAppTemplate,
 } from '../delivery/whatsapp/whatsapp-template';
@@ -54,6 +55,17 @@ function dueDateVariable(dueDate: string, locale: Locale): string {
   return cleanVariable(formatCalendarDate(dueDate, locale) ?? dueDate, NOT_SET[locale]);
 }
 
+const OVERDUE_EXAMPLE: FeeOverdueParams = {
+  studentId: 'membership-student-1',
+  studentName: 'Aarav Sharma',
+  feeId: 'fee-1',
+  amount: 5000,
+  currency: 'INR',
+  dueDate: '2026-04-10',
+  daysOverdue: 12,
+  feeType: 'Tuition',
+};
+
 const overdueWhatsAppSingle: WhatsAppTemplate<FeeOverdueParams> = {
   name: 'fee_overdue_v1',
   category: MessageTemplateCategory.UTILITY,
@@ -68,6 +80,8 @@ const overdueWhatsAppSingle: WhatsAppTemplate<FeeOverdueParams> = {
     dueDateVariable(p.dueDate, locale),
   ],
   buttonPath: () => buttonPathOf(FEE_PATH),
+  buttonLabel: OPEN_ROVIQ,
+  example: OVERDUE_EXAMPLE,
 };
 
 const overdueWhatsAppDigest: WhatsAppTemplate<readonly FeeOverdueParams[]> = {
@@ -86,6 +100,8 @@ const overdueWhatsAppDigest: WhatsAppTemplate<readonly FeeOverdueParams[]> = {
     String(items.length),
   ],
   buttonPath: () => buttonPathOf(FEE_PATH),
+  buttonLabel: OPEN_ROVIQ,
+  example: [OVERDUE_EXAMPLE, { ...OVERDUE_EXAMPLE, studentName: 'Diya Sharma', feeId: 'fee-2' }],
 };
 
 export const feeOverdueWhatsApp: TypeTemplates<FeeOverdueParams> = {
@@ -108,6 +124,17 @@ const reminderWhatsApp: WhatsAppTemplate<FeeReminderParams> = {
     dueDateVariable(p.dueDate, locale),
   ],
   buttonPath: () => buttonPathOf(FEE_PATH),
+  buttonLabel: OPEN_ROVIQ,
+  example: {
+    studentId: 'membership-student-1',
+    studentName: 'Aarav Sharma',
+    feeId: 'fee-1',
+    amount: 5000,
+    currency: 'INR',
+    dueDate: '2026-04-10',
+    feeType: 'Tuition',
+    feePeriod: 'April 2026',
+  },
 };
 
 export const feeReminderWhatsApp: TypeTemplates<FeeReminderParams> = { single: reminderWhatsApp };

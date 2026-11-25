@@ -12,6 +12,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { parseTemplateEvents } from '../delivery/whatsapp/template-events';
 import { parseWebhookPayload } from '../delivery/whatsapp/webhook-payload';
 import { isSignedByProvider } from '../delivery/whatsapp/webhook-signature';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
@@ -60,6 +61,7 @@ export class WhatsAppWebhookController {
     }
     // A database error propagates as 500, so the provider sends the events again.
     await this.webhook.handle(parseWebhookPayload(body));
+    await this.webhook.handleTemplateEvents(parseTemplateEvents(body));
     return 'ok';
   }
 }

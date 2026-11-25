@@ -405,6 +405,10 @@ const NOTIFICATION_SCHEMAS = {
     requestedAt: z.iso.datetime(),
     tenantId: z.null(),
   }),
+  'NOTIFICATION.whatsapp_templates.sync_requested': z.object({
+    providerAccountId: z.string().min(1),
+    tenantId: z.null(),
+  }),
   'NOTIFICATION.fee.overdue': tenantBase.catchall(z.unknown()),
   'NOTIFICATION.fee.reminder': tenantBase.catchall(z.unknown()),
   // Pointer only: the consumer reads the row as the recipient, so no text travels on NATS.

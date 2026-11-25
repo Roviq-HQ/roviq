@@ -7,6 +7,8 @@ import {
   type PlatformContext,
 } from '@roviq/common-types';
 import { MessagingTokenCipher } from '@roviq/crypto';
+import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { REDIS_CLIENT, senderResetKeys } from '@roviq/redis';
 import type Redis from 'ioredis';
 import type {
@@ -16,10 +18,12 @@ import type {
 import { AdminMessagingRepository } from './repositories/admin-messaging.repository';
 import type {
   MessagingSenderRecord,
+  MessagingTemplateRecord,
   SmsUsageRecord,
   UpdateMessagingSenderData,
   WhatsAppUsageRecord,
 } from './repositories/types';
+import { WhatsAppAccountCheck } from './whatsapp-account-check';
 
 @Injectable()
 export class AdminMessagingService {
@@ -27,6 +31,8 @@ export class AdminMessagingService {
     private readonly repo: AdminMessagingRepository,
     private readonly cipher: MessagingTokenCipher,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly accounts: WhatsAppAccountCheck,
+    private readonly eventBus: EventBusService,
   ) {}
 
   list(ctx: PlatformContext): Promise<MessagingSenderRecord[]> {
@@ -40,10 +46,13 @@ export class AdminMessagingService {
     const tenantId = input.tenantId ?? null;
     const instituteDailyCap = input.instituteDailyCap ?? null;
     if (tenantId && instituteDailyCap !== null) refuseInstituteShare();
+    // Before anything is stored: a token that cannot manage the account's templates is useless.
+    await this.assertTokenFits(input.providerAccountId, input.accessToken);
 
     const result = await this.repo.register(ctx, {
       tenantId,
       providerNumberId: input.providerNumberId,
+      providerAccountId: input.providerAccountId,
       displayNumber: input.displayNumber,
       accessTokenEncrypted: this.cipher.encrypt(input.accessToken),
       dailyCap: input.dailyCap,
@@ -51,6 +60,7 @@ export class AdminMessagingService {
     });
     switch (result.kind) {
       case 'ok':
+        this.requestSync(input.providerAccountId);
         return result.sender;
       case 'institute_not_found':
         throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
@@ -71,13 +81,25 @@ export class AdminMessagingService {
     if (existing.scope === 'institute' && input.instituteDailyCap != null) {
       refuseInstituteShare();
     }
+    // An institute reads the template rows of its sender's account: the sender's own token must
+    // be the account's, as at registration.
+    if (input.providerAccountId !== undefined) {
+      const stored = await this.repo.findTokenEncrypted(ctx, id);
+      if (stored === null) throw notFound(id);
+      await this.assertTokenFits(input.providerAccountId, this.cipher.decrypt(stored));
+    }
     const data: UpdateMessagingSenderData = {
       ...(input.displayNumber !== undefined && { displayNumber: input.displayNumber }),
+      ...(input.providerAccountId !== undefined && {
+        providerAccountId: input.providerAccountId,
+      }),
       ...(input.dailyCap !== undefined && { dailyCap: input.dailyCap }),
       ...(input.instituteDailyCap !== undefined && { instituteDailyCap: input.instituteDailyCap }),
       ...(input.messagesPerSecond !== undefined && { messagesPerSecond: input.messagesPerSecond }),
     };
-    return this.found(await this.repo.update(ctx, id, data), id);
+    const updated = this.found(await this.repo.update(ctx, id, data), id);
+    if (input.providerAccountId !== undefined) this.requestSync(input.providerAccountId);
+    return updated;
   }
 
   async rotateToken(
@@ -85,7 +107,29 @@ export class AdminMessagingService {
     id: string,
     accessToken: string,
   ): Promise<MessagingSenderRecord> {
-    return this.found(await this.repo.replaceToken(ctx, id, this.cipher.encrypt(accessToken)), id);
+    const existing = await this.getOrThrow(ctx, id);
+    if (existing.providerAccountId !== null) {
+      await this.assertTokenFits(existing.providerAccountId, accessToken);
+    }
+    const sender = this.found(
+      await this.repo.replaceToken(ctx, id, this.cipher.encrypt(accessToken)),
+      id,
+    );
+    if (sender.providerAccountId !== null) this.requestSync(sender.providerAccountId);
+    return sender;
+  }
+
+  /** Asks the notification service to sync the sender's account's templates now (ROV-333). */
+  async syncTemplates(ctx: PlatformContext, id: string): Promise<void> {
+    const sender = await this.getOrThrow(ctx, id);
+    this.requestSync(this.accountOf(sender));
+  }
+
+  /** The template rows of the sender's account, by name then language. */
+  async templates(ctx: PlatformContext, id: string): Promise<MessagingTemplateRecord[]> {
+    const sender = await this.getOrThrow(ctx, id);
+    if (sender.providerAccountId === null) return [];
+    return this.repo.listTemplates(ctx, sender.providerAccountId);
   }
 
   pause(ctx: PlatformContext, id: string): Promise<MessagingSenderRecord> {
@@ -135,6 +179,40 @@ export class AdminMessagingService {
       );
     }
     return updated;
+  }
+
+  private accountOf(sender: MessagingSenderRecord): string {
+    if (sender.providerAccountId === null) {
+      throw new BusinessException(
+        ErrorCode.MESSAGING_SENDER_ACCOUNT_MISSING,
+        `Messaging sender ${sender.id} has no provider account id`,
+      );
+    }
+    return sender.providerAccountId;
+  }
+
+  private async assertTokenFits(providerAccountId: string, accessToken: string): Promise<void> {
+    const answer = await this.accounts.canManageTemplates(providerAccountId, accessToken);
+    if (answer === 'refused') {
+      throw new BusinessException(
+        ErrorCode.MESSAGING_TOKEN_CANNOT_MANAGE_TEMPLATES,
+        'The provider refused this token for the account: it is not the account of the number, or the token may not manage message templates',
+      );
+    }
+    if (answer === 'unreachable') {
+      throw new BusinessException(
+        ErrorCode.MESSAGING_PROVIDER_UNREACHABLE,
+        'The provider could not be reached to check the token; nothing was stored',
+      );
+    }
+  }
+
+  /** After the change committed, and not awaited: the sync runs in the notification service. */
+  private requestSync(providerAccountId: string): void {
+    this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.WHATSAPP_TEMPLATES_SYNC_REQUESTED, {
+      providerAccountId,
+      tenantId: null,
+    });
   }
 
   private async getOrThrow(ctx: PlatformContext, id: string): Promise<MessagingSenderRecord> {

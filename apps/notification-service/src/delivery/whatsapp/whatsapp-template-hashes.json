@@ -1,0 +1,22 @@
+{
+  "delivery_canary_v2:en": "20f3e85f55b1725ec3258b2219229143822df4701aaa19e8e4586223ba15203a",
+  "delivery_canary_v2:hi": "6a765da3b8af9010324b663bf2368502368757c5d24c4ad35d91fccdf0ecaf3d",
+  "attendance_absent_v1:en": "5834babaab19c6a58b9b3df1140c4afb8d5504367302aae1825de4c721dfb44f",
+  "attendance_absent_v1:hi": "3ff630797ec4dbb8fbf1ecfb56639a38dbd4c52ef04bf059d3900e0fecfe0a78",
+  "attendance_absent_digest_v1:en": "ad50f03121d05f78635cb72800885c98eed94064787fde41507294f2e67cb384",
+  "attendance_absent_digest_v1:hi": "fc8b375d236fab6ca8a3ec8eda835678e08ffcb3d757b26bc3b8b4d1548277cb",
+  "fee_overdue_v1:en": "73a49167998701cdb111c8b3c482b87535b61d10539ae8fd11b69144b8dae4a1",
+  "fee_overdue_v1:hi": "7eeb4a44afd33bc97bffcdc783b19cef583958a663c3826a8da5c356950c6867",
+  "fee_overdue_digest_v1:en": "6d8854e6a74a863c21e4e35a3a255422a0830a56cdd0def175a9399dfa51606c",
+  "fee_overdue_digest_v1:hi": "63cc61c308c8d38be0ceae17b04d2c5ee4c254d0983a021e92c88de5126eb9ce",
+  "fee_reminder_v1:en": "4f8335a228e36cce43f7b8d7f29048627e2d3bb29ab7ac5f9d85a80760915272",
+  "fee_reminder_v1:hi": "e00ea8bcb79a066af4be098538ba4d51e631736ad4a982bbf0688668b0316bca",
+  "approval_requested_v1:en": "3ee04f8ef37bffd91e0a4ea66e1d8f654ab1b15c64dbe091f889eaad4e96d850",
+  "approval_requested_v1:hi": "f9fe7ecdaa1a13f5c5fbb751d4e0dfc74f25ee659f313cd08fedf0de8e3c0fa5",
+  "approval_resolved_v1:en": "ea9190264f7fb2a5c49011c8ac7f90e502110f7a1f611abde1363c1f5365a678",
+  "approval_resolved_v1:hi": "e631f2af6ad5da0efbbb657d4d4dea93cfce44ae2aadbbb6bac2c19b2b6b2e15",
+  "auth_password_reset_v1:en": "e3e012f880ab2d146a4cf6b1fd1bfa64724e5a9a07a9259e3a246fec141e185a",
+  "auth_password_reset_v1:hi": "cab8a912be9f69e529120b6bfef149102eb87ce457b563a8f3c608b8cf117562",
+  "auth_new_device_v1:en": "baa94784d9fead6f2092a01be5e183d536ff1f03048855566855c5ae0c8397ee",
+  "auth_new_device_v1:hi": "364bb908d9ccc73f628bbdc0eca0476a335e4277ce3c6fd2fa490033323b2c84"
+}

@@ -14,6 +14,8 @@ import {
 } from 'class-validator';
 
 const E164 = /^\+[1-9]\d{6,14}$/;
+/** The provider's ids are digits. */
+const PROVIDER_ACCOUNT_ID = /^\d{1,32}$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const TOKEN_MAX_LENGTH = 4096;
 /** The database CHECK `chk_messaging_senders_rate` holds the same bounds. */
@@ -35,6 +37,13 @@ export class RegisterMessagingSenderInput {
   @MinLength(1)
   @MaxLength(64)
   providerNumberId!: string;
+
+  @Field({
+    description:
+      "The provider's id of the account the number belongs to. WhatsApp templates are registered per account; the token must be allowed to manage them.",
+  })
+  @Matches(PROVIDER_ACCOUNT_ID, { message: 'providerAccountId must be the provider account id' })
+  providerAccountId!: string;
 
   @Field({
     description: 'The number as people see it: E.164 with a leading +, e.g. +919876543210.',
@@ -71,6 +80,15 @@ export class UpdateMessagingSenderInput {
   @ValidateIf((_, value) => value !== undefined)
   @Matches(E164, { message: 'displayNumber must be E.164 with a leading +' })
   displayNumber?: string;
+
+  @Field({
+    nullable: true,
+    description:
+      'The provider account the number belongs to, for a sender registered without one. Its templates are synced afterwards.',
+  })
+  @ValidateIf((_, value) => value !== undefined)
+  @Matches(PROVIDER_ACCOUNT_ID, { message: 'providerAccountId must be the provider account id' })
+  providerAccountId?: string;
 
   @Field(() => Int, { nullable: true, description: 'At least 1.' })
   @ValidateIf((_, value) => value !== undefined)

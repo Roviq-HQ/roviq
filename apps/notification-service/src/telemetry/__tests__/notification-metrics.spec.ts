@@ -28,6 +28,7 @@ describe('notification metric labels', () => {
       'notification.breaker.open': ['channel', 'provider'],
       'notification.sender.blocked': ['channel'],
       'notification.skipped.recent': ['channel', 'reason'],
+      'notification.template.problems': ['reason'],
       'notification.event.lag': ['stream', 'consumer'],
       'notification.canary.last_success': ['channel'],
       'notification.worker.running': [],

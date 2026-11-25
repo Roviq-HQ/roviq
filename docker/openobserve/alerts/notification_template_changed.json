@@ -1,0 +1,32 @@
+{
+  "name": "notification_template_changed",
+  "description": "The provider approved a WhatsApp template under another category, or its text was changed at the provider. A recategorised template is not sent; it needs new wording under a new name.",
+  "stream_type": "metrics",
+  "stream_name": "notification_template_problems",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "max by (reason) (notification_template_problems{reason=~\"CATEGORY_CHANGED|OUT_OF_STEP\"})",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 240
+  },
+  "pending_period_sec": 0,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "ticket",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#template-changed"
+  }
+}

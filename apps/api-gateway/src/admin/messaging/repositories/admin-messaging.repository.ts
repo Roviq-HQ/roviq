@@ -1,6 +1,7 @@
 import type { MessagingSenderStatus, PlatformContext } from '@roviq/common-types';
 import type {
   MessagingSenderRecord,
+  MessagingTemplateRecord,
   RegisterMessagingSenderData,
   RegisterMessagingSenderResult,
   SmsUsageRecord,
@@ -48,4 +49,13 @@ export abstract class AdminMessagingRepository {
    * delivery canary rows are not usage.
    */
   abstract smsUsage(ctx: PlatformContext, month: string): Promise<SmsUsageRecord[]>;
+
+  /** The sender's stored token, encrypted; null when the sender is gone. Never returned by the API. */
+  abstract findTokenEncrypted(ctx: PlatformContext, id: string): Promise<Buffer | null>;
+
+  /** The template rows of one provider account (ROV-333), by name then language. */
+  abstract listTemplates(
+    ctx: PlatformContext,
+    providerAccountId: string,
+  ): Promise<MessagingTemplateRecord[]>;
 }

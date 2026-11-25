@@ -17,6 +17,7 @@ import { ConsentGate, GuardianConsentGate } from '../delivery/consent-gate';
 import { ProviderBreaker } from '../delivery/rate/provider-breaker';
 import { SenderRateLimiter } from '../delivery/rate/sender-rate-limiter';
 import { SmsHttp } from '../delivery/sms/sms-http';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { HealthController } from '../health/health.controller';
@@ -28,9 +29,11 @@ import { AuthListener } from '../listeners/auth.listener';
 import { CanaryListener } from '../listeners/canary.listener';
 import { FeeListener } from '../listeners/fee.listener';
 import { LeaveListener } from '../listeners/leave.listener';
+import { TemplateSyncListener } from '../listeners/template-sync.listener';
 import { UserListener } from '../listeners/user.listener';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
 import { ContactReadRepository } from '../repositories/contact-read.repository';
+import { MessagingTemplateRepository } from '../repositories/messaging-template.repository';
 import { NotificationServiceRepositoryModule } from '../repositories/notification-service-repository.module';
 import { NotificationWriteRepository } from '../repositories/notification-write.repository';
 import { DeliveryCanary } from '../services/delivery-canary.service';
@@ -38,6 +41,7 @@ import { FlowArrivals } from '../services/flow-arrivals.service';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
 import { SmsWebhookService } from '../services/sms-webhook.service';
+import { TemplateSyncStarter } from '../services/template-sync-starter.service';
 import { WhatsAppWebhookService } from '../services/whatsapp-webhook.service';
 import { NotificationGauges } from '../telemetry/notification-gauges';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
@@ -68,6 +72,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     FeeListener,
     LeaveListener,
     UserListener,
+    TemplateSyncListener,
   ],
   providers: [
     {
@@ -132,6 +137,11 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     },
     WhatsAppCloud,
     SmsHttp,
+    {
+      provide: TemplateSendability,
+      useFactory: (templates: MessagingTemplateRepository) => new TemplateSendability(templates),
+      inject: [MessagingTemplateRepository],
+    },
     WhatsAppRoute,
     Clock,
     NotificationDispatcher,
@@ -147,6 +157,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     NotificationGauges,
     NotificationStateGauges,
     DeliveryCanary,
+    TemplateSyncStarter,
   ],
 })
 export class AppModule {}

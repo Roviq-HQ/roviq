@@ -41,6 +41,7 @@ import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { WhatsAppCloudAdapter } from '../delivery/adapters/whatsapp-cloud.adapter';
 import { ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { WHATSAPP_CLOUD_PROVIDER } from '../delivery/whatsapp/whatsapp-cloud.client';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
@@ -48,6 +49,7 @@ import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizz
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { MessagingInboundDrizzleRepository } from '../repositories/messaging-inbound.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import type { Audience } from '../repositories/types';
@@ -62,6 +64,7 @@ import { NotificationMetrics } from '../telemetry/notification-metrics';
 import type { RegularPayload } from '../types/registry';
 import { createNotificationActivities } from '../workflows/notification.activities';
 import { noDeliveryLimits } from './delivery-limits';
+import { approveRegistryTemplates, SPEC_PROVIDER_ACCOUNT } from './template-fixtures';
 
 const CTX = 'test:whatsapp-delivery';
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -238,6 +241,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
           channel: 'WHATSAPP',
           provider: WHATSAPP_CLOUD_PROVIDER,
           providerNumberId: numberId,
+          providerAccountId: SPEC_PROVIDER_ACCOUNT,
           displayNumber: '+910000000000',
           status: options.status ?? 'ACTIVE',
           dailyCap: options.dailyCap ?? 1000,
@@ -348,6 +352,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
     releaseLock = await holdPlatformSenderLock(superUrl);
     pool = new pg.Pool({ connectionString: poolerUrl });
     superPool = new pg.Pool({ connectionString: superUrl });
+    await approveRegistryTemplates(superPool);
     db = createDrizzleDb(pool);
 
     const leftover = await superPool.query(
@@ -382,7 +387,12 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
       new ContactReadDrizzleRepository(db),
       new NotificationWriteDrizzleRepository(db),
-      new WhatsAppRoute(senders, new RecipientReadDrizzleRepository(db), clock),
+      new WhatsAppRoute(
+        senders,
+        new RecipientReadDrizzleRepository(db),
+        clock,
+        new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
+      ),
       new NotificationMetrics(),
       ...noDeliveryLimits(),
     );

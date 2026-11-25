@@ -2,6 +2,7 @@ import { MessageTemplateCategory, type NotificationTypeKey } from '@roviq/common
 import { buttonPathOf } from '../delivery/whatsapp/template-variables';
 import {
   cleanVariable,
+  OPEN_ROVIQ,
   renderTemplate,
   type WhatsAppTemplate,
 } from '../delivery/whatsapp/whatsapp-template';
@@ -95,6 +96,12 @@ function authWhatsApp(
       cleanVariable(p.ip ?? '', UNKNOWN_IP[locale]),
     ],
     buttonPath: (p) => buttonPathOf(p.accountPath),
+    buttonLabel: OPEN_ROVIQ,
+    example: {
+      ip: '203.0.113.9',
+      at: '2026-11-23T06:00:00.000Z',
+      accountPath: '/institute/account',
+    },
   };
 }
 

@@ -28,6 +28,7 @@ export const ADMIN_MONITORING_SENDERS = gql`
       displayNumber
       status
       messagesPerSecond
+      providerAccountId
     }
   }
 `;
@@ -38,5 +39,26 @@ export const ADMIN_UPDATE_SENDER_RATE = gql`
       id
       messagesPerSecond
     }
+  }
+`;
+
+export const ADMIN_MESSAGING_TEMPLATES = gql`
+  query AdminMessagingTemplates($senderId: ID!) {
+    adminMessagingTemplates(senderId: $senderId) {
+      name
+      language
+      status
+      declaredCategory
+      approvedCategory
+      rejectedReason
+      outOfStep
+      sendable
+    }
+  }
+`;
+
+export const ADMIN_SYNC_WHATSAPP_TEMPLATES = gql`
+  mutation AdminSyncWhatsAppTemplates($senderId: ID!) {
+    adminSyncWhatsAppTemplates(senderId: $senderId)
   }
 `;

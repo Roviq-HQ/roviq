@@ -43,6 +43,7 @@ import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
 import { SMS_HTTP_PROVIDER } from '../delivery/sms/sms-http.client';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ArrivalListener } from '../listeners/arrival.listener';
 import { AttendanceListener } from '../listeners/attendance.listener';
@@ -51,6 +52,7 @@ import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizz
 import { DeliveryReceiptDrizzleRepository } from '../repositories/delivery-receipt.drizzle-repository';
 import { FlowArrivalDrizzleRepository } from '../repositories/flow-arrival.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationConfigReadDrizzleRepository } from '../repositories/notification-config-read.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
@@ -425,7 +427,12 @@ describe('notification flow (integration)', () => {
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
       new ContactReadDrizzleRepository(db),
       writes,
-      new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
+      new WhatsAppRoute(
+        new MessagingSenderDrizzleRepository(db),
+        recipients,
+        new Clock(),
+        new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
+      ),
       new NotificationMetrics(),
       ...noDeliveryLimits(),
     );

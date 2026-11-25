@@ -38,6 +38,7 @@ import { ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
 import { SmsHttp } from '../delivery/sms/sms-http';
 import { SMS_HTTP_PROVIDER } from '../delivery/sms/sms-http.client';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { WHATSAPP_CLOUD_PROVIDER } from '../delivery/whatsapp/whatsapp-cloud.client';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
@@ -45,11 +46,13 @@ import { CanaryReadDrizzleRepository } from '../repositories/canary-read.drizzle
 import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { DeliveryCanary } from '../services/delivery-canary.service';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { noDeliveryLimits } from './delivery-limits';
+import { approveRegistryTemplates, SPEC_PROVIDER_ACCOUNT } from './template-fixtures';
 
 const CTX = 'test:delivery-canary';
 const AT = '2026-11-24T10:15:00.000Z';
@@ -127,6 +130,7 @@ describe('delivery canary (integration)', () => {
         new MessagingSenderDrizzleRepository(db),
         new RecipientReadDrizzleRepository(db),
         new Clock(),
+        new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
       ),
       new NotificationMetrics(),
       ...noDeliveryLimits(),
@@ -161,6 +165,7 @@ describe('delivery canary (integration)', () => {
     releaseLock = await holdPlatformSenderLock(superUrl);
     pool = new pg.Pool({ connectionString: poolerUrl });
     superPool = new pg.Pool({ connectionString: superUrl });
+    await approveRegistryTemplates(superPool);
     db = createDrizzleDb(pool);
     const leftover = await superPool.query(
       `SELECT id FROM messaging_senders WHERE scope = 'platform' AND deleted_at IS NULL`,
@@ -202,6 +207,7 @@ describe('delivery canary (integration)', () => {
           channel: 'WHATSAPP',
           provider: WHATSAPP_CLOUD_PROVIDER,
           providerNumberId: `canary-spec-${providers.run}`,
+          providerAccountId: SPEC_PROVIDER_ACCOUNT,
           displayNumber: '+910000000000',
           status: 'ACTIVE',
           dailyCap: 1000,

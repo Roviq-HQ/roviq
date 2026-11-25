@@ -24,11 +24,13 @@ import { GuardianConsentGate } from '../delivery/consent-gate';
 import { SmsHttp } from '../delivery/sms/sms-http';
 import { SMS_HTTP_PROVIDER } from '../delivery/sms/sms-http.client';
 import { type SmsDraft, SmsVariableError } from '../delivery/sms/sms-template';
+import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
+import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-template.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
@@ -159,6 +161,7 @@ describe('SMS delivery through the provider adapter (integration)', () => {
         new MessagingSenderDrizzleRepository(db),
         new RecipientReadDrizzleRepository(db),
         new Clock(),
+        new TemplateSendability(new MessagingTemplateDrizzleRepository(db)),
       ),
       new NotificationMetrics(),
       ...noDeliveryLimits(),

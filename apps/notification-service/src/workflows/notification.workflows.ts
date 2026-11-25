@@ -9,6 +9,9 @@
  * DeliveryCanaryWorkflow (ROV-329): started by the canary schedule; asks for one test message
  * per configured channel.
  *
+ * WhatsAppTemplateSyncWorkflow (ROV-333): one per provider account at a time; registers the
+ * code's WhatsApp templates and records their state.
+ *
  * None ever receives an address, a name, a code or a password.
  */
 import {
@@ -40,6 +43,7 @@ import {
   type NotificationActivities,
   type SendChannelInput,
   sendData,
+  type TemplateSyncInput,
 } from './notification-workflow.types';
 
 const activities = proxyActivities<NotificationActivities>({
@@ -50,6 +54,18 @@ const activities = proxyActivities<NotificationActivities>({
 const canaryActivities = proxyActivities<Pick<NotificationActivities, 'requestCanary'>>({
   startToCloseTimeout: '30 seconds',
   retry: { maximumAttempts: 3, initialInterval: '5 seconds' },
+});
+
+// A refused token or a portal address the provider rejects is not retried: someone must fix it.
+const templateActivities = proxyActivities<Pick<NotificationActivities, 'syncWhatsAppTemplates'>>({
+  startToCloseTimeout: '5 minutes',
+  retry: {
+    maximumAttempts: 8,
+    initialInterval: '1 minute',
+    backoffCoefficient: 2,
+    maximumInterval: '30 minutes',
+    nonRetryableErrorTypes: ['TemplatePortalUrlError', 'WA_PERMISSION_MISSING'],
+  },
 });
 
 export const digestItemSignal = defineSignal<[DigestItem]>(DIGEST_ITEM_SIGNAL);
@@ -236,4 +252,8 @@ export async function NotificationDigestWorkflow(input: DigestWorkflowInput): Pr
 
 export async function DeliveryCanaryWorkflow(input: CanaryWorkflowInput): Promise<void> {
   await runCanary(input, new Date().toISOString(), canaryActivities.requestCanary);
+}
+
+export async function WhatsAppTemplateSyncWorkflow(input: TemplateSyncInput): Promise<void> {
+  await templateActivities.syncWhatsAppTemplates(input);
 }

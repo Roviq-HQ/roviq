@@ -27,6 +27,7 @@ const PLATFORM_SENDER: MessagingSenderRecord = {
   tenantId: null,
   status: 'ACTIVE',
   providerNumberId: 'number-platform',
+  providerAccountId: 'acct-1',
   dailyCap: 1000,
   instituteDailyCap: 100,
   messagesPerSecond: 10,
@@ -39,6 +40,7 @@ const SENDER: MessagingSenderRecord = {
   tenantId: INSTITUTE.tenantId,
   status: 'ACTIVE',
   providerNumberId: 'number-1',
+  providerAccountId: 'acct-1',
   dailyCap: 1000,
   instituteDailyCap: null,
   messagesPerSecond: 10,
@@ -113,6 +115,8 @@ describe('ChannelSender', () => {
       recordDeferral: vi.fn().mockResolvedValue(undefined),
     });
     route = createMock<WhatsAppRoute>({
+      // The account has every template approved as declared, unless a test says otherwise.
+      approvedTemplate: vi.fn(async (_sender, template) => template),
       resolveSender: vi.fn().mockResolvedValue(SENDER),
       optedOut: vi.fn().mockResolvedValue(false),
       quietUntil: vi.fn().mockResolvedValue(null),
@@ -339,6 +343,36 @@ describe('ChannelSender', () => {
         metrics,
         rate,
         breaker,
+      );
+    });
+
+    it("should skip as no_template, before the provider, when the sender's account has not approved it", async () => {
+      route.approvedTemplate.mockResolvedValue(null);
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({ status: 'SKIPPED', provider: null, skipReason: 'no_template' });
+      expect(route.approvedTemplate).toHaveBeenCalledWith(
+        SENDER,
+        expect.objectContaining({ name: templateIn('en').name }),
+      );
+      expect(whatsappSend).not.toHaveBeenCalled();
+    });
+
+    it('should record the category the provider approved, not the declared one', async () => {
+      route.approvedTemplate.mockImplementation(async (_sender, t) => ({
+        ...t,
+        category: 'MARKETING',
+      }));
+
+      await sender.attempt(whatsappAttempt());
+
+      expect(writes.recordDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: expect.objectContaining({
+            route: expect.objectContaining({ templateCategory: 'MARKETING' }),
+          }),
+        }),
       );
     });
 

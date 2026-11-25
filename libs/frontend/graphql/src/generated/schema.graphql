@@ -407,6 +407,11 @@ type AdminMessagingSender {
   """
   messagesPerSecond: Int!
 
+  """
+  The provider account the number belongs to; its WhatsApp templates are registered there. Null for a sender registered before accounts were recorded.
+  """
+  providerAccountId: String
+
   """The provider's id of the number; inbound webhooks are matched by it."""
   providerNumberId: String!
 
@@ -416,6 +421,46 @@ type AdminMessagingSender {
 
   """The institute; null for the platform's sender."""
   tenantId: ID
+  updatedAt: DateTime!
+}
+
+"""
+One code-defined WhatsApp template in one language at a sender's provider account (ROV-333).
+"""
+type AdminMessagingTemplate {
+  """
+  The category the provider approved it under; null until reviewed. When it differs from declaredCategory the template is not sent.
+  """
+  approvedCategory: String
+
+  """The category the code declares."""
+  declaredCategory: String!
+
+  """'en' or 'hi'."""
+  language: String!
+
+  """The template name, version included (attendance_absent_v1)."""
+  name: String!
+
+  """
+  True when the provider's text no longer matches the code's definition (edited at the provider).
+  """
+  outOfStep: Boolean!
+
+  """The provider's quality score."""
+  quality: String
+
+  """The provider's reason for a rejection."""
+  rejectedReason: String
+
+  """APPROVED under the declared category: messages using it are sent."""
+  sendable: Boolean!
+  status: MessageTemplateStatus!
+
+  """
+  A category the provider suggests on its own review; shown, never applied.
+  """
+  suggestedCategory: String
   updatedAt: DateTime!
 }
 
@@ -4175,6 +4220,17 @@ enum MessageTemplateCategory {
   UTILITY
 }
 
+"""
+Where a WhatsApp template stands at the provider. Only APPROVED is sent.
+"""
+enum MessageTemplateStatus {
+  APPROVED
+  DISABLED
+  PAUSED
+  PENDING
+  REJECTED
+}
+
 """State of a WhatsApp sender. Only an ACTIVE sender sends."""
 enum MessagingSenderStatus {
   ACTIVE
@@ -4324,6 +4380,11 @@ type Mutation {
 
   """Suspend a reseller and revoke all staff sessions"""
   adminSuspendReseller(reason: String, resellerId: String!): AdminResellerModel!
+
+  """
+  Submits the code's missing WhatsApp templates to the sender's provider account and refreshes their state, in the notification service. Returns at once; the panel shows the result as it arrives.
+  """
+  adminSyncWhatsAppTemplates(senderId: ID!): Boolean!
 
   """Unsuspend a previously suspended reseller (reactivates staff login)"""
   adminUnsuspendReseller(resellerId: String!): AdminResellerModel!
@@ -5462,6 +5523,11 @@ type Query {
   """Every live WhatsApp sender, the platform's first."""
   adminMessagingSenders: [AdminMessagingSender!]!
 
+  """
+  The code's WhatsApp templates at the sender's provider account, with what the provider decided about each (ROV-333).
+  """
+  adminMessagingTemplates(senderId: ID!): [AdminMessagingTemplate!]!
+
   """Platform support: every notification delivery attempt, newest first."""
   adminNotificationDeliveries(after: String, filter: NotificationDeliveryFilterInput, first: Int = 20): NotificationDeliveryConnection!
 
@@ -5940,6 +6006,11 @@ input RegisterMessagingSenderInput {
   Only on the platform's sender: what one institute may use of dailyCap (at least 1). Refused on an institute's sender.
   """
   instituteDailyCap: Int
+
+  """
+  The provider's id of the account the number belongs to. WhatsApp templates are registered per account; the token must be allowed to manage them.
+  """
+  providerAccountId: String!
 
   """The provider's id of the number."""
   providerNumberId: String!
@@ -8104,6 +8175,11 @@ input UpdateMessagingSenderInput {
   Messages per second the sender may hand the provider, 1 to 1000. Set it to the provider's limit for the number.
   """
   messagesPerSecond: Int
+
+  """
+  The provider account the number belongs to, for a sender registered without one. Its templates are synced afterwards.
+  """
+  providerAccountId: String
 }
 
 """

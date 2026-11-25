@@ -44,6 +44,8 @@ export const ALERT_TARGET: Record<string, AlertTarget> = {
   notification_sender_blocked: 'senders',
   notification_service_down: 'services',
   notification_skips_rising: 'notifications',
+  notification_template_changed: 'senders',
+  notification_template_rejected: 'senders',
 };
 
 /** The repository is public; a runbook label is a path in it with an anchor. */

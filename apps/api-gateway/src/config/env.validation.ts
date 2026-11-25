@@ -107,6 +107,11 @@ const envSchema = z
       })
       .optional(),
     OPENOBSERVE_ORG: z.string().optional(),
+    // The WhatsApp provider's API: a sender's token is checked against its account at
+    // registration (ROV-333). Unset, registering or re-tokening a sender is refused.
+    WHATSAPP_API_BASE_URL: z
+      .url({ protocol: /^https?$/, error: 'WHATSAPP_API_BASE_URL — the provider API base URL' })
+      .optional(),
     OPENOBSERVE_USER: z.string().optional(),
     OPENOBSERVE_PASSWORD: z.string().optional(),
 
