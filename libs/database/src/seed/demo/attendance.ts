@@ -8,10 +8,12 @@ import {
   memberships,
   SYSTEM_USER_ID,
   sections,
+  standards,
   studentAcademics,
   studentProfiles,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
+import { SEED_ADMISSIONS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -26,7 +28,7 @@ export async function seedAttendanceAndLeaves(tx: DrizzleDB, inst1Id: string) {
     return;
   }
 
-  // Find a section + academic year + standard in inst1.
+  // student1 sits in the class its seeded admission number was issued for.
   const sectionRows = await tx
     .select({
       id: sections.id,
@@ -34,7 +36,14 @@ export async function seedAttendanceAndLeaves(tx: DrizzleDB, inst1Id: string) {
       standardId: sections.standardId,
     })
     .from(sections)
-    .where(and(eq(sections.tenantId, inst1Id), isNull(sections.deletedAt)))
+    .innerJoin(standards, eq(standards.id, sections.standardId))
+    .where(
+      and(
+        eq(sections.tenantId, inst1Id),
+        eq(standards.numericOrder, SEED_ADMISSIONS.STUDENT_1.numericOrder),
+        isNull(sections.deletedAt),
+      ),
+    )
     .orderBy(sections.displayOrder)
     .limit(1);
   const section = sectionRows[0];

@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   institutes,
@@ -6,6 +6,7 @@ import {
   staffProfiles,
   studentGuardianLinks,
   studentProfiles,
+  tenantSequences,
   users,
 } from '../../schema';
 import { seedDemo, seedE2e, seedEssential } from '..';
@@ -87,6 +88,39 @@ describe('Seed tier idempotency + cumulative chaining', () => {
       .where(inArray(studentProfiles.id, [...SEEDED_STUDENT_PROFILE_IDS]));
 
     expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_STUDENT_PROFILE_IDS].sort());
+  });
+
+  it('seedE2e leaves the admission counters as they are and never lowers one (ROV-276)', async () => {
+    await seedE2e(db);
+    const counters = () =>
+      db
+        .select({ name: tenantSequences.sequenceName, value: tenantSequences.currentValue })
+        .from(tenantSequences)
+        .where(eq(tenantSequences.tenantId, SEED_IDS.INSTITUTE_1))
+        .orderBy(tenantSequences.sequenceName);
+    const before = await counters();
+    await seedE2e(db);
+    expect(await counters()).toEqual(before);
+
+    const nursery = and(
+      eq(tenantSequences.tenantId, SEED_IDS.INSTITUTE_1),
+      eq(tenantSequences.sequenceName, 'adm_no:N-'),
+    );
+    const [original] = await db
+      .select({ value: tenantSequences.currentValue })
+      .from(tenantSequences)
+      .where(nursery);
+    try {
+      await db.update(tenantSequences).set({ currentValue: 50n }).where(nursery);
+      await seedE2e(db);
+      const [after] = await db
+        .select({ value: tenantSequences.currentValue })
+        .from(tenantSequences)
+        .where(nursery);
+      expect(after.value).toBe(50n);
+    } finally {
+      await db.update(tenantSequences).set({ currentValue: original.value }).where(nursery);
+    }
   });
 
   it('seedE2e repairs missing e2e fixtures when student rows already exist', async () => {

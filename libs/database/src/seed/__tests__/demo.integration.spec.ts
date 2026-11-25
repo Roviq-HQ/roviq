@@ -15,7 +15,11 @@ import {
 import { seedDemo } from '../demo';
 import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
-import { makeSeedTestDb, SEED_HOOK_TIMEOUT_MS } from './seed-test-helpers';
+import {
+  expectSeededAdmissionsMatchSeries,
+  makeSeedTestDb,
+  SEED_HOOK_TIMEOUT_MS,
+} from './seed-test-helpers';
 
 describe('seedDemo', () => {
   const { pool, db } = makeSeedTestDb();
@@ -26,6 +30,10 @@ describe('seedDemo', () => {
   beforeAll(async () => {
     await seedDemo(db);
   }, SEED_HOOK_TIMEOUT_MS);
+
+  it('numbers the demo students from the Nursery series and sets its counter past them (ROV-276)', async () => {
+    await expectSeededAdmissionsMatchSeries(db, ['STUDENT_1', 'STUDENT_6', 'STUDENT_7']);
+  });
 
   it('creates 2 institutes', async () => {
     const rows = await db.select({ id: institutes.id }).from(institutes);

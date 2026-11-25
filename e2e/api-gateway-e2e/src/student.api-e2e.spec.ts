@@ -28,8 +28,8 @@ import type {
 } from '@roviq/graphql/generated';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { SEED_IDS } from '../../shared/seed-fixtures';
-import { loginAsInstituteAdmin } from './helpers/auth';
+import { SEED_IDS, SEED_PEOPLE } from '../../shared/seed-fixtures';
+import { loginAsInstituteAdmin, loginAsInstituteAdminSecondInstitute } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
 describe('Student E2E', () => {
@@ -596,6 +596,98 @@ describe('Student E2E', () => {
     it('preserves the admission number captured in the create test', () => {
       expect(createdStudentId).toBeTruthy();
       expect(createdAdmissionNumber).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────
+  // ROV-276: seeded admission numbers and the generated series
+  // ─────────────────────────────────────────────────────
+  describe('admission number series after the seed (ROV-276)', () => {
+    const seededNumbers = new Set<string>(SEED_PEOPLE.STUDENTS.map((s) => s.admissionNumber));
+
+    /** Admits one student into the class with `numericOrder` (or the first class), then removes it. */
+    async function admitAndDelete(
+      token: string,
+      yearId: string,
+      numericOrder?: number,
+    ): Promise<string> {
+      const standardsRes = await gql<{ standards: StandardModel[] }>(
+        `query Standards($academicYearId: ID!) {
+          standards(academicYearId: $academicYearId) { id numericOrder }
+        }`,
+        { academicYearId: yearId },
+        token,
+      );
+      expect(standardsRes.errors).toBeUndefined();
+      const all = standardsRes.data?.standards ?? [];
+      const standard =
+        numericOrder === undefined ? all[0] : all.find((s) => s.numericOrder === numericOrder);
+      assert(standard, `no class with numeric order ${numericOrder}`);
+
+      const sectionsRes = await gql<{ sections: SectionModel[] }>(
+        `query Sections($standardId: ID!) { sections(standardId: $standardId) { id } }`,
+        { standardId: standard.id },
+        token,
+      );
+      expect(sectionsRes.errors).toBeUndefined();
+      const section = sectionsRes.data?.sections[0];
+      assert(section, `class ${numericOrder} has no section`);
+
+      const created = await gql<{ createStudent: Pick<StudentModel, 'id' | 'admissionNumber'> }>(
+        `mutation CreateStudent($input: CreateStudentInput!) {
+          createStudent(input: $input) { id admissionNumber }
+        }`,
+        {
+          input: {
+            firstName: { en: 'Series' },
+            lastName: { en: 'Check' },
+            gender: Gender.FEMALE,
+            dateOfBirth: '2018-01-15',
+            standardId: standard.id,
+            sectionId: section.id,
+            academicYearId: yearId,
+            socialCategory: SocialCategory.GENERAL,
+          },
+        },
+        token,
+      );
+      expect(created.errors).toBeUndefined();
+      const student = created.data?.createStudent;
+      assert(student);
+
+      // The delete guard refuses a student with an active enrolment.
+      const withdrawn = await gql<{ transitionStudentStatus: { id: string } }>(
+        `mutation Withdraw($id: ID!, $newStatus: AcademicStatus!) {
+          transitionStudentStatus(id: $id, newStatus: $newStatus) { id }
+        }`,
+        { id: student.id, newStatus: AcademicStatus.WITHDRAWN },
+        token,
+      );
+      expect(withdrawn.errors).toBeUndefined();
+      const deleted = await gql<{ deleteStudent: boolean }>(
+        `mutation DeleteStudent($id: ID!) { deleteStudent(id: $id) }`,
+        { id: student.id },
+        token,
+      );
+      expect(deleted.errors).toBeUndefined();
+      return student.admissionNumber;
+    }
+
+    it.each([
+      ['Nursery', -3],
+      ['LKG', -2],
+      ['UKG', -1],
+      ['Class 1', 1],
+      ['Class 5', 5],
+    ])('admits into %s of Institute 1 with a number no seeded student holds', async (_label, order) => {
+      const number = await admitAndDelete(accessToken, SEED_IDS.ACADEMIC_YEAR_INST1, order);
+      expect(seededNumbers.has(number)).toBe(false);
+    });
+
+    it('admits into Institute 2 with a number no seeded student holds', async () => {
+      const second = await loginAsInstituteAdminSecondInstitute();
+      const number = await admitAndDelete(second.accessToken, SEED_IDS.ACADEMIC_YEAR_INST2);
+      expect(seededNumbers.has(number)).toBe(false);
     });
   });
 });

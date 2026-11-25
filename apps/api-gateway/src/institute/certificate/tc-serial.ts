@@ -1,7 +1,11 @@
 import { BusinessException, ErrorCode } from '@roviq/common-types';
-import { academicYearsLive, type DrizzleDB, tenantSequences } from '@roviq/database';
+import {
+  academicYearsLive,
+  type DrizzleDB,
+  formatSequenceValue,
+  tenantSequences,
+} from '@roviq/database';
 import { eq, sql } from 'drizzle-orm';
-import { formatSequenceValue } from '../student/admission-number';
 
 /** Counter resets per academic year, so the year label must be part of the serial to stay unique. */
 export function formatTcSerial(academicYearLabel: string, value: bigint): string {
