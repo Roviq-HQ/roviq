@@ -19,9 +19,10 @@ import type {
   PreviousYearResultRecord,
   PreviousYearResultUpdate,
   SectionCapacityRecord,
+  SectionStrengthChange,
   SectionStrengthNorms,
 } from './repositories/types';
-import { DEFAULT_SECTION_NORMS } from './section-norms';
+import { DEFAULT_SECTION_NORMS, emitSectionCapacityWarning } from './section-norms';
 
 @Injectable()
 export class StudentAcademicService {
@@ -95,7 +96,7 @@ export class StudentAcademicService {
       );
     }
 
-    this.warnIfOptimalReached(tenantId, input.sectionId, section.currentStrength, norms.optimal);
+    this.warnIfOptimalReached(tenantId, result.strength);
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.enrolled, {
       studentProfileId: input.studentProfileId,
@@ -105,7 +106,7 @@ export class StudentAcademicService {
     });
 
     this.logger.log(`Student ${input.studentProfileId} enrolled in section ${input.sectionId}`);
-    return result;
+    return { id: result.id };
   }
 
   // ── SECTION CHANGE ────────────────────────────────────────
@@ -132,22 +133,14 @@ export class StudentAcademicService {
     );
     this.checkCapacity(targetSection.currentStrength, norms, input.overrideReason);
 
-    // Update section + adjust strengths
-    await this.repository.setSection(
+    // The trigger adjusts both sections' strengths.
+    const strength = await this.repository.setSection(
       tenantId,
       input.studentAcademicId,
       input.newSectionId,
       actorId,
     );
-
-    if (input.newSectionId !== oldSectionId) {
-      this.warnIfOptimalReached(
-        tenantId,
-        input.newSectionId,
-        targetSection.currentStrength,
-        norms.optimal,
-      );
-    }
+    this.warnIfOptimalReached(tenantId, strength);
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.section_changed, {
       studentProfileId: current.studentProfileId,
@@ -173,7 +166,6 @@ export class StudentAcademicService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    let target: { strengthBefore: number; optimal: number } | null = null;
     const result = await this.repository.changeClass(
       tenantId,
       {
@@ -194,7 +186,6 @@ export class StudentAcademicService {
         assertCapacity: (capacity) => {
           const { section, norms } = this.withDefaultNorms(capacity);
           this.checkCapacity(section.currentStrength, norms, input.overrideReason);
-          target = { strengthBefore: section.currentStrength, optimal: norms.optimal };
         },
         previousYearResult: (previous, newStandard) =>
           this.alignedPreviousYearResult(previous, newStandard),
@@ -219,10 +210,7 @@ export class StudentAcademicService {
       studentProfileId: moved.studentProfileId,
       tenantId,
     });
-    if (target && moved.sectionId !== input.sectionId) {
-      const { strengthBefore, optimal } = target;
-      this.warnIfOptimalReached(tenantId, input.sectionId, strengthBefore, optimal);
-    }
+    this.warnIfOptimalReached(tenantId, result.strength);
 
     this.logger.log(
       `Student class changed: ${moved.studentProfileId} to standard ${input.standardId}, section ${input.sectionId}`,
@@ -325,21 +313,13 @@ export class StudentAcademicService {
     throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
   }
 
-  /**
-   * Once per crossing: only the placement that takes the section from below its optimal strength
-   * to it, so the class teacher is told again only after the section has dropped below and refilled.
-   */
-  private warnIfOptimalReached(
-    tenantId: string,
-    sectionId: string,
-    strengthBefore: number,
-    optimal: number,
-  ): void {
-    const strengthAfter = strengthBefore + 1;
-    if (strengthBefore >= optimal || strengthAfter < optimal) return;
-    const payload = { tenantId, sectionId, currentStrength: strengthAfter, optimal };
-    this.eventBus.emit(EVENT_PATTERNS.SECTION.capacity_warning, payload);
-    this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.SECTION_CAPACITY_WARNING, payload);
+  /** Called after the placement's transaction committed, with the counts it read under the lock. */
+  private warnIfOptimalReached(tenantId: string, strength: SectionStrengthChange | null): void {
+    emitSectionCapacityWarning(
+      (pattern, payload) => this.eventBus.emit(pattern, payload),
+      tenantId,
+      strength,
+    );
   }
 
   private async getSectionWithNorms(

@@ -13,7 +13,13 @@ import {
 } from '../../../auth/tenant-user-profile';
 import { nextAdmissionNumber } from '../admission-number.sequence';
 import { findYearAndClass, findYearAndStandard } from './class-lookup';
-import type { AdmissionClassData, AdmissionClassResult, NewStudentProfileData } from './types';
+import { lockSectionForPlacement, strengthChange } from './section-strength';
+import type {
+  AdmissionClassData,
+  AdmissionClassResult,
+  NewStudentProfileData,
+  SectionStrengthChange,
+} from './types';
 
 export interface AdmitStudentData extends Omit<AdmissionClassData, 'sectionId'> {
   /** Null admits the student to the standard with no section and no enrolment row yet. */
@@ -34,7 +40,14 @@ export interface AdmitStudentData extends Omit<AdmissionClassData, 'sectionId'> 
 export type AdmitStudentResult =
   | Exclude<AdmissionClassResult, { kind: 'ok' }>
   | { kind: 'role_not_found' }
-  | { kind: 'ok'; membershipId: string; studentProfileId: string; admissionNumber: string };
+  | {
+      kind: 'ok';
+      membershipId: string;
+      studentProfileId: string;
+      admissionNumber: string;
+      /** The section's strength around this enrolment; null without a section. */
+      strength: SectionStrengthChange | null;
+    };
 
 /**
  * Every institute-side row of a new student: membership, the institute's profile copy, the
@@ -84,7 +97,9 @@ export async function admitStudent(
     })
     .returning({ id: studentProfiles.id });
 
+  let strength: SectionStrengthChange | null = null;
   if (data.sectionId) {
+    const locked = await lockSectionForPlacement(tx, data.sectionId);
     const rollNumber = data.assignRollNumber
       ? await nextRollNumber(tx, tenantId, data.sectionId, data.academicYearId)
       : null;
@@ -98,6 +113,7 @@ export async function admitStudent(
       createdBy: actorId,
       updatedBy: actorId,
     });
+    strength = locked && (await strengthChange(tx, locked));
   }
 
   return {
@@ -105,6 +121,7 @@ export async function admitStudent(
     membershipId: membership.id,
     studentProfileId: profile.id,
     admissionNumber,
+    strength,
   };
 }
 

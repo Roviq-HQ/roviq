@@ -23,6 +23,7 @@ import {
 } from '@roviq/database';
 import { and, desc, eq, exists, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { findClassInYear } from './class-lookup';
+import { lockSectionForPlacement, strengthChange } from './section-strength';
 import { StudentAcademicRepository } from './student-academic.repository';
 import type {
   ChangeClassData,
@@ -30,9 +31,11 @@ import type {
   ClassChangeRules,
   EnrolTargetData,
   EnrolTargetResult,
+  PlacementResult,
   PromotionDecisionData,
   RemoveFromYearResult,
   SectionCapacityRecord,
+  SectionStrengthChange,
   StudentAcademicHistoryRecord,
   StudentAcademicPlacementRecord,
 } from './types';
@@ -109,8 +112,9 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
   async createPlacement(
     tenantId: string,
     data: EnrolTargetData & { actorId: string },
-  ): Promise<{ id: string } | null> {
+  ): Promise<PlacementResult | null> {
     const result = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const locked = await lockSectionForPlacement(tx, data.sectionId);
       const rows = await tx
         .insert(studentAcademics)
         .values({
@@ -127,10 +131,11 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
           where: sql`${studentAcademics.deletedAt} IS NULL`,
         })
         .returning({ id: studentAcademics.id });
+      if (!rows[0]) return null;
 
-      return rows[0];
+      return { id: rows[0].id, strength: locked && (await strengthChange(tx, locked)) };
     });
-    return result ?? null;
+    return result;
   }
 
   async findPlacement(
@@ -151,17 +156,24 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
     return current[0] ?? null;
   }
 
-  async setSection(
+  setSection(
     tenantId: string,
     studentAcademicId: string,
     sectionId: string,
     actorId: string,
-  ): Promise<void> {
-    await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+  ): Promise<SectionStrengthChange | null> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const [current] = await tx
+        .select({ sectionId: studentAcademicsLive.sectionId })
+        .from(studentAcademicsLive)
+        .where(eq(studentAcademicsLive.id, studentAcademicId))
+        .limit(1);
+      const locked = await lockSectionForPlacement(tx, sectionId, [current?.sectionId ?? null]);
       await tx
         .update(studentAcademics)
         .set({ sectionId, updatedBy: actorId })
         .where(eq(studentAcademics.id, studentAcademicId));
+      return locked && strengthChange(tx, locked);
     });
   }
 
@@ -194,9 +206,9 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
 
       rules.assertPlacementChanges(row);
 
-      const capacity = await this.readSectionCapacity(tx, data.sectionId);
-      if (!capacity) return { kind: 'section_not_found' };
-      rules.assertCapacity(capacity);
+      const locked = await lockSectionForPlacement(tx, data.sectionId, [row.sectionId]);
+      if (!locked) return { kind: 'section_not_found' };
+      rules.assertCapacity(locked);
 
       await tx
         .update(studentAcademics)
@@ -216,7 +228,7 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
         data.actorId,
         rules,
       );
-      return { kind: 'ok', row };
+      return { kind: 'ok', row, strength: await strengthChange(tx, locked) };
     });
   }
 

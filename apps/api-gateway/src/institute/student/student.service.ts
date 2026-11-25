@@ -26,6 +26,7 @@ import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
 import type { AdmitStudentResult } from './repositories/admit-student';
 import { StudentRepository } from './repositories/student.repository';
+import { emitSectionCapacityWarning } from './section-norms';
 import { StudentReadRepository } from './student-read.repository';
 
 const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
@@ -132,6 +133,11 @@ export class StudentService {
       sectionId: input.sectionId,
       tenantId,
     });
+    emitSectionCapacityWarning(
+      (pattern, payload) => this.eventBus.emit(pattern, payload),
+      tenantId,
+      admitted.strength,
+    );
 
     this.logger.log(`Student created: ${studentProfileId} (admission: ${admissionNumber})`);
 

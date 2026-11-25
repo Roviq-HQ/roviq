@@ -106,10 +106,10 @@
     }
   },
   "displaySettings.sampleAdmissionNumber": {
-    "reviewedReason": "Sample topic checked against admitStudent and nextAdmissionNumber: a blank admission number takes the next in the series",
+    "reviewedReason": "admitStudent now also locks the section and returns its strength change; admission numbers are unchanged",
     "targets": {
       "apps/api-gateway/src/institute/student/admission-number.sequence.ts#nextAdmissionNumber": "cfc6226e1dea1d9d",
-      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "c6e093d7e143fac5"
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "75c109359de80d4f"
     }
   },
   "groups.new.memberTypes": {
@@ -187,10 +187,12 @@
     }
   },
   "instituteSettings.config.optimalStrength": {
-    "reviewedReason": "ROV-351: reaching the optimal strength now notifies the class teacher, else the academic coordinators, once per crossing; copy updated",
+    "reviewedReason": "The warning is now decided from the counts read under the section lock and is sent from every placement path; copy lists adding, admitting and importing too",
     "targets": {
-      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll": "515150e0d1218f36",
-      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.warnIfOptimalReached": "a37d1f607d470ac0",
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "75c109359de80d4f",
+      "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockSectionForPlacement": "a6bc331d60be191b",
+      "apps/api-gateway/src/institute/student/section-norms.ts#sectionCapacityWarning": "8674a3b46ed2f6e6",
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll": "57d9771a6c4ce57d",
       "apps/notification-service/src/listeners/section.listener.ts#SectionListener.handleCapacityWarning": "d6576d020dd30c7a",
       "apps/notification-service/src/repositories/recipient-read.drizzle-repository.ts#RecipientReadDrizzleRepository.findSectionCapacityAudience": "7efc3493fcf23280"
     }
@@ -281,10 +283,10 @@
     }
   },
   "students.new.admissionType": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "create now also sends the section capacity warning; admission type handling is unchanged",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/awr.export.ts": "70fe5ba515c3e4ec",
-      "apps/api-gateway/src/institute/student/student.service.ts#StudentService.create": "c55917b38d373b40",
+      "apps/api-gateway/src/institute/student/student.service.ts#StudentService.create": "0e60b6a209567ce7",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#ADMISSION_TYPE_VALUES": "9a09ce5f6d345b29"
     }
   },

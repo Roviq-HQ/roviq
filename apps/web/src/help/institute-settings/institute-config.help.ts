@@ -33,8 +33,8 @@ export const instituteConfigHelp = defineFieldHelp('instituteSettings.config', {
   optimalStrength: {
     title: { en: 'Optimal strength', hi: 'आदर्श संख्या' },
     body: {
-      en: "The number of students a section is planned for. When enrolling or moving a student brings a section up to it, the section's class teacher gets a notification (the academic coordinators, when the section has none); it is sent again only after the section drops below and fills up again. The hard maximum is what limits a section.",
-      hi: 'एक अनुभाग में जितने विद्यार्थियों की योजना है। जब किसी विद्यार्थी का नामांकन करने या उसे भेजने से अनुभाग इस संख्या तक पहुँचता है, तो अनुभाग के कक्षा शिक्षक को सूचना मिलती है (कक्षा शिक्षक न हों तो शैक्षणिक समन्वयकों को); यह दोबारा तभी आती है जब अनुभाग इससे कम होकर फिर भरता है। अनुभाग की सीमा अधिकतम सीमा से तय होती है।',
+      en: "The number of students a section is planned for. When adding, admitting, importing, enrolling or moving a student brings a section up to it, the section's class teacher gets a notification (the academic coordinators, when the section has none); it is sent again only after the section drops below and fills up again. The hard maximum is what limits a section.",
+      hi: 'एक अनुभाग में जितने विद्यार्थियों की योजना है। जब किसी विद्यार्थी को जोड़ने, प्रवेश देने, आयात करने, नामांकन करने या उसे भेजने से अनुभाग इस संख्या तक पहुँचता है, तो अनुभाग के कक्षा शिक्षक को सूचना मिलती है (कक्षा शिक्षक न हों तो शैक्षणिक समन्वयकों को); यह दोबारा तभी आती है जब अनुभाग इससे कम होकर फिर भरता है। अनुभाग की सीमा अधिकतम सीमा से तय होती है।',
     },
   },
   hardMax: {

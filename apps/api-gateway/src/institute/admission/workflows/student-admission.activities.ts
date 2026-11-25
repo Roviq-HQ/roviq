@@ -45,6 +45,7 @@ import {
   findActiveGuardianByPhone,
 } from '../../../auth/tenant-user-profile';
 import { admitStudent as admitStudentInTx } from '../../student/repositories/admit-student';
+import { emitSectionCapacityWarning } from '../../student/section-norms';
 import type {
   ApplicationPayload,
   EnquiryPayload,
@@ -212,6 +213,11 @@ export function createStudentAdmissionActivities(
       if (!existing) {
         eventBus.emit(EVENT_PATTERNS.USER.admission_created, { tenantId, userId, email, username });
       }
+      emitSectionCapacityWarning(
+        (pattern, payload) => eventBus.emit(pattern, payload),
+        tenantId,
+        admitted.strength,
+      );
       return {
         userId,
         membershipId: admitted.membershipId,
@@ -234,7 +240,8 @@ export function createStudentAdmissionActivities(
               .from(studentProfilesLive)
               .where(eq(studentProfilesLive.userId, userId))
               .limit(1);
-            if (done) return { kind: 'ok' as const, ...done };
+            // An earlier attempt committed and already sent its warning.
+            if (done) return { kind: 'ok' as const, ...done, strength: null };
             return admitStudentInTx(tx, {
               tenantId,
               userId,

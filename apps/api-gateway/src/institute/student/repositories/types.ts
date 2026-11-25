@@ -124,6 +124,20 @@ export interface SectionCapacityRecord {
   norms: SectionStrengthNorms | null;
 }
 
+/** A section's ENROLLED count before and after one placement, read under the section lock. */
+export interface SectionStrengthChange {
+  sectionId: string;
+  before: number;
+  after: number;
+  norms: SectionStrengthNorms | null;
+}
+
+export interface PlacementResult {
+  id: string;
+  /** Null when the section was deleted before the insert. */
+  strength: SectionStrengthChange | null;
+}
+
 export interface StudentAcademicPlacementRecord {
   id: string;
   sectionId: string;
@@ -170,7 +184,7 @@ export interface ChangeClassData {
 export type ChangeClassResult =
   | { kind: 'academic_not_found' }
   | ClassLookupFailure
-  | { kind: 'ok'; row: ClassChangeRecord };
+  | { kind: 'ok'; row: ClassChangeRecord; strength: SectionStrengthChange };
 
 export interface RemovedPlacementRecord {
   id: string;
