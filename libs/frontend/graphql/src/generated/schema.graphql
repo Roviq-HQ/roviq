@@ -8084,12 +8084,12 @@ input UpdateInstituteConfigInput {
   """
   attendanceType: AttendanceType
 
-  """HH:mm format"""
+  """HH:mm, or HH:mm:ss as the config query returns it (a PostgreSQL time)"""
   closingTime: String
   gradingSystem: JSON
   notificationPreferences: JSON
 
-  """HH:mm format"""
+  """HH:mm, or HH:mm:ss as the config query returns it (a PostgreSQL time)"""
   openingTime: String
   payrollConfig: JSON
   sectionStrengthNorms: SectionStrengthNormsInput
