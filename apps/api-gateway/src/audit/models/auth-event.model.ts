@@ -32,6 +32,13 @@ export class AuthEventModel {
   @Field(() => String, { nullable: true })
   resellerId?: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Membership of the session, in the membership table of `scope`. Null when there was no session.',
+  })
+  membershipId?: string | null;
+
   @Field(() => String, { nullable: true })
   authMethod?: string | null;
 

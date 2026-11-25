@@ -18,6 +18,8 @@ interface LoginSuccessEvent extends AuthEventBase {
   scope: AuthScope;
   tenantId?: string;
   resellerId?: string;
+  /** The membership of the session that was issued, in the table `scope` names. */
+  membershipId: string;
 }
 
 /** Nothing was granted, so there is no scope, tenant or reseller — only where it was tried and why it failed. */
@@ -40,6 +42,8 @@ interface SessionEvent extends AuthEventBase {
   scope?: AuthScope;
   tenantId?: string;
   resellerId?: string;
+  /** Set when the event belongs to a session (logout, token_refresh, institute_switch). */
+  membershipId?: string;
 }
 
 export type AuthEventInput = LoginSuccessEvent | RefusedAttemptEvent | SessionEvent;
@@ -60,6 +64,7 @@ export class AuthEventService {
         scope: 'scope' in event ? event.scope : undefined,
         tenantId: 'tenantId' in event ? event.tenantId : undefined,
         resellerId: 'resellerId' in event ? event.resellerId : undefined,
+        membershipId: 'membershipId' in event ? event.membershipId : undefined,
         authMethod: event.authMethod,
         ipAddress: event.ip,
         userAgent: event.userAgent,

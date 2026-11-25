@@ -237,6 +237,7 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
         scope: row.scope,
         tenantId: row.tenantId,
         resellerId: row.resellerId,
+        membershipId: row.membershipId,
         authMethod: row.authMethod,
         ipAddress: row.ipAddress,
         userAgent: row.userAgent,

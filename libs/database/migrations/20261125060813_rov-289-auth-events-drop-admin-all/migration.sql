@@ -1,0 +1,1 @@
+DROP POLICY "auth_events_admin_all" ON "auth_events";

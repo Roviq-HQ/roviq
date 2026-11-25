@@ -13,7 +13,6 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
-import { users } from './users';
 
 const SCOPES = sql.raw(AUTH_SCOPE_VALUES.map((v) => `'${v}'`).join(', '));
 const FAILURE_REASONS = sql.raw(AUTH_FAILURE_REASON_VALUES.map((v) => `'${v}'`).join(', '));
@@ -22,7 +21,13 @@ export const authEvents = pgTable(
   'auth_events',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    userId: uuid('user_id').references(() => users.id),
+    // No foreign key: the security log must outlive the user row it names.
+    userId: uuid('user_id'),
+    /**
+     * Membership of the session, in the table `scope` names (memberships, reseller_memberships or
+     * platform_memberships), so no foreign key. Null when no session exists.
+     */
+    membershipId: uuid('membership_id'),
     eventType: varchar('event_type', { length: 50 }).notNull(),
     /** Entry point the request came through. Known before, and independent of, any authentication. */
     portal: varchar({ length: 20 }),
@@ -40,6 +45,7 @@ export const authEvents = pgTable(
   },
   (table) => [
     index('auth_events_user_id_idx').on(table.userId),
+    index('auth_events_membership_id_idx').on(table.membershipId),
     index('auth_events_event_type_idx').on(table.eventType),
     index('auth_events_tenant_id_idx').on(table.tenantId),
     index('auth_events_created_at_idx').on(table.createdAt),
@@ -70,11 +76,15 @@ export const authEvents = pgTable(
       to: roviqReseller,
       withCheck: sql`true`,
     }),
-    // roviq_admin: full access (read all events)
-    pgPolicy('auth_events_admin_all', {
-      for: 'all',
+    // roviq_admin reads and writes but never changes a row: the table is append-only.
+    pgPolicy('auth_events_admin_select', {
+      for: 'select',
       to: roviqAdmin,
       using: sql`true`,
+    }),
+    pgPolicy('auth_events_admin_insert', {
+      for: 'insert',
+      to: roviqAdmin,
       withCheck: sql`true`,
     }),
   ],
