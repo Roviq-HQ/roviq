@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "10723207-610f-4917-a3af-443fb58e814d",
+  "id": "29391402-1cfd-43d9-a80e-defe15c13b96",
   "prevIds": [
-    "7919ddeb-4308-4291-9c63-9955d4be6920"
+    "8f914a68-4987-46f0-9a40-8b2aae4b5042"
   ],
   "ddl": [
     {
@@ -648,6 +648,18 @@
     },
     {
       "values": [
+        "PENDING",
+        "APPROVED",
+        "REJECTED",
+        "PAUSED",
+        "DISABLED"
+      ],
+      "name": "MessageTemplateStatus",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
         "ACTIVE",
         "PAUSED",
         "BLOCKED"
@@ -1191,6 +1203,12 @@
     {
       "isRlsEnabled": true,
       "name": "messaging_senders",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": true,
+      "name": "messaging_templates",
       "entityType": "tables",
       "schema": "public"
     },
@@ -4086,6 +4104,19 @@
       "table": "auth_events"
     },
     {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "membership_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
       "type": "varchar(50)",
       "typeSchema": null,
       "notNull": true,
@@ -6688,6 +6719,19 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "provider_account_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_senders"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -6840,6 +6884,227 @@
       "entityType": "columns",
       "schema": "public",
       "table": "messaging_senders"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "provider_account_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "varchar(8)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "language",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "declared_category",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "approved_category",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "content_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "provider_template_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "MessageTemplateStatus",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'PENDING'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "rejected_reason",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "quality",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "suggested_category",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "out_of_step",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "updated_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "messaging_templates"
     },
     {
       "type": "uuid",
@@ -22744,6 +23009,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "membership_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "auth_events_membership_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "event_type",
           "isExpression": false,
           "asc": true,
@@ -23593,6 +23879,41 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "messaging_senders"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "provider_account_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "language",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "messaging_templates_account_name_language_key",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "messaging_templates"
     },
     {
       "nameExplicit": true,
@@ -29722,23 +30043,6 @@
       "columnsTo": [
         "id"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "auth_events_user_id_users_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "auth_events"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
       "onUpdate": "CASCADE",
       "onDelete": "RESTRICT",
       "name": "auth_providers_user_id_users_id_fkey",
@@ -33687,6 +33991,16 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "messaging_templates_pkey",
+      "schema": "public",
+      "table": "messaging_templates",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "institute_notification_configs_pkey",
       "schema": "public",
       "table": "institute_notification_configs",
@@ -35390,13 +35704,26 @@
     },
     {
       "as": "PERMISSIVE",
-      "for": "ALL",
+      "for": "SELECT",
       "roles": [
         "roviq_admin"
       ],
       "using": "true",
+      "withCheck": null,
+      "name": "auth_events_admin_select",
+      "entityType": "policies",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "as": "PERMISSIVE",
+      "for": "INSERT",
+      "roles": [
+        "roviq_admin"
+      ],
+      "using": null,
       "withCheck": "true",
-      "name": "auth_events_admin_all",
+      "name": "auth_events_admin_insert",
       "entityType": "policies",
       "schema": "public",
       "table": "auth_events"
@@ -36050,6 +36377,45 @@
       "entityType": "policies",
       "schema": "public",
       "table": "messaging_senders"
+    },
+    {
+      "as": "PERMISSIVE",
+      "for": "SELECT",
+      "roles": [
+        "roviq_app"
+      ],
+      "using": "provider_account_id IN (\n        SELECT s.provider_account_id FROM messaging_senders s\n         WHERE s.scope = 'institute'\n           AND s.deleted_at IS NULL\n           AND s.tenant_id = current_setting('app.current_tenant_id', true)::uuid\n      )",
+      "withCheck": null,
+      "name": "messaging_templates_app_select",
+      "entityType": "policies",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "as": "PERMISSIVE",
+      "for": "SELECT",
+      "roles": [
+        "roviq_reseller"
+      ],
+      "using": "false",
+      "withCheck": null,
+      "name": "messaging_templates_reseller_none",
+      "entityType": "policies",
+      "schema": "public",
+      "table": "messaging_templates"
+    },
+    {
+      "as": "PERMISSIVE",
+      "for": "ALL",
+      "roles": [
+        "roviq_admin"
+      ],
+      "using": "true",
+      "withCheck": "true",
+      "name": "messaging_templates_admin_all",
+      "entityType": "policies",
+      "schema": "public",
+      "table": "messaging_templates"
     },
     {
       "as": "PERMISSIVE",
@@ -42111,7 +42477,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"scope\", \"tenant_id\", \"channel\", \"provider\", \"provider_number_id\", \"display_number\", \"status\", \"daily_cap\", \"institute_daily_cap\", \"messages_per_second\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"messaging_senders\" where (\"messaging_senders\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"scope\", \"tenant_id\", \"channel\", \"provider\", \"provider_number_id\", \"provider_account_id\", \"display_number\", \"status\", \"daily_cap\", \"institute_daily_cap\", \"messages_per_second\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"messaging_senders\" where (\"messaging_senders\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
