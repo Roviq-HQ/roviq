@@ -202,7 +202,7 @@ Must be wrapped in `<form.AppForm>`:
 </form.AppForm>
 ```
 
-It is disabled only while submitting (or by `disabled`, for "no changes yet"), never because the form is invalid. A submit attempt marks every field touched, so each field shows its error, and `useAppForm` moves focus to the first field showing one (`[aria-invalid="true"]`, in page order) in the form that holds the submit button, so a page form and a dialog form sharing a field name do not mix. A field shows its error once it is touched or after a submit attempt, never before. A custom field that should take that focus sets `aria-invalid` on its control. It subscribes to `isSubmitting` only, so the surrounding form does not re-render per keystroke.
+It is disabled only while submitting (or by `disabled`, for "no changes yet"), never because the form is invalid. A submit attempt marks every field touched, so each field shows its error, and `useAppForm` moves focus to the first field showing one (`[aria-invalid="true"]`, in page order) in the form that holds that form's `SubmitButton` (the button carries the form's id; focus is no guide, since Safari does not focus a clicked button), so a page form and a dialog form sharing a field name do not mix. A form without a `SubmitButton` falls back to the first invalid field's id. A field shows its error once it is touched or after a submit attempt, never before. A custom field that should take that focus sets `aria-invalid` on its control. It subscribes to `isSubmitting` only, so the surrounding form does not re-render per keystroke.
 
 ## Testing
 

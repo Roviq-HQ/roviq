@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { zodValidator } from '@roviq/i18n';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -579,7 +579,9 @@ describe('SubmitButton', () => {
         <NamedForm prefix="dialog" />
       </>,
     );
-    await userEvent.click(screen.getByTestId('dialog-submit'));
+    // Safari does not focus a clicked button: focus stays in the other form while this one submits.
+    screen.getByTestId('page-name').focus();
+    fireEvent.click(screen.getByTestId('dialog-submit'));
 
     await waitFor(() => expect(screen.getByTestId('dialog-name')).toHaveFocus());
     expect(screen.getByTestId('page-name')).not.toHaveFocus();
