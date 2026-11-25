@@ -97,7 +97,9 @@ export function createAuditLogColumns({
         return (
           <div className="flex items-center gap-1.5">
             <span className="max-w-[120px] truncate text-xs">{actor}</span>
-            {unknown && <CopyIdButton value={log.actorId} name={t('detail.actorId')} />}
+            {unknown && (
+              <CopyIdButton value={log.actorId} name={t('detail.actorId')} rowKey={log.id} />
+            )}
             {outside && (
               <Badge
                 variant="outline"
@@ -189,7 +191,7 @@ export function createAuditLogColumns({
                 {entityId}
               </span>
             )}
-            <CopyIdButton value={entityId} name={t('detail.entityId')} />
+            <CopyIdButton value={entityId} name={t('detail.entityId')} rowKey={id} />
           </div>
         );
       },

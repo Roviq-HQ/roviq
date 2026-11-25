@@ -116,7 +116,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `buildCsv(headers, rows)` + `downloadCsv(filename, csv)` (`@web/lib/csv`) — CSV export of what a table shows: every field quoted, UTF-8 with a BOM so Excel opens Hindi correctly. Pass translated headers and values, never ids.
 - `useRoleName()` (`@web/hooks/use-role-name`) — display name for any role. System roles store their key as the name (`class_teacher`, matched by the server), so they get a translated label from the `roles` namespace; a role an institute named itself is shown as written. Use it wherever a role name is shown, never `useI18nField()` on a role name.
 - `useErrorCopy(namespace?)` (`@web/hooks/use-error-copy`) — translated copy for a failed request (see "Error messages"); use it for every error toast or inline error, never `err.message`.
-- `CopyIdButton` (`@web/components/copy-id-button`) — copies a full id where a list has no name to show (`value`, `name` for its "Copy …" label) and confirms with a "Copied!" toast; does not open the row it sits in. Show a name when one exists, never a shortened id.
+- `CopyIdButton` (`@web/components/copy-id-button`) — copies a full id where a list has no name to show (`value`, `name` for its "Copy …" label, `rowKey` for the row or place it sits in, which keeps its test id unique when an id repeats) and confirms with a "Copied!" toast; does not open the row it sits in. Show a name when one exists, never a shortened id.
 - `usePersonName()` (`@web/hooks/use-person-name`) — full name in the current language from i18n first and last names; `''` when there is none, so the caller shows its own translated fallback ("Unknown student").
 
 ## Shared Libraries

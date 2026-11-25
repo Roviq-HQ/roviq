@@ -158,7 +158,11 @@ export default function ApplicationsPage() {
                   data-testid={instituteAdmissionApplications.applicant(row.original.id)}
                 >
                   {t('applications.unnamedApplicant')}
-                  <CopyIdButton value={row.original.id} name={t('applications.applicationId')} />
+                  <CopyIdButton
+                    value={row.original.id}
+                    name={t('applications.applicationId')}
+                    rowKey={row.original.id}
+                  />
                 </p>
               )}
               {parentName && <p className="text-xs text-muted-foreground">{parentName}</p>}

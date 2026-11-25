@@ -198,7 +198,7 @@ describe('ApplicationsPage (component)', () => {
     expect(cell).toHaveTextContent(messagesEn.applications.unnamedApplicant);
     expect(cell).not.toHaveTextContent(unnamedApp.id.slice(0, 8));
 
-    await user.click(within(cell).getByTestId(testIds.copyId.button(unnamedApp.id)));
+    await user.click(within(cell).getByTestId(testIds.copyId.button(unnamedApp.id, unnamedApp.id)));
     expect(await navigator.clipboard.readText()).toBe(unnamedApp.id);
     expect(toast.success).toHaveBeenCalledWith('Copied!', { duration: 2000 });
     listState.unnamed = false;

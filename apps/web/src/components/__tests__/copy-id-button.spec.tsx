@@ -15,9 +15,11 @@ describe('CopyIdButton', () => {
 
   it('copies the full id and confirms in Hindi', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<CopyIdButton value={ID} name="आवेदन आईडी" />, { locale: 'hi' });
+    renderWithProviders(<CopyIdButton value={ID} name="आवेदन आईडी" rowKey="row-1" />, {
+      locale: 'hi',
+    });
 
-    const button = screen.getByTestId(testIds.copyId.button(ID));
+    const button = screen.getByTestId(testIds.copyId.button('row-1', ID));
     expect(button).toHaveAccessibleName('आवेदन आईडी कॉपी करें');
     await user.click(button);
 
@@ -28,9 +30,9 @@ describe('CopyIdButton', () => {
   it('says how to copy by hand when the browser refuses the clipboard', async () => {
     const user = userEvent.setup();
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'));
-    renderWithProviders(<CopyIdButton value={ID} name="application ID" />);
+    renderWithProviders(<CopyIdButton value={ID} name="application ID" rowKey="row-1" />);
 
-    await user.click(screen.getByTestId(testIds.copyId.button(ID)));
+    await user.click(screen.getByTestId(testIds.copyId.button('row-1', ID)));
 
     expect(toast.error).toHaveBeenCalledWith(
       "Couldn't copy. Allow clipboard access for this site, or select the text and copy it.",

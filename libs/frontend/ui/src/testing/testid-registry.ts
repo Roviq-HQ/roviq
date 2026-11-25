@@ -13,7 +13,8 @@
 export const testIds = {
   // ── Common: copy an id (apps/web/src/components/copy-id-button.tsx) ──
   copyId: {
-    button: (value: string) => `copy-id-btn-${value}`,
+    // The same id can show in several rows, so the key names the row (or the place) as well.
+    button: (rowKey: string, value: string) => `copy-id-btn-${rowKey}-${value}`,
   },
 
   profilePhoto: {
