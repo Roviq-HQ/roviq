@@ -38,6 +38,7 @@ import type {
 const ENQUIRY_FIELDS = `
   id
   tenantId
+  enquiryNumber
   studentName
   dateOfBirth
   gender
@@ -71,7 +72,7 @@ const ENQUIRY_FIELDS = `
   updatedAt
 `;
 
-const LIST_ENQUIRIES_QUERY = gql`
+export const LIST_ENQUIRIES_QUERY = gql`
   query InstituteListEnquiries($filter: EnquiryFilterInput) {
     listEnquiries(filter: $filter) {
       edges {

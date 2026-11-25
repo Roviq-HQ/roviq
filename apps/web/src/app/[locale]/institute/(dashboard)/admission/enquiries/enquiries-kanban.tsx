@@ -212,7 +212,10 @@ function KanbanCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate font-medium">{enquiry.studentName}</p>
-            <p className="truncate text-xs text-muted-foreground">{enquiry.classRequested}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {enquiry.enquiryNumber ? `${enquiry.enquiryNumber} · ` : ''}
+              {enquiry.classRequested}
+            </p>
           </div>
           <Badge
             variant="secondary"

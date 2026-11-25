@@ -47,10 +47,10 @@
     }
   },
   "admission.enquiry.followUpDate": {
-    "reviewedReason": "ROV-360 changed only the assignee cell; follow-up order and overdue marking unchanged",
+    "reviewedReason": "Only the enquiry number was added to the row subtitle; ordering by follow-up date and the overdue marking are unchanged",
     "targets": {
       "apps/api-gateway/src/institute/admission/admission-read.repository.ts#AdmissionReadRepository.listEnquiries": "3e5bce015de8e8a5",
-      "apps/web/src/app/[locale]/institute/(dashboard)/admission/enquiries/page.tsx": "ef40b84359939173"
+      "apps/web/src/app/[locale]/institute/(dashboard)/admission/enquiries/page.tsx": "2f7c61dcc99af83d"
     }
   },
   "admission.enquiry.source": {
