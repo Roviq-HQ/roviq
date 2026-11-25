@@ -72,4 +72,4 @@ export const impersonationSessions = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

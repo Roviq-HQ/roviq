@@ -55,4 +55,4 @@ export const userAddresses = pgTable(
     index('idx_user_addresses_user_id').on(table.userId),
     ...userScopedPolicies('user_addresses'),
   ],
-).enableRLS();
+);

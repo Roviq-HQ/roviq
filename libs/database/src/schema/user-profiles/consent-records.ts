@@ -151,4 +151,4 @@ export const consentRecords = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

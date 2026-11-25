@@ -63,4 +63,4 @@ export const certificateTemplates = pgTable(
 
     ...tenantPolicies('certificate_templates'),
   ],
-).enableRLS();
+);

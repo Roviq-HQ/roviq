@@ -104,4 +104,4 @@ export const groups = pgTable(
 
     ...tenantPolicies('groups'),
   ],
-).enableRLS();
+);

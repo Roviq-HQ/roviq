@@ -59,4 +59,4 @@ export const studentGuardianLinks = pgTable(
 
     ...tenantPolicies('student_guardian_links'),
   ],
-).enableRLS();
+);

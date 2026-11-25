@@ -61,4 +61,4 @@ export const userDocuments = pgTable(
     index('idx_user_documents_user_type').on(table.userId, table.type),
     ...userScopedPolicies('user_documents'),
   ],
-).enableRLS();
+);

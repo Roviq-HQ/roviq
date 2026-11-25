@@ -33,4 +33,4 @@ export const phoneNumbers = pgTable(
     // Writes are platform-only: the custom migration revokes them from roviq_app and roviq_reseller.
     ...userScopedPolicies('phone_numbers'),
   ],
-).enableRLS();
+);

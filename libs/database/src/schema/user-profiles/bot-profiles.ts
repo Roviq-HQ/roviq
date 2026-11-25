@@ -99,4 +99,4 @@ export const botProfiles = pgTable(
 
     ...tenantPolicies('bot_profiles'),
   ],
-).enableRLS();
+);

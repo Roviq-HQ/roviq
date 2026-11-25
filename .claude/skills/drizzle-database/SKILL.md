@@ -34,7 +34,7 @@ withAdmin(db, ctx: PlatformContext, async (tx) => { … })
 
 - **Foreign keys do not apply RLS**, and `WITH CHECK` sees only the new row's `tenant_id`. A row can therefore point at another institute's student, year or class. Before storing a caller-supplied id, read it through its `*Live` view inside the caller's `withTenant`, and check that related ids agree (the class belongs to the year, the section to the class).
 - A rule that must hold on every code path belongs in the database too: GRANT, RLS policy, CHECK or trigger. Test it by attempting the forbidden write as the role.
-- `.enableRLS()` only does `ENABLE`. `FORCE ROW LEVEL SECURITY` is applied in custom SQL.
+- drizzle-kit enables row security on any table that has a policy; never call the deprecated `.enableRLS()` (`pnpm check:rls-coverage` refuses it). `FORCE ROW LEVEL SECURITY` is applied in custom SQL.
 - Hard `DELETE` is blocked for `roviq_app` (`USING (false)`): it silently removes nothing.
 
 ## Tables

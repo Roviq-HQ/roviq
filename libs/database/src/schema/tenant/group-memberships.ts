@@ -34,4 +34,4 @@ export const groupMemberships = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

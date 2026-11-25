@@ -44,4 +44,4 @@ export const resellerMemberships = pgTable(
       withCheck: sql`true`,
     }),
   ],
-).enableRLS();
+);

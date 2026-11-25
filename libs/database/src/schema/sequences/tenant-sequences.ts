@@ -45,4 +45,4 @@ export const tenantSequences = pgTable(
       .onUpdate('cascade'),
     ...tenantPolicies('tenant_sequences'),
   ],
-).enableRLS();
+);

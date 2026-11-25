@@ -56,4 +56,4 @@ export const privacyNotices = pgTable(
 
     ...tenantPolicies('privacy_notices'),
   ],
-).enableRLS();
+);

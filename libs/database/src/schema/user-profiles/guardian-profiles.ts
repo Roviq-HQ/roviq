@@ -60,4 +60,4 @@ export const guardianProfiles = pgTable(
 
     ...tenantPolicies('guardian_profiles'),
   ],
-).enableRLS();
+);

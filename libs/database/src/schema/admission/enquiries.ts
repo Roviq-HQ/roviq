@@ -138,4 +138,4 @@ export const enquiries = pgTable(
 
     ...tenantPolicies('enquiries'),
   ],
-).enableRLS();
+);

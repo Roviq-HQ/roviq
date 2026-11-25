@@ -131,4 +131,4 @@ export const admissionApplications = pgTable(
 
     ...tenantPolicies('admission_applications'),
   ],
-).enableRLS();
+);
