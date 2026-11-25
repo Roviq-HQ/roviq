@@ -12,6 +12,19 @@ export interface NavItem {
   ability?: NavAbility;
 }
 
+/**
+ * An entry in the Quick actions group of the command palette: a page (`href`) or an action the
+ * app handles (`onSelect`, e.g. opening Display settings). Filtered by `ability` like nav items.
+ */
+export interface QuickAction {
+  id: string;
+  title: string;
+  icon?: LucideIcon;
+  ability?: NavAbility;
+  href?: string;
+  onSelect?: () => void;
+}
+
 export interface NavGroup {
   title: string;
   items: NavItem[];
@@ -93,6 +106,11 @@ export interface LayoutConfig {
   instituteSwitcher?: InstituteSwitcherConfig;
   /** Topbar notification bell; the app supplies it because it fetches its own data. */
   notificationBell?: ReactNode;
+  /**
+   * First group of the command palette, opened by the top-bar Quick actions button. The user's
+   * pinned pages follow it; a destination is listed once.
+   */
+  quickActions?: QuickAction[];
   /**
    * Symbolic-slug → render-info map used to resolve bottom-nav slugs into
    * actual links. Required when `bottomNav` is set.

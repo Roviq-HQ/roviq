@@ -65,5 +65,28 @@
       "generic": "Something went wrong. Try again in a moment.",
       "limitReached": "No more codes can be sent to this account today. Try again tomorrow."
     }
+  },
+  "displaySettings": {
+    "title": "Display settings",
+    "description": "How Roviq shows forms to you. Saved to your account, so it follows you to any computer.",
+    "openFromAccount": "Display settings",
+    "formHelp": {
+      "title": "Form help",
+      "description": "Every field that needs explaining has an ⓘ button. Choose whether forms also show a short hint under those labels.",
+      "ICON_AND_HINT": "Help icon and short hints",
+      "ICON_AND_HINTDescription": "A one-sentence hint under labels where it helps. Easier while you are learning the forms.",
+      "ICON_ONLY": "Help icon only",
+      "ICON_ONLYDescription": "Hints are hidden, so forms are shorter. Tap ⓘ whenever you need an explanation.",
+      "preview": "Preview",
+      "sampleLabel": "Admission number",
+      "samplePlaceholder": "ADM/2025/0142"
+    },
+    "loading": "Loading your settings…",
+    "saving": "Saving…",
+    "saved": "Display settings saved",
+    "saveFailed": "Could not save your display settings. Your previous choice is still in use.",
+    "loadFailed": "Could not load your saved settings. Forms use the default for now.",
+    "retry": "Retry",
+    "impersonating": "You are viewing as another person, so their settings cannot be changed. Forms show the default."
   }
 }

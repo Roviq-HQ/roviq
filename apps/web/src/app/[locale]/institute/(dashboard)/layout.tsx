@@ -6,6 +6,10 @@ import { type AppAbility, NAV_SLUGS } from '@roviq/common-types';
 import { useI18nField } from '@roviq/i18n';
 import type { LayoutConfig, NavGroup, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
+import {
+  DisplaySettingsProvider,
+  useDisplaySettings,
+} from '@web/components/display-settings/display-settings-context';
 import { ImpersonationBannerView } from '@web/components/impersonation/impersonation-banner';
 import { useImpersonationSession } from '@web/components/impersonation/use-impersonation-session';
 import { NotificationBell } from '@web/components/notifications/notification-bell';
@@ -30,6 +34,7 @@ import {
   Receipt,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   UserCheck,
   UserCog,
   UserPlus,
@@ -51,6 +56,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const tGroups = useTranslations('groups');
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
+  const tQuick = useTranslations('common.quickActions');
+  const { openDisplaySettings } = useDisplaySettings();
   const impersonation = useImpersonationSession();
   const { logout, user, memberships, switchInstitute } = useAuth();
   const ti = useI18nField();
@@ -279,6 +286,42 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     logoutLabel: impersonation.active ? tAuth('exitImpersonation') : undefined,
     instituteSwitcher,
     notificationBell: <NotificationBell />,
+    quickActions: [
+      {
+        id: 'display-settings',
+        title: tQuick('displaySettings'),
+        icon: SlidersHorizontal,
+        onSelect: openDisplaySettings,
+      },
+      {
+        id: 'attendance',
+        title: tQuick('attendance'),
+        icon: ClipboardCheck,
+        href: '/attendance',
+        ability: { action: 'read', subject: 'Attendance' },
+      },
+      {
+        id: 'today-timetable',
+        title: tQuick('todayTimetable'),
+        icon: CalendarDays,
+        href: '/timetable/day',
+        ability: { action: 'read', subject: 'Timetable' },
+      },
+      {
+        id: 'add-student',
+        title: tQuick('addStudent'),
+        icon: UserPlus,
+        href: '/people/students/new',
+        ability: { action: 'create', subject: 'Student' },
+      },
+      {
+        id: 'add-staff',
+        title: tQuick('addStaff'),
+        icon: UserPlus,
+        href: '/people/staff/new',
+        ability: { action: 'create', subject: 'Staff' },
+      },
+    ],
     navGroups: [
       {
         title: t('overview'),
@@ -422,7 +465,9 @@ export default function InstituteDashboard({ children }: { children: React.React
   return (
     <ProtectedRoute>
       <CurrentInstituteLocalesProvider>
-        <DashboardLayout>{children}</DashboardLayout>
+        <DisplaySettingsProvider>
+          <DashboardLayout>{children}</DashboardLayout>
+        </DisplaySettingsProvider>
       </CurrentInstituteLocalesProvider>
     </ProtectedRoute>
   );

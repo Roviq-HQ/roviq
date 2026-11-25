@@ -36,5 +36,20 @@
     "articleDescription": "More about this field",
     "articleFailed": "This help could not be loaded. Check your connection and try again.",
     "retry": "Try again"
+  },
+  "quickActions": {
+    "button": "Quick actions",
+    "buttonTitle": "Quick actions and search (Ctrl+K)",
+    "title": "Quick actions and search",
+    "heading": "Quick actions",
+    "pinned": "Pinned pages",
+    "placeholder": "Search pages and actions…",
+    "empty": "Nothing matches your search.",
+    "displaySettings": "Display settings",
+    "attendance": "Take attendance",
+    "todayTimetable": "Today’s timetable",
+    "addStudent": "Add student",
+    "addStaff": "Add staff",
+    "description": "Pick an action, or type to search pages."
   }
 }

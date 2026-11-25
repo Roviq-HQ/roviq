@@ -21,6 +21,7 @@ export function AdminLayout({
   children: React.ReactNode;
 }) {
   const config = useAbilityFilteredConfig(rawConfig);
+  const [paletteOpen, setPaletteOpen] = React.useState(false);
   return (
     <SidebarProvider>
       {/* Skip link — visible only when focused, lets keyboard users jump
@@ -43,7 +44,7 @@ export function AdminLayout({
           </div>
           <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
             <div className="contents print:hidden">
-              <Topbar config={config} />
+              <Topbar config={config} onOpenQuickActions={() => setPaletteOpen(true)} />
             </div>
             {config.bottomNav && config.navRegistry && (
               <div className="contents print:hidden">
@@ -69,7 +70,7 @@ export function AdminLayout({
           </div>
         </div>
       </div>
-      <CommandPalette config={config} />
+      <CommandPalette config={config} open={paletteOpen} onOpenChange={setPaletteOpen} />
     </SidebarProvider>
   );
 }
@@ -85,6 +86,9 @@ function useAbilityFilteredConfig(config: LayoutConfig): LayoutConfig {
         ),
       }))
       .filter((group) => group.items.length > 0);
-    return { ...config, navGroups };
+    const quickActions = config.quickActions?.filter(
+      (action) => !action.ability || ability.can(action.ability.action, action.ability.subject),
+    );
+    return { ...config, navGroups, quickActions };
   }, [config, ability]);
 }
