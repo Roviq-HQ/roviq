@@ -267,6 +267,8 @@ export const ErrorCode = {
   SECTION_NOT_FOUND: 'SECTION_NOT_FOUND',
   /** Staff profile not found */
   STAFF_NOT_FOUND: 'STAFF_NOT_FOUND',
+  /** Another current staff member of the institute already has this employee ID */
+  EMPLOYEE_ID_DUPLICATE: 'EMPLOYEE_ID_DUPLICATE',
   /** Staff qualification not found */
   STAFF_QUALIFICATION_NOT_FOUND: 'STAFF_QUALIFICATION_NOT_FOUND',
   /** Standard not found */
@@ -566,6 +568,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   ROLE_NOT_FOUND: HttpStatus.NOT_FOUND,
   SECTION_NOT_FOUND: HttpStatus.NOT_FOUND,
   STAFF_NOT_FOUND: HttpStatus.NOT_FOUND,
+  EMPLOYEE_ID_DUPLICATE: HttpStatus.CONFLICT,
   STAFF_QUALIFICATION_NOT_FOUND: HttpStatus.NOT_FOUND,
   STANDARD_NOT_FOUND: HttpStatus.NOT_FOUND,
   STUDENT_ACADEMIC_NOT_FOUND: HttpStatus.NOT_FOUND,

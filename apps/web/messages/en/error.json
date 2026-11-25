@@ -37,5 +37,6 @@
   "MESSAGING_SENDER_NOT_FOUND": "That messaging sender was not found. Refresh and try again.",
   "MESSAGING_SENDER_EXISTS": "A sender is already registered for this institute, or this number is already in use.",
   "ACADEMIC_YEAR_NOT_FOUND": "That academic year was not found. Refresh and try again.",
-  "ACADEMIC_YEAR_NOT_ACTIVE": "No academic year is active for this."
+  "ACADEMIC_YEAR_NOT_ACTIVE": "No academic year is active for this.",
+  "EMPLOYEE_ID_DUPLICATE": "Another current staff member already has this employee ID."
 }

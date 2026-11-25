@@ -1,4 +1,4 @@
-import type { EmploymentType } from '@roviq/common-types';
+import type { EmploymentType, SocialCategory } from '@roviq/common-types';
 import type { staffProfiles, staffProfilesLive, tenantUserProfilesLive } from '@roviq/database';
 import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
 import type { SignInState } from '../../sign-in-details/sign-in-status';
@@ -61,8 +61,16 @@ export interface CreateStaffProfileData {
   dateOfJoining: string;
   employmentType: EmploymentType;
   specialization: string | null;
+  socialCategory: SocialCategory | null;
   actorId: string;
 }
+
+/** `employee_id_taken`: another current staff member of the institute has the ID. */
+export type CreateStaffProfileResult =
+  | { kind: 'ok'; row: StaffProfileRow }
+  | { kind: 'employee_id_taken' };
+
+export type RestoreStaffResult = 'restored' | 'not_found' | 'employee_id_taken';
 
 /** Changed staff fields only; an absent key keeps the stored value. */
 export type StaffProfilePatch = Partial<

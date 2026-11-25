@@ -80,6 +80,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/section/__tests__/section-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  // ROV-349: a Teacher role for the test institute and reads of the stored staff rows.
+  'apps/api-gateway/src/institute/staff/__tests__/staff-employee-id.integration.spec.ts',
   'apps/api-gateway/src/institute/standard/__tests__/standard-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-create-foreign-id.integration.spec.ts',
   // ROV-275: fixtures and row snapshots for the one-transaction student create and its cleanup.

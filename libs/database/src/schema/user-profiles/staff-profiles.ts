@@ -1,6 +1,15 @@
 import { EmploymentType } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
-import { boolean, date, foreignKey, index, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  date,
+  foreignKey,
+  index,
+  pgTable,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { tenantColumns } from '../common/columns';
 import { employmentType, socialCategory } from '../common/enums';
@@ -79,6 +88,10 @@ export const staffProfiles = pgTable(
       .onUpdate('cascade'),
 
     index('idx_staff_profiles_tenant').on(table.tenantId).where(sql`${table.deletedAt} IS NULL`),
+    // An employee ID is unique among an institute's current staff; a deleted row frees it.
+    uniqueIndex('uq_staff_profiles_tenant_employee_id')
+      .on(table.tenantId, table.employeeId)
+      .where(sql`${table.deletedAt} IS NULL`),
 
     ...tenantPolicies('staff_profiles'),
   ],

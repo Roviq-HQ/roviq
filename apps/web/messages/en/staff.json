@@ -79,6 +79,7 @@
       "phoneInvalid": "Enter a valid 10-digit Indian mobile number",
       "dateInvalid": "Use the DD/MM/YYYY date format",
       "generic": "Could not create staff member",
+      "employeeIdDuplicate": "Another current staff member already has this employee ID. Enter a different one, or leave it blank to get the next number.",
       "duplicate": "A staff member with this email already exists"
     }
   },

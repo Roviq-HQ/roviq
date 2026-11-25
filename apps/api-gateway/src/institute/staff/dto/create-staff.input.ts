@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { EmploymentType, Gender } from '@roviq/common-types';
+import { EmploymentType, Gender, SocialCategory } from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import {
@@ -53,6 +53,25 @@ export class CreateStaffInput {
     message: 'phone must be a 10-digit Indian mobile starting with 6-9',
   })
   phone?: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The institute's own employee ID, up to 30 characters. Unique among current staff of the institute (EMPLOYEE_ID_DUPLICATE); when omitted the next number of the institute's employee ID series is used.",
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: 'employeeId must not be blank' })
+  @MaxLength(30)
+  employeeId?: string;
+
+  @Field(() => SocialCategory, {
+    nullable: true,
+    description: 'Social category, printed in UDISE+ and board staff reports',
+  })
+  @IsOptional()
+  @IsEnum(SocialCategory)
+  socialCategory?: SocialCategory;
 
   @Field(() => String, {
     nullable: true,

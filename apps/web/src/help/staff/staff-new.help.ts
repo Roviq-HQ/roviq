@@ -22,9 +22,13 @@ export const staffNewHelp = defineFieldHelp('staff.new', {
   },
   employeeId: {
     title: { en: 'Employee ID', hi: 'कर्मचारी ID' },
+    hint: {
+      en: 'Leave it blank to get the next number.',
+      hi: 'अगली संख्या पाने के लिए इसे खाली छोड़ें।',
+    },
     body: {
-      en: "Your institute's own code for this person, printed in staff exports and returns. It is not the Aadhaar, PAN or any government ID. Keep it unique and short enough to print on an ID card.",
-      hi: 'इस व्यक्ति के लिए आपके संस्थान का अपना कोड, जो स्टाफ एक्सपोर्ट और रिटर्न में छपता है। यह आधार, PAN या कोई सरकारी ID नहीं है। इसे अद्वितीय और इतना छोटा रखें कि ID कार्ड पर छप सके।',
+      en: "Your institute's own code for this person, printed in staff exports and returns. It is not the Aadhaar, PAN or any government ID. No two current staff can share one. Left blank, the next number of the series (EMP-0001, EMP-0002, …) is given.",
+      hi: 'इस व्यक्ति के लिए आपके संस्थान का अपना कोड, जो स्टाफ एक्सपोर्ट और रिटर्न में छपता है। यह आधार, PAN या कोई सरकारी ID नहीं है। दो मौजूदा स्टाफ सदस्यों का एक ही ID नहीं हो सकता। खाली छोड़ने पर श्रृंखला की अगली संख्या (EMP-0001, EMP-0002, …) दी जाती है।',
     },
     example: { en: 'EMP-1001, T-2025-045', hi: 'EMP-1001, T-2025-045' },
   },
