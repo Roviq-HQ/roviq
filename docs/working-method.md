@@ -69,10 +69,15 @@ The full gate (`pnpm ci:check`: lint, typecheck, unit, integration, e2e, gates) 
 
 - **One gate per machine.** Each gate uses every CPU thread; two at once made tests time out. A
   push waits while another checkout's gate runs (`[ci:check] waiting for the gate already
-  running…`), and `pnpm ci:queue` shows whose it is.
+  running…`), and `pnpm ci:queue` shows whose it is. It says `stale` when that gate is gone but a
+  process it started still holds the lock; the next push takes a new lock after about 40 seconds
+  and names the process.
 - **Tell the other sessions.** Before pushing, run `pnpm ci:queue`, list the local sessions and
   message the busy ones: your branch, your slot, and whether it adds a migration. After merging a
   pull request that adds a migration, message them again: theirs must be generated again on top.
+- **Do not message a session that said it has nothing to push.** When your work is merged and
+  nothing is queued, say so once to the others; they then leave you out of push and migration
+  notices. Say so again when you start a branch you will push.
 - **Rebase only when the gate says so.** `main` moving on is not a reason: GitHub requires no
   up-to-date branch, and CI tests the pull request merged into `main`. The gate fails within
   seconds when the branch conflicts with `origin/main`, or when `main` and the branch both add a
