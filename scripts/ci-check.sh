@@ -202,6 +202,15 @@ fi
 # Phase 2 (sequential): seed (needs postgres up AND migrate-and-seed image).
 # Phase 3 (sequential): start app containers (need built images + seeded DB).
 if (( run_e2e )); then
+  # Playwright reuses a server already on the e2e web port; one left by an interrupted gate
+  # serves an old build (ChunkLoadError, chunks as text/plain). Refuse rather than test it.
+  web_port="${E2E_WEB_PORT:-4201}"
+  if (( run_e2e_ui && ! IS_CI )) && ss -ltn "sport = :$web_port" | grep -q LISTEN; then
+    log "✗ port $web_port (this slot's e2e web server) is already in use, probably by a gate that was stopped:"
+    ss -ltnp "sport = :$web_port" | sed 's/^/  /'
+    log "  stop that process, then push again"
+    exit 1
+  fi
   COMPOSE=(scripts/e2e-compose.sh)
   prewarm_start=$SECONDS
   log "phase 1 (parallel): infra start + backend image build + web build"

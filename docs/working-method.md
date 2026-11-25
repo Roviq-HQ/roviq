@@ -79,6 +79,9 @@ The full gate (`pnpm ci:check`: lint, typecheck, unit, integration, e2e, gates) 
   migration.
 - **A forked migration chain** (`pnpm check:migration-chain`): rebase on `origin/main`, delete the
   branch's migration folders and generate them again, then re-run the touched integration specs.
+- **A stopped gate can leave its web server running.** Playwright would reuse it and test an old
+  build (ChunkLoadError, chunks served as text/plain), so the gate refuses to start while this
+  slot's e2e web port is taken and names the process to stop.
 - **The suites follow the change.** Integration and e2e API run for backend and shared paths,
   Playwright for web and shared paths; lint, typecheck, unit and the static gates always run
   (`scripts/ci-check.sh` lists the paths).
