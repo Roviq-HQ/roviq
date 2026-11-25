@@ -156,6 +156,7 @@ export class AuthService {
         type: 'login_success',
         portal: 'platform',
         scope: 'platform',
+        membershipId: membership.id,
         authMethod: 'password',
         ip: meta?.ip,
         userAgent: meta?.userAgent,
@@ -198,6 +199,7 @@ export class AuthService {
         portal: 'reseller',
         scope: 'reseller',
         resellerId: m.resellerId,
+        membershipId: m.id,
         authMethod: 'password',
         ip: meta?.ip,
         userAgent: meta?.userAgent,
@@ -254,6 +256,7 @@ export class AuthService {
           portal: 'institute',
           scope: 'institute',
           tenantId: m.tenantId,
+          membershipId: m.id,
           authMethod: 'password',
           ip: meta?.ip,
           userAgent: meta?.userAgent,
@@ -335,6 +338,7 @@ export class AuthService {
           portal: 'institute',
           scope: 'institute',
           tenantId: m.tenantId,
+          membershipId: m.id,
           authMethod: 'passkey',
           ip: meta?.ip,
           userAgent: meta?.userAgent,
@@ -437,6 +441,7 @@ export class AuthService {
         portal: 'institute',
         scope: 'institute',
         tenantId: membership.tenantId,
+        membershipId: membership.id,
         authMethod,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
@@ -523,6 +528,7 @@ export class AuthService {
         type: 'institute_switch',
         scope: 'institute',
         tenantId: membership.tenantId,
+        membershipId: membership.id,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -569,10 +575,10 @@ export class AuthService {
         scope,
         tenantId: membership.tenantId,
         resellerId: scope === 'reseller' ? membership.resellerId : undefined,
+        membershipId: membership.membershipId,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
-        metadata: { membership_id: membership.membershipId },
       })
       .catch(() => {});
 
@@ -604,10 +610,10 @@ export class AuthService {
         scope: current.scope,
         tenantId: current.scope === 'institute' ? current.tenantId : undefined,
         resellerId: current.scope === 'reseller' ? current.resellerId : undefined,
+        membershipId: current.membershipId,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
-        metadata: { membership_id: current.membershipId },
       })
       .catch(() => {});
   }

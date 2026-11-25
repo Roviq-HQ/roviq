@@ -13,6 +13,7 @@ export interface AuthEventRow {
   scope: string | null;
   tenantId: string | null;
   resellerId: string | null;
+  membershipId: string | null;
   authMethod: string | null;
   ipAddress: string | null;
   userAgent: string | null;

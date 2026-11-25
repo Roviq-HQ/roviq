@@ -342,11 +342,11 @@ E2E fixtures live in `libs/database/src/seed/e2e/impersonation.ts` (one active +
 
 | `event_type` | Emitted by | Columns and `metadata` |
 | --- | --- | --- |
-| `login_success` | `adminLogin`, `resellerLogin`, `instituteLogin`, `selectInstitute`, passkey sign-in (each also sends the new-login notification) | `portal`, `scope` (always equal), `tenant_id` or `reseller_id`, `auth_method` (`password` / `passkey`), ip, user agent |
+| `login_success` | `adminLogin`, `resellerLogin`, `instituteLogin`, `selectInstitute`, passkey sign-in (each also sends the new-login notification) | `portal`, `scope` (always equal), `tenant_id` or `reseller_id`, `membership_id`, `auth_method` (`password` / `passkey`), ip, user agent |
 | `login_failed` | every refused sign-in attempt | `portal`, `auth_method`, `failure_reason`; `scope`, `tenant_id`, `reseller_id` are always NULL; `user_id` is set when an account matched, otherwise `metadata.username_lower` |
-| `logout` | `logout` | `scope`, `tenant_id` or `reseller_id`, `metadata.membership_id` |
-| `token_refresh` | `refreshToken` | `scope`, `tenant_id` or `reseller_id`, ip, `metadata.membership_id` |
-| `institute_switch` | `switchInstitute` | `scope='institute'`, `metadata: { from_tenant_id, to_tenant_id }` |
+| `logout` | `logout` | `scope`, `tenant_id` or `reseller_id`, `membership_id` |
+| `token_refresh` | `refreshToken` | `scope`, `tenant_id` or `reseller_id`, `membership_id`, ip |
+| `institute_switch` | `switchInstitute` | `scope='institute'`, `membership_id` (the target), `metadata: { from_tenant_id, to_tenant_id }` |
 | `impersonation_start` | `exchangeImpersonationCode` | `user_id` and `scope` are the impersonator's, `tenant_id` the target institute, `metadata: { target_user_id, target_tenant_id, session_id }` |
 | `impersonation_end` | `endImpersonation` (all scopes), reseller suspension, expiry sweep | `user_id` and `scope` are the actor's (the impersonator's on expiry), `metadata: { session_id, ended_reason }` (`manual` / `revoked` / `expired`) |
 | `password_change` | `changePassword` | always followed by `all_sessions_revoked` |
@@ -354,7 +354,8 @@ E2E fixtures live in `libs/database/src/seed/e2e/impersonation.ts` (one active +
 | `account_locked` | `LoginLockoutService`, on the attempt that reaches the threshold | `portal`, `failure_reason = TOO_MANY_ATTEMPTS`, `metadata: { username_lower, attempts, lockout_seconds }` |
 | `passkey_register` | passkey registration | `metadata: { passkey_id, device_type, backed_up, aaguid }` |
 
-- `auth_events` has no `membership_id` column; the membership goes in `metadata.membership_id`.
+- **`membership_id`** is the membership of the session, in the table `scope` names (`memberships`, `reseller_memberships` or `platform_memberships`), so it has no foreign key; it is NULL for events with no session. `user_id` has no foreign key either: the log outlives the user row.
+- **Append-only.** No application role may change or remove a row: `roviq_admin` holds SELECT and INSERT only (policies `auth_events_admin_select`, `auth_events_admin_insert`), and the triggers `auth_events_append_only` and `auth_events_no_truncate` (function `forbid_row_change()`) refuse UPDATE, DELETE and TRUNCATE for every role, the owner included. Removing rows, for example for data erasure, needs the owner to disable the triggers in a migration.
 - **`portal` vs `scope`.** `portal` is the entry point the request came through (`platform` / `reseller` / `institute`), known before any authentication. `scope` is the authority of the session that was granted. A refused attempt has a portal and never a scope; a granted session has both and they are equal. Events with no entry point (token refresh, expiry sweep) have no portal.
 - **`failure_reason`** is an `AuthFailureReason` code from `@roviq/common-types`. It is internal detail: the API answers all of them with the same `INVALID_CREDENTIALS` (or `ACCOUNT_LOCKED`) error.
 
@@ -498,7 +499,7 @@ A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (
 - **Member detail.** `resellerGetTeamMember` returns `sessions` (live refresh tokens, with IP and device) only to the member themselves or to a caller who may manage them (`canManage`); others get `null`, so a support admin does not see a full admin's sessions. Recent activity comes from `resellerAuditLogs(filter: { userId })`.
 - Tests: `reseller-roles.spec.ts`, `reseller-team.service.spec.ts`, `reseller-team.integration.spec.ts` (role caps, another reseller's member, stale tokens, tier change), `auth-invariants-db.integration.spec.ts` → "reseller member deactivation".
 - Database guards: `chk_role_scope` rejects unknown scopes and wrong tenant/reseller combinations; role names are unique per platform (`roles_platform_name_key`) and per reseller (`roles_reseller_id_name_key`) among live rows. `refresh_tokens.membership_scope` and `impersonation_sessions.impersonator_scope` accept only `platform`, `reseller`, `institute`.
-- `auth_events`: `roviq_app` and `roviq_reseller` hold the INSERT table privilege only; `roviq_admin` reads.
+- `auth_events`: `roviq_app` and `roviq_reseller` hold the INSERT table privilege only; `roviq_admin` reads and inserts, and no role updates or deletes (see "Append-only" above).
 
 ### Reseller settings (ROV-186)
 

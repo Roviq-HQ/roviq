@@ -26,6 +26,7 @@ interface AuthEvent {
   portal: string | null;
   scope: string | null;
   tenantId: string | null;
+  membershipId: string | null;
   authMethod: string | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -86,7 +87,8 @@ describe('Auth events E2E (ROV-96)', () => {
         const res = await request<{ adminAuthEvents: AuthEvent[] }>(
           `query($first: Int) {
             adminAuthEvents(first: $first) {
-              id userId eventType portal scope tenantId authMethod ipAddress userAgent failureReason metadata
+              id userId eventType portal scope tenantId membershipId authMethod ipAddress userAgent
+              failureReason metadata
             }
           }`,
           { first: 200 },
@@ -158,9 +160,12 @@ describe('Auth events E2E (ROV-96)', () => {
     expect(event.metadata).toEqual({});
   });
 
-  it('records token_refresh and logout against the session membership', async () => {
+  it('records login_success, token_refresh and logout against the session membership', async () => {
     const login = await teacherLogin();
     const { membershipId } = claims(login.accessToken);
+
+    const loginEvent = await findEvent('login_success');
+    expect(loginEvent.membershipId).toBe(membershipId);
 
     const refreshRes = await request<{ refreshToken: Tokens }>(
       `mutation($token: String!) { refreshToken(token: $token) { accessToken refreshToken } }`,
@@ -175,7 +180,8 @@ describe('Auth events E2E (ROV-96)', () => {
     expect(refreshEvent.scope).toBe('institute');
     expect(refreshEvent.tenantId).toBe(SEED_IDS.INSTITUTE_1);
     expect(refreshEvent.ipAddress).toBeTruthy();
-    expect(refreshEvent.metadata).toEqual({ membership_id: membershipId });
+    expect(refreshEvent.membershipId).toBe(membershipId);
+    expect(refreshEvent.metadata).toEqual({});
 
     const logoutRes = await request<{ logout: boolean }>(
       `mutation($token: String!) { logout(currentRefreshToken: $token) }`,
@@ -188,7 +194,8 @@ describe('Auth events E2E (ROV-96)', () => {
     expect(logoutEvent.userId).toBe(SEED_IDS.USER_TEACHER);
     expect(logoutEvent.scope).toBe('institute');
     expect(logoutEvent.tenantId).toBe(SEED_IDS.INSTITUTE_1);
-    expect(logoutEvent.metadata).toEqual({ membership_id: membershipId });
+    expect(logoutEvent.membershipId).toBe(membershipId);
+    expect(logoutEvent.metadata).toEqual({});
   });
 
   it('records impersonation_start and impersonation_end with the session id', async () => {

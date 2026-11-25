@@ -566,8 +566,7 @@ describe('ROV-90: users is read-only outside roviq_admin', () => {
 // ── WebSocket / auth_events (19) ──────────────────────────────
 
 describe('Auth events', () => {
-  it('19. roviq_admin can read and write auth_events, roviq_app cannot read', async () => {
-    // AuthEventService uses withAdmin() to write — verify admin can INSERT
+  it('19. roviq_admin can read and add auth_events, roviq_app cannot read', async () => {
     await asRole('roviq_admin', {}, async (client) => {
       const insertRes = await client.query(
         `INSERT INTO auth_events (user_id, event_type, portal, scope, created_at)
@@ -576,15 +575,49 @@ describe('Auth events', () => {
       );
       expect(insertRes.rows).toHaveLength(1);
 
-      // Admin can also read
-      const selectRes = await client.query('SELECT * FROM auth_events LIMIT 1');
-      expect(selectRes.rows.length).toBeGreaterThanOrEqual(1);
+      const selectRes = await client.query('SELECT * FROM auth_events WHERE id = $1', [
+        insertRes.rows[0].id,
+      ]);
+      expect(selectRes.rows).toHaveLength(1);
     });
 
-    // roviq_app cannot SELECT auth events (REVOKE SELECT enforced by db:reset)
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
       await expect(client.query('SELECT * FROM auth_events')).rejects.toThrow(/permission denied/);
     });
+  });
+
+  // ROV-289: a security log no application role may change.
+  it.each([
+    ['UPDATE', `UPDATE auth_events SET event_type = 'tampered'`],
+    ['DELETE', 'DELETE FROM auth_events'],
+    ['TRUNCATE', 'TRUNCATE auth_events'],
+  ])('19b. roviq_admin cannot %s auth_events', async (_op, statement) => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(client.query(statement)).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  // The trigger holds even for a role that has the grant, so a later blanket grant reopens nothing.
+  it.each([
+    ['UPDATE', `UPDATE auth_events SET event_type = 'tampered'`],
+    ['DELETE', 'DELETE FROM auth_events'],
+    ['TRUNCATE', 'TRUNCATE auth_events'],
+  ])('19c. the append-only trigger refuses %s even for the owner', async (op, statement) => {
+    const client = await superPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO auth_events (user_id, event_type, portal, scope)
+         VALUES ($1, 'login_success', 'institute', 'institute')`,
+        [SEED.USER_TEACHER],
+      );
+      await expect(client.query(statement)).rejects.toThrow(
+        new RegExp(`auth_events is append-only: ${op} is not allowed`),
+      );
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
   });
 
   // `portal` is where a request came in; `scope` is what a session was granted.

@@ -12,7 +12,6 @@ import { randomUUID } from 'node:crypto';
 import { hash } from '@node-rs/argon2';
 import { ErrorCode, ResellerStatus } from '@roviq/common-types';
 import {
-  authEvents,
   impersonationSessions,
   institutes,
   memberships,
@@ -158,7 +157,6 @@ describe('Reseller suspension and deletion (integration)', () => {
           .delete(impersonationSessions)
           .where(inArray(impersonationSessions.targetUserId, userIds));
         await tx.delete(refreshTokens).where(inArray(refreshTokens.userId, userIds));
-        await tx.delete(authEvents).where(inArray(authEvents.userId, userIds));
       });
     }
     for (const institute of createdInstitutes) await cleanupTestInstitute(result.db, institute);

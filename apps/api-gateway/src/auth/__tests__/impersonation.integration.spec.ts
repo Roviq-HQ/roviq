@@ -40,7 +40,7 @@ import {
   type TestReseller,
   type TestTeacher,
 } from '@roviq/testing/integration';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../app/app.module';
@@ -167,14 +167,12 @@ describe('Impersonation (integration)', () => {
   });
 
   afterAll(async () => {
-    // Sessions and auth events reference the test users; they must go first.
+    // Sessions reference the test users; they must go first.
     if (tenant && teacher && otherTenant) {
-      const testUsers = [tenant.userId, teacher.userId, otherTenant.userId];
       await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), async (tx) => {
         await tx
           .delete(impersonationSessions)
           .where(eq(impersonationSessions.targetTenantId, tenant.tenantId));
-        await tx.delete(authEvents).where(inArray(authEvents.userId, testUsers));
       });
     }
     if (teacher) await cleanupTestTeacher(result.db, teacher);
@@ -585,9 +583,6 @@ describe('Impersonation (integration)', () => {
         await tx
           .delete(impersonationSessions)
           .where(eq(impersonationSessions.targetTenantId, owned.tenantId));
-        await tx
-          .delete(authEvents)
-          .where(inArray(authEvents.userId, [reseller.userId, owned.userId, ownedTeacher.userId]));
         await tx.delete(phoneNumbers).where(eq(phoneNumbers.userId, owned.userId));
       });
       await cleanupTestTeacher(result.db, ownedTeacher);

@@ -635,6 +635,7 @@ describe('AuthService', () => {
         portal: 'institute',
         scope: 'institute',
         tenantId: 'tenant-1',
+        membershipId: 'membership-1',
         authMethod: 'passkey',
         ip: '10.0.0.1',
         userAgent: 'vitest',
@@ -824,6 +825,7 @@ describe('AuthService', () => {
         portal: 'institute',
         scope: 'institute',
         tenantId: 'tenant-1',
+        membershipId: 'membership-1',
         authMethod: 'passkey',
         ip: '10.0.0.1',
         userAgent: 'vitest',
@@ -966,10 +968,10 @@ describe('AuthService', () => {
         scope: 'institute',
         tenantId: 'tenant-1',
         resellerId: undefined,
+        membershipId: 'membership-1',
         ip: '10.0.0.1',
         userAgent: 'vitest',
         deviceInfo: undefined,
-        metadata: { membership_id: 'membership-1' },
       });
       // Every successful refresh rotates — old token gets tagged `rotation`
       // so any subsequent use triggers the reuse-cascade.
@@ -1516,6 +1518,7 @@ describe('AuthService', () => {
         type: 'institute_switch',
         scope: 'institute',
         tenantId: 'tenant-2',
+        membershipId: 'membership-2',
         ip: '10.0.0.1',
         userAgent: 'vitest',
         deviceInfo: 'laptop',
@@ -1620,10 +1623,10 @@ describe('AuthService', () => {
         scope: 'institute',
         tenantId: 'tenant-1',
         resellerId: undefined,
+        membershipId: 'membership-1',
         ip: '10.0.0.1',
         userAgent: 'vitest',
         deviceInfo: 'laptop',
-        metadata: { membership_id: 'membership-1' },
       });
     });
 

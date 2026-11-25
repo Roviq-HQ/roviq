@@ -11,7 +11,6 @@ import { hash } from '@node-rs/argon2';
 import { ErrorCode, type ResellerSystemRoleName } from '@roviq/common-types';
 import {
   auditLogs,
-  authEvents,
   memberships,
   mkAdminCtx,
   provisionResellerSystemRoles,
@@ -182,7 +181,6 @@ describe('Reseller team management (integration)', () => {
         ),
       );
       await tx.delete(refreshTokens).where(inArray(refreshTokens.userId, userIds));
-      await tx.delete(authEvents).where(inArray(authEvents.userId, userIds));
       await tx.delete(auditLogs).where(inArray(auditLogs.userId, userIds));
     });
     for (const institute of createdInstitutes) await cleanupTestInstitute(result.db, institute);

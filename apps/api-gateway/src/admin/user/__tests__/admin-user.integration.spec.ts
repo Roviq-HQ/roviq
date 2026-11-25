@@ -197,7 +197,6 @@ describe('Admin user queries (integration)', () => {
     const userIds = [instituteA?.userId, instituteB?.userId].filter(Boolean);
     if (userIds.length > 0) {
       await withAdmin(result.db, mkAdminCtx('test:admin-user'), async (tx) => {
-        await tx.delete(authEvents).where(inArray(authEvents.userId, userIds));
         await tx.delete(userAddresses).where(inArray(userAddresses.userId, userIds));
         await tx.delete(userDocuments).where(inArray(userDocuments.userId, userIds));
         await tx.delete(files).where(inArray(files.subjectUserId, userIds));
@@ -467,7 +466,6 @@ describe('Admin user queries (integration)', () => {
     } finally {
       const ids = [newUser.id, oldUser.id];
       await withAdmin(result.db, mkAdminCtx('test:admin-user'), async (tx) => {
-        await tx.delete(authEvents).where(inArray(authEvents.userId, ids));
         await tx.delete(users).where(inArray(users.id, ids));
       });
     }
