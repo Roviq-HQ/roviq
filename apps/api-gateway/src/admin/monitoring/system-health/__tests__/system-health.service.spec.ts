@@ -25,6 +25,7 @@ import {
 import {
   classifyProbe,
   computeUptimePercent,
+  evaluateAlert,
   healthFingerprint,
   type SystemHealth,
   SystemHealthService,
@@ -98,8 +99,11 @@ function firing(name: string, severity: string, activeAt: string): FiringAlert {
     annotations: { summary: `${name} summary` },
     state: 'firing',
     activeAt,
+    condition: null,
   };
 }
+
+const UNKNOWN = { runbook: null, affected: [], stillTrue: true };
 
 describe('pure helpers', () => {
   describe('classifyProbe', () => {
@@ -150,6 +154,7 @@ describe('pure helpers', () => {
         severity: 'CRITICAL',
         message: 'NatsDown summary',
         since: new Date('2026-11-18T07:00:00Z'),
+        ...UNKNOWN,
       });
     });
 
@@ -164,6 +169,7 @@ describe('pure helpers', () => {
         severity,
         message: 'NotificationCanaryMissing summary',
         since: new Date('2026-11-18T07:00:00Z'),
+        ...UNKNOWN,
       });
     });
 
@@ -174,13 +180,74 @@ describe('pure helpers', () => {
           annotations: {},
           state: 'firing',
           activeAt: '2026-11-18T07:00:00Z',
+          condition: null,
         }),
       ).toEqual({
         name: 'Odd',
         severity: 'INFO',
         message: 'Odd',
         since: new Date('2026-11-18T07:00:00Z'),
+        ...UNKNOWN,
       });
+    });
+  });
+
+  describe('evaluateAlert', () => {
+    const canary = {
+      promql: 'time() - max by (channel) (notification_canary_last_success)',
+      operator: '>' as const,
+      value: 1800,
+    };
+
+    it('should name the channel of a firing canary rule', () => {
+      expect(
+        evaluateAlert(
+          [
+            { metric: { channel: 'WHATSAPP' }, value: 4000 },
+            { metric: { channel: 'EMAIL' }, value: 30 },
+          ],
+          canary,
+        ),
+      ).toEqual({ affected: [{ label: 'channel', value: 'WHATSAPP' }], stillTrue: true });
+    });
+
+    it('should say the rule is no longer true when no row passes its condition', () => {
+      expect(evaluateAlert([{ metric: { channel: 'WHATSAPP' }, value: 60 }], canary)).toEqual({
+        affected: [],
+        stillTrue: false,
+      });
+      expect(evaluateAlert([], canary)).toEqual({ affected: [], stillTrue: false });
+    });
+
+    it('should return only the allowed labels, never an id or an address', () => {
+      expect(
+        evaluateAlert(
+          [
+            {
+              metric: {
+                __name__: 'x',
+                channel: 'SMS',
+                tenant_id: '01a2-institute',
+                user_id: 'u-1',
+                phone: '+919800000000',
+                service_name: 'notification-service',
+              },
+              value: 4000,
+            },
+          ],
+          canary,
+        ).affected,
+      ).toEqual([{ label: 'channel', value: 'SMS' }]);
+    });
+
+    it('should pass a below-threshold rule such as a stopped worker', () => {
+      expect(
+        evaluateAlert([{ metric: {}, value: 0 }], {
+          promql: 'max(w) or vector(0)',
+          operator: '<',
+          value: 1,
+        }),
+      ).toEqual({ affected: [], stillTrue: true });
     });
   });
 
@@ -246,6 +313,22 @@ describe('pure helpers', () => {
       ).not.toBe(fp);
       expect(healthFingerprint({ ...base, alertsAvailable: false })).not.toBe(fp);
       expect(healthFingerprint({ ...base, dlqPendingCount: 1 })).not.toBe(fp);
+      const alert = {
+        name: 'notification_canary_missing',
+        severity: 'CRITICAL' as const,
+        message: 'm',
+        since: new Date(1),
+        runbook: null,
+        affected: [{ label: 'channel', value: 'WHATSAPP' }],
+        stillTrue: true,
+      };
+      const firingFp = healthFingerprint({ ...base, alerts: [alert] });
+      expect(healthFingerprint({ ...base, alerts: [{ ...alert, stillTrue: false }] })).not.toBe(
+        firingFp,
+      );
+      expect(healthFingerprint({ ...base, alerts: [{ ...alert, affected: [] }] })).not.toBe(
+        firingFp,
+      );
     });
   });
 });
@@ -274,6 +357,7 @@ describe('SystemHealthService', () => {
     temporal = createMock<TemporalHealthIndicator>({ probe: vi.fn().mockResolvedValue(UP) });
     storage = createMock<StorageHealthIndicator>({ probe: vi.fn().mockResolvedValue(DOWN) });
     openObserve = createMock<OpenObserveClient>({
+      query: vi.fn().mockResolvedValue([]),
       alerts: vi
         .fn()
         .mockResolvedValue([
@@ -365,8 +449,47 @@ describe('SystemHealthService', () => {
         severity: 'WARNING',
         message: 'DlqMessages summary',
         since: new Date('2026-11-18T07:00:00Z'),
+        ...UNKNOWN,
       },
     ]);
+  });
+
+  it("should run a firing rule's own query and keep it shown, as recovered, once it no longer passes", async () => {
+    vi.mocked(openObserve.alerts).mockResolvedValue([
+      {
+        ...firing('notification_canary_missing', 'page', '2026-11-18T07:00:00Z'),
+        labels: {
+          alertname: 'notification_canary_missing',
+          severity: 'page',
+          runbook: 'docs/runbooks/notification-delivery.md#canary-missing',
+        },
+        condition: { promql: 'q', operator: '>', value: 1800 },
+      },
+    ]);
+    vi.mocked(openObserve.query).mockResolvedValueOnce([
+      { metric: { channel: 'WHATSAPP' }, value: 4000 },
+    ]);
+
+    const [firingNow] = (await service.getSystemHealth()).alerts;
+
+    expect(openObserve.query).toHaveBeenCalledWith('q');
+    expect(firingNow).toMatchObject({
+      runbook: 'docs/runbooks/notification-delivery.md#canary-missing',
+      affected: [{ label: 'channel', value: 'WHATSAPP' }],
+      stillTrue: true,
+    });
+
+    vi.mocked(openObserve.query).mockResolvedValueOnce([
+      { metric: { channel: 'WHATSAPP' }, value: 60 },
+    ]);
+    await service.poll();
+    const [recovered] = (await service.getSystemHealth()).alerts;
+    expect(recovered).toMatchObject({ affected: [], stillTrue: false });
+
+    vi.mocked(openObserve.query).mockRejectedValueOnce(new OpenObserveUnavailableError('down'));
+    await service.poll();
+    const [unknown] = (await service.getSystemHealth()).alerts;
+    expect(unknown).toMatchObject({ affected: [], stillTrue: true });
   });
 
   it('should mark alerts unavailable (not "all clear") when OpenObserve is down', async () => {

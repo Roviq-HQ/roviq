@@ -88,6 +88,9 @@ describe('AlertsPanel', () => {
               severity: 'CRITICAL',
               message: '5xx above 5%',
               since: '2026-11-18T09:30:00.000Z',
+              runbook: null,
+              stillTrue: true,
+              affected: [],
             },
           ],
         }}
@@ -96,7 +99,69 @@ describe('AlertsPanel', () => {
 
     const item = screen.getByTestId(ids.alertItem('HighErrorRate'));
     expect(item).toHaveTextContent('Critical');
+    // A rule without copy falls back to the description the metrics store holds.
     expect(item).toHaveTextContent('5xx above 5%');
+    expect(screen.queryByTestId(ids.alertAction('HighErrorRate'))).not.toBeInTheDocument();
+  });
+
+  const canary = (stillTrue: boolean) => ({
+    __typename: 'ActiveAlert' as const,
+    name: 'notification_canary_missing',
+    severity: 'CRITICAL' as const,
+    message: 'The delivery canary has not been accepted on a channel.',
+    since: '2026-11-18T09:30:00.000Z',
+    runbook: 'docs/runbooks/notification-delivery.md#canary-missing',
+    stillTrue,
+    affected: stillTrue
+      ? [{ __typename: 'AlertLabel' as const, label: 'channel', value: 'WHATSAPP' }]
+      : [],
+  });
+
+  it('should name the channel, the impact, the steps, the screen and the runbook', () => {
+    renderWithProviders(<AlertsPanel health={{ alertsAvailable: true, alerts: [canary(true)] }} />);
+
+    const name = 'notification_canary_missing';
+    const item = screen.getByTestId(ids.alertItem(name));
+    expect(item).toHaveTextContent('Test message not delivered');
+    expect(screen.getByTestId(ids.alertAffected(name))).toHaveTextContent('WhatsApp');
+    expect(item).toHaveTextContent('Real messages on this channel are probably not arriving.');
+    expect(screen.getByTestId(ids.alertSteps(name)).querySelectorAll('li')).toHaveLength(3);
+    expect(screen.getByTestId(ids.alertAction(name))).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/admin\/monitoring#notification-delivery$/),
+    );
+    expect(screen.getByTestId(ids.alertRunbook(name))).toHaveAttribute(
+      'href',
+      'https://github.com/Roviq-HQ/roviq/blob/main/docs/runbooks/notification-delivery.md#canary-missing',
+    );
+    expect(screen.queryByTestId(ids.alertRecovered(name))).not.toBeInTheDocument();
+  });
+
+  it('should show a rule whose query no longer passes as recovered, without steps', () => {
+    renderWithProviders(
+      <AlertsPanel health={{ alertsAvailable: true, alerts: [canary(false)] }} />,
+    );
+
+    const name = 'notification_canary_missing';
+    expect(screen.getByTestId(ids.alertRecovered(name))).toHaveTextContent(
+      'Recovered, closing at the next check',
+    );
+    expect(screen.queryByTestId(ids.alertSteps(name))).not.toBeInTheDocument();
+    expect(screen.queryByTestId(ids.alertAction(name))).not.toBeInTheDocument();
+  });
+
+  it('should show the whole card in Hindi', () => {
+    renderWithProviders(
+      <AlertsPanel health={{ alertsAvailable: true, alerts: [canary(true)] }} />,
+      {
+        locale: 'hi',
+      },
+    );
+
+    const item = screen.getByTestId(ids.alertItem('notification_canary_missing'));
+    expect(item).toHaveTextContent('परीक्षण संदेश नहीं पहुँचा');
+    expect(item).toHaveTextContent('रनबुक');
+    expect(item).toHaveTextContent('सूचना वितरण खोलें');
   });
 
   it('should render in Hindi', () => {

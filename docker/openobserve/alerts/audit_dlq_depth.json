@@ -26,6 +26,7 @@
   "destinations": ["roviq_ops_email"],
   "context_attributes": {
     "severity": "critical",
-    "component": "audit"
+    "component": "audit",
+    "runbook": "docs/runbooks/audit-alerts.md#dead-lettered-audit-events"
   }
 }

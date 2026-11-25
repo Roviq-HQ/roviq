@@ -27,7 +27,12 @@ import { RedisHealthIndicator } from '../../../health/indicators/redis.health';
 import { StorageHealthIndicator } from '../../../health/indicators/storage.health';
 import { TemporalHealthIndicator } from '../../../health/indicators/temporal.health';
 import { type ConnectionCounts, ConnectionTracker } from '../connections/connection-tracker';
-import { type FiringAlert, OpenObserveClient } from '../openobserve.client';
+import {
+  type AlertCondition,
+  type FiringAlert,
+  type MetricSample,
+  OpenObserveClient,
+} from '../openobserve.client';
 import {
   DEGRADED_THRESHOLD_MS,
   SYSTEM_HEALTH_POLL_INTERVAL_MS,
@@ -50,12 +55,82 @@ export interface NatsStreamLag {
   consumerLag: number;
 }
 
+export interface AlertLabel {
+  label: string;
+  value: string;
+}
+
 export interface ActiveAlert {
   name: string;
   severity: AlertSeverity;
   message: string;
   since: Date;
+  /** The rule's `runbook` label: a repository path with an anchor. */
+  runbook: string | null;
+  /** Label values of the rows that pass the rule's condition now (`channel = WHATSAPP`). */
+  affected: AlertLabel[];
+  /** False when the rule's own query no longer passes: the alert closes at its next run. */
+  stillTrue: boolean;
 }
+
+/** What the rule says right now. */
+export interface AlertEvaluation {
+  affected: AlertLabel[];
+  stillTrue: boolean;
+}
+
+/**
+ * The only labels returned to the page. Each is bounded by the metric rules and names no person,
+ * address or institute; any other label a query returns is dropped.
+ */
+export const ALERT_LABELS: readonly string[] = [
+  'channel',
+  'provider',
+  'reason',
+  'consumer',
+  'stream',
+  'stream_name',
+  'consumer_name',
+  'origin_stream',
+  'subject_prefix',
+  'scope',
+];
+
+function passes(value: number, condition: AlertCondition): boolean {
+  switch (condition.operator) {
+    case '>':
+      return value > condition.value;
+    case '<':
+      return value < condition.value;
+    case '>=':
+      return value >= condition.value;
+    case '<=':
+      return value <= condition.value;
+  }
+}
+
+/** The rows of the rule's query that pass its condition, reduced to their allowed labels. */
+export function evaluateAlert(
+  samples: readonly MetricSample[],
+  condition: AlertCondition,
+): AlertEvaluation {
+  const passing = samples.filter((s) => Number.isFinite(s.value) && passes(s.value, condition));
+  const seen = new Set<string>();
+  const affected: AlertLabel[] = [];
+  for (const sample of passing) {
+    for (const label of ALERT_LABELS) {
+      const value = sample.metric[label];
+      const key = `${label}=${value}`;
+      if (value === undefined || seen.has(key)) continue;
+      seen.add(key);
+      affected.push({ label, value });
+    }
+  }
+  return { affected, stillTrue: passing.length > 0 };
+}
+
+/** Unknown is treated as true: a card must not look resolved because a query failed. */
+export const UNKNOWN_EVALUATION: AlertEvaluation = { affected: [], stillTrue: true };
 
 export interface SystemHealth {
   services: ServiceHealth[];
@@ -111,13 +186,18 @@ export function toAlertSeverity(label: string | undefined): AlertSeverity {
   }
 }
 
-export function toActiveAlert(alert: FiringAlert): ActiveAlert {
+export function toActiveAlert(
+  alert: FiringAlert,
+  evaluation: AlertEvaluation = UNKNOWN_EVALUATION,
+): ActiveAlert {
   const name = alert.labels.alertname ?? 'unknown';
   return {
     name,
     severity: toAlertSeverity(alert.labels.severity),
     message: alert.annotations.summary ?? alert.annotations.description ?? name,
     since: new Date(alert.activeAt),
+    runbook: alert.labels.runbook ?? null,
+    ...evaluation,
   };
 }
 
@@ -126,7 +206,9 @@ export function healthFingerprint(snapshot: SystemHealth): string {
   return JSON.stringify({
     services: snapshot.services.map((s) => [s.name, s.status]),
     streams: snapshot.natsStreams.map((s) => [s.name, s.consumerLag]),
-    alerts: snapshot.alerts.map((a) => [a.name, a.severity]).sort(),
+    alerts: snapshot.alerts
+      .map((a) => [a.name, a.severity, a.stillTrue, a.affected.map((l) => `${l.label}=${l.value}`)])
+      .sort(),
     alertsAvailable: snapshot.alertsAvailable,
     dlq: snapshot.dlqPendingCount,
   });
@@ -359,14 +441,25 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
   /** null = OpenObserve unavailable (distinct from "no alerts firing"). */
   private async firingAlerts(): Promise<ActiveAlert[] | null> {
     try {
-      const alerts = await this.openObserve.alerts();
-      return alerts
-        .filter((a) => a.state === 'firing')
-        .map(toActiveAlert)
-        .sort((a, b) => a.since.getTime() - b.since.getTime());
+      const alerts = (await this.openObserve.alerts()).filter((a) => a.state === 'firing');
+      const active = await Promise.all(
+        alerts.map(async (a) => toActiveAlert(a, await this.evaluate(a))),
+      );
+      return active.sort((a, b) => a.since.getTime() - b.since.getTime());
     } catch (err) {
       this.logger.debug({ err }, 'OpenObserve alerts unavailable');
       return null;
+    }
+  }
+
+  /** Runs the rule's own query: the store re-checks a fired rule only after its silence time. */
+  private async evaluate(alert: FiringAlert): Promise<AlertEvaluation> {
+    if (!alert.condition) return UNKNOWN_EVALUATION;
+    try {
+      return evaluateAlert(await this.openObserve.query(alert.condition.promql), alert.condition);
+    } catch (err) {
+      this.logger.debug({ err, alert: alert.labels.alertname }, 'Could not evaluate alert query');
+      return UNKNOWN_EVALUATION;
     }
   }
 

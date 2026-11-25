@@ -27,18 +27,148 @@
     "uptimePercent": "{value}%"
   },
   "dlq": {
-    "banner": "{count, plural, one {# failed event is} other {# failed events are}} waiting in the dead letter queue.",
+    "banner": "{count, plural, one {# failed event is} other {# failed events are}} waiting in the dead letter queue: what they should have done (a notification, a billing change, an audit entry) has not happened.",
     "action": "Review failed events"
   },
   "alerts": {
     "heading": "Active alerts",
-    "unavailable": "Metrics unavailable — OpenObserve cannot be reached, so alerts cannot be shown.",
+    "unavailable": "Alerts cannot be shown: the metrics store (OpenObserve) does not answer. Open Observability to check it; alerts appear here again once it answers.",
     "empty": "No alerts are firing.",
     "since": "Since {time}",
     "severity": {
       "CRITICAL": "Critical",
       "WARNING": "Warning",
       "INFO": "Info"
+    },
+    "recovered": "Recovered, closing at the next check",
+    "runbook": "Runbook",
+    "actions": {
+      "notifications": "Open notification delivery",
+      "senders": "Open WhatsApp senders",
+      "services": "Open services",
+      "streams": "Open queue backlog",
+      "dlq": "Open Dead Letter Queue",
+      "logs": "Open logs",
+      "auditLogs": "Open audit log",
+      "impersonation": "Open impersonation sessions"
+    },
+    "rules": {
+      "notification_service_down": {
+        "title": "Notification service stopped",
+        "impact": "No message is going out on any channel (e-mail, SMS, WhatsApp, push) while it is stopped.",
+        "step1": "Check the notification service under \"Services\" above.",
+        "step2": "Read the service's log in Observability: it names why the worker stopped, and it retries every 30 seconds.",
+        "step3": "Check that Temporal is reachable and that at least one instance runs the worker."
+      },
+      "notification_canary_missing": {
+        "title": "Test message not delivered",
+        "impact": "The platform's test message has not been accepted on this channel for over 30 minutes. Real messages on this channel are probably not arriving.",
+        "step1": "Open \"Notification delivery\" below: check when the test message was last accepted and how many sends failed.",
+        "step2": "Open \"WhatsApp senders\": a sender marked blocked or paused is the cause.",
+        "step3": "If both look normal, follow the runbook: the provider's status, then the notification service's log."
+      },
+      "notification_failure_rate": {
+        "title": "Many messages failing",
+        "impact": "More than 1 in 5 messages on this channel failed in the last 10 minutes. People are missing messages now.",
+        "step1": "Open \"Notification delivery\" below to see the failed count per channel.",
+        "step2": "In Observability, find the failure reason of the failed sends: one reason for most of them points at the provider or its credentials.",
+        "step3": "Check the provider's status page."
+      },
+      "notification_sender_blocked": {
+        "title": "WhatsApp number blocked",
+        "impact": "The provider blocked a WhatsApp number. Nothing is sent from it; institutes that use it fall back to the platform's number when that one is active.",
+        "step1": "Open \"WhatsApp senders\" below to see which number is blocked.",
+        "step2": "Resolve the restriction in the provider's console.",
+        "step3": "Activate the sender again; the alert ends then."
+      },
+      "notification_breaker_opened": {
+        "title": "Sending paused on a provider",
+        "impact": "A provider or a WhatsApp number kept failing, so sending through it is paused and retried every minute. Messages wait; none are lost.",
+        "step1": "Open \"Notification delivery\" below to see which channel is failing.",
+        "step2": "Check the provider's status page and the credentials of that channel.",
+        "step3": "It ends by itself when a retry succeeds."
+      },
+      "notification_events_stuck": {
+        "title": "Notification events waiting",
+        "impact": "Events that start notifications have waited over 5 minutes. Messages are late.",
+        "step1": "Check the notification service under \"Services\" above and in its log.",
+        "step2": "Look at the NOTIFICATION stream in \"Queue backlog (NATS)\".",
+        "step3": "A handler that keeps failing holds its queue until the event is dead-lettered."
+      },
+      "notification_dead_letters": {
+        "title": "A notification was never sent",
+        "impact": "A notification event failed every retry and was set aside, so its message did not go out.",
+        "step1": "Open the Dead Letter Queue and find the NOTIFICATION message.",
+        "step2": "Read its error and fix the cause.",
+        "step3": "Replay it from there; sending it twice is safe."
+      },
+      "notification_skips_rising": {
+        "title": "Messages skipped: channel not set up",
+        "impact": "Messages on this channel were skipped because it has no provider or the message has no approved template. Recipients on this channel get nothing.",
+        "step1": "Open \"Notification delivery\" below to see which channel is affected.",
+        "step2": "For no_provider: set the channel's provider, and for WhatsApp activate a sender. For no_template: register or approve the template with the provider.",
+        "step3": "It ends 15 minutes after the last skip."
+      },
+      "dlq_messages_warning": {
+        "title": "Events failing and set aside",
+        "impact": "More than one event a minute is failing every retry. What it should have done (a notification, a billing change, an audit entry) did not happen.",
+        "step1": "Open the Dead Letter Queue and read the subject and error of the newest messages.",
+        "step2": "Fix the cause, then replay them.",
+        "step3": "Follow the runbook if they keep coming."
+      },
+      "dlq_messages_critical": {
+        "title": "Many events failing and set aside",
+        "impact": "More than 10 events a minute are failing every retry. Notifications, billing changes or audit entries are being lost now.",
+        "step1": "Open the Dead Letter Queue and read the subject and error of the newest messages.",
+        "step2": "Fix the cause, then replay them.",
+        "step3": "Follow the runbook if they keep coming."
+      },
+      "eventbus_emit_failures_warning": {
+        "title": "Events not being published",
+        "impact": "The gateway cannot publish events to the message broker. Notifications, billing and audit steps after a change are being missed.",
+        "step1": "Check NATS under \"Services\" above.",
+        "step2": "Read the gateway's log in Observability for the failing subject.",
+        "step3": "Follow the runbook for a missing or changed stream."
+      },
+      "eventbus_emit_failures_critical": {
+        "title": "Many events not being published",
+        "impact": "The gateway is failing to publish more than 10 events a minute. Notifications, billing and audit steps after a change are being lost now.",
+        "step1": "Check NATS under \"Services\" above.",
+        "step2": "Read the gateway's log in Observability for the failing subject.",
+        "step3": "Follow the runbook for a missing or changed stream."
+      },
+      "audit_consumer_lag": {
+        "title": "Audit log falling behind",
+        "impact": "Over 30 audit events have waited 5 minutes to be written. The audit log is incomplete until they are.",
+        "step1": "Look at the AUDIT stream in \"Queue backlog (NATS)\".",
+        "step2": "Check the gateway and the database under \"Services\" above.",
+        "step3": "Read the audit consumer's log in Observability."
+      },
+      "audit_dlq_depth": {
+        "title": "Audit entries dropped",
+        "impact": "Audit events failed every retry: some actions are missing from the audit log.",
+        "step1": "Open the Dead Letter Queue and find the AUDIT messages.",
+        "step2": "Read the audit consumer's log for the error and fix the cause.",
+        "step3": "Replay them from the Dead Letter Queue."
+      },
+      "audit_event_spike": {
+        "title": "Unusual amount of activity",
+        "impact": "Audit events in the last hour are over three times the usual hourly amount. This can be a bulk change or deletion.",
+        "step1": "Open the audit log and look at the last hour: who made the changes, and where.",
+        "step2": "Confirm with that person or institute that the change was intended."
+      },
+      "audit_impersonation_volume": {
+        "title": "Many actions while impersonating",
+        "impact": "More than 10 actions were taken while impersonating users in one scope in the last hour.",
+        "step1": "Open impersonation sessions and check who impersonated whom, and why.",
+        "step2": "End any session that is not expected."
+      },
+      "audit_partition_creation": {
+        "title": "Audit log may stop at month end",
+        "impact": "It is late in the month and no audit event has been written, so next month's audit table may not be ready.",
+        "step1": "Read the audit consumer's log in Observability.",
+        "step2": "Check the audit partition workflow in Temporal."
+      }
     }
   },
   "nats": {
@@ -78,7 +208,7 @@
     "trendLabel": "API calls per day for {institute}, last 7 days: {values}",
     "resellerFilter": "Reseller",
     "allResellers": "All resellers",
-    "metricsUnavailable": "API call metrics are unavailable right now. Active users are still shown.",
+    "metricsUnavailable": "API call counts are unavailable: the metrics store (OpenObserve) does not answer. Active users are still shown; the counts return once it answers.",
     "empty": "No institutes yet.",
     "emptyFiltered": "No institutes for this reseller.",
     "pageInfo": "{from}–{to} of {total}",
@@ -135,6 +265,10 @@
       "FORBIDDEN": "You are not allowed to change senders.",
       "other": "The rate could not be saved. Try again."
     },
-    "senderRateSaving": "Saving…"
+    "senderRateSaving": "Saving…",
+    "senderStatusHint": {
+      "PAUSED": "Paused by the platform: nothing is sent from this number until it is activated again.",
+      "BLOCKED": "The provider blocked this number: resolve it in the provider's console, then activate the sender."
+    }
   }
 }

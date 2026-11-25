@@ -66,6 +66,17 @@ export class ConnectionStatsModel {
   http!: number;
 }
 
+@ObjectType('AlertLabel', {
+  description: 'One label of a row that passes the rule now; bounded values, never personal data',
+})
+export class AlertLabelModel {
+  @Field({ description: 'Label name, for example `channel`' })
+  label!: string;
+
+  @Field({ description: 'Label value, for example `WHATSAPP`' })
+  value!: string;
+}
+
 @ObjectType('ActiveAlert', { description: 'A firing OpenObserve alert' })
 export class ActiveAlertModel {
   @Field({ description: 'Alert name' })
@@ -79,6 +90,24 @@ export class ActiveAlertModel {
 
   @Field(() => DateTimeScalar, { description: 'When the alert became active' })
   since!: Date;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The rule's runbook section: a repository path with an anchor",
+  })
+  runbook!: string | null;
+
+  @Field(() => [AlertLabelModel], {
+    description:
+      "What the rule's own query names now (channel, consumer, stream…); empty when unknown",
+  })
+  affected!: AlertLabelModel[];
+
+  @Field({
+    description:
+      "False when the rule's own query no longer passes its condition: the alert closes at its next run",
+  })
+  stillTrue!: boolean;
 }
 
 @ObjectType('SystemHealth', { description: 'Platform-wide health snapshot (ROV-184)' })

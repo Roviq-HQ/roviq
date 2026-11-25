@@ -17,11 +17,20 @@ export interface MetricSeries {
   values: Array<[number, number]>;
 }
 
+/** A rule's PromQL query and the comparison each result row must pass for the rule to fire. */
+export interface AlertCondition {
+  promql: string;
+  operator: '>' | '<' | '>=' | '<=';
+  value: number;
+}
+
 export interface FiringAlert {
   labels: Record<string, string>;
   annotations: Record<string, string>;
   state: 'firing' | 'pending' | 'inactive';
   activeAt: string;
+  /** null for a rule that is not PromQL. */
+  condition: AlertCondition | null;
 }
 
 /** OpenObserve unconfigured, unreachable, timed out, or answered with a non-success status. Callers degrade to "metrics unavailable". */
@@ -67,6 +76,15 @@ const alertDetailSchema = z.object({
   name: z.string(),
   description: z.string().nullish(),
   context_attributes: labelsSchema.nullish(),
+  query_condition: z
+    .object({
+      type: z.string().nullish(),
+      promql: z.string().nullish(),
+      promql_condition: z
+        .object({ operator: z.enum(['>', '<', '>=', '<=']), value: z.number() })
+        .nullish(),
+    })
+    .nullish(),
 });
 
 /** Reads metrics and alerts from OpenObserve (metrics through its PromQL-compatible API). */
@@ -127,7 +145,12 @@ export class OpenObserveClient {
         );
         const detail = parse(alertDetailSchema, raw, 'alert detail');
         const since = alert.last_outcome_since;
+        const q = detail.query_condition;
         return {
+          condition:
+            q?.type === 'promql' && q.promql && q.promql_condition
+              ? { promql: q.promql, ...q.promql_condition }
+              : null,
           labels: { alertname: detail.name, ...detail.context_attributes },
           annotations: detail.description ? { summary: detail.description } : {},
           state: 'firing',

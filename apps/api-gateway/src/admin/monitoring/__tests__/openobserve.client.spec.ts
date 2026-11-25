@@ -211,8 +211,32 @@ describe('OpenObserveClient', () => {
           annotations: { summary: 'DLQ growing' },
           state: 'firing',
           activeAt: new Date(SINCE_MICROS / 1_000).toISOString(),
+          condition: null,
         },
       ]);
+    });
+
+    it("should return a PromQL rule's query and condition", async () => {
+      stubAlertsApi({
+        '/api/v2/default/alerts': { list: [listEntry('a1')] },
+        '/api/v2/default/alerts/a1': {
+          name: 'notification_canary_missing',
+          context_attributes: { severity: 'page' },
+          query_condition: {
+            type: 'promql',
+            promql: 'time() - max by (channel) (notification_canary_last_success)',
+            promql_condition: { column: 'value', operator: '>', value: 1800 },
+          },
+        },
+      });
+
+      const [alert] = await clientWith(BASE).alerts();
+
+      expect(alert?.condition).toEqual({
+        promql: 'time() - max by (channel) (notification_canary_last_success)',
+        operator: '>',
+        value: 1800,
+      });
     });
 
     it('should ignore a disabled alert even when its last outcome was firing', async () => {

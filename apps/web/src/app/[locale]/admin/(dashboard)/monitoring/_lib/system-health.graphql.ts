@@ -24,6 +24,12 @@ const SYSTEM_HEALTH_FIELDS = gql`
       severity
       message
       since
+      runbook
+      stillTrue
+      affected {
+        label
+        value
+      }
     }
     alertsAvailable
     dlqPendingCount

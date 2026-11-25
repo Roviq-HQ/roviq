@@ -25,6 +25,7 @@ Users are Indian institute admins, clerks, teachers, parents — non-technical, 
 - [GQLCG] GraphQL operations are `gql\`…\`` literals with generated types (`*.generated.ts` beside the file). After changing an operation or a resolver, regenerate (`pnpm tilt logs codegen`, or `pnpm codegen` with the gateway up) and commit the generated files; `pnpm check:codegen-drift` fails otherwise
 - [ERRCP] Errors show translated copy chosen by `extensions.code` (`extractGraphQLErrorCode`, `isAppError`), never `err.message`. Every code an operation can return has copy in both `en` and `hi`
 - [MUTRF] After a mutation the screen shows the new state without a reload: refetch the queries that list the changed data, or update the cache. Name refetched queries exactly as their operations are named
+- [PRBMS] A message that reports a problem (alert, banner, failed or skipped status, "unavailable" state) says what happened, which one, who is affected now, one to three first steps, where to take them (button or link) and how it ends: `docs/frontend.md` → "Messages that report a problem"
 - Check `docs/frontend.md` → "Common components" before building a picker, dialog or table part; add a line there for a new common component
 
 ## Forms
