@@ -5,7 +5,8 @@ import {
   GroupMemberSource,
   GroupMembershipType,
 } from '@roviq/common-types';
-import { DateTimeScalar } from '@roviq/nestjs-graphql';
+import type { I18nContent } from '@roviq/database';
+import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 
 registerEnumType(DynamicGroupStatus, {
   name: 'DynamicGroupStatus',
@@ -70,6 +71,23 @@ export class GroupModel {
   updatedAt!: Date;
 }
 
+@ObjectType({ description: 'A student matching a group rule, with the name to show in a preview' })
+export class RulePreviewMember {
+  @Field(() => ID)
+  membershipId!: string;
+
+  @Field(() => I18nTextScalar, {
+    description: "First name (i18n) from the institute's profile copy",
+  })
+  firstName!: I18nContent;
+
+  @Field(() => I18nTextScalar, { nullable: true, description: 'Last name (i18n)' })
+  lastName!: I18nContent | null;
+
+  @Field({ description: 'Admission number, to tell apart students with the same name' })
+  admissionNumber!: string;
+}
+
 @ObjectType({ description: 'Preview result from dry-run rule evaluation' })
 export class RulePreviewResult {
   @Field(() => Int)
@@ -77,6 +95,11 @@ export class RulePreviewResult {
 
   @Field(() => [String], { description: 'Sample of up to 10 matching membership IDs' })
   sampleMembershipIds!: string[];
+
+  @Field(() => [RulePreviewMember], {
+    description: 'The same sample as sampleMembershipIds, with names, in the same order',
+  })
+  sampleMembers!: RulePreviewMember[];
 }
 
 @ObjectType({ description: 'Group resolution update for subscriptions' })

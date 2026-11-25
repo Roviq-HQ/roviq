@@ -1,7 +1,7 @@
 'use client';
 
 import type { DlqStatus } from '@roviq/graphql/generated';
-import { useFormatDate } from '@roviq/i18n';
+import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +42,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { ColumnDef } from '@tanstack/react-table';
+import { CopyIdButton } from '@web/components/copy-id-button';
 import {
   Ban,
   Clock,
@@ -85,6 +86,7 @@ const filterParsers = {
 export function DlqTab() {
   const t = useTranslations('dlq');
   const { format } = useFormatDate();
+  const resolveI18n = useI18nField();
 
   const [filters, setFilters] = useQueryStates(filterParsers);
   const hasFilters = Boolean(filters.originStream) || Boolean(filters.status);
@@ -143,12 +145,18 @@ export function DlqTab() {
       {
         accessorKey: 'tenantId',
         header: t('columns.tenant'),
-        cell: ({ row }) =>
-          row.original.tenantId ? (
-            <span className="font-mono text-xs">{row.original.tenantId.slice(0, 8)}</span>
-          ) : (
-            <span className="text-muted-foreground">{t('none')}</span>
-          ),
+        cell: ({ row }) => {
+          const { tenantId, tenantName } = row.original;
+          if (!tenantId) return <span className="text-muted-foreground">{t('none')}</span>;
+          const name = resolveI18n(tenantName);
+          if (name) return <span className="max-w-[160px] truncate text-xs">{name}</span>;
+          return (
+            <span className="flex items-center gap-1">
+              <span className="text-xs">{t('unknownInstitute')}</span>
+              <CopyIdButton value={tenantId} name={t('inspect.tenant')} />
+            </span>
+          );
+        },
       },
       {
         accessorKey: 'retryCount',
@@ -241,7 +249,7 @@ export function DlqTab() {
         },
       },
     ],
-    [t, formatDate],
+    [t, formatDate, resolveI18n],
   );
 
   const handleLoadMore = async () => {

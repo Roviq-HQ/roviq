@@ -3,6 +3,13 @@ import type { I18nContent, issuedCertificates } from '@roviq/database';
 
 export type IssuedCertificateRow = typeof issuedCertificates.$inferSelect;
 
+/** A certificate with its student's name; the student fields are null without a readable student. */
+export type CertificateDetailsRow = IssuedCertificateRow & {
+  studentFirstName: I18nContent | null;
+  studentLastName: I18nContent | null;
+  studentAdmissionNumber: string | null;
+};
+
 export interface CertificateTemplateRow {
   id: string;
   type: CertificateTemplateType;

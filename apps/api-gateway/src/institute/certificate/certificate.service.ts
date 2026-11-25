@@ -26,9 +26,10 @@ import { CertificatePdfService } from './certificate-pdf.service';
 import type { ClearanceEntryObject } from './models/tc.model';
 import { CertificateRepository } from './repositories/certificate.repository';
 import type {
+  CertificateDetailsRow,
   CertificateListFilter,
+  CertificateStudentRow,
   CertificateTemplateSummaryRow,
-  IssuedCertificateRow,
 } from './repositories/certificate.types';
 import { TcRepository } from './repositories/tc.repository';
 import type { TcDetailsRow, TcListFilter, TcRow } from './repositories/tc.types';
@@ -217,7 +218,7 @@ export class CertificateService {
   async generateCertificatePdf(
     ctx: InstituteContext,
     certId: string,
-  ): Promise<IssuedCertificateRow> {
+  ): Promise<CertificateDetailsRow> {
     await this.pdfs.ensureCertificatePdf(ctx, certId);
     return this.findCertificateById(ctx, certId);
   }
@@ -285,7 +286,7 @@ export class CertificateService {
       staffProfileId?: string;
       purpose: string;
     },
-  ): Promise<IssuedCertificateRow> {
+  ): Promise<CertificateDetailsRow> {
     const template = await this.certificates.findTemplate(ctx, input.templateId);
     if (!template)
       throw new BusinessException(
@@ -295,8 +296,9 @@ export class CertificateService {
 
     // Auto-populate certificate data from the student profile
     let certificateData: Record<string, unknown> = {};
+    let student: CertificateStudentRow | null = null;
     if (input.studentProfileId) {
-      const student = await this.certificates.findStudent(ctx, input.studentProfileId);
+      student = await this.certificates.findStudent(ctx, input.studentProfileId);
       // Before the serial is taken: the foreign key would accept another institute's student.
       if (!student) throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
       certificateData = {
@@ -320,7 +322,7 @@ export class CertificateService {
       template.type.toUpperCase().slice(0, 3),
     );
 
-    return this.certificates.create(ctx, {
+    const created = await this.certificates.create(ctx, {
       templateId: input.templateId,
       studentProfileId: input.studentProfileId ?? null,
       staffProfileId: input.staffProfileId ?? null,
@@ -330,9 +332,15 @@ export class CertificateService {
       purpose: input.purpose,
       actorId: ctx.userId,
     });
+    return {
+      ...created,
+      studentFirstName: student?.firstName ?? null,
+      studentLastName: student?.lastName ?? null,
+      studentAdmissionNumber: student?.admissionNumber ?? null,
+    };
   }
 
-  async issueCertificate(ctx: InstituteContext, certId: string): Promise<IssuedCertificateRow> {
+  async issueCertificate(ctx: InstituteContext, certId: string): Promise<CertificateDetailsRow> {
     await this.pdfs.assertCertificatePrintable(ctx, certId);
     const issued = await this.certificates.markIssued(ctx, {
       id: certId,
@@ -357,7 +365,7 @@ export class CertificateService {
     return this.findCertificateById(ctx, certId);
   }
 
-  async findCertificateById(ctx: InstituteContext, id: string): Promise<IssuedCertificateRow> {
+  async findCertificateById(ctx: InstituteContext, id: string): Promise<CertificateDetailsRow> {
     const row = await this.certificates.findById(ctx, id);
     if (!row) throw new BusinessException(ErrorCode.CERTIFICATE_NOT_FOUND, 'Certificate not found');
     return row;
@@ -494,7 +502,7 @@ h1{font-size:20px;margin:0 0 16px}p{margin:8px 0}</style></head><body>${rendered
   listCertificates(
     ctx: InstituteContext,
     filter?: CertificateListFilter,
-  ): Promise<IssuedCertificateRow[]> {
+  ): Promise<CertificateDetailsRow[]> {
     return this.certificates.list(ctx, filter ?? {});
   }
 }

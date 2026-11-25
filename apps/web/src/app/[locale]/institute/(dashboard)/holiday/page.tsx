@@ -278,7 +278,7 @@ function HolidaysTable({ holidays, loading, onChanged }: HolidaysTableProps) {
             className="font-medium truncate"
             data-testid={`holiday-row-${row.original.id}-name`}
           >
-            {resolveI18n(name) || row.original.id.slice(0, 8)}
+            {resolveI18n(name) || t('untitled')}
           </span>
         );
       },

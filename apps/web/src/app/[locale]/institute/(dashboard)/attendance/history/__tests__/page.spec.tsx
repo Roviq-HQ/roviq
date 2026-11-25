@@ -42,15 +42,33 @@ vi.mock('nuqs', () => ({
   },
 }));
 
+// Students the picker can find by membership id; the lookup is what shows the
+// chosen student's name, so it must not depend on the search page.
+const studentsState: {
+  byMembership: Record<
+    string,
+    {
+      firstName: Record<string, string>;
+      lastName: Record<string, string> | null;
+      admissionNumber: string;
+    }
+  >;
+  loading: boolean;
+} = { byMembership: {}, loading: false };
 vi.mock('../../../people/students/use-students', () => ({
-  useStudents: () => ({
-    students: [],
-    totalCount: 0,
-    hasNextPage: false,
-    loading: false,
-    loadMore: vi.fn(),
-    refetch: vi.fn(),
-  }),
+  useStudents: (filter?: { membershipId?: string }) => {
+    const found = filter?.membershipId
+      ? studentsState.byMembership[filter.membershipId]
+      : undefined;
+    return {
+      students: found ? [{ membershipId: filter?.membershipId, ...found }] : [],
+      totalCount: found ? 1 : 0,
+      hasNextPage: false,
+      loading: filter?.membershipId ? studentsState.loading : false,
+      loadMore: vi.fn(),
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 interface HistoryRowFixture {
@@ -177,6 +195,43 @@ describe('AttendanceHistoryPage', () => {
       });
       expect(screen.getByTestId('history-table')).toBeInTheDocument();
       expect(screen.queryByTestId(link)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('chosen student label (ROV-360)', () => {
+    const picker = testIds.instituteAttendance.historyStudentPicker;
+
+    it('shows the name and admission number, in Hindi too', () => {
+      QUERY_STATE_OVERRIDES.studentId = '01a2b3c4-0000-7000-8000-000000000001';
+      hookState.rows = [];
+      studentsState.byMembership = {
+        '01a2b3c4-0000-7000-8000-000000000001': {
+          firstName: { en: 'Aarav', hi: 'आरव' },
+          lastName: { en: 'Sharma', hi: 'शर्मा' },
+          admissionNumber: 'ADM-0042',
+        },
+      };
+      renderWithProviders(<AttendanceHistoryPage />, { locale: 'hi' });
+      expect(screen.getByTestId(picker)).toHaveTextContent('आरव शर्मा · ADM-0042');
+    });
+
+    it('says "Unknown student", never a shortened id, when the student is not found', () => {
+      QUERY_STATE_OVERRIDES.studentId = '01a2b3c4-0000-7000-8000-000000000002';
+      studentsState.byMembership = {};
+      renderWithProviders(<AttendanceHistoryPage />);
+      const button = screen.getByTestId(picker);
+      expect(button).toHaveTextContent('Unknown student');
+      expect(button).not.toHaveTextContent('01a2b3c4');
+    });
+
+    it('shows neither a fallback nor an id while the student loads', () => {
+      QUERY_STATE_OVERRIDES.studentId = '01a2b3c4-0000-7000-8000-000000000003';
+      studentsState.loading = true;
+      renderWithProviders(<AttendanceHistoryPage />);
+      const button = screen.getByTestId(picker);
+      expect(button).not.toHaveTextContent('Unknown student');
+      expect(button).not.toHaveTextContent('01a2b3c4');
+      studentsState.loading = false;
     });
   });
 });

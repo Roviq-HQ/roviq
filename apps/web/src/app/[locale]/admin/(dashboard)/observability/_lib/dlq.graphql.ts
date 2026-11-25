@@ -23,6 +23,7 @@ const DLQ_MESSAGE_FIELDS = gql`
     retryCount
     correlationId
     tenantId
+    tenantName
     failedAt
     status
     replayedAt

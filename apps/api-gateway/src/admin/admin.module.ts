@@ -10,6 +10,7 @@ import { AdminAttendanceModule } from './attendance/admin-attendance.module';
 import { AdminAuditResolver } from './audit/admin-audit.resolver';
 import { AdminComplianceExportModule } from './compliance-export/admin-compliance-export.module';
 import { AdminDlqResolver } from './dlq/admin-dlq.resolver';
+import { DlqInstituteNameLoader } from './dlq/dlq-institute-name.loader';
 import { AdminImpersonationResolver } from './impersonation/admin-impersonation.resolver';
 import { AdminImpersonationSubscriptionResolver } from './impersonation/admin-impersonation.subscription';
 import { AdminInstituteLoaders } from './institute/admin-institute.loaders';
@@ -64,6 +65,7 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminImpersonationSubscriptionResolver,
     AdminAuditResolver,
     AdminDlqResolver,
+    DlqInstituteNameLoader,
   ],
 })
 export class AdminModule {}

@@ -219,5 +219,8 @@
     },
     "createSuccess": "समूह बनाया गया",
     "createError": "समूह बनाने में विफल"
+  },
+  "previewSample": {
+    "admissionNumber": "प्रवेश सं. {number}"
   }
 }

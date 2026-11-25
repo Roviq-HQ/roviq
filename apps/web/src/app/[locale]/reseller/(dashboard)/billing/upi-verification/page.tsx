@@ -1,6 +1,6 @@
 'use client';
 
-import { useFormatDate, useFormatNumber } from '@roviq/i18n';
+import { useFormatDate, useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -27,6 +27,7 @@ import {
   useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { CopyIdButton } from '@web/components/copy-id-button';
 import { CheckCircle, Clock, ShieldAlert, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -119,6 +120,7 @@ function UpiVerificationContent() {
   const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
+  const resolveI18n = useI18nField();
   const { payments, loading } = useUnverifiedPayments({ first: 20 });
   const [verifyUpi] = useVerifyUpiPayment();
   const [rejectUpi] = useRejectUpiPayment();
@@ -197,6 +199,7 @@ function UpiVerificationContent() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t('upiVerification.columns.invoiceId')}</TableHead>
+                        <TableHead>{t('upiVerification.columns.institute')}</TableHead>
                         <TableHead>{t('upiVerification.columns.utr')}</TableHead>
                         <TableHead className="text-right">
                           {t('upiVerification.columns.amount')}
@@ -211,8 +214,22 @@ function UpiVerificationContent() {
                     <TableBody>
                       {payments.map((payment) => (
                         <TableRow key={payment.id}>
-                          <TableCell className="font-mono text-xs">
-                            {payment.invoiceId.slice(0, 8)}...
+                          <TableCell data-testid={ids.invoice(payment.id)}>
+                            {payment.invoiceNumber ? (
+                              <span className="font-mono text-xs">{payment.invoiceNumber}</span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-xs">
+                                {t('upiVerification.unknownInvoice')}
+                                <CopyIdButton
+                                  value={payment.invoiceId}
+                                  name={t('upiVerification.invoiceIdName')}
+                                />
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm" data-testid={ids.institute(payment.id)}>
+                            {resolveI18n(payment.instituteName) ||
+                              t('upiVerification.unknownInstitute')}
                           </TableCell>
                           <TableCell className="font-mono text-xs">
                             {payment.utrNumber ?? '—'}

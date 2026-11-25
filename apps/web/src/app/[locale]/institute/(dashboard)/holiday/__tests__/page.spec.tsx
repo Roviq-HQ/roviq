@@ -147,4 +147,26 @@ describe('HolidaysPage', () => {
     expect(screen.getByTestId('holiday-row-hol-2-name')).toHaveTextContent('Diwali');
     expect(screen.getByTestId('holiday-row-hol-2-type')).toHaveTextContent('Religious');
   });
+
+  it('calls a holiday without a name "Untitled holiday", never a shortened id (ROV-360)', () => {
+    hookState.holidays = [
+      {
+        id: '01a2b3c4-0000-7000-8000-0000000000h1',
+        name: {},
+        description: null,
+        type: 'INSTITUTE',
+        startDate: '2027-02-01',
+        endDate: '2027-02-01',
+        tags: [],
+        isPublic: false,
+        createdAt: '2026-04-01T00:00:00Z',
+        updatedAt: '2026-04-01T00:00:00Z',
+      },
+    ];
+    renderWithProviders(<HolidaysPage />, { locale: 'hi' });
+
+    const cell = screen.getByTestId('holiday-row-01a2b3c4-0000-7000-8000-0000000000h1-name');
+    expect(cell).toHaveTextContent('बिना नाम की छुट्टी');
+    expect(cell).not.toHaveTextContent('01a2b3c4');
+  });
 });

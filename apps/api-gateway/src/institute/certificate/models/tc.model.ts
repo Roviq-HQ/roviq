@@ -112,6 +112,25 @@ export class CertificateModel {
   @Field(() => String, { nullable: true })
   studentProfileId?: string | null;
 
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description:
+      "Student's first name (i18n) from the institute's profile copy; null for a staff certificate or a student who is no longer readable",
+  })
+  studentFirstName!: I18nContent | null;
+
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: "Student's last name (i18n) from the institute's profile copy",
+  })
+  studentLastName!: I18nContent | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Student's admission number, to tell apart students with the same name",
+  })
+  studentAdmissionNumber!: string | null;
+
   @Field(() => String, { nullable: true })
   staffProfileId?: string | null;
 

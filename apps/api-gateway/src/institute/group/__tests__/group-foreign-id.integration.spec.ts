@@ -3,15 +3,26 @@
  * institute, returns none of its data, and stores no row that points at it.
  */
 import { randomUUID } from 'node:crypto';
-import { DomainGroupType, ErrorCode, GroupMembershipType } from '@roviq/common-types';
+import {
+  AcademicStatus,
+  AdmissionType,
+  DomainGroupType,
+  ErrorCode,
+  GroupMembershipType,
+  SocialCategory,
+} from '@roviq/common-types';
 import {
   type DrizzleDB,
   groupChildren,
   groupMembers,
   groupRules,
   groups,
+  memberships,
   mkAdminCtx,
   SYSTEM_USER_ID,
+  studentProfiles,
+  tenantUserProfiles,
+  users,
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -49,6 +60,20 @@ const UPDATE = /* GraphQL */ `
   mutation UpdateGroup($id: ID!, $rule: JSON) {
     updateGroup(id: $id, input: { name: "Renamed", rule: $rule }) {
       id
+    }
+  }
+`;
+const PREVIEW = /* GraphQL */ `
+  query PreviewGroupRule($rule: JSON!) {
+    previewGroupRule(rule: $rule) {
+      count
+      sampleMembershipIds
+      sampleMembers {
+        membershipId
+        firstName
+        lastName
+        admissionNumber
+      }
     }
   }
 `;
@@ -311,6 +336,70 @@ describe('group: another institute id (ROV-293)', () => {
           .where(and(eq(groupMembers.id, a.memberId), eq(groupMembers.groupId, a.hybridGroupId))),
       );
       expect(stored).toEqual([{ isExcluded: true }]);
+    });
+  });
+
+  it("previewGroupRule should name its own matching students and never another institute's (ROV-360)", async () => {
+    const addStudent = (inst: TestInstitute, userId: string, admissionNumber: string) =>
+      asAdmin(async (tx) => {
+        const [membership] = await tx
+          .insert(memberships)
+          .values({ userId, roleId: inst.roleId, tenantId: inst.tenantId, abilities: [], ...BY })
+          .returning({ id: memberships.id });
+        await tx.insert(studentProfiles).values({
+          tenantId: inst.tenantId,
+          userId,
+          membershipId: membership.id,
+          admissionNumber,
+          admissionDate: '2026-04-01',
+          admissionType: AdmissionType.NEW,
+          academicStatus: AcademicStatus.ENROLLED,
+          socialCategory: SocialCategory.GENERAL,
+          ...BY,
+        });
+        return membership.id;
+      });
+    // One person enrolled in both institutes, under a different name in each.
+    const suffix = randomUUID().slice(0, 8);
+    const userId = await asAdmin(async (tx) => {
+      const [user] = await tx
+        .insert(users)
+        .values({
+          email: `group_preview_${suffix}@test.local`,
+          username: `group_preview_${suffix}`,
+          passwordHash: 'not-a-real-hash',
+          ...BY,
+        })
+        .returning({ id: users.id });
+      await tx.insert(tenantUserProfiles).values([
+        { tenantId: instA.tenantId, userId: user.id, firstName: { en: 'Neha' }, ...BY },
+        { tenantId: instB.tenantId, userId: user.id, firstName: { en: 'Wrong' }, ...BY },
+      ]);
+      return user.id;
+    });
+    const ownMembershipId = await addStudent(instA, userId, `GRP-A-${suffix}`);
+    await addStudent(instB, userId, `GRP-B-${suffix}`);
+
+    const res = await gqlRequest(result.httpServer, {
+      query: PREVIEW,
+      variables: { rule: RULE },
+      token: tokenA,
+    });
+
+    expect(res.errors).toBeUndefined();
+    expect(res.data).toEqual({
+      previewGroupRule: {
+        count: 1,
+        sampleMembershipIds: [ownMembershipId],
+        sampleMembers: [
+          {
+            membershipId: ownMembershipId,
+            firstName: { en: 'Neha' },
+            lastName: null,
+            admissionNumber: `GRP-A-${suffix}`,
+          },
+        ],
+      },
     });
   });
 });

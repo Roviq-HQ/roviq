@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
+import { CopyIdButton } from '@web/components/copy-id-button';
 import { parseISO } from 'date-fns';
 import {
   CheckCircle2,
@@ -56,13 +57,11 @@ import { RejectApplicationDialog } from './reject-application-dialog';
 import { StatusChangeDialog } from './status-change-dialog';
 
 const { instituteAdmissionApplications } = testIds;
-function applicantNameOf(application: ApplicationNode): string {
+/** The applicant's name as the form recorded it; null when the form has none. */
+function applicantNameOf(application: ApplicationNode): string | null {
   const formData = (application.formData ?? {}) as Record<string, unknown>;
-  return (
-    (formData.studentName as string) ??
-    (formData.student_name as string) ??
-    application.id.slice(0, 8)
-  );
+  const name = formData.studentName ?? formData.student_name;
+  return typeof name === 'string' && name.trim() ? name : null;
 }
 
 const filterParsers = {
@@ -145,9 +144,23 @@ export default function ApplicationsPage() {
             (formData.parentName as string) ?? (formData.parent_name as string) ?? '';
           return (
             <div className="space-y-0.5">
-              <p className="font-medium" data-testid={`application-applicant-${row.original.id}`}>
-                {studentName}
-              </p>
+              {studentName ? (
+                <p
+                  className="font-medium"
+                  data-testid={instituteAdmissionApplications.applicant(row.original.id)}
+                >
+                  {studentName}
+                </p>
+              ) : (
+                // No human reference exists for an application; the id is what support asks for.
+                <p
+                  className="flex items-center gap-1 text-muted-foreground"
+                  data-testid={instituteAdmissionApplications.applicant(row.original.id)}
+                >
+                  {t('applications.unnamedApplicant')}
+                  <CopyIdButton value={row.original.id} name={t('applications.applicationId')} />
+                </p>
+              )}
               {parentName && <p className="text-xs text-muted-foreground">{parentName}</p>}
             </div>
           );
@@ -478,7 +491,11 @@ export default function ApplicationsPage() {
               open={!!documentsTarget}
               onOpenChange={(o) => !o && setDocumentsTarget(null)}
               application={documentsTarget}
-              applicantName={documentsTarget ? applicantNameOf(documentsTarget) : ''}
+              applicantName={
+                documentsTarget
+                  ? (applicantNameOf(documentsTarget) ?? t('applications.unnamedApplicant'))
+                  : ''
+              }
             />
             <RejectApplicationDialog
               open={!!rejectTarget}

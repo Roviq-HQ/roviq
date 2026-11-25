@@ -50,6 +50,12 @@ const ENQUIRY_FIELDS = `
   source
   referredBy
   assignedTo
+  assignee {
+    userId
+    firstName
+    lastName
+    employeeId
+  }
   previousSchool
   previousBoard
   siblingInSchool

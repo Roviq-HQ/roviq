@@ -43,6 +43,11 @@ export class DlqService {
     };
   }
 
+  /** Institute names for the DLQ list; ids come from stored messages, never from the caller. */
+  instituteNames(tenantIds: readonly string[]) {
+    return this.repo.findInstituteNames(tenantIds);
+  }
+
   /** List dead-lettered messages, newest-first, keyset-paginated on id DESC. */
   async list(filter: DlqMessageFilterInput = {}) {
     const limit = Math.min(filter.first ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);

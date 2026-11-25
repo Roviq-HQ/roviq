@@ -164,8 +164,8 @@ function NameWithId({ name, id }: { name: string | null; id: string }) {
     return (
       <span className="flex items-baseline gap-1.5 overflow-hidden">
         <span className="truncate text-sm font-medium">{name}</span>
-        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-          {id.slice(0, 8)}
+        <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground" title={id}>
+          {id}
         </span>
       </span>
     );
@@ -257,7 +257,7 @@ export function AuditLogDetail({
                       {t('detail.impersonated')}
                     </span>
                     <ImpersonationBadge
-                      impersonatorName={actorName ?? log.actorId.slice(0, 8)}
+                      impersonatorName={actorName ?? t('unknownUser')}
                       actorScope={getImpersonatorScope(log)}
                       userName={log.userName ?? undefined}
                       labels={labels.impersonation}

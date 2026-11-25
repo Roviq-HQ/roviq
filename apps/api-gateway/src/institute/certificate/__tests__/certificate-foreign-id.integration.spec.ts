@@ -138,6 +138,26 @@ const LIST_CERTIFICATES = /* GraphQL */ `
     }
   }
 `;
+const CERTIFICATE_STUDENT_FIELDS = `
+  id
+  studentFirstName
+  studentLastName
+  studentAdmissionNumber
+`;
+const LIST_NAMED_CERTIFICATES = /* GraphQL */ `
+  query ListNamedCertificates($filter: ListCertificateFilterInput) {
+    listCertificates(filter: $filter) {
+      ${CERTIFICATE_STUDENT_FIELDS}
+    }
+  }
+`;
+const GET_NAMED_CERTIFICATE = /* GraphQL */ `
+  query GetNamedCertificate($id: ID!) {
+    getCertificate(id: $id) {
+      ${CERTIFICATE_STUDENT_FIELDS}
+    }
+  }
+`;
 const TEMPLATE_FIELDS = /* GraphQL */ `
   query GetCertificateTemplateFields($templateId: ID!) {
     getCertificateTemplateFields(templateId: $templateId)
@@ -162,6 +182,8 @@ const REQUEST_CERTIFICATE = /* GraphQL */ `
     requestCertificate(input: $input) {
       id
       status
+      studentFirstName
+      studentAdmissionNumber
     }
   }
 `;
@@ -628,6 +650,70 @@ describe('certificates and TCs: another institute id (ROV-293)', () => {
       ).toEqual({ listCertificates: [] });
     });
 
+    it("listCertificates and getCertificate should return the student's name and admission number (ROV-360)", async () => {
+      type Named = {
+        id: string;
+        studentFirstName: Record<string, string> | null;
+        studentLastName: Record<string, string> | null;
+        studentAdmissionNumber: string | null;
+      };
+      const admissionNumber = await asAdmin(async (tx) => {
+        const [row] = await tx
+          .select({ admissionNumber: studentProfiles.admissionNumber })
+          .from(studentProfiles)
+          .where(eq(studentProfiles.id, a.studentIds[0]));
+        return row.admissionNumber;
+      });
+      const expected = {
+        id: a.issuedCertificateId,
+        studentFirstName: { en: 'Asha' },
+        studentLastName: { en: 'Verma' },
+        studentAdmissionNumber: admissionNumber,
+      };
+
+      const listed = await query<{ listCertificates: Named[] }>(LIST_NAMED_CERTIFICATES, {
+        filter: { studentProfileId: a.studentIds[0] },
+      });
+      expect(listed?.listCertificates).toEqual([expected]);
+
+      const one = await query<{ getCertificate: Named }>(GET_NAMED_CERTIFICATE, {
+        id: a.issuedCertificateId,
+      });
+      expect(one?.getCertificate).toEqual(expected);
+    });
+
+    it("listCertificates should never join in another institute's student (ROV-360)", async () => {
+      // The foreign key accepts any student id; RLS on the joined views must hide B's name.
+      const [pointing] = await asAdmin((tx) =>
+        tx
+          .insert(issuedCertificates)
+          .values({
+            tenantId: instA.tenantId,
+            templateId: a.templateId,
+            studentProfileId: b.studentIds[3],
+            serialNumber: `CERT/TMP/${randomUUID().slice(0, 8)}`,
+            status: CertificateStatus.DRAFT,
+            certificateData: {},
+            purpose: 'Fixture pointing at another institute',
+            ...BY,
+          })
+          .returning({ id: issuedCertificates.id }),
+      );
+
+      const listed = await query<{ listCertificates: { id: string; studentFirstName: unknown }[] }>(
+        LIST_NAMED_CERTIFICATES,
+        { filter: { studentProfileId: b.studentIds[3] } },
+      );
+      expect(listed?.listCertificates).toEqual([
+        {
+          id: pointing.id,
+          studentFirstName: null,
+          studentLastName: null,
+          studentAdmissionNumber: null,
+        },
+      ]);
+    });
+
     it('listCertificateTemplates should list its own active templates and none of another institute', async () => {
       type Rows = { listCertificateTemplates: { id: string; name: string; type: string }[] };
       const [character, inactive] = await asAdmin((tx) =>
@@ -718,14 +804,20 @@ describe('certificates and TCs: another institute id (ROV-293)', () => {
 
   describe('certificate mutations', () => {
     it('requestCertificate should request a certificate of its own template for its own student', async () => {
-      const data = await query<{ requestCertificate: { id: string; status: string } }>(
-        REQUEST_CERTIFICATE,
-        {
-          input: { templateId: a.templateId, studentProfileId: a.studentIds[2], purpose: 'Visa' },
-        },
-      );
+      const data = await query<{
+        requestCertificate: {
+          id: string;
+          status: string;
+          studentFirstName: Record<string, string> | null;
+          studentAdmissionNumber: string | null;
+        };
+      }>(REQUEST_CERTIFICATE, {
+        input: { templateId: a.templateId, studentProfileId: a.studentIds[2], purpose: 'Visa' },
+      });
 
       expect(data?.requestCertificate.status).toBe(CertificateStatus.DRAFT);
+      expect(data?.requestCertificate.studentFirstName).toEqual({ en: 'Chitra' });
+      expect(data?.requestCertificate.studentAdmissionNumber).toMatch(/^CERT-ADM-/);
     });
 
     it('requestCertificate should request a certificate of its own template for its own staff', async () => {

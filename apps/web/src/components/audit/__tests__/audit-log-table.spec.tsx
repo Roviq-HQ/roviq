@@ -11,7 +11,7 @@ import type { AuditLogRow } from '../audit-utils';
 const { auditLogs } = testIds;
 
 const STUDENT_ID = '019a0000-0000-7000-8000-0000000000aa';
-// A prefix no other id of the fixture shares, so the shortened id is found only as the actor.
+// A prefix no other id of the fixture shares, so a shortened id would be found only as the actor.
 const OUTSIDER_ID = '7c1e0000-0000-7000-8000-0000000000bb';
 
 function makeLog(overrides: Partial<AuditLogRow> = {}): AuditLogRow {
@@ -97,11 +97,18 @@ describe('AuditLogTable', () => {
     );
   });
 
-  it('shows a plain entity id when the portal has no page for that entity', () => {
+  it('shows the full entity id with a copy button when the portal has no page for it', async () => {
+    const user = userEvent.setup();
     renderTable({ scope: 'admin' });
 
     expect(screen.queryByTestId(auditLogs.entityLink('log-1'))).not.toBeInTheDocument();
-    expect(screen.getByText(STUDENT_ID.slice(0, 8))).toBeInTheDocument();
+    expect(screen.getByText(STUDENT_ID)).toBeInTheDocument();
+    expect(screen.queryByText(STUDENT_ID.slice(0, 8))).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId(testIds.copyId.button(STUDENT_ID)));
+    expect(await navigator.clipboard.readText()).toBe(STUDENT_ID);
+    // Copying must not open the row's detail sheet.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('does not open the detail sheet when the entity link is clicked', async () => {
@@ -173,11 +180,13 @@ describe('AuditLogTable', () => {
     expect(screen.getByText('रीसेलर')).toBeInTheDocument();
   });
 
-  it('keeps the id for an unnamed actor in the platform log', () => {
+  it('calls an unnamed actor in the platform log "Unknown user", with the id to copy', () => {
     const log = makeLog({ scope: 'platform', actorName: null, actorId: OUTSIDER_ID });
-    renderTable({ scope: 'admin', logs: [log] });
+    renderTable({ scope: 'admin', logs: [log] }, 'hi');
 
-    expect(screen.getByText(OUTSIDER_ID.slice(0, 8))).toBeInTheDocument();
+    expect(screen.getByText('अज्ञात उपयोगकर्ता')).toBeInTheDocument();
+    expect(screen.getByTestId(testIds.copyId.button(OUTSIDER_ID))).toBeInTheDocument();
+    expect(screen.queryByText(OUTSIDER_ID.slice(0, 8))).not.toBeInTheDocument();
     expect(screen.queryByText('Roviq platform')).not.toBeInTheDocument();
   });
 

@@ -1,9 +1,9 @@
 'use client';
 
 import { gql, useMutation, useQuery } from '@roviq/graphql';
-import type { PaymentModel } from '@roviq/graphql/generated';
+import type { UnverifiedPaymentModel } from '@roviq/graphql/generated';
 
-export type UnverifiedPaymentNode = PaymentModel;
+export type UnverifiedPaymentNode = UnverifiedPaymentModel;
 
 interface UnverifiedPaymentsQueryData {
   unverifiedPayments: UnverifiedPaymentNode[];
@@ -18,7 +18,9 @@ const UNVERIFIED_PAYMENTS_QUERY = gql`
     unverifiedPayments(first: $first) {
       id
       invoiceId
+      invoiceNumber
       tenantId
+      instituteName
       amountPaise
       currency
       utrNumber

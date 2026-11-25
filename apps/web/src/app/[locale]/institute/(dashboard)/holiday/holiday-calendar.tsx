@@ -281,7 +281,7 @@ export function HolidayCalendar() {
                         key={h.id}
                         holiday={h}
                         locale={locale}
-                        label={resolveI18n(h.name) || h.id.slice(0, 8)}
+                        label={resolveI18n(h.name) || t('untitled')}
                       />
                     ))}
                     {overflow > 0 ? (
@@ -305,7 +305,7 @@ export function HolidayCalendar() {
                                 key={h.id}
                                 holiday={h}
                                 locale={locale}
-                                label={resolveI18n(h.name) || h.id.slice(0, 8)}
+                                label={resolveI18n(h.name) || t('untitled')}
                               />
                             ))}
                           </div>

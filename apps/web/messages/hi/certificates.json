@@ -253,7 +253,10 @@
     "student": "छात्र",
     "purpose": "उद्देश्य",
     "createdAt": "बनाया गया",
-    "issuedDate": "जारी तिथि"
+    "issuedDate": "जारी तिथि",
+    "unknownStudent": "अज्ञात छात्र",
+    "openStudent": "छात्र की प्रोफ़ाइल खोलें",
+    "admissionNumber": "प्रवेश सं. {number}"
   },
   "filters": {
     "searchPlaceholder": "क्रम संख्या या कारण खोजें…",

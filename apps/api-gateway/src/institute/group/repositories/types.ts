@@ -4,7 +4,7 @@ import type {
   GroupMemberSource,
   GroupMembershipType,
 } from '@roviq/common-types';
-import type { groupMembers, groupRules, groups } from '@roviq/database';
+import type { groupMembers, groupRules, groups, I18nContent } from '@roviq/database';
 
 export type GroupRecord = typeof groups.$inferSelect;
 export type GroupMemberRow = typeof groupMembers.$inferSelect;
@@ -67,7 +67,15 @@ export interface UserNameRow {
   email: string;
 }
 
+export interface RulePreviewMember {
+  membershipId: string;
+  firstName: I18nContent;
+  lastName: I18nContent | null;
+  admissionNumber: string;
+}
+
 export interface RulePreview {
   count: number;
   sampleMembershipIds: string[];
+  sampleMembers: RulePreviewMember[];
 }

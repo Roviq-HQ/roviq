@@ -1,5 +1,6 @@
 import type { CertificateTemplateType, InstituteContext } from '@roviq/common-types';
 import type {
+  CertificateDetailsRow,
   CertificateListFilter,
   CertificateStudentRow,
   CertificateTemplateRow,
@@ -36,7 +37,7 @@ export abstract class CertificateRepository {
     ctx: InstituteContext,
     data: MarkCertificateIssuedData,
   ): Promise<IssuedCertificateRow | null>;
-  abstract findById(ctx: InstituteContext, id: string): Promise<IssuedCertificateRow | null>;
+  abstract findById(ctx: InstituteContext, id: string): Promise<CertificateDetailsRow | null>;
   /**
    * Makes the rendered PENDING file READY and points the certificate at it, in one
    * transaction. False when the certificate already has a PDF.
@@ -49,5 +50,5 @@ export abstract class CertificateRepository {
   abstract list(
     ctx: InstituteContext,
     filter: CertificateListFilter,
-  ): Promise<IssuedCertificateRow[]>;
+  ): Promise<CertificateDetailsRow[]>;
 }

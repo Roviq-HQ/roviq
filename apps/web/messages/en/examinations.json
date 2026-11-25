@@ -121,7 +121,8 @@
     "viewDesigner": "Designer",
     "editDatesheet": "Edit datesheet",
     "backToList": "Back to list",
-    "done": "Done"
+    "done": "Done",
+    "unknownSubject": "Unknown subject"
   },
   "designer": {
     "title": "Datesheet designer",

@@ -218,6 +218,9 @@ const CERTIFICATE_FIELDS = `
   purpose
   templateId
   studentProfileId
+  studentFirstName
+  studentLastName
+  studentAdmissionNumber
   staffProfileId
   certificateData
   pdf {

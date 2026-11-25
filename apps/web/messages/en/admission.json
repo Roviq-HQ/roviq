@@ -118,7 +118,9 @@
       "error": "Could not convert enquiry. Please try again."
     },
     "liveBadge": "Live",
-    "newEventToast": "New enquiry received: {name}"
+    "newEventToast": "New enquiry received: {name}",
+    "unknownAssignee": "Unknown staff member",
+    "employeeId": "Emp. ID {id}"
   },
   "applications": {
     "title": "Admission Applications",
@@ -223,7 +225,9 @@
       "addError": "Could not add the document.",
       "closed": "This application is closed. Its documents can no longer be changed.",
       "close": "Close"
-    }
+    },
+    "unnamedApplicant": "Applicant without a name",
+    "applicationId": "application ID"
   },
   "statistics": {
     "title": "Admission Statistics",

@@ -1,3 +1,4 @@
+import type { I18nContent } from '@roviq/database';
 import type { DlqListQuery, DlqMessageRecord, DlqTransitionResult } from './types';
 
 export interface DlqStreamCount {
@@ -9,6 +10,8 @@ export abstract class DlqRepository {
   /** Matching rows newest first, and the count of every row the filters match. */
   abstract list(query: DlqListQuery): Promise<{ records: DlqMessageRecord[]; totalCount: number }>;
   abstract countPending(): Promise<number>;
+  /** Names of the given institutes; a deleted institute is missing from the map. */
+  abstract findInstituteNames(tenantIds: readonly string[]): Promise<Map<string, I18nContent>>;
   /** Rows written since `since`, per origin stream. */
   abstract countSinceByStream(since: Date): Promise<DlqStreamCount[]>;
   /**

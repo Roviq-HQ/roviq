@@ -20,6 +20,7 @@ import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import { markFilesReady } from '../../../files/file-attachment';
 import { CertificateRepository } from './certificate.repository';
 import type {
+  CertificateDetailsRow,
   CertificateListFilter,
   CertificateStudentRow,
   CertificateTemplateRow,
@@ -198,14 +199,14 @@ export class CertificateDrizzleRepository extends CertificateRepository {
     });
   }
 
-  async findById(ctx: InstituteContext, id: string): Promise<IssuedCertificateRow | null> {
+  async findById(ctx: InstituteContext, id: string): Promise<CertificateDetailsRow | null> {
     const [row] = await withTenant(this.db, ctx, (tx) =>
-      tx.select().from(issuedCertificatesLive).where(eq(issuedCertificatesLive.id, id)).limit(1),
+      selectDetails(tx).where(eq(issuedCertificatesLive.id, id)).limit(1),
     );
     return row ?? null;
   }
 
-  list(ctx: InstituteContext, filter: CertificateListFilter): Promise<IssuedCertificateRow[]> {
+  list(ctx: InstituteContext, filter: CertificateListFilter): Promise<CertificateDetailsRow[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const conditions: SQL[] = [];
       if (filter.status) conditions.push(eq(issuedCertificatesLive.status, filter.status));
@@ -228,7 +229,54 @@ export class CertificateDrizzleRepository extends CertificateRepository {
       }
 
       const where = conditions.length > 0 ? and(...conditions) : undefined;
-      return tx.select().from(issuedCertificatesLive).where(where).limit(50);
+      return selectDetails(tx).where(where).limit(50);
     });
   }
+}
+
+/**
+ * A certificate with its student's name and admission number. Left joins: a staff certificate
+ * has no student, and a deleted student's profile is gone from the live views.
+ */
+function selectDetails(tx: DrizzleDB) {
+  return tx
+    .select({
+      // Named one by one: `getColumns(view)` yields the base table's columns, which render
+      // as "issued_certificates"."id" and fail outside the view.
+      id: issuedCertificatesLive.id,
+      tenantId: issuedCertificatesLive.tenantId,
+      templateId: issuedCertificatesLive.templateId,
+      studentProfileId: issuedCertificatesLive.studentProfileId,
+      staffProfileId: issuedCertificatesLive.staffProfileId,
+      serialNumber: issuedCertificatesLive.serialNumber,
+      status: issuedCertificatesLive.status,
+      certificateData: issuedCertificatesLive.certificateData,
+      pdfFileId: issuedCertificatesLive.pdfFileId,
+      issuedDate: issuedCertificatesLive.issuedDate,
+      issuedBy: issuedCertificatesLive.issuedBy,
+      purpose: issuedCertificatesLive.purpose,
+      validUntil: issuedCertificatesLive.validUntil,
+      createdAt: issuedCertificatesLive.createdAt,
+      updatedAt: issuedCertificatesLive.updatedAt,
+      createdBy: issuedCertificatesLive.createdBy,
+      updatedBy: issuedCertificatesLive.updatedBy,
+      deletedAt: issuedCertificatesLive.deletedAt,
+      deletedBy: issuedCertificatesLive.deletedBy,
+      version: issuedCertificatesLive.version,
+      studentFirstName: tenantUserProfilesLive.firstName,
+      studentLastName: tenantUserProfilesLive.lastName,
+      studentAdmissionNumber: studentProfilesLive.admissionNumber,
+    })
+    .from(issuedCertificatesLive)
+    .leftJoin(
+      studentProfilesLive,
+      eq(studentProfilesLive.id, issuedCertificatesLive.studentProfileId),
+    )
+    .leftJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+        eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+      ),
+    );
 }

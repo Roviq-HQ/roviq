@@ -26,6 +26,7 @@ export class StudentQueryService {
       [filter.isRteAdmitted, 'isRteAdmitted'],
       [filter.sectionId, 'currentSectionId'],
       [filter.standardId, 'currentStandardId'],
+      [filter.membershipId, 'membershipId'],
     ] as const;
     for (const [value, field] of filters) {
       if (value !== undefined && !access.ability.can('read', 'Student', field)) {

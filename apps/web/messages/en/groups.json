@@ -219,5 +219,8 @@
     },
     "createSuccess": "Group created",
     "createError": "Failed to create group"
+  },
+  "previewSample": {
+    "admissionNumber": "Adm. no. {number}"
   }
 }

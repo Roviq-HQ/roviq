@@ -83,5 +83,6 @@
     "description": "Something went wrong while fetching dead-lettered messages.",
     "retry": "Retry"
   },
-  "none": "—"
+  "none": "—",
+  "unknownInstitute": "Unknown institute"
 }

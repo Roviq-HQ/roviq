@@ -47,10 +47,10 @@
     }
   },
   "admission.enquiry.followUpDate": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "ROV-360 changed only the assignee cell; follow-up order and overdue marking unchanged",
     "targets": {
       "apps/api-gateway/src/institute/admission/admission-read.repository.ts#AdmissionReadRepository.listEnquiries": "3e5bce015de8e8a5",
-      "apps/web/src/app/[locale]/institute/(dashboard)/admission/enquiries/page.tsx": "91ec52343bd26f51"
+      "apps/web/src/app/[locale]/institute/(dashboard)/admission/enquiries/page.tsx": "ef40b84359939173"
     }
   },
   "admission.enquiry.source": {
@@ -61,10 +61,10 @@
     }
   },
   "certificates.other.purpose": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "ROV-360 adds the student name to the result; purpose handling unchanged",
     "targets": {
       "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#DEFAULT_CERTIFICATE_BODY": "ffcb189bbff27afb",
-      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate": "b454bc5aa519d948"
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate": "a306fecc4f4285af"
     }
   },
   "certificates.other.template": {

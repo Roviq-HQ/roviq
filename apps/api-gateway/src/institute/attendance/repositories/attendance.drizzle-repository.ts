@@ -17,6 +17,7 @@ import {
   studentAcademicsLive,
   studentProfilesLive,
   subjectsLive,
+  tenantUserProfilesLive,
   type UniqueViolationErrors,
   withTenant,
 } from '@roviq/database';
@@ -29,6 +30,7 @@ import {
   countDistinct,
   desc,
   eq,
+  inArray,
   isNull,
   type SQL,
   sql,
@@ -45,6 +47,7 @@ import type {
   CreateSessionData,
   DateSummaryQuery,
   DateSummaryRow,
+  MembershipNameRow,
   SectionDailyBreakdownQuery,
   SectionDailyBreakdownRow,
   SessionDateRangeQuery,
@@ -539,6 +542,9 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
       const rows = await tx
         .select({
           studentId: attendanceEntriesLive.studentId,
+          studentFirstName: tenantUserProfilesLive.firstName,
+          studentLastName: tenantUserProfilesLive.lastName,
+          admissionNumber: studentProfilesLive.admissionNumber,
           totalSessions: count(),
           presentCount: countWhere(eq(status, 'PRESENT')),
           absentCount: countWhere(eq(status, 'ABSENT')),
@@ -556,6 +562,18 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
           eq(attendanceEntriesLive.sessionId, attendanceSessionsLive.id),
         )
         .innerJoin(sectionsLive, eq(sectionsLive.id, attendanceSessionsLive.sectionId))
+        .leftJoin(membershipsLive, eq(membershipsLive.id, attendanceEntriesLive.studentId))
+        .leftJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, membershipsLive.userId),
+            eq(tenantUserProfilesLive.tenantId, membershipsLive.tenantId),
+          ),
+        )
+        .leftJoin(
+          studentProfilesLive,
+          eq(studentProfilesLive.membershipId, attendanceEntriesLive.studentId),
+        )
         .where(
           and(
             between(attendanceSessionsLive.date, query.startDate, query.endDate),
@@ -564,7 +582,12 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
             entryInScope(access.ability, 'read', attendanceEntriesLive.id),
           ),
         )
-        .groupBy(attendanceEntriesLive.studentId)
+        .groupBy(
+          attendanceEntriesLive.studentId,
+          tenantUserProfilesLive.firstName,
+          tenantUserProfilesLive.lastName,
+          studentProfilesLive.admissionNumber,
+        )
         .orderBy(asc(attendanceEntriesLive.studentId));
       return rows;
     });
@@ -621,7 +644,22 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
           asc(attendanceSessionsLive.sectionId),
           sql`${attendanceSessionsLive.period} asc nulls first`,
         );
-      return rows;
+
+      const names = await namesByMembership(tx, [
+        ...new Set(rows.flatMap((row) => [row.lecturerId, ...row.absenteeIds])),
+      ]);
+      return rows.map((row) => {
+        const lecturer = names.get(row.lecturerId);
+        return {
+          ...row,
+          lecturerFirstName: lecturer?.firstName ?? null,
+          lecturerLastName: lecturer?.lastName ?? null,
+          absentees: row.absenteeIds.map((studentId) => ({
+            studentId,
+            ...(names.get(studentId) ?? { firstName: null, lastName: null, admissionNumber: null }),
+          })),
+        };
+      });
     });
   }
 
@@ -666,4 +704,33 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
       await softDelete(tx, attendanceSessions, id);
     });
   }
+}
+
+/**
+ * Names of members of the caller's institute, with a student's admission number, in one
+ * statement. Runs inside the caller's transaction, so RLS hides another institute's people.
+ */
+async function namesByMembership(
+  tx: DrizzleDB,
+  membershipIds: string[],
+): Promise<Map<string, MembershipNameRow>> {
+  if (membershipIds.length === 0) return new Map();
+  const rows = await tx
+    .select({
+      membershipId: membershipsLive.id,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
+      admissionNumber: studentProfilesLive.admissionNumber,
+    })
+    .from(membershipsLive)
+    .leftJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, membershipsLive.userId),
+        eq(tenantUserProfilesLive.tenantId, membershipsLive.tenantId),
+      ),
+    )
+    .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, membershipsLive.id))
+    .where(inArray(membershipsLive.id, membershipIds));
+  return new Map(rows.map(({ membershipId, ...name }) => [membershipId, name]));
 }

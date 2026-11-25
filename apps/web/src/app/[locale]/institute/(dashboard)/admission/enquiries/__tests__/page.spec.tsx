@@ -7,6 +7,7 @@
  */
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '@roviq/common-types';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -45,7 +46,18 @@ vi.mock('nuqs', () => {
   };
 });
 
-const sampleEnquiry = {
+interface Assignee {
+  userId: string;
+  firstName: Record<string, string>;
+  lastName: Record<string, string> | null;
+  employeeId: string | null;
+}
+const sampleEnquiry: {
+  id: string;
+  assignedTo: string | null;
+  assignee: Assignee | null;
+  [field: string]: unknown;
+} = {
   id: 'enq-1',
   enquiryNumber: 'ENQ-000001',
   studentName: 'Aarav Sharma',
@@ -56,17 +68,19 @@ const sampleEnquiry = {
   status: 'NEW',
   followUpDate: null,
   assignedTo: null,
+  assignee: null,
   convertedToApplicationId: null,
   createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
   updatedAt: new Date('2026-04-15T10:00:00Z').toISOString(),
 };
 
+const listed = { enquiries: [sampleEnquiry] };
 const refetch = vi.fn();
 const createEnquiry = vi.hoisted(() => vi.fn());
 
 vi.mock('../../use-admission', () => ({
   useEnquiries: () => ({
-    enquiries: [sampleEnquiry],
+    enquiries: listed.enquiries,
     totalCount: 1,
     hasNextPage: false,
     endCursor: null,
@@ -185,5 +199,40 @@ describe('EnquiriesPage (component)', () => {
       const convertBtn = within(row).getByTestId('enquiry-convert-btn-enq-1');
       expect(convertBtn).toBeEnabled();
     }
+  });
+
+  const STAFF_USER_ID = '01a2b3c4-d5e6-7f80-9a0b-1c2d3e4f5a6b';
+
+  it('names the assigned staff member with their employee id, never a shortened id (ROV-360)', () => {
+    listed.enquiries = [
+      {
+        ...sampleEnquiry,
+        assignedTo: STAFF_USER_ID,
+        assignee: {
+          userId: STAFF_USER_ID,
+          firstName: { en: 'Meena' },
+          lastName: { en: 'Rao' },
+          employeeId: 'EMP-7',
+        },
+      },
+    ];
+    renderPage();
+
+    const cell = screen.getByTestId(testIds.instituteAdmissionEnquiries.assignee('enq-1'));
+    expect(cell).toHaveTextContent('Meena Rao');
+    expect(cell).toHaveTextContent(messagesEn.enquiries.employeeId.replace('{id}', 'EMP-7'));
+    expect(screen.queryByText(STAFF_USER_ID.slice(0, 8))).not.toBeInTheDocument();
+    listed.enquiries = [sampleEnquiry];
+  });
+
+  it('says "Unknown staff member" when the assignee cannot be read (ROV-360)', () => {
+    listed.enquiries = [{ ...sampleEnquiry, assignedTo: STAFF_USER_ID, assignee: null }];
+    renderPage();
+
+    expect(
+      screen.getByTestId(testIds.instituteAdmissionEnquiries.assignee('enq-1')),
+    ).toHaveTextContent(messagesEn.enquiries.unknownAssignee);
+    expect(screen.queryByText(STAFF_USER_ID.slice(0, 8))).not.toBeInTheDocument();
+    listed.enquiries = [sampleEnquiry];
   });
 });
