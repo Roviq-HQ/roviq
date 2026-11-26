@@ -95,6 +95,7 @@ describe('GroupService (unit)', () => {
       parentGroupId: null,
       rule: { rule, ruleDimensions: ['academic_status'], description: null },
       childGroupIds: [],
+      memberMembershipIds: [],
     });
   });
 
