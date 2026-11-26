@@ -388,10 +388,10 @@ describe('Student status changes and dynamic groups (integration)', () => {
   const addGroups = (tenantId: string) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), async (tx) => {
       const audit = { tenantId, createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
-      const [byStatus, byStandard, bySection, byGender] = await tx
+      const [byStatus, byStandard, bySection, byGender, byRte] = await tx
         .insert(groups)
         .values(
-          ['By status', 'By standard', 'By section', 'By gender'].map((name) => ({
+          ['By status', 'By standard', 'By section', 'By gender', 'By RTE'].map((name) => ({
             ...audit,
             name: `${name} ${randomUUID().slice(0, 8)}`,
             groupType: DomainGroupType.CLUB,
@@ -425,12 +425,19 @@ describe('Student status changes and dynamic groups (integration)', () => {
           rule: { '==': [{ var: 'gender' }, Gender.FEMALE] },
           ruleDimensions: ['gender'],
         },
+        {
+          ...audit,
+          groupId: byRte.id,
+          rule: { '==': [{ var: 'is_rte_admitted' }, true] },
+          ruleDimensions: ['is_rte_admitted'],
+        },
       ]);
       return {
         byStatus: byStatus.id,
         byStandard: byStandard.id,
         bySection: bySection.id,
         byGender: byGender.id,
+        byRte: byRte.id,
       };
     });
 
@@ -518,10 +525,12 @@ describe('Student status changes and dynamic groups (integration)', () => {
         [mine.byStandard, 'resolved'],
         [mine.bySection, 'resolved'],
         [mine.byGender, 'resolved'],
+        [mine.byRte, 'resolved'],
         [theirs.byStatus, 'resolved'],
         [theirs.byStandard, 'resolved'],
         [theirs.bySection, 'resolved'],
         [theirs.byGender, 'resolved'],
+        [theirs.byRte, 'resolved'],
       ]),
     );
   });
@@ -559,10 +568,39 @@ describe('Student status changes and dynamic groups (integration)', () => {
         [mine.byStandard, 'resolved'],
         [mine.bySection, 'resolved'],
         [mine.byGender, 'unresolved'],
+        [mine.byRte, 'resolved'],
         [theirs.byStatus, 'resolved'],
         [theirs.byStandard, 'resolved'],
         [theirs.bySection, 'resolved'],
         [theirs.byGender, 'resolved'],
+        [theirs.byRte, 'resolved'],
+      ]),
+    );
+  });
+
+  it('should mark only the is_rte_admitted groups unresolved when updateStudent sets isRteAdmitted', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const mine = await addGroups(inst.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, input: { version, isRteAdmitted: true } },
+    });
+    expect(response.errors).toBeUndefined();
+    const [payload] = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
+    await groupHandler.onStudentUpdated(payload);
+
+    expect(await stateOf(Object.values(mine))).toEqual(
+      new Map([
+        [mine.byStatus, 'resolved'],
+        [mine.byStandard, 'resolved'],
+        [mine.bySection, 'resolved'],
+        [mine.byGender, 'resolved'],
+        [mine.byRte, 'unresolved'],
       ]),
     );
   });
@@ -582,12 +620,9 @@ describe('Student status changes and dynamic groups (integration)', () => {
     const [payload] = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
     await groupHandler.onStudentUpdated(payload);
 
-    expect([...(await stateOf(Object.values(mine))).values()]).toEqual([
-      'resolved',
-      'resolved',
-      'resolved',
-      'resolved',
-    ]);
+    expect([...(await stateOf(Object.values(mine))).values()]).toEqual(
+      Object.values(mine).map(() => 'resolved'),
+    );
   });
 
   it('should emit nothing and keep the status on a refused transition', async () => {
