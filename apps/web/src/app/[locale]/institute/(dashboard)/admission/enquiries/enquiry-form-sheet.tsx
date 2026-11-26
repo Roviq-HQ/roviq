@@ -13,9 +13,11 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  setFormSubmitError,
   useAppForm,
 } from '@roviq/ui';
 import { enquiryHelp } from '@web/help/admission/enquiry.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -42,11 +44,20 @@ const RELATIONSHIPS = [
 /** Build a Zod schema keyed on translation function so errors localise. */
 function buildSchema(t: ReturnType<typeof useTranslations>) {
   return z.object({
-    studentName: z.string().min(1, t('enquiries.newForm.errors.studentNameRequired')).max(200),
+    studentName: z
+      .string()
+      .min(1, t('enquiries.newForm.errors.studentNameRequired'))
+      .max(200, t('enquiries.newForm.errors.tooLong', { max: 200 })),
     dateOfBirth: emptyStringToUndefined(z.string().optional()),
     gender: emptyStringToUndefined(z.enum(GENDERS).optional()),
-    classRequested: z.string().min(1, t('enquiries.newForm.errors.classRequiredRequired')).max(50),
-    parentName: z.string().min(1, t('enquiries.newForm.errors.parentNameRequired')).max(200),
+    classRequested: z
+      .string()
+      .min(1, t('enquiries.newForm.errors.classRequiredRequired'))
+      .max(20, t('enquiries.newForm.errors.tooLong', { max: 20 })),
+    parentName: z
+      .string()
+      .min(1, t('enquiries.newForm.errors.parentNameRequired'))
+      .max(200, t('enquiries.newForm.errors.tooLong', { max: 200 })),
     parentPhone: phoneSchema(t('enquiries.newForm.errors.parentPhoneInvalid')),
     parentEmail: emptyStringToUndefined(
       z.email({ error: t('enquiries.newForm.errors.emailInvalid') }).optional(),
@@ -67,10 +78,25 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
         return value;
       }),
     source: emptyStringToUndefined(z.enum(ENQUIRY_SOURCE_VALUES).optional()),
-    referredBy: emptyStringToUndefined(z.string().max(200).optional()),
-    previousSchool: emptyStringToUndefined(z.string().max(200).optional()),
+    referredBy: emptyStringToUndefined(
+      z
+        .string()
+        .max(200, t('enquiries.newForm.errors.tooLong', { max: 200 }))
+        .optional(),
+    ),
+    previousSchool: emptyStringToUndefined(
+      z
+        .string()
+        .max(255, t('enquiries.newForm.errors.tooLong', { max: 255 }))
+        .optional(),
+    ),
     followUpDate: emptyStringToUndefined(z.string().optional()),
-    notes: emptyStringToUndefined(z.string().max(2000).optional()),
+    notes: emptyStringToUndefined(
+      z
+        .string()
+        .max(2000, t('enquiries.newForm.errors.tooLong', { max: 2000 }))
+        .optional(),
+    ),
   });
 }
 
@@ -107,13 +133,14 @@ export interface EnquiryFormSheetProps {
 export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormSheetProps) {
   const t = useTranslations('admission');
   const [createEnquiry] = useCreateEnquiry();
+  const errorCopy = useErrorCopy();
 
   const schema = React.useMemo(() => buildSchema(t), [t]);
 
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value, formApi }) => {
       const parsed = schema.parse(value);
       try {
         const result = await createEnquiry({
@@ -140,8 +167,11 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
         onOpenChange(false);
         if (id) onCreated?.(id);
       } catch (err) {
-        toast.error(t('enquiries.newForm.errors.generic'), {
-          description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+        const key = admissionErrorKey(extractGraphQLErrorCode(err));
+        setFormSubmitError(formApi, {
+          title: t('enquiries.newForm.errors.generic'),
+          // Unlisted codes and a lost connection still get their own translated copy.
+          description: key === 'generic' ? errorCopy(err, t('errors.generic')) : t(`errors.${key}`),
         });
       }
     },
@@ -221,6 +251,7 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
                   <field.TextField
                     label={t('enquiries.newForm.fields.classRequested')}
                     placeholder={t('enquiries.newForm.placeholders.classRequested')}
+                    description={t('enquiries.newForm.classRequestedLimit')}
                     testId="enquiry-class-input"
                   />
                 )}
@@ -332,6 +363,9 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
             </FieldGroup>
           </FieldSet>
 
+          <form.AppForm>
+            <form.SubmitError />
+          </form.AppForm>
           <SheetFooter className="sticky bottom-0 border-t bg-background pt-4">
             <Button
               type="button"

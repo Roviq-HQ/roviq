@@ -231,7 +231,7 @@ The page opens in **Table** view by default. Click the toggle in the top-right t
 3. Click **Create enquiry**.
 4. If a previous enquiry already exists for the same parent phone + class combination, the system flags the new row as a duplicate but still creates it -- staff can decide whether to merge.
 
-Every newly-created enquiry is assigned a sequential **enquiry number** (for example `ENQ-000123`) which is shown on the row and used in parent communications.
+Every newly-created enquiry is assigned a sequential **enquiry number** (for example `ENQ-000123`) which is shown on the row and used in parent communications. A save that fails does not use up a number.
 
 #### Filtering and searching
 

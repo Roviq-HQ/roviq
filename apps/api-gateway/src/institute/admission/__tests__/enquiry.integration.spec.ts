@@ -10,6 +10,7 @@ import { AdmissionApplicationStatus, EnquirySource, EnquiryStatus } from '@roviq
 import {
   academicYears,
   type DrizzleDB,
+  enquiries,
   mkAdminCtx,
   SYSTEM_USER_ID,
   standards,
@@ -297,6 +298,58 @@ describe('Admission enquiries (integration)', () => {
     expect(response.data?.updateEnquiry.assignedTo).toBe(assignee);
   });
 
+  it.each([
+    ['a null student name', { studentName: null }],
+    ['a blank class', { classRequested: '' }],
+    ['a null parent name', { parentName: null }],
+    ['a null parent phone', { parentPhone: null }],
+    ['a 21-character class', { classRequested: 'Class 5 Science Grp A' }],
+    ['a malformed email', { parentEmail: 'not-an-email' }],
+  ])('updateEnquiry: refuses %s with VALIDATION_FAILED and changes nothing', async (_, input) => {
+    const create = await gqlRequest<CreateEnquiryResponse>(result.httpServer, {
+      query: CREATE_ENQUIRY,
+      token: instituteToken,
+      variables: {
+        input: {
+          studentName: 'Rhea Kapoor',
+          classRequested: 'Class 4',
+          parentName: 'Nisha Kapoor',
+          parentPhone: '9988776644',
+          parentRelation: 'MOTHER',
+        },
+      },
+    });
+    const enquiryId = create.data?.createEnquiry.id as string;
+    expect(enquiryId).toBeTruthy();
+
+    const response = await gqlRequest<UpdateEnquiryResponse>(result.httpServer, {
+      query: UPDATE_ENQUIRY,
+      token: instituteToken,
+      variables: { id: enquiryId, input },
+    });
+
+    expect(response.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+    const [row] = await withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx
+        .select({
+          studentName: enquiries.studentName,
+          classRequested: enquiries.classRequested,
+          parentName: enquiries.parentName,
+          parentPhone: enquiries.parentPhone,
+          parentEmail: enquiries.parentEmail,
+        })
+        .from(enquiries)
+        .where(eq(enquiries.id, enquiryId)),
+    );
+    expect(row).toEqual({
+      studentName: 'Rhea Kapoor',
+      classRequested: 'Class 4',
+      parentName: 'Nisha Kapoor',
+      parentPhone: '9988776644',
+      parentEmail: null,
+    });
+  });
+
   it('convertEnquiryToApplication: creates application and updates enquiry status', async () => {
     const create = await gqlRequest<CreateEnquiryResponse>(result.httpServer, {
       query: CREATE_ENQUIRY,
@@ -446,5 +499,90 @@ describe('Enquiry numbers (integration)', () => {
       'ENQ-000005',
     ]);
     expect(await counter(third.tenantId)).toEqual([{ value: 5n, format: 'ENQ-{value:06d}' }]);
+  });
+
+  it('a failed insert does not use up a number', async () => {
+    const fresh = await createTestInstitute(result.db);
+    const untouched = await counter(second.tenantId);
+    expect(await enquire(fresh, 10)).toBe('ENQ-000001');
+    expect(await enquire(fresh, 11)).toBe('ENQ-000002');
+
+    // A row already holding the next number makes the insert fail on the unique index.
+    const [blocker] = await withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx
+        .insert(enquiries)
+        .values({
+          tenantId: fresh.tenantId,
+          enquiryNumber: 'ENQ-000003',
+          studentName: 'Blocker',
+          classRequested: 'Class 1',
+          parentName: 'Parent',
+          parentPhone: '9876500098',
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: enquiries.id }),
+    );
+    const enquiryCount = () =>
+      withAdmin(result.db, mkAdminCtx('test:enquiry'), async (tx) => {
+        const rows = await tx
+          .select({ id: enquiries.id })
+          .from(enquiries)
+          .where(eq(enquiries.tenantId, fresh.tenantId));
+        return rows.length;
+      });
+    const before = await enquiryCount();
+
+    const failed = await gqlRequest<{ createEnquiry: { enquiryNumber: string } }>(
+      result.httpServer,
+      {
+        query: CREATE_NUMBERED,
+        token: tokenOf(fresh),
+        variables: {
+          input: {
+            studentName: 'Refused by the index',
+            classRequested: 'Class 1',
+            parentName: 'Parent',
+            parentPhone: '9876500012',
+            parentRelation: 'FATHER',
+          },
+        },
+      },
+    );
+    // The unique index refuses the insert; nothing maps that violation to a business code.
+    expect(failed.errors?.[0]?.extensions?.code).toBe('INTERNAL_ERROR');
+    expect(await counter(fresh.tenantId)).toEqual([{ value: 2n, format: 'ENQ-{value:06d}' }]);
+    expect(await enquiryCount()).toBe(before);
+
+    await withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx.update(enquiries).set({ enquiryNumber: null }).where(eq(enquiries.id, blocker.id)),
+    );
+    expect(await enquire(fresh, 13)).toBe('ENQ-000003');
+    expect(await counter(fresh.tenantId)).toEqual([{ value: 3n, format: 'ENQ-{value:06d}' }]);
+    expect(await counter(second.tenantId)).toEqual(untouched);
+  });
+
+  it('a class name longer than its column is refused before a number is taken', async () => {
+    const fresh = await createTestInstitute(result.db);
+    const response = await gqlRequest<{ createEnquiry: { enquiryNumber: string } }>(
+      result.httpServer,
+      {
+        query: CREATE_NUMBERED,
+        token: tokenOf(fresh),
+        variables: {
+          input: {
+            studentName: 'Too long class',
+            classRequested: 'Class 5 Science Section Alpha',
+            parentName: 'Parent',
+            parentPhone: '9876500099',
+            parentRelation: 'FATHER',
+          },
+        },
+      },
+    );
+
+    expect(response.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+    expect(await counter(fresh.tenantId)).toEqual([]);
+    expect(await enquire(fresh, 9)).toBe('ENQ-000001');
   });
 });

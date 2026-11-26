@@ -15,12 +15,10 @@ export abstract class AdmissionRepository {
     parentPhone: string,
     classRequested: string,
   ): Promise<boolean>;
-  /** Next `ENQ-000123` number from the institute's `enq_no` sequence, created on first use. */
-  abstract nextEnquiryNumber(tenantId: string): Promise<string>;
+  /** Takes the next `ENQ-000123` number and inserts the enquiry, in one transaction. */
   abstract createEnquiry(
     tenantId: string,
     actorId: string,
-    enquiryNumber: string,
     data: NewEnquiryData,
   ): Promise<EnquiryRecord>;
   /** Null when no enquiry has the id. */

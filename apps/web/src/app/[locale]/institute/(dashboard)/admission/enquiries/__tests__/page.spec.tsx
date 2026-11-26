@@ -5,6 +5,8 @@
  * rendering, CASL gate, and table structure without wiring real Apollo or
  * subscriptions. Real GraphQL behaviour is covered by integration + e2e.
  */
+
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -13,6 +15,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../../messages/en/admission.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
+import type { EnquiryNode } from '../../use-admission';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -46,35 +49,44 @@ vi.mock('nuqs', () => {
   };
 });
 
-interface Assignee {
-  userId: string;
-  firstName: Record<string, string>;
-  lastName: Record<string, string> | null;
-  employeeId: string | null;
+function makeEnquiry(overrides: Partial<EnquiryNode> = {}): EnquiryNode {
+  return {
+    id: 'enq-1',
+    tenantId: 'tenant-1',
+    enquiryNumber: 'ENQ-000001',
+    studentName: 'Aarav Sharma',
+    dateOfBirth: null,
+    gender: null,
+    classRequested: 'Class 5',
+    academicYearId: null,
+    parentName: 'Rohan Sharma',
+    parentPhone: '9876543210',
+    parentEmail: null,
+    parentRelation: null,
+    source: 'WALK_IN',
+    referredBy: null,
+    previousSchool: null,
+    previousBoard: null,
+    siblingInSchool: false,
+    siblingAdmissionNo: null,
+    specialNeeds: null,
+    notes: null,
+    status: 'NEW',
+    followUpDate: null,
+    lastContactedAt: null,
+    assignedTo: null,
+    assignee: null,
+    convertedToApplicationId: null,
+    isDuplicate: null,
+    createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
+    updatedAt: new Date('2026-04-15T10:00:00Z').toISOString(),
+    ...overrides,
+  };
 }
-const sampleEnquiry: {
-  id: string;
-  assignedTo: string | null;
-  assignee: Assignee | null;
-  [field: string]: unknown;
-} = {
-  id: 'enq-1',
-  enquiryNumber: 'ENQ-000001',
-  studentName: 'Aarav Sharma',
-  classRequested: 'Class 5',
-  parentName: 'Rohan Sharma',
-  parentPhone: '9876543210',
-  source: 'WALK_IN',
-  status: 'NEW',
-  followUpDate: null,
-  assignedTo: null,
-  assignee: null,
-  convertedToApplicationId: null,
-  createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
-  updatedAt: new Date('2026-04-15T10:00:00Z').toISOString(),
-};
 
-const listed = { enquiries: [sampleEnquiry] };
+const sampleEnquiry = makeEnquiry();
+
+const listed: { enquiries: EnquiryNode[] } = { enquiries: [sampleEnquiry] };
 const refetch = vi.fn();
 const createEnquiry = vi.hoisted(() => vi.fn());
 
@@ -177,6 +189,49 @@ describe('EnquiriesPage (component)', () => {
     ).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('enquiry-relation-select')).toHaveFocus());
     expect(createEnquiry).not.toHaveBeenCalled();
+  });
+
+  it('refuses a class name longer than 20 characters with the limit under the field', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId('enquiries-new-btn'));
+    await userEvent.type(await screen.findByTestId('enquiry-student-name-input'), 'Diya Patel');
+    await userEvent.type(screen.getByTestId('enquiry-class-input'), 'Class 5 Science Section A');
+    await userEvent.type(screen.getByTestId('enquiry-parent-name-input'), 'Meera Patel');
+    await userEvent.type(screen.getByTestId('enquiry-parent-phone-input'), '9876543210');
+
+    expect(screen.getByText(messagesEn.enquiries.newForm.classRequestedLimit)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('enquiry-form-submit-btn'));
+
+    expect(
+      await screen.findByText(messagesEn.enquiries.newForm.errors.tooLong.replace('{max}', '20')),
+    ).toBeInTheDocument();
+    expect(createEnquiry).not.toHaveBeenCalled();
+  });
+
+  it('shows a refused save in the form, above the button, and keeps the sheet open', async () => {
+    createEnquiry.mockRejectedValueOnce(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'raw server text', extensions: { code: 'VALIDATION_FAILED' } }],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByTestId('enquiries-new-btn'));
+    await user.type(await screen.findByTestId('enquiry-student-name-input'), 'Diya Patel');
+    await user.type(screen.getByTestId('enquiry-class-input'), 'Class 1');
+    await user.type(screen.getByTestId('enquiry-parent-name-input'), 'Meera Patel');
+    await user.type(screen.getByTestId('enquiry-parent-phone-input'), '9876543210');
+    await user.click(screen.getByTestId('enquiry-relation-select'));
+    await user.click(await screen.findByRole('option', { name: messagesEn.relationships.MOTHER }));
+    await user.click(screen.getByTestId('enquiry-form-submit-btn'));
+
+    const alert = await screen.findByRole('alert', {
+      name: (_, el) => el.textContent?.includes(messagesEn.errors.validation) ?? false,
+    });
+    expect(alert).toHaveTextContent(messagesEn.enquiries.newForm.errors.generic);
+    expect(alert).not.toHaveTextContent('raw server text');
+    expect(createEnquiry).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('enquiry-form-title')).toBeInTheDocument();
   });
 
   it('marks the relationship as required and says so once it is left empty', async () => {

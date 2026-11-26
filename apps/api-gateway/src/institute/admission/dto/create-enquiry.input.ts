@@ -10,6 +10,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
 } from 'class-validator';
 
 @InputType({ description: 'Input for creating a pre-admission enquiry.' })
@@ -17,6 +18,7 @@ export class CreateEnquiryInput {
   @Field({ description: 'Full name of the prospective student.' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
   studentName!: string;
 
   @Field({
@@ -32,9 +34,13 @@ export class CreateEnquiryInput {
   @IsEnum(Gender)
   gender?: Gender;
 
-  @Field({ description: 'Requested class or grade, e.g. "Nursery", "LKG", "Class 5".' })
+  @Field({
+    description:
+      'Requested class or grade, e.g. "Nursery", "LKG", "Class 5"; at most 20 characters.',
+  })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(20)
   classRequested!: string;
 
   @Field(() => ID, {
@@ -48,6 +54,7 @@ export class CreateEnquiryInput {
   @Field({ description: 'Full name of the parent or guardian submitting the enquiry.' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
   parentName!: string;
 
   @Field({ description: '10-digit Indian mobile number (without +91 prefix).' })
@@ -59,6 +66,7 @@ export class CreateEnquiryInput {
   @Field({ nullable: true, description: 'Parent contact email address.' })
   @IsOptional()
   @IsEmail()
+  @MaxLength(320)
   parentEmail?: string;
 
   @Field(() => GuardianRelationship, {
@@ -81,6 +89,7 @@ export class CreateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   referredBy?: string;
 
   @Field(() => ID, {
@@ -94,6 +103,7 @@ export class CreateEnquiryInput {
   @Field({ nullable: true, description: "Name of the student's current or previous institute." })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   previousSchool?: string;
 
   @Field({
@@ -102,6 +112,7 @@ export class CreateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   previousBoard?: string;
 
   @Field({
@@ -118,6 +129,7 @@ export class CreateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   siblingAdmissionNo?: string;
 
   @Field({
@@ -126,11 +138,13 @@ export class CreateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   specialNeeds?: string;
 
   @Field({ nullable: true, description: 'Additional internal notes for the admissions team.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 
   @Field({ nullable: true, description: 'Scheduled follow-up date (ISO date YYYY-MM-DD).' })
