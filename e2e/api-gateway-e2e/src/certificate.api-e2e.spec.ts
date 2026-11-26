@@ -501,7 +501,7 @@ describe('Certificate E2E', () => {
   // mutation to create one at test time, so the flow is
   // unreachable from an external client.
   // ─────────────────────────────────────────────────────
-  describe.skip('Bonafide certificate (blocked: no seeded certificate_templates + no create mutation)', () => {
+  describe.skip('Bonafide certificate (ROV-370 — no way to create a certificate template)', () => {
     it('requests + issues a bonafide certificate from a template', () => {
       // Unskip once either (a) templates are seeded with stable IDs in
       // scripts/seed.ts + e2e/shared/seed.ts, or (b) a createCertificateTemplate

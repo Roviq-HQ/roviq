@@ -854,6 +854,6 @@ describe('Billing Integration', () => {
     // real NATS server (`createIntegrationAppWithNats`) or direct invocation
     // of the consumer — both cross the module boundary and belong in a
     // dedicated consumer test.
-    it.todo('cancel subscription → institute suspended → pay → reactivated');
+    it.todo('cancel subscription → institute suspended → pay → reactivated — ROV-369');
   });
 });
