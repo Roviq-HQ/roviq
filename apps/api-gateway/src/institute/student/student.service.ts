@@ -288,9 +288,7 @@ export class StudentService {
     }
     this.warnIfOptimalReached(tenantId, updated?.strength ?? []);
 
-    // Update user_profile fields if any provided
-    await this.applyUserProfileUpdates(tenantId, id, input, actorId);
-
+    // The status write has committed: announce it even if the profile write below fails.
     if (fromStatus && input.academicStatus) {
       this.eventBus.emit(EVENT_PATTERNS.STUDENT.statusChanged, {
         studentProfileId: id,
@@ -301,6 +299,8 @@ export class StudentService {
       });
     }
     this.emitLeftEventIfApplicable(id, input, tenantId);
+
+    await this.applyUserProfileUpdates(tenantId, id, input, actorId);
 
     const updatedStudent = await this.findById(id);
 

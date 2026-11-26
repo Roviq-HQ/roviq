@@ -162,6 +162,31 @@ describe('StudentService (unit)', () => {
       expect(eventBus.emit).not.toHaveBeenCalledWith('STUDENT.left', expect.anything());
     });
 
+    it('should emit STUDENT.statusChanged once the status is written, even if the profile write fails', async () => {
+      repository.findStatus.mockResolvedValue({
+        academicStatus: AcademicStatus.ENROLLED,
+        tcIssued: false,
+      });
+      repository.updateProfile.mockResolvedValue({ strength: [] });
+      repository.updateTenantProfile.mockRejectedValue(new Error('profile write failed'));
+
+      await expect(
+        service.update('student-1', {
+          version: 1,
+          academicStatus: AcademicStatus.PROMOTED,
+          religion: 'Hindu',
+        }),
+      ).rejects.toThrow('profile write failed');
+
+      expect(eventBus.emit).toHaveBeenCalledWith('STUDENT.statusChanged', {
+        studentProfileId: 'student-1',
+        fromStatus: AcademicStatus.ENROLLED,
+        toStatus: AcademicStatus.PROMOTED,
+        reason: null,
+        tenantId: 'tenant-1',
+      });
+    });
+
     it('should emit STUDENT.statusChanged from the stored status to the new one', async () => {
       repository.findStatus.mockResolvedValue({
         academicStatus: AcademicStatus.ENROLLED,
