@@ -45,6 +45,15 @@ export class GroupInvalidationHandler {
     await this.invalidateByDimensions(tenantId, ['standard_id']);
   }
 
+  @EventPattern(
+    EVENT_PATTERNS.STUDENT.statusChanged,
+    gatewayConsumer(EVENT_PATTERNS.STUDENT.statusChanged),
+  )
+  async onStudentStatusChanged(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.statusChanged].parse(data);
+    await this.invalidateByDimensions(tenantId, ['academic_status']);
+  }
+
   /** A student who left drops out of every rule-based group. */
   @EventPattern(EVENT_PATTERNS.STUDENT.left, gatewayConsumer(EVENT_PATTERNS.STUDENT.left))
   async onStudentLeft(@Payload() data: unknown): Promise<void> {

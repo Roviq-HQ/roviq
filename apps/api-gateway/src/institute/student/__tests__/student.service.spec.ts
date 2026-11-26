@@ -161,6 +161,51 @@ describe('StudentService (unit)', () => {
 
       expect(eventBus.emit).not.toHaveBeenCalledWith('STUDENT.left', expect.anything());
     });
+
+    it('should emit STUDENT.statusChanged from the stored status to the new one', async () => {
+      repository.findStatus.mockResolvedValue({
+        academicStatus: AcademicStatus.ENROLLED,
+        tcIssued: false,
+      });
+      repository.updateProfile.mockResolvedValue({ strength: [] });
+      readRepository.findForMutation.mockResolvedValue(
+        buildStudent({ academicStatus: AcademicStatus.PROMOTED }),
+      );
+
+      await service.update('student-1', { version: 1, academicStatus: AcademicStatus.PROMOTED });
+
+      expect(eventBus.emit).toHaveBeenCalledWith('STUDENT.statusChanged', {
+        studentProfileId: 'student-1',
+        fromStatus: AcademicStatus.ENROLLED,
+        toStatus: AcademicStatus.PROMOTED,
+        reason: null,
+        tenantId: 'tenant-1',
+      });
+    });
+
+    it('should not emit STUDENT.statusChanged when academicStatus is not changed', async () => {
+      repository.updateProfile.mockResolvedValue({ strength: [] });
+      readRepository.findForMutation.mockResolvedValue(buildStudent());
+
+      await service.update('student-1', { version: 1, socialCategory: SocialCategory.OBC });
+
+      expect(repository.findStatus).not.toHaveBeenCalled();
+      expect(eventBus.emit).not.toHaveBeenCalledWith('STUDENT.statusChanged', expect.anything());
+    });
+
+    it('should not emit STUDENT.statusChanged when the status write loses a version race', async () => {
+      repository.findStatus.mockResolvedValue({
+        academicStatus: AcademicStatus.ENROLLED,
+        tcIssued: false,
+      });
+      repository.updateProfile.mockResolvedValue(null);
+      repository.exists.mockResolvedValue(true);
+
+      await expect(
+        service.update('student-1', { version: 1, academicStatus: AcademicStatus.PROMOTED }),
+      ).rejects.toMatchObject({ code: ErrorCode.CONCURRENT_MODIFICATION });
+      expect(eventBus.emit).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteDocument', () => {

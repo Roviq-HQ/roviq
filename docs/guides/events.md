@@ -184,7 +184,7 @@ interceptor do not run for event deliveries (they read a request an event does n
 | ------- | -------- | ------ |
 | `ACADEMIC_YEAR.activated` | `StudentEventHandler`, `GroupInvalidationHandler` | Continuing students get a row in the new year by the year-end promotion rule below; dynamic groups are invalidated |
 | `SECTION.deleted` | `StudentEventHandler`, `GroupInvalidationHandler` | The deleted section's `student_academics` rows are soft-deleted; section-based groups are invalidated |
-| `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` |
+| `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.statusChanged`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` (`academic_status` for `STUDENT.statusChanged`) |
 | `STUDENT.removed_from_year` | `GroupInvalidationHandler` | Every dynamic and hybrid group of the institute gets `resolved_at = NULL` (emitted by `removeStudentFromYear`) |
 | `GROUP.rules_updated` | `GroupInvalidationHandler` | That group gets `resolved_at = NULL` |
 | `RESELLER.status_changed` (EE) | `ResellerDeletionConsumer` | On `newStatus: DELETED`, starts `resellerDeletionCleanupWorkflow` (workflow id `reseller-deletion-cleanup-<resellerId>-<deletedAt in ms>`, one per deletion): the reseller's billing moves to Roviq Direct (`ee/docs/billing.md` → "Reseller deletion") |
