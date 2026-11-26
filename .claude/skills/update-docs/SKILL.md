@@ -49,7 +49,7 @@ Go through every row. A row that does not apply is skipped; a row that applies i
 | Work was deferred, with the user's agreement | A new issue with the current one as parent (`create-linear-issue` skill) |
 | What is merged, what is next, what waits for the owner | Append to the document "Roadmap: order of work". Only the owner changes "Current stage" |
 | The owner decided something | Append to "Product decisions log", dated |
-| A security finding or its change of status | Append an `SF-NNN` entry to "Security Findings Log" |
+| A security finding or its change of status | Append an `SF-NNN` entry to "Security Findings Log". Nothing about it goes in an issue, a comment, a commit or `docs/` ([SECPV]) |
 | A plan, spec, review or decision record | A Linear document, never a file in the repository |
 | Hosting, provider, cost or backup details | A Linear document only. Never an issue, a comment, a commit or `docs/` |
 | The last open issue of a milestone or project was finished, or its scope changed | Update the milestone or the project description to the present state, and post a project status update |

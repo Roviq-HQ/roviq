@@ -17,6 +17,7 @@ description: Use when creating or updating Linear issues — provides issue temp
 
 - Search first (`list_issues` with a keyword): update or link an existing issue instead of creating a second one.
 - Issues are public and sync to GitHub. Never put hosting, provider, cost or backup details in an issue or a comment; those go in a Linear document.
+- An issue for a security finding has a neutral title and description: what changes, the files, the checks, and the line "Background is in a private document." No description of the hole, no steps, no `SF-NNN` ([SECPV] in `docs/references/hard-rules.md`).
 - `save_issue` echoes the whole description back: make all edits to one issue in a single call.
 - Check the code before stating a fact about it (a file path, what a function does today).
 
