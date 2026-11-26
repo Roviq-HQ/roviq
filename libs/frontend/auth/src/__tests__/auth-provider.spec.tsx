@@ -732,3 +732,47 @@ describe('AuthProvider — re-login from the session-expired dialog, several ins
     expect(props.selectInstituteMutation).toHaveBeenCalledWith('sel-token', 'm1');
   });
 });
+
+describe('AuthProvider — refreshes take turns across tabs', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('waits for the browser lock and then refreshes with the token another tab just stored', async () => {
+    sessionStorage.clear();
+    localStorage.clear();
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-old');
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+
+    let releaseLock: () => void = () => {};
+    const request = vi.fn(
+      (_name: string, callback: () => Promise<unknown>) =>
+        new Promise((resolve, reject) => {
+          releaseLock = () => void callback().then(resolve, reject);
+        }),
+    );
+    vi.stubGlobal('navigator', { ...navigator, locks: { request } });
+
+    const props = makeDefaultProps();
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    let done: Promise<void> = Promise.resolve();
+    act(() => {
+      done = result.current.refreshSession();
+    });
+    expect(request).toHaveBeenCalledWith('roviq-token-refresh:institute', expect.any(Function));
+    expect(props.refreshMutation).not.toHaveBeenCalled();
+
+    // Another tab rotated the shared refresh token while this one waited.
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-from-other-tab');
+    await act(async () => {
+      releaseLock();
+      await done;
+    });
+
+    expect(props.refreshMutation).toHaveBeenCalledTimes(1);
+    expect(props.refreshMutation).toHaveBeenCalledWith('rt-from-other-tab');
+  });
+});

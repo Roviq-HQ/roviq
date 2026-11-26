@@ -127,7 +127,7 @@ A missing, malformed, unknown, expired or reused ticket closes the socket with c
 - In an impersonation tab a 401 ends the impersonation; there is no refresh token to try.
 - A network error, another status, or a refresh that could not be made (network, server error) keeps the socket retrying with backoff.
 
-The web app refreshes the access token through one shared request per refresh token (`AuthProvider`), whatever asked for it: the timer, an HTTP request refused as `UNAUTHENTICATED`, or the ticket. Two requests with the same refresh token would replay a rotated token, which the server answers by revoking every session of the user.
+The web app never sends a refresh token twice. In a tab, everything that asks for a refresh (the timer, an HTTP request refused as `UNAUTHENTICATED`, the ticket) shares one request per refresh token (`AuthProvider`). The refresh token is shared by the tabs of a portal through `localStorage`, while each tab keeps its own access token, so tabs take turns under a browser lock (`navigator.locks`, where the browser has it) and each reads the refresh token again once it holds the lock. A replayed rotated token would make the server revoke every session of the user.
 
 ## Session Management
 

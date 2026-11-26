@@ -148,18 +148,25 @@ export function AuthProvider({
     result: ReturnType<AuthProviderProps['refreshMutation']>;
   } | null>(null);
   // The server rotates the refresh token and treats a second use of the old one as theft,
-  // revoking every session: callers holding the same token must share one request.
+  // revoking every session. In this tab, callers holding the same token share one request.
+  // Across tabs (the refresh token is shared through localStorage) refreshes take turns under a
+  // browser lock and each reads the token again once it holds the lock, so a tab never sends a
+  // token another tab has just rotated.
   const refreshOnce = React.useCallback(
     (refreshToken: string) => {
       const inFlight = refreshInFlightRef.current;
       if (inFlight?.refreshToken === refreshToken) return inFlight.result;
-      const result = refreshMutation(refreshToken).finally(() => {
-        if (refreshInFlightRef.current?.result === result) refreshInFlightRef.current = null;
-      });
+      const send = () => refreshMutation(tokenStorage.getRefreshToken() ?? refreshToken);
+      const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+      const result = (locks ? locks.request(`roviq-token-refresh:${scope}`, send) : send()).finally(
+        () => {
+          if (refreshInFlightRef.current?.result === result) refreshInFlightRef.current = null;
+        },
+      );
       refreshInFlightRef.current = { refreshToken, result };
       return result;
     },
-    [refreshMutation],
+    [refreshMutation, scope, tokenStorage],
   );
   // True while the session comes only from storage: the server may have revoked it since.
   const unverifiedSessionRef = React.useRef(false);
