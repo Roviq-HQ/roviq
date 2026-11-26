@@ -49,8 +49,21 @@ Every security vulnerability found, by any means (code review, audit, test, auto
 
 - Append an `SF-NNN` entry using the template at the top of the document: found (date, how), severity, affected, impact, root cause, fix and the layer it lives in (database, application, both), the test that proves it, issue and PR, status.
 - **Append only.** Never edit or delete an entry. A status change (fixed, merged, reopened, found to be wrong) is a new entry that names the original one.
-- Each finding also has a Linear issue for the work. The log is the record; the issue is the task.
+- The work on a finding is tracked by an issue written as the next rule says. The entry names the issue; the issue never names the entry.
 - Read the log before a security review and before changing code that an entry names.
+
+---
+
+### [SECPV] Security findings stay private
+
+Linear issues, their comments and this repository are public; Linear documents are not. A description of a hole that is still open tells a reader where to attack, and what is written in an issue or a commit stays readable after the first institute enters real data.
+
+- **Where a finding is written:** the Security Findings Log, and a private plan document when the fix needs a design. Nowhere else.
+- **What stays neutral:** an issue title and description, a comment, a commit message, a branch name, a migration folder name, a pull request title and body, and `docs/`. Each says what changes ("limit which memberships the institute role may insert"), never what was possible before, who could do it, or how. None carries an `SF-NNN` number.
+- **The issue for the work** has a neutral title, the files and the checks to run, and one line: "Background is in a private document." Whoever picks it up finds the entry by searching the log for the issue number.
+- **A test may say what it refuses** ("another institute's id is refused"): that states the rule, not the hole.
+- **After the fix:** a finding may be described once its fix is merged. From the first production deployment on, only once the fix is deployed.
+- **A report from outside** follows `SECURITY.md` and is logged the same way.
 
 ---
 

@@ -24,6 +24,16 @@ describe('findBaseTableReads', () => {
     ]);
   });
 
+  it('should flag an alias of a base table and not an alias of its view', () => {
+    const base = "const link = alias(studentGuardianLinks, 'link');";
+    const live = "const link = alias(studentGuardianLinksLive, 'link');";
+
+    expect(findBaseTableReads(base, TABLES)).toEqual([
+      { line: 1, text: base, table: 'studentGuardianLinks' },
+    ]);
+    expect(findBaseTableReads(live, TABLES)).toEqual([]);
+  });
+
   it('should not flag the *Live view', () => {
     const text = ['.leftJoin(', '  studentGuardianLinksLive,', '  eq(a, b),', ')'].join('\n');
 

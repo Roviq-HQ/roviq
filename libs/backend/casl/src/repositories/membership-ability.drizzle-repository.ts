@@ -6,7 +6,7 @@ import {
   membershipsLive,
   mkAdminCtx,
   sectionsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
   timetableEntriesLive,
   timetablesLive,
@@ -60,20 +60,20 @@ export class MembershipAbilityDrizzleRepository extends MembershipAbilityReposit
           ),
         );
       const children = await tx
-        .select({ id: studentGuardianLinks.studentProfileId })
-        .from(studentGuardianLinks)
+        .select({ id: studentGuardianLinksLive.studentProfileId })
+        .from(studentGuardianLinksLive)
         .innerJoin(
           guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
+          eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
         )
         .innerJoin(
           studentProfilesLive,
-          eq(studentProfilesLive.id, studentGuardianLinks.studentProfileId),
+          eq(studentProfilesLive.id, studentGuardianLinksLive.studentProfileId),
         )
         .where(
           and(
             eq(guardianProfilesLive.membershipId, membershipId),
-            eq(studentGuardianLinks.tenantId, tenantId),
+            eq(studentGuardianLinksLive.tenantId, tenantId),
             eq(guardianProfilesLive.tenantId, tenantId),
             eq(studentProfilesLive.tenantId, tenantId),
           ),

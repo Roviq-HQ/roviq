@@ -8,8 +8,8 @@ import { alias } from 'drizzle-orm/pg-core';
  * counting after that number's sender row is deleted and registered again.
  */
 export function sameNumberSenderIds(tx: DrizzleDB, senderId: string) {
-  const current = alias(messagingSenders, 'current_sender');
-  const sameNumber = alias(messagingSenders, 'same_number_sender');
+  const current = alias(messagingSenders, 'current_sender'); // allow-base-read: a removed sender's opt-outs still bind its number
+  const sameNumber = alias(messagingSenders, 'same_number_sender'); // allow-base-read: see above
   return tx
     .select({ id: sameNumber.id })
     .from(current) // allow-base-read: a removed sender's opt-outs still bind its number

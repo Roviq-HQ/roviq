@@ -128,5 +128,5 @@ These are the pace rules that go with it.
   browser twice in one week, once from a stale gateway and once from a real defect.
 - **Security-sensitive parts of a delegated change** (tenant checks, abilities, password and
   session handling) are specified exactly in the brief and read line by line in review; every
-  finding goes to the Security Findings Log.
+  finding goes to the Security Findings Log, and only there ([SECPV]).
 - Never do for a subagent an action it was denied permission for. Tell the user.

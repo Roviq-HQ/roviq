@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { subject } from '@casl/ability';
+import { AbilityFactory } from '@roviq/casl';
 import {
   type AbilityRule,
   AttendanceStatus,
@@ -13,6 +15,7 @@ import {
   attendanceSessions,
   type DrizzleDB,
   guardianProfiles,
+  leaves,
   memberships,
   mkAdminCtx,
   roles,
@@ -95,6 +98,8 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
     sessionCPeriod: '',
     sessionOld: '',
     sessionForeign: '',
+    childProfile: '',
+    parentGuardian: '',
   };
 
   async function actor(
@@ -330,6 +335,7 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
         .select({ id: studentProfiles.id })
         .from(studentProfiles)
         .where(eq(studentProfiles.membershipId, studentA.membershipId));
+      ids.childProfile = childProfile.id;
       for (const person of [parent, unlinkedParent]) {
         await tx.insert(userProfiles).values({
           createdBy: SYSTEM_USER_ID,
@@ -349,6 +355,7 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
           .values({ tenantId: t, userId: person.userId, membershipId: person.membershipId, ...by })
           .returning();
         if (person === parent) {
+          ids.parentGuardian = guardian.id;
           await tx.insert(studentGuardianLinks).values({
             createdBy: SYSTEM_USER_ID,
             updatedBy: SYSTEM_USER_ID,
@@ -378,6 +385,7 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
     if (tenant && foreignTenant) {
       await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), async (tx) => {
         const tenantIds = [tenant.tenantId, foreignTenant.tenantId];
+        await tx.delete(leaves).where(inArray(leaves.tenantId, tenantIds));
         await tx.delete(attendanceEntries).where(inArray(attendanceEntries.tenantId, tenantIds));
         await tx.delete(attendanceSessions).where(inArray(attendanceSessions.tenantId, tenantIds));
         await tx
@@ -889,5 +897,128 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
       variables: { y: ids.year },
     });
     expect(response.errors?.map((error) => error.extensions?.code)).toEqual(['FORBIDDEN']);
+  });
+
+  // Runs last: it removes the link the guardian tests above rely on.
+  describe('a guardian link that is removed', () => {
+    const GET_STUDENT = 'query($id: ID!) { getStudent(id: $id) { id } }';
+    const GET_GUARDIAN = 'query($id: ID!) { getGuardian(id: $id) { id } }';
+    const CONSENT =
+      'query($id: ID!) { consentStatusForStudent(studentProfileId: $id) { purpose } }';
+    const APPLY_LEAVE = `mutation($u: ID!, $d: DateOnly!) {
+      applyLeave(input: { userId: $u, startDate: $d, endDate: $d, type: CASUAL, reason: "Family function" }) { id }
+    }`;
+    const HISTORY =
+      'query($id: ID!, $d: String!) { attendanceStudentHistory(studentId: $id, startDate: $d, endDate: $d) { status } }';
+    let coParentGuardian = '';
+
+    beforeAll(async () => {
+      // A student keeps at least one guardian, so the child needs a second one before the unlink.
+      const coParent = await actor('parent');
+      await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), async (tx) => {
+        const t = tenant.tenantId;
+        await tx
+          .insert(userProfiles)
+          .values({ ...by, userId: coParent.userId, firstName: { en: 'Co' } });
+        await tx
+          .insert(tenantUserProfiles)
+          .values({ ...by, tenantId: t, userId: coParent.userId, firstName: { en: 'Co' } });
+        const [guardian] = await tx
+          .insert(guardianProfiles)
+          .values({
+            tenantId: t,
+            userId: coParent.userId,
+            membershipId: coParent.membershipId,
+            ...by,
+          })
+          .returning();
+        coParentGuardian = guardian.id;
+        await tx.insert(studentGuardianLinks).values({
+          ...by,
+          tenantId: t,
+          guardianProfileId: guardian.id,
+          studentProfileId: ids.childProfile,
+          relationship: GuardianRelationship.FATHER,
+        });
+      });
+    });
+
+    it('lets the guardian and the class teacher in while the link exists', async () => {
+      const student = await query<{ getStudent: { id: string } }>(parent, GET_STUDENT, {
+        id: ids.childProfile,
+      });
+      expect(student.getStudent.id).toBe(ids.childProfile);
+      expect(await errorCodes(parent, CONSENT, { id: ids.childProfile })).toBeUndefined();
+      expect(await sectionIds(parent)).toEqual([ids.sectionA]);
+      const seen = await query<{ getGuardian: { id: string } }>(teacher, GET_GUARDIAN, {
+        id: ids.parentGuardian,
+      });
+      expect(seen.getGuardian.id).toBe(ids.parentGuardian);
+    });
+
+    describe('after the unlink', () => {
+      beforeAll(async () => {
+        const removed = await query<{ unlinkGuardianFromStudent: boolean }>(
+          admin,
+          'mutation($i: UnlinkGuardianInput!) { unlinkGuardianFromStudent(input: $i) }',
+          { i: { guardianProfileId: ids.parentGuardian, studentProfileId: ids.childProfile } },
+        );
+        expect(removed.unlinkGuardianFromStudent).toBe(true);
+      });
+
+      it('refuses the removed guardian every operation on the child', async () => {
+        expect(await errorCodes(parent, GET_STUDENT, { id: ids.childProfile })).toEqual([
+          'STUDENT_NOT_FOUND',
+        ]);
+        expect(await errorCodes(parent, CONSENT, { id: ids.childProfile })).toEqual(['FORBIDDEN']);
+        expect(
+          await errorCodes(parent, APPLY_LEAVE, { u: studentA.membershipId, d: TODAY }),
+        ).toEqual(['FORBIDDEN']);
+        expect(await sectionIds(parent)).toEqual([]);
+        expect(await summary(parent)).toEqual({ sessionCount: 0, studentCount: 0, counts: [] });
+        const history = await query<{ attendanceStudentHistory: unknown[] }>(parent, HISTORY, {
+          id: studentA.membershipId,
+          d: TODAY,
+        });
+        expect(history.attendanceStudentHistory).toEqual([]);
+        const stored = await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), (tx) =>
+          tx.select({ id: leaves.id }).from(leaves).where(eq(leaves.tenantId, tenant.tenantId)),
+        );
+        expect(stored).toEqual([]);
+      });
+
+      it('gives the removed guardian no rule on any child', async () => {
+        const ability = await app.app.get(AbilityFactory).createForUser({
+          userId: parent.userId,
+          scope: 'institute',
+          tenantId: tenant.tenantId,
+          membershipId: parent.membershipId,
+          roleId: parent.roleId,
+        });
+        // A new object per check: CASL tags the object it is given with its subject type.
+        const linked = () => ({ studentProfileId: ids.childProfile });
+        expect(ability.can('read', subject('Student', { id: ids.childProfile }))).toBe(false);
+        expect(ability.can('read', subject('Attendance', linked()))).toBe(false);
+        expect(
+          ability.can('read', subject('ReportCard', { ...linked(), status: 'PUBLISHED' })),
+        ).toBe(false);
+        expect(ability.can('create', subject('Leave', linked()))).toBe(false);
+        expect(ability.can('read', subject('Leave', linked()))).toBe(false);
+        expect(ability.can('withdraw', subject('Leave', { ...linked(), status: 'PENDING' }))).toBe(
+          false,
+        );
+        expect(ability.can('read', subject('Consent', linked()))).toBe(false);
+      });
+
+      it('hides the removed guardian from the class teacher and keeps the linked one', async () => {
+        expect(await errorCodes(teacher, GET_GUARDIAN, { id: ids.parentGuardian })).toEqual([
+          'GUARDIAN_NOT_FOUND',
+        ]);
+        const kept = await query<{ getGuardian: { id: string } }>(teacher, GET_GUARDIAN, {
+          id: coParentGuardian,
+        });
+        expect(kept.getGuardian.id).toBe(coParentGuardian);
+      });
+    });
   });
 });
