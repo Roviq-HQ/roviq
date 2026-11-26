@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../../messages/en/admission.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
+import type { EnquiryNode } from '../../use-admission';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -46,35 +47,44 @@ vi.mock('nuqs', () => {
   };
 });
 
-interface Assignee {
-  userId: string;
-  firstName: Record<string, string>;
-  lastName: Record<string, string> | null;
-  employeeId: string | null;
+function makeEnquiry(overrides: Partial<EnquiryNode> = {}): EnquiryNode {
+  return {
+    id: 'enq-1',
+    tenantId: 'tenant-1',
+    enquiryNumber: 'ENQ-000001',
+    studentName: 'Aarav Sharma',
+    dateOfBirth: null,
+    gender: null,
+    classRequested: 'Class 5',
+    academicYearId: null,
+    parentName: 'Rohan Sharma',
+    parentPhone: '9876543210',
+    parentEmail: null,
+    parentRelation: null,
+    source: 'WALK_IN',
+    referredBy: null,
+    previousSchool: null,
+    previousBoard: null,
+    siblingInSchool: false,
+    siblingAdmissionNo: null,
+    specialNeeds: null,
+    notes: null,
+    status: 'NEW',
+    followUpDate: null,
+    lastContactedAt: null,
+    assignedTo: null,
+    assignee: null,
+    convertedToApplicationId: null,
+    isDuplicate: null,
+    createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
+    updatedAt: new Date('2026-04-15T10:00:00Z').toISOString(),
+    ...overrides,
+  };
 }
-const sampleEnquiry: {
-  id: string;
-  assignedTo: string | null;
-  assignee: Assignee | null;
-  [field: string]: unknown;
-} = {
-  id: 'enq-1',
-  enquiryNumber: 'ENQ-000001',
-  studentName: 'Aarav Sharma',
-  classRequested: 'Class 5',
-  parentName: 'Rohan Sharma',
-  parentPhone: '9876543210',
-  source: 'WALK_IN',
-  status: 'NEW',
-  followUpDate: null,
-  assignedTo: null,
-  assignee: null,
-  convertedToApplicationId: null,
-  createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
-  updatedAt: new Date('2026-04-15T10:00:00Z').toISOString(),
-};
 
-const listed = { enquiries: [sampleEnquiry] };
+const sampleEnquiry = makeEnquiry();
+
+const listed: { enquiries: EnquiryNode[] } = { enquiries: [sampleEnquiry] };
 const refetch = vi.fn();
 const createEnquiry = vi.hoisted(() => vi.fn());
 
