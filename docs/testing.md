@@ -115,6 +115,29 @@ The E2E sections keep the numbering used when the suite was first written, which
 
 CI runs the database and session specs as the named step **Auth Security Invariants** in the `test` job, before the full integration suite. The E2E spec runs in the `e2e-api` job.
 
+## Two-institute response scan
+
+`e2e/api-gateway-e2e/src/two-institute.api-e2e.spec.ts` calls every field of `Query` and looks in each whole response for an id that belongs to an institute the caller has nothing to do with. The queries come from the running gateway by introspection, so a new query is covered the day it is added.
+
+- **Callers**: the admin of an institute created for the run, the seeded admin, teacher, student and guardian of the first institute, the seeded reseller, and a reseller created for the run that owns no institute.
+- **Forbidden ids**: read with the superuser connection (read-only): the institute id, the primary key of every row that carries its `tenant_id`, and the users whose only memberships are in it. For a reseller: its own id, team, roles and plans.
+- **Two calls per query**: one with the caller's own ids in the required id arguments, one with another institute's ids in every id argument. Each selects every scalar three levels deep. A nested field the caller may not read is left out and the query is asked again.
+- **A query fails** when a response holds a forbidden id, or when the generated call is refused as invalid. An id the request itself sent may be repeated in an error message, never in the data.
+
+The tables are in `e2e/api-gateway-e2e/src/two-institute-queries.ts`:
+
+| Table | Holds | The spec fails when |
+|---|---|---|
+| `KIND_BY_NAME`, `KIND_BY_PATH` | which table an id argument names | a required argument has no rule |
+| `VALUE_BY_PATH` | fixed values for required arguments that are not ids | the same |
+| `NOT_CALLED` | queries that cannot be called, with the reason | an entry names a query that no longer exists |
+| `WITHOUT_DATA` | queries that answer no caller with data, with the reason (mostly a kind the seed has no row of) | a query answers nobody with data and is not listed |
+| `EXPECTED_TO_FAIL` | queries whose check does not pass yet | a listed query passes |
+
+A new query needs no entry when its id arguments use the names in `KIND_BY_NAME`. Set `TWO_INSTITUTE_REPORT=<file>` to write every call's result as JSON.
+
+The spec reads only. What a mutation refuses, and that a refused call writes nothing, is proven by the foreign-id specs (`apps/api-gateway/src/__tests__/foreign-id-coverage.ts`).
+
 ## Docker Compose Files
 
 Compose files live under `docker/` and are selected explicitly per use case — this project does not use named `--profile` flags.
