@@ -77,15 +77,37 @@
   },
   "dimensions": {
     "gender": "लिंग",
-    "standard_id": "क्लास",
-    "section_id": "सेक्शन",
-    "social_category": "सामाजिक श्रेणी",
-    "is_rte_admitted": "RTE एडमिशन",
+    "date_of_birth": "जन्म तारीख",
     "religion": "धर्म",
-    "is_cwsn": "विशेष आवश्यकता",
+    "mother_tongue": "मातृभाषा",
+    "nationality": "राष्ट्रीयता",
+    "academic_status": "स्टूडेंट स्टेटस",
+    "social_category": "सामाजिक श्रेणी",
     "is_minority": "अल्पसंख्यक",
     "is_bpl": "बीपीएल",
-    "mother_tongue": "मातृभाषा"
+    "is_cwsn": "विशेष आवश्यकता",
+    "is_rte_admitted": "RTE एडमिशन",
+    "stream": "धारा",
+    "admission_type": "एडमिशन टाइप",
+    "standard_id": "क्लास",
+    "section_id": "सेक्शन",
+    "house_id": "हाउस",
+    "route_id": "ट्रांसपोर्ट रूट",
+    "shift": "शिफ्ट",
+    "medium": "शिक्षा का माध्यम"
+  },
+  "ruleValues": {
+    "boolean": {
+      "true": "हाँ",
+      "false": "नहीं"
+    },
+    "stream": {
+      "SCIENCE_PCM": "विज्ञान (PCM)",
+      "SCIENCE_PCB": "विज्ञान (PCB)",
+      "COMMERCE": "वाणिज्य",
+      "ARTS": "कला",
+      "VOCATIONAL": "व्यावसायिक"
+    }
   },
   "operators": {
     "eq": "बराबर",
@@ -194,6 +216,7 @@
       "operator": "ऑपरेटर",
       "value": "मान",
       "valuePlaceholder": "मान दर्ज करें",
+      "chooseValue": "मान चुनें",
       "addCondition": "शर्त जोड़ें",
       "addGroup": "नेस्टेड ग्रुप जोड़ें",
       "removeCondition": "शर्त हटाएँ",

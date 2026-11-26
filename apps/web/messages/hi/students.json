@@ -97,7 +97,7 @@
     "DETAINED": "रोका गया",
     "TRANSFERRED_OUT": "ट्रांसफ़र्ड",
     "DROPPED_OUT": "छोड़ दिया",
-    "PASSED_OUT": "उत्तीर्ण",
+    "PASSOUT": "उत्तीर्ण",
     "GRADUATED": "स्नातक",
     "WITHDRAWN": "वापस लिया",
     "SUSPENDED": "सस्पेंडेड",

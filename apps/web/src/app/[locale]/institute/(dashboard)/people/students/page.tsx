@@ -101,14 +101,14 @@ import { YearEndResultDialog } from './year-end-result-dialog';
  * Matches the values accepted by StudentFilterInput.academicStatus. These are
  * the domain-level lifecycle states of a student enrollment.
  */
-const ACADEMIC_STATUSES = [
+const ACADEMIC_STATUSES: readonly AcademicStatus[] = [
   'ENROLLED',
   'PROMOTED',
   'DETAINED',
   'TRANSFERRED_OUT',
   'DROPPED_OUT',
-  'PASSED_OUT',
-] as const;
+  'PASSOUT',
+];
 
 /** Values accepted by StudentFilterInput.gender (joined from tenant_user_profiles). */
 const GENDERS = ['MALE', 'FEMALE', 'OTHER'] as const;
@@ -125,7 +125,7 @@ const STATUS_CLASS: Record<string, string> = {
   DETAINED: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
   TRANSFERRED_OUT: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
   DROPPED_OUT: 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300',
-  PASSED_OUT: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+  PASSOUT: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
 };
 
 /**
@@ -138,7 +138,7 @@ const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> =
   DETAINED: AlertCircle,
   TRANSFERRED_OUT: ArrowRightCircle,
   DROPPED_OUT: XCircle,
-  PASSED_OUT: GraduationCap,
+  PASSOUT: GraduationCap,
 };
 
 /** Sort directive helpers — serialised into the `orderBy` filter param. */
@@ -1227,7 +1227,7 @@ export default function StudentsPage() {
 const PROMOTION_BADGE = {
   PROMOTED: { icon: ArrowUpCircle, className: STATUS_CLASS.PROMOTED },
   DETAINED: { icon: AlertCircle, className: STATUS_CLASS.DETAINED },
-  GRADUATED: { icon: GraduationCap, className: STATUS_CLASS.PASSED_OUT },
+  GRADUATED: { icon: GraduationCap, className: STATUS_CLASS.PASSOUT },
 } as const;
 
 function PromotionBadge({ student }: { student: StudentListNode }) {

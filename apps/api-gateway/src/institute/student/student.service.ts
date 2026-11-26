@@ -269,10 +269,9 @@ export class StudentService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    // Validate status transition if changing
-    if (input.academicStatus) {
-      await this.validateStatusChange(tenantId, id, input);
-    }
+    const fromStatus = input.academicStatus
+      ? await this.validateStatusChange(tenantId, id, input)
+      : null;
 
     // Optimistic concurrency: update student_profile WHERE version = expected
     const profileUpdates = this.buildStudentProfileUpdates(input, actorId);
@@ -289,11 +288,19 @@ export class StudentService {
     }
     this.warnIfOptimalReached(tenantId, updated?.strength ?? []);
 
-    // Update user_profile fields if any provided
-    await this.applyUserProfileUpdates(tenantId, id, input, actorId);
-
-    // Emit student.left event for departure statuses
+    // The status write has committed: announce it even if the profile write below fails.
+    if (fromStatus && input.academicStatus) {
+      this.eventBus.emit(EVENT_PATTERNS.STUDENT.statusChanged, {
+        studentProfileId: id,
+        fromStatus,
+        toStatus: input.academicStatus,
+        reason: null,
+        tenantId,
+      });
+    }
     this.emitLeftEventIfApplicable(id, input, tenantId);
+
+    await this.applyUserProfileUpdates(tenantId, id, input, actorId);
 
     const updatedStudent = await this.findById(id);
 
@@ -301,7 +308,14 @@ export class StudentService {
     // `studentsInTenantUpdated` both filter on payload.tenantId. Emit the
     // full student so the filter matches and `@Subscription(() => StudentModel)`
     // can resolve any selected field on the client side.
-    this.eventBus.emit(EVENT_PATTERNS.STUDENT.updated, { ...updatedStudent, tenantId });
+    const changedFields = Object.entries(input)
+      .filter(([field, value]) => field !== 'version' && value !== undefined)
+      .map(([field]) => field);
+    this.eventBus.emit(EVENT_PATTERNS.STUDENT.updated, {
+      ...updatedStudent,
+      changedFields,
+      tenantId,
+    });
 
     return updatedStudent;
   }
@@ -429,7 +443,7 @@ export class StudentService {
     tenantId: string,
     id: string,
     input: UpdateStudentInput,
-  ): Promise<void> {
+  ): Promise<AcademicStatus> {
     const current = await this.repository.findStatus(tenantId, id);
     if (!current) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
@@ -446,6 +460,7 @@ export class StudentService {
         'Cannot transfer out without issuing a Transfer Certificate',
       );
     }
+    return current.academicStatus;
   }
 
   private buildStudentProfileUpdates(

@@ -36,6 +36,15 @@ The student management module (Linear issue **ROV-167**) provides the institute-
 
 Resolvers live under [apps/api-gateway/src/institute/student/](<../../apps/api-gateway/src/institute/student/>) and are decorated with `@InstituteScope()`.
 
+A status change, through `transitionStudentStatus` or `updateStudent` with `academicStatus`, is
+checked against `STUDENT_ACADEMIC_STATE_MACHINE` and emits `STUDENT.statusChanged` (from, to)
+as soon as the student row is written; a leaving status also emits `STUDENT.left`. Issuing an
+original TC sets `TRANSFERRED_OUT` in the issue's transaction and emits both after it commits.
+Dynamic groups whose rules use `academic_status` are then re-resolved on their next read
+([events](../guides/events.md)).
+Every `updateStudent` emits `STUDENT.updated` with the whole student and `changedFields`, the input
+fields it set; groups whose rules use one of those fields are re-resolved the same way.
+
 ## Database schema
 
 - [`student_profiles`](<../../libs/database/src/schema/user-profiles/student-profiles.ts>) — core student row with admission no, status enum, `search_vector` for FTS.

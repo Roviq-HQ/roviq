@@ -9,6 +9,8 @@ const EXCEPTIONS: Record<string, string> = {
     'the JWT scope claim, read by every guard and five CHECK constraints (ROV-227)',
   NOTIFICATION_SKIP_REASON_VALUES:
     'stored in notification_deliveries.skip_reason as lowercase codes',
+  GROUP_RULE_DIMENSION_VALUES:
+    'field names, not states: the `var` of every stored group_rules.rule and its rule_dimensions',
 };
 
 const tuples = Object.entries(enums).filter(

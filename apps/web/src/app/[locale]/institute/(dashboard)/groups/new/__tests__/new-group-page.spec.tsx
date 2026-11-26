@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import errorEn from '../../../../../../../../messages/en/error.json';
 import groupsEn from '../../../../../../../../messages/en/groups.json';
+import studentsEn from '../../../../../../../../messages/en/students.json';
 import groupsHi from '../../../../../../../../messages/hi/groups.json';
+import studentsHi from '../../../../../../../../messages/hi/students.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 
 const { instituteGroups: ids, form: formIds } = testIds;
@@ -112,8 +114,11 @@ async function addCandidate(m: Messages, label: string) {
   await userEvent.click(within(row).getByRole('button', { name: m.new.members.addMember }));
 }
 
+/** Gender is the default dimension; its value is picked from the translated genders. */
 async function fillCondition(m: Messages) {
-  await userEvent.type(screen.getByRole('textbox', { name: m.new.rule.value }), 'female');
+  const genders = (m === groupsHi ? studentsHi : studentsEn).genders;
+  await userEvent.click(screen.getByTestId(ids.newRuleValue));
+  await userEvent.click(await screen.findByRole('option', { name: genders.FEMALE }));
 }
 
 const submitAlert = () => screen.getByTestId(formIds.submitError);
@@ -260,7 +265,7 @@ describe('NewGroupPage submit errors', () => {
           groupType: 'CLUB',
           membershipType: 'DYNAMIC',
           memberTypes: ['student'],
-          rule: { and: [{ '==': [{ var: 'gender' }, 'female'] }] },
+          rule: { and: [{ '==': [{ var: 'gender' }, 'FEMALE'] }] },
         },
       },
     });

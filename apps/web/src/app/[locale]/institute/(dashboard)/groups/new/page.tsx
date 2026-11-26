@@ -1,6 +1,10 @@
 'use client';
 
-import { DOMAIN_GROUP_TYPE_VALUES, GROUP_MEMBERSHIP_TYPE_VALUES } from '@roviq/common-types';
+import {
+  DOMAIN_GROUP_TYPE_VALUES,
+  GROUP_MEMBERSHIP_TYPE_VALUES,
+  GROUP_RULE_DIMENSION_VALUES,
+} from '@roviq/common-types';
 import { extractGraphQLErrorCode, isNetworkError } from '@roviq/graphql';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
@@ -71,24 +75,14 @@ import {
   useCreateGroup,
   usePreviewGroupRule,
 } from '../use-groups';
+import { RuleValueInput } from './rule-value-input';
 
 const { instituteGroups } = testIds;
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const MEMBER_TYPES = ['student', 'staff', 'guardian'] as const;
 
-const DIMENSION_OPTIONS = [
-  'gender',
-  'standard_id',
-  'section_id',
-  'social_category',
-  'is_rte_admitted',
-  'religion',
-  'is_cwsn',
-  'is_minority',
-  'is_bpl',
-  'mother_tongue',
-] as const;
+const DIMENSION_OPTIONS = GROUP_RULE_DIMENSION_VALUES;
 
 const OPERATOR_OPTIONS = ['==', '!=', 'in', '>', '<', '>=', '<='] as const;
 
@@ -774,9 +768,13 @@ function RuleNodeEditor({
           <div key={c.id} className="flex flex-wrap items-center gap-2">
             <Select
               value={c.dimension}
-              onValueChange={(v) => updateCondition(c.id, { dimension: v })}
+              onValueChange={(v) => updateCondition(c.id, { dimension: v, value: '' })}
             >
-              <SelectTrigger className="h-8 w-[180px]" aria-label={t('new.rule.dimension')}>
+              <SelectTrigger
+                className="h-8 w-[180px]"
+                aria-label={t('new.rule.dimension')}
+                data-testid={instituteGroups.newRuleDimension}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -791,7 +789,11 @@ function RuleNodeEditor({
               value={c.operator}
               onValueChange={(v) => updateCondition(c.id, { operator: v as Operator })}
             >
-              <SelectTrigger className="h-8 w-[100px]" aria-label={t('new.rule.operator')}>
+              <SelectTrigger
+                className="h-8 w-[100px]"
+                aria-label={t('new.rule.operator')}
+                data-testid={instituteGroups.newRuleOperator}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -802,12 +804,10 @@ function RuleNodeEditor({
                 ))}
               </SelectContent>
             </Select>
-            <Input
+            <RuleValueInput
+              dimension={c.dimension}
               value={c.value}
-              onChange={(e) => updateCondition(c.id, { value: e.target.value })}
-              placeholder={t('new.rule.valuePlaceholder')}
-              className="h-8 w-[200px]"
-              aria-label={t('new.rule.value')}
+              onChange={(value) => updateCondition(c.id, { value })}
             />
             <Button
               type="button"

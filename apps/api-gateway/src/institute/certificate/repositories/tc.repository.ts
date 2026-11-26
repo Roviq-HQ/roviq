@@ -3,6 +3,7 @@ import type {
   CreateDuplicateTcData,
   CreateTcRequestData,
   InstituteLetterheadRow,
+  IssuedOriginalTc,
   IssueTcData,
   StudentStatusRow,
   TcDetailsRow,
@@ -43,9 +44,9 @@ export abstract class TcRepository {
   ): Promise<void>;
   /**
    * APPROVED → ISSUED with the next serial of the TC's year, and the student marked
-   * TRANSFERRED_OUT, in one transaction. Returns the serial.
+   * TRANSFERRED_OUT, in one transaction. Returns the serial and the status the student left.
    */
-  abstract issueOriginal(ctx: InstituteContext, data: IssueTcData): Promise<string>;
+  abstract issueOriginal(ctx: InstituteContext, data: IssueTcData): Promise<IssuedOriginalTc>;
   /**
    * DUPLICATE_REQUESTED → DUPLICATE_ISSUED as `<original serial>-D<n>`, n counted in the same
    * transaction. Leaves the student untouched. Returns the serial.

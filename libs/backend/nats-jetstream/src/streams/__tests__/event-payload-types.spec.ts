@@ -39,7 +39,7 @@ describe('EventPayload<P> type lookup (compile-time only)', () => {
   });
 
   it('passthrough schemas allow extra keys but require base fields', () => {
-    type T = EventPayload<'STUDENT.updated'>;
+    type T = EventPayload<'NOTIFICATION.fee.overdue'>;
     // tenantBase.passthrough() — tenantId is required, anything else allowed.
     const ok: T = { tenantId: 'a', someExtra: 'value', another: 42 };
     void ok;

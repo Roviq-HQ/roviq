@@ -36,6 +36,7 @@ import {
   withAdmin,
   withTenant,
 } from '@roviq/database';
+import { EventBusService } from '@roviq/event-bus';
 import { FakeStorageClient, StorageClient } from '@roviq/storage';
 import { TemporalClientService } from '@roviq/temporal';
 import {
@@ -699,6 +700,61 @@ describe('TCResolver (integration)', () => {
     expect(await issue(await approvedTc(fixture))).toBe('TC/2025-26/0001');
     expect(await issue(await approvedTc(fixture))).toBe('TC/2025-26/0002');
     expect(await issue(await approvedTc(nextYear))).toBe('TC/2026-27/0001');
+  });
+
+  it('issueTC announces the student leaving: STUDENT.statusChanged then STUDENT.left, once each', async () => {
+    const student = await createEnrolledStudent(result.db, tenantId, '2027-28');
+    const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx
+        .insert(tcRegister)
+        .values({
+          tenantId,
+          studentProfileId: student.studentProfileId,
+          academicYearId: student.academicYearId,
+          tcSerialNumber: `TC-TMP-${randomUUID()}`,
+          status: TcStatus.APPROVED,
+          reason: 'Leaving events test',
+          requestedBy: SYSTEM_USER_ID,
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: tcRegister.id }),
+    );
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest<IssueTCResponse>(result.httpServer, {
+      query: ISSUE_TC,
+      token: instituteToken,
+      variables: { id: tc.id },
+    });
+
+    expect(response.errors).toBeUndefined();
+    const serial = response.data?.issueTC.tcSerialNumber;
+    const studentEvents = emit.mock.calls
+      .filter(([pattern]) => pattern === 'STUDENT.statusChanged' || pattern === 'STUDENT.left')
+      .map(([pattern, payload]) => [pattern, payload]);
+    expect(studentEvents).toEqual([
+      [
+        'STUDENT.statusChanged',
+        {
+          studentProfileId: student.studentProfileId,
+          fromStatus: AcademicStatus.ENROLLED,
+          toStatus: AcademicStatus.TRANSFERRED_OUT,
+          reason: null,
+          tenantId,
+        },
+      ],
+      [
+        'STUDENT.left',
+        {
+          studentProfileId: student.studentProfileId,
+          reason: AcademicStatus.TRANSFERRED_OUT,
+          tcNumber: serial,
+          tenantId,
+        },
+      ],
+    ]);
+    emit.mockRestore();
   });
 
   describe('duplicate TC', () => {

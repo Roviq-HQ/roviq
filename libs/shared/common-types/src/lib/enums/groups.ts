@@ -153,3 +153,35 @@ export type DomainGroupType = (typeof DOMAIN_GROUP_TYPE_VALUES)[number];
 export const DomainGroupType = Object.fromEntries(DOMAIN_GROUP_TYPE_VALUES.map((v) => [v, v])) as {
   readonly [K in DomainGroupType]: K;
 };
+
+/**
+ * Student fields a dynamic group's rule can test: the `var` names of a JsonLogic rule. The
+ * group rule interpreter maps each one to a column, and the rule builder offers each one.
+ */
+export const GROUP_RULE_DIMENSION_VALUES = [
+  // The institute's copy of the student's profile
+  'gender',
+  'date_of_birth',
+  'religion',
+  'mother_tongue',
+  'nationality',
+  // The student record
+  'academic_status',
+  'social_category',
+  'is_minority',
+  'is_bpl',
+  'is_cwsn',
+  'is_rte_admitted',
+  'stream',
+  'admission_type',
+  // The student's placement in a year
+  'standard_id',
+  'section_id',
+  'house_id',
+  'route_id',
+  // The placement's section
+  'shift',
+  'medium',
+] as const;
+
+export type GroupRuleDimension = (typeof GROUP_RULE_DIMENSION_VALUES)[number];

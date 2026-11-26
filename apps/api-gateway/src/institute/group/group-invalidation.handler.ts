@@ -1,6 +1,6 @@
 import { Controller, Inject, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
-import { GroupMembershipType } from '@roviq/common-types';
+import { GROUP_RULE_DIMENSION_VALUES, GroupMembershipType } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -13,6 +13,7 @@ import { EVENT_PATTERNS, eventPayloadSchemas, gatewayConsumer } from '@roviq/nat
 import { and, arrayOverlaps, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 
 const ORIGIN = 'consumer:group-invalidation';
+const RULE_DIMENSIONS: ReadonlySet<string> = new Set(GROUP_RULE_DIMENSION_VALUES);
 
 /**
  * Sets `groups.resolved_at = NULL` on groups whose members an event may have changed; the next
@@ -23,6 +24,13 @@ export class GroupInvalidationHandler {
   private readonly logger = new Logger(GroupInvalidationHandler.name);
 
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+
+  /** A new student can match a rule on any dimension. */
+  @EventPattern(EVENT_PATTERNS.STUDENT.admitted, gatewayConsumer(EVENT_PATTERNS.STUDENT.admitted))
+  async onStudentAdmitted(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.admitted].parse(data);
+    await this.invalidateByDimensions(tenantId, [...GROUP_RULE_DIMENSION_VALUES]);
+  }
 
   @EventPattern(EVENT_PATTERNS.STUDENT.enrolled, gatewayConsumer(EVENT_PATTERNS.STUDENT.enrolled))
   async onStudentEnrolled(@Payload() data: unknown): Promise<void> {
@@ -43,6 +51,26 @@ export class GroupInvalidationHandler {
   async onStudentPromoted(@Payload() data: unknown): Promise<void> {
     const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.promoted].parse(data);
     await this.invalidateByDimensions(tenantId, ['standard_id']);
+  }
+
+  @EventPattern(
+    EVENT_PATTERNS.STUDENT.statusChanged,
+    gatewayConsumer(EVENT_PATTERNS.STUDENT.statusChanged),
+  )
+  async onStudentStatusChanged(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.statusChanged].parse(data);
+    await this.invalidateByDimensions(tenantId, ['academic_status']);
+  }
+
+  /** Invalidates only the rule dimensions the update set: `isRteAdmitted` → `is_rte_admitted`. */
+  @EventPattern(EVENT_PATTERNS.STUDENT.updated, gatewayConsumer(EVENT_PATTERNS.STUDENT.updated))
+  async onStudentUpdated(@Payload() data: unknown): Promise<void> {
+    const { tenantId, changedFields } =
+      eventPayloadSchemas[EVENT_PATTERNS.STUDENT.updated].parse(data);
+    const dimensions = changedFields
+      .map((field) => field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`))
+      .filter((dimension) => RULE_DIMENSIONS.has(dimension));
+    if (dimensions.length > 0) await this.invalidateByDimensions(tenantId, dimensions);
   }
 
   /** A student who left drops out of every rule-based group. */
@@ -68,6 +96,13 @@ export class GroupInvalidationHandler {
   async onAcademicYearActivated(@Payload() data: unknown): Promise<void> {
     const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.ACADEMIC_YEAR.activated].parse(data);
     await this.invalidateAllDynamic(tenantId);
+  }
+
+  /** A section's shift or medium is read by rules through the student's placement. */
+  @EventPattern(EVENT_PATTERNS.SECTION.updated, gatewayConsumer(EVENT_PATTERNS.SECTION.updated))
+  async onSectionUpdated(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.SECTION.updated].parse(data);
+    await this.invalidateByDimensions(tenantId, ['shift', 'medium']);
   }
 
   @EventPattern(EVENT_PATTERNS.SECTION.deleted, gatewayConsumer(EVENT_PATTERNS.SECTION.deleted))

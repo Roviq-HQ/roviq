@@ -6,11 +6,21 @@
  * listStudentDocuments, and listStudentGuardians against a fresh
  * test institute with a minimal student fixture.
  */
+import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { AcademicStatus, AdmissionType, Gender, SocialCategory } from '@roviq/common-types';
+import {
+  AcademicStatus,
+  AdmissionType,
+  DomainGroupType,
+  Gender,
+  GroupMembershipType,
+  SocialCategory,
+} from '@roviq/common-types';
 import {
   academicYears,
   type DrizzleDB,
+  groupRules,
+  groups,
   memberships,
   mkAdminCtx,
   roles,
@@ -24,15 +34,20 @@ import {
   users,
   withAdmin,
 } from '@roviq/database';
+import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
 import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  type TestInstitute,
 } from '@roviq/testing/integration';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq, inArray } from 'drizzle-orm';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
+import { GroupInvalidationHandler } from '../../group/group-invalidation.handler';
 
 interface StudentFixture {
   studentProfileId: string;
@@ -343,5 +358,345 @@ describe('Student detail operations (integration)', () => {
     );
     expect(response.errors).toBeUndefined();
     expect(Array.isArray(response.data?.listStudentGuardians)).toBe(true);
+  });
+});
+
+describe('Student status changes and dynamic groups (integration)', () => {
+  let result: IntegrationAppResult;
+  let groupHandler: GroupInvalidationHandler;
+  let other: TestInstitute;
+
+  const ORIGIN = 'test:student-detail';
+  const tokenFor = (i: TestInstitute) =>
+    createInstituteToken({
+      sub: i.userId,
+      tenantId: i.tenantId,
+      membershipId: i.membershipId,
+      roleId: i.roleId,
+    });
+
+  const TRANSITION = /* GraphQL */ `
+    mutation Transition($id: ID!, $newStatus: AcademicStatus!) {
+      transitionStudentStatus(id: $id, newStatus: $newStatus) { id academicStatus }
+    }`;
+  const UPDATE = /* GraphQL */ `
+    mutation Update($id: ID!, $input: UpdateStudentInput!) {
+      updateStudent(id: $id, input: $input) { id academicStatus }
+    }`;
+
+  /** One group per dimension the handler must tell apart, all resolved. */
+  const addGroups = (tenantId: string) =>
+    withAdmin(result.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const audit = { tenantId, createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
+      const [byStatus, byStandard, bySection, byGender, byRte] = await tx
+        .insert(groups)
+        .values(
+          ['By status', 'By standard', 'By section', 'By gender', 'By RTE'].map((name) => ({
+            ...audit,
+            name: `${name} ${randomUUID().slice(0, 8)}`,
+            groupType: DomainGroupType.CLUB,
+            membershipType: GroupMembershipType.DYNAMIC,
+            resolvedAt: new Date(),
+          })),
+        )
+        .returning({ id: groups.id });
+      await tx.insert(groupRules).values([
+        {
+          ...audit,
+          groupId: byStatus.id,
+          rule: { '==': [{ var: 'academic_status' }, AcademicStatus.PROMOTED] },
+          ruleDimensions: ['academic_status'],
+        },
+        {
+          ...audit,
+          groupId: byStandard.id,
+          rule: { '==': [{ var: 'standard_id' }, randomUUID()] },
+          ruleDimensions: ['standard_id'],
+        },
+        {
+          ...audit,
+          groupId: bySection.id,
+          rule: { '==': [{ var: 'section_id' }, randomUUID()] },
+          ruleDimensions: ['section_id'],
+        },
+        {
+          ...audit,
+          groupId: byGender.id,
+          rule: { '==': [{ var: 'gender' }, Gender.FEMALE] },
+          ruleDimensions: ['gender'],
+        },
+        {
+          ...audit,
+          groupId: byRte.id,
+          rule: { '==': [{ var: 'is_rte_admitted' }, true] },
+          ruleDimensions: ['is_rte_admitted'],
+        },
+      ]);
+      return {
+        byStatus: byStatus.id,
+        byStandard: byStandard.id,
+        bySection: bySection.id,
+        byGender: byGender.id,
+        byRte: byRte.id,
+      };
+    });
+
+  const stateOf = async (ids: string[]) => {
+    const rows = await withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+      tx
+        .select({ id: groups.id, resolvedAt: groups.resolvedAt })
+        .from(groups)
+        .where(inArray(groups.id, ids)),
+    );
+    return new Map(rows.map((r) => [r.id, r.resolvedAt === null ? 'unresolved' : 'resolved']));
+  };
+
+  const statusOf = async (studentProfileId: string) => {
+    const [row] = await withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+      tx
+        .select({ status: studentProfiles.academicStatus, version: studentProfiles.version })
+        .from(studentProfiles)
+        .where(eq(studentProfiles.id, studentProfileId)),
+    );
+    assert(row, `fixture: no student_profiles ${studentProfileId}`);
+    return row;
+  };
+
+  const emitted = (spy: ReturnType<typeof vi.spyOn>, pattern: string) =>
+    spy.mock.calls.filter(([p]) => p === pattern).map(([, payload]) => payload);
+
+  beforeAll(async () => {
+    result = await createIntegrationApp({ modules: [AppModule] });
+    groupHandler = result.app.get(GroupInvalidationHandler);
+    other = await createTestInstitute(result.db);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    await result?.close();
+  });
+
+  it('should emit STUDENT.statusChanged once, from ENROLLED to PROMOTED, on transitionStudentStatus', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: TRANSITION,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, newStatus: AcademicStatus.PROMOTED },
+    });
+
+    expect(response.errors).toBeUndefined();
+    expect(emitted(emit, EVENT_PATTERNS.STUDENT.statusChanged)).toEqual([
+      {
+        studentProfileId: student.studentProfileId,
+        fromStatus: AcademicStatus.ENROLLED,
+        toStatus: AcademicStatus.PROMOTED,
+        reason: null,
+        tenantId: inst.tenantId,
+      },
+    ]);
+    expect(emitted(emit, EVENT_PATTERNS.STUDENT.promoted)).toEqual([]);
+    expect(emitted(emit, EVENT_PATTERNS.STUDENT.left)).toEqual([]);
+  });
+
+  it('should mark only academic_status groups of this institute unresolved', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const mine = await addGroups(inst.tenantId);
+    const theirs = await addGroups(other.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    await gqlRequest(result.httpServer, {
+      query: TRANSITION,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, newStatus: AcademicStatus.PROMOTED },
+    });
+    const [payload] = emitted(emit, EVENT_PATTERNS.STUDENT.statusChanged);
+    await groupHandler.onStudentStatusChanged(payload);
+
+    expect(await stateOf([...Object.values(mine), ...Object.values(theirs)])).toEqual(
+      new Map([
+        [mine.byStatus, 'unresolved'],
+        [mine.byStandard, 'resolved'],
+        [mine.bySection, 'resolved'],
+        [mine.byGender, 'resolved'],
+        [mine.byRte, 'resolved'],
+        [theirs.byStatus, 'resolved'],
+        [theirs.byStandard, 'resolved'],
+        [theirs.bySection, 'resolved'],
+        [theirs.byGender, 'resolved'],
+        [theirs.byRte, 'resolved'],
+      ]),
+    );
+  });
+
+  it('should mark only the gender groups of this institute unresolved when updateStudent edits gender', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const mine = await addGroups(inst.tenantId);
+    const theirs = await addGroups(other.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: {
+        id: student.studentProfileId,
+        input: { version, gender: Gender.FEMALE, firstName: { en: 'Asha' } },
+      },
+    });
+    expect(response.errors).toBeUndefined();
+    const updates = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
+    expect(updates).toHaveLength(1);
+    const [payload] = updates;
+    expect(
+      eventPayloadSchemas[EVENT_PATTERNS.STUDENT.updated].parse(payload).changedFields.sort(),
+    ).toEqual(['firstName', 'gender']);
+    expect(emitted(emit, EVENT_PATTERNS.STUDENT.statusChanged)).toEqual([]);
+
+    await groupHandler.onStudentUpdated(payload);
+
+    expect(await stateOf([...Object.values(mine), ...Object.values(theirs)])).toEqual(
+      new Map([
+        [mine.byStatus, 'resolved'],
+        [mine.byStandard, 'resolved'],
+        [mine.bySection, 'resolved'],
+        [mine.byGender, 'unresolved'],
+        [mine.byRte, 'resolved'],
+        [theirs.byStatus, 'resolved'],
+        [theirs.byStandard, 'resolved'],
+        [theirs.bySection, 'resolved'],
+        [theirs.byGender, 'resolved'],
+        [theirs.byRte, 'resolved'],
+      ]),
+    );
+  });
+
+  it('should mark only the is_rte_admitted groups unresolved when updateStudent sets isRteAdmitted', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const mine = await addGroups(inst.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, input: { version, isRteAdmitted: true } },
+    });
+    expect(response.errors).toBeUndefined();
+    const [payload] = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
+    await groupHandler.onStudentUpdated(payload);
+
+    expect(await stateOf(Object.values(mine))).toEqual(
+      new Map([
+        [mine.byStatus, 'resolved'],
+        [mine.byStandard, 'resolved'],
+        [mine.bySection, 'resolved'],
+        [mine.byGender, 'resolved'],
+        [mine.byRte, 'unresolved'],
+      ]),
+    );
+  });
+
+  it('should leave every group resolved when updateStudent edits only fields no rule uses', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const mine = await addGroups(inst.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, input: { version, bloodGroup: 'O+' } },
+    });
+    const [payload] = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
+    await groupHandler.onStudentUpdated(payload);
+
+    expect([...(await stateOf(Object.values(mine))).values()]).toEqual(
+      Object.values(mine).map(() => 'resolved'),
+    );
+  });
+
+  it('should emit nothing and keep the status on a refused transition', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    await gqlRequest(result.httpServer, {
+      query: TRANSITION,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, newStatus: AcademicStatus.PROMOTED },
+    });
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: TRANSITION,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, newStatus: AcademicStatus.DETAINED },
+    });
+
+    expect(response.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
+    expect(emit).not.toHaveBeenCalled();
+    expect((await statusOf(student.studentProfileId)).status).toBe(AcademicStatus.PROMOTED);
+  });
+
+  it('should emit STUDENT.statusChanged when updateStudent changes academicStatus', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: {
+        id: student.studentProfileId,
+        input: { version, academicStatus: AcademicStatus.SUSPENDED },
+      },
+    });
+
+    expect(response.errors).toBeUndefined();
+    expect(emitted(emit, EVENT_PATTERNS.STUDENT.statusChanged)).toEqual([
+      {
+        studentProfileId: student.studentProfileId,
+        fromStatus: AcademicStatus.ENROLLED,
+        toStatus: AcademicStatus.SUSPENDED,
+        reason: null,
+        tenantId: inst.tenantId,
+      },
+    ]);
+    expect((await statusOf(student.studentProfileId)).status).toBe(AcademicStatus.SUSPENDED);
+  });
+
+  it('should refuse another institute’s student on both mutations and emit nothing', async () => {
+    const inst = await createTestInstitute(result.db);
+    const theirs = await createStudentFixture(result.db, other.tenantId);
+    const before = await statusOf(theirs.studentProfileId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const transition = await gqlRequest(result.httpServer, {
+      query: TRANSITION,
+      token: tokenFor(inst),
+      variables: { id: theirs.studentProfileId, newStatus: AcademicStatus.PROMOTED },
+    });
+    const update = await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: {
+        id: theirs.studentProfileId,
+        input: { version: before.version, academicStatus: AcademicStatus.PROMOTED },
+      },
+    });
+
+    expect(transition.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
+    expect(update.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
+    expect(emit).not.toHaveBeenCalled();
+    expect(await statusOf(theirs.studentProfileId)).toEqual(before);
   });
 });
