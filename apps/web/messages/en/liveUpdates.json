@@ -2,7 +2,8 @@
   "reconnecting": {
     "title": "Live updates paused.",
     "description": "This page stopped receiving changes made by others, so what you see may be out of date. Reconnecting now; this message goes away once live updates are back.",
-    "stillFailing": "Still not connected after {count} attempts. Check this device's internet connection, then press Reconnect."
+    "stillFailing": "Still not connected. Check this device's internet connection, then press Reconnect.",
+    "attempts": "Tried {count} times."
   },
   "offline": {
     "title": "You're offline.",
@@ -19,6 +20,25 @@
     "connecting": "Connecting to live updates",
     "reconnecting": "Live updates paused, reconnecting",
     "offline": "Offline: no internet connection",
-    "sessionEnded": "Live updates stopped: sign in again"
+    "sessionEnded": "Live updates stopped: sign in again",
+    "stopped": "Live updates stopped: press Reconnect",
+    "impersonationEnded": "Live updates ended with the view-as session",
+    "idle": "No live data on this page"
+  },
+  "stopped": {
+    "title": "Live updates stopped.",
+    "description": "The server closed the live connection and will not reopen it by itself, so this page no longer receives changes made by others. Press Reconnect; if it stops again, reload the page."
+  },
+  "impersonationEnded": {
+    "title": "Live updates ended.",
+    "description": "This view-as session is over, so this tab no longer receives changes. Close this tab; live updates do not restart here."
+  },
+  "announce": {
+    "reconnecting": "Live updates paused, reconnecting.",
+    "stopped": "Live updates stopped. Press Reconnect.",
+    "offline": "You're offline.",
+    "sessionEnded": "Live updates stopped: sign in again.",
+    "impersonationEnded": "Live updates ended with the view-as session.",
+    "restored": "Live updates are back."
   }
 }
