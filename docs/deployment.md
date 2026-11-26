@@ -67,11 +67,17 @@ To point an environment at a store:
    that cannot apply prints `SKIP` (the plain-http check against an http endpoint) and does not
    fail the run.
 
+Both scripts read the `S3_*` variables, plus an optional `S3_SESSION_TOKEN` for temporary
+credentials. To run them with an administrator's `aws login` sign-in instead of a stored key, map
+the output of `aws configure export-credentials --format env`: `AWS_ACCESS_KEY_ID` →
+`S3_ACCESS_KEY`, `AWS_SECRET_ACCESS_KEY` → `S3_SECRET_KEY`, `AWS_SESSION_TOKEN` →
+`S3_SESSION_TOKEN`. The app itself never uses a session token: it runs with the scoped key.
+
 Required on any provider:
 
 - **Two buckets**: `S3_BUCKET_PRIVATE` with all public access blocked, and `S3_BUCKET_PUBLIC`
-  readable without sign-in (objects only, no listing). The public bucket holds branding and
-  nothing else.
+  readable without sign-in at `S3_PUBLIC_BASE_URL` (objects only, no listing); behind a CDN the
+  bucket itself can stay closed. The public bucket holds branding and nothing else.
 - **`S3_PUBLIC_ENDPOINT`** must be the address browsers reach, because presigned URLs are signed
   for that host. **`S3_PUBLIC_BASE_URL`** is the public bucket's base URL; put a CDN there.
 - **CORS** on the private bucket: allow `PUT` and `GET` from the three portal origins only, with
@@ -98,8 +104,8 @@ Provider notes:
 |---|---|---|
 | `S3_REGION` | `ap-south-1` (Mumbai) | `auto` |
 | `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` | `https://s3.ap-south-1.amazonaws.com` | `https://<account-id>.r2.cloudflarestorage.com` |
-| Public bucket | bucket policy allowing `s3:GetObject` to everyone, behind CloudFront | no bucket policies: connect a custom domain to the bucket (public access) |
-| `S3_PUBLIC_BASE_URL` | the CloudFront domain | the custom domain |
+| Public bucket | all public access blocked; served only through CloudFront with origin access control (OAC), the bucket policy allowing `s3:GetObject` to that distribution alone (`AWS:SourceArn`). A new AWS account must be verified by AWS Support before it can create a CloudFront distribution | no bucket policies: connect a custom domain to the bucket (public access) |
+| `S3_PUBLIC_BASE_URL` | the distribution's domain (or a custom domain on it) | the custom domain |
 | Data location | stays in the Mumbai region | pick the location or jurisdiction when creating the bucket; confirm it meets the data-residency position for student records before choosing R2 |
 | Cost shape | storage plus per-GB download fees | lower storage price, no download fees |
 

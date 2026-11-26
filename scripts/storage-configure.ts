@@ -26,6 +26,7 @@ import {
   parseOrigins,
   ruleDifferences,
   S3_CHECKSUM_OPTIONS,
+  storageCredentials,
   storagePlan,
 } from './lib/storage-rules';
 
@@ -108,10 +109,11 @@ async function apply(): Promise<void> {
     region: required('S3_REGION', process.env.S3_REGION),
     forcePathStyle: true,
     ...S3_CHECKSUM_OPTIONS,
-    credentials: {
+    credentials: storageCredentials({
       accessKeyId: required('S3_ACCESS_KEY', process.env.S3_ACCESS_KEY),
       secretAccessKey: required('S3_SECRET_KEY', process.env.S3_SECRET_KEY),
-    },
+      sessionToken: process.env.S3_SESSION_TOKEN,
+    }),
   });
 
   const differences: string[] = [];
