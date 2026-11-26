@@ -158,7 +158,23 @@ export class CertificateService {
     TC_STATE_MACHINE.assertTransition(tc.status, TcStatus.ISSUED);
     await this.pdfs.assertTcPrintable(ctx, tcId);
 
-    const tcSerialNumber = await this.tcs.issueOriginal(ctx, this.issueData(ctx, tc));
+    const { serial: tcSerialNumber, fromStatus } = await this.tcs.issueOriginal(
+      ctx,
+      this.issueData(ctx, tc),
+    );
+    this.eventBus.emit(EVENT_PATTERNS.STUDENT.statusChanged, {
+      studentProfileId: tc.studentProfileId,
+      fromStatus,
+      toStatus: AcademicStatus.TRANSFERRED_OUT,
+      reason: null,
+      tenantId: ctx.tenantId,
+    });
+    this.eventBus.emit(EVENT_PATTERNS.STUDENT.left, {
+      studentProfileId: tc.studentProfileId,
+      reason: AcademicStatus.TRANSFERRED_OUT,
+      tcNumber: tcSerialNumber,
+      tenantId: ctx.tenantId,
+    });
     await this.renderTcPdf(ctx, tcId);
     this.eventBus.emit(EVENT_PATTERNS.TC.issued, {
       tcId,

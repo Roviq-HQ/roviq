@@ -38,8 +38,10 @@ Resolvers live under [apps/api-gateway/src/institute/student/](<../../apps/api-g
 
 A status change, through `transitionStudentStatus` or `updateStudent` with `academicStatus`, is
 checked against `STUDENT_ACADEMIC_STATE_MACHINE` and emits `STUDENT.statusChanged` (from, to)
-after the write; a leaving status also emits `STUDENT.left`. Dynamic groups whose rules use
-`academic_status` are then re-resolved on their next read ([events](../guides/events.md)).
+as soon as the student row is written; a leaving status also emits `STUDENT.left`. Issuing an
+original TC sets `TRANSFERRED_OUT` in the issue's transaction and emits both after it commits.
+Dynamic groups whose rules use `academic_status` are then re-resolved on their next read
+([events](../guides/events.md)).
 Every `updateStudent` emits `STUDENT.updated` with the whole student and `changedFields`, the input
 fields it set; groups whose rules use one of those fields are re-resolved the same way.
 

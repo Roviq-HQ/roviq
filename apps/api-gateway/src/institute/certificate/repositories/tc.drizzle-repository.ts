@@ -31,6 +31,7 @@ import type {
   CreateDuplicateTcData,
   CreateTcRequestData,
   InstituteLetterheadRow,
+  IssuedOriginalTc,
   IssueTcData,
   StudentStatusRow,
   TcDetailsRow,
@@ -226,7 +227,7 @@ export class TcDrizzleRepository extends TcRepository {
     });
   }
 
-  async issueOriginal(ctx: InstituteContext, data: IssueTcData): Promise<string> {
+  async issueOriginal(ctx: InstituteContext, data: IssueTcData): Promise<IssuedOriginalTc> {
     const { tc, today, verificationToken, actorId } = data;
     // Serial + status in one transaction so a failed issue doesn't burn a number
     return withTenant(this.db, ctx, async (tx) => {
@@ -251,8 +252,8 @@ export class TcDrizzleRepository extends TcRepository {
         );
       }
 
-      // PRD §5.1 Step 5
-      await tx
+      // PRD §5.1 Step 5. `old.` (PostgreSQL 18) returns the status before this write.
+      const [student] = await tx
         .update(studentProfiles)
         .set({
           tcIssued: true,
@@ -262,8 +263,12 @@ export class TcDrizzleRepository extends TcRepository {
           academicStatus: AcademicStatus.TRANSFERRED_OUT,
           updatedBy: actorId,
         })
-        .where(eq(studentProfiles.id, tc.studentProfileId));
-      return serial;
+        .where(eq(studentProfiles.id, tc.studentProfileId))
+        .returning({ fromStatus: sql<AcademicStatus>`old.academic_status` });
+      if (!student) {
+        throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student of the TC not found');
+      }
+      return { serial, fromStatus: student.fromStatus };
     });
   }
 

@@ -70,6 +70,12 @@ export interface IssueTcData {
   actorId: string;
 }
 
+/** An original TC issue: its serial, and the student's status before TRANSFERRED_OUT. */
+export interface IssuedOriginalTc {
+  serial: string;
+  fromStatus: AcademicStatus;
+}
+
 export interface StudentStatusRow {
   academicStatus: AcademicStatus;
 }
