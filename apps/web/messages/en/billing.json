@@ -391,7 +391,12 @@
     "clientSecret": "Client Secret",
     "vpa": "UPI VPA Address",
     "vpaPlaceholder": "e.g. institute@upi",
-    "accessDenied": "You do not have permission to view payment gateways."
+    "accessDenied": "You do not have permission to view payment gateways.",
+    "providerNames": {
+      "RAZORPAY": "Razorpay",
+      "CASHFREE": "Cashfree",
+      "UPI_DIRECT": "Direct UPI"
+    }
   },
   "upiVerification": {
     "title": "UPI Payment Verification",

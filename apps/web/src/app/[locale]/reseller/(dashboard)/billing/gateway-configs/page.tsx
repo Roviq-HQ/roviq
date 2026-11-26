@@ -133,7 +133,9 @@ function GatewayConfigsContent() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="size-5" />
-                    {config.provider}
+                    {isKnownProvider(config.provider)
+                      ? t(`gateway.providerNames.${config.provider}`)
+                      : config.provider}
                   </CardTitle>
                   <div className="flex gap-1">
                     {config.isDefault && <Badge>{t('gateway.default')}</Badge>}
@@ -308,7 +310,7 @@ function GatewayConfigDialog({
                   <SelectContent>
                     {PROVIDERS.map((p) => (
                       <SelectItem key={p} value={p}>
-                        {p}
+                        {t(`gateway.providerNames.${p}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -428,4 +430,8 @@ function GatewayConfigDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function isKnownProvider(provider: string): provider is (typeof PROVIDERS)[number] {
+  return (PROVIDERS as readonly string[]).includes(provider);
 }
