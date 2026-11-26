@@ -76,5 +76,8 @@ describe('S3StorageClient presigned URLs', () => {
 
     expect(second).toBe(first);
     expect(new URL(first).searchParams.get('X-Amz-Date')).toBe('20261126T060000Z');
+    expect(
+      [...new URL(first).searchParams.keys()].filter((name) => /checksum/i.test(name)),
+    ).toEqual([]);
   });
 });

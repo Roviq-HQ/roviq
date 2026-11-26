@@ -1,13 +1,6 @@
 import type { CORSRule, LifecycleRule } from '@aws-sdk/client-s3';
 
-/**
- * The SDK otherwise adds a CRC32 of an empty body to every presigned PUT URL, which a strict
- * store checks against the real upload and refuses.
- */
-export const S3_CHECKSUM_OPTIONS = {
-  requestChecksumCalculation: 'WHEN_REQUIRED',
-  responseChecksumValidation: 'WHEN_REQUIRED',
-} as const;
+export { S3_CHECKSUM_OPTIONS } from '../../libs/backend/storage/src/s3-checksum-options';
 
 /** Prefix that `storage:check` writes under; the lifecycle rule cleans up after an aborted run. */
 export const STORAGE_CHECK_PREFIX = '__storage-check__/';

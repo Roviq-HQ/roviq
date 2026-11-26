@@ -11,6 +11,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { S3_CHECKSUM_OPTIONS } from './s3-checksum-options';
 import {
   contentDisposition,
   type PresignedPut,
@@ -41,10 +42,7 @@ export class S3StorageClient extends StorageClient {
     const shared = {
       region: config.getOrThrow<string>('S3_REGION'),
       forcePathStyle: true,
-      // By default the SDK puts a CRC32 of an empty body into every presigned PUT URL, which a
-      // strict store checks against the browser's upload and refuses.
-      requestChecksumCalculation: 'WHEN_REQUIRED' as const,
-      responseChecksumValidation: 'WHEN_REQUIRED' as const,
+      ...S3_CHECKSUM_OPTIONS,
       credentials: {
         accessKeyId: config.getOrThrow<string>('S3_ACCESS_KEY'),
         secretAccessKey: config.getOrThrow<string>('S3_SECRET_KEY'),
