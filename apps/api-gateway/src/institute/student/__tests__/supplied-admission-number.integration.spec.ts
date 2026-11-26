@@ -1,7 +1,7 @@
 /**
  * ROV-367: admission numbers the institute supplies (bulk import today) and generated numbers
  * never collide. A supplied number that fits its own series raises that series' counter, and
- * generation skips numbers a live student already holds.
+ * generation moves past numbers a live student already holds.
  */
 import { randomUUID } from 'node:crypto';
 import {
@@ -17,7 +17,9 @@ import {
   academicYears,
   type DrizzleDB,
   instituteConfigs,
+  MAX_SEQUENCE_VALUE,
   mkAdminCtx,
+  mkInstituteCtx,
   resolveAdmissionYear,
   roles,
   SYSTEM_USER_ID,
@@ -26,6 +28,7 @@ import {
   studentProfiles,
   tenantSequences,
   withAdmin,
+  withTenant,
 } from '@roviq/database';
 import { createMock } from '@roviq/testing';
 import {
@@ -35,13 +38,17 @@ import {
   gqlRequest,
   type IntegrationAppResult,
 } from '@roviq/testing/integration';
-import { and, eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 import { IdentityService } from '../../../auth/identity.service';
 import { nextAdmissionNumber } from '../admission-number.sequence';
+import { type AdmitStudentData, admitStudent } from '../repositories/admit-student';
 import { StudentRepository } from '../repositories/student.repository';
-import { createBulkStudentImportActivities } from '../workflows/bulk-student-import.activities';
+import {
+  createBulkStudentImportActivities,
+  ROW_ADMISSION_NUMBERS_EXHAUSTED,
+} from '../workflows/bulk-student-import.activities';
 import type { ImportFileStore, ValidatedRow } from '../workflows/bulk-student-import.types';
 
 const ORIGIN = 'test:supplied-admission-number';
@@ -77,6 +84,20 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
+
+  /** Resolves once another backend waits on a row lock: an insert held by the unique index. */
+  const someoneWaitsOnALock = async () => {
+    for (let i = 0; i < 100; i++) {
+      const waiting = await asAdmin((tx) =>
+        tx.execute<{ n: number }>(
+          sql`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted AND locktype = 'transactionid'`,
+        ),
+      );
+      if ((waiting.rows[0]?.n ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error('No insert ever waited on the held admission');
+  };
 
   const setUpInstitute = async () => {
     const inst = await createTestInstitute(result.db);
@@ -172,7 +193,7 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
       return number;
     };
 
-    const importNumbers = async (numbers: string[], target: ClassRef = fixture.class5) => {
+    const importRows = async (numbers: Array<string | undefined>, target = fixture.class5) => {
       const activities = createBulkStudentImportActivities(
         result.db,
         null,
@@ -225,25 +246,91 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
     const setCounter = (sequenceName: string, value: bigint) =>
       asAdmin((tx) =>
         tx
-          .update(tenantSequences)
-          .set({ currentValue: value })
-          .where(
-            and(
-              eq(tenantSequences.tenantId, inst.tenantId),
-              eq(tenantSequences.sequenceName, sequenceName),
-            ),
-          ),
+          .insert(tenantSequences)
+          .values({ tenantId: inst.tenantId, sequenceName, currentValue: value })
+          .onConflictDoUpdate({
+            target: [tenantSequences.tenantId, tenantSequences.sequenceName],
+            set: { currentValue: value },
+          }),
       );
+
+    const newAccount = async () => {
+      const { userId } = await result.app.get(IdentityService).createUser({
+        email: `adm-${randomUUID()}@roviq.test`,
+        username: `adm-${randomUUID().slice(0, 12)}`,
+        actorId: inst.userId,
+      });
+      return userId;
+    };
+
+    const admitData = (
+      userId: string,
+      target: ClassRef,
+      admissionNumber: string | null,
+    ): AdmitStudentData => ({
+      tenantId: inst.tenantId,
+      userId,
+      actorId: inst.userId,
+      academicYearId: fixture.academicYearId,
+      standardId: target.standardId,
+      sectionId: target.sectionId,
+      tenantProfile: { firstName: { en: 'Held' }, lastName: null, gender: Gender.FEMALE },
+      profile: {
+        admissionDate: '2026-11-26',
+        admissionClass: null,
+        admissionType: AdmissionType.NEW,
+        academicStatus: AcademicStatus.ENROLLED,
+        socialCategory: SocialCategory.GENERAL,
+        caste: null,
+        isMinority: false,
+        minorityType: null,
+        isBpl: false,
+        isCwsn: false,
+        cwsnType: null,
+        isRteAdmitted: false,
+        rteCertificate: null,
+        previousSchoolName: null,
+        previousSchoolBoard: null,
+        previousSchoolUdise: null,
+        incomingTcNumber: null,
+        incomingTcDate: null,
+      },
+      admissionNumber,
+    });
+
+    /** An admission of `number` saved but not committed until `release()`. */
+    const holdAdmission = async (number: string, target: ClassRef) => {
+      const userId = await newAccount();
+      let release = () => {};
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let saved = () => {};
+      const ready = new Promise<void>((resolve) => {
+        saved = resolve;
+      });
+      const done = withTenant(result.db, mkInstituteCtx(inst.tenantId, ORIGIN), async (tx) => {
+        const admitted = await admitStudent(tx, admitData(userId, target, number));
+        saved();
+        await released;
+        return admitted;
+      });
+      await ready;
+      return { release, done };
+    };
 
     return {
       inst,
       fixture,
       admitByForm,
       formNumber,
-      importNumbers,
+      importRows,
       counters,
       storedNumbers,
       setCounter,
+      newAccount,
+      admitData,
+      holdAdmission,
     };
   };
 
@@ -256,9 +343,9 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
   });
 
   it('should continue the series after imported numbers that fit it', async () => {
-    const { fixture, importNumbers, counters, formNumber } = await setUpInstitute();
+    const { fixture, importRows, counters, formNumber } = await setUpInstitute();
 
-    const outcome = await importNumbers([serial(1), serial(2), serial(3)]);
+    const outcome = await importRows([serial(1), serial(2), serial(3)]);
     expect(outcome.created).toBe(3);
     expect(await counters()).toEqual({ [PLAIN]: 3n });
 
@@ -267,18 +354,31 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
   });
 
   it('should give the next number after an imported register of ten', async () => {
-    const { fixture, importNumbers, formNumber } = await setUpInstitute();
+    const { fixture, importRows, formNumber } = await setUpInstitute();
 
-    const outcome = await importNumbers(Array.from({ length: 10 }, (_, i) => serial(i + 1)));
+    const outcome = await importRows(Array.from({ length: 10 }, (_, i) => serial(i + 1)));
     expect(outcome.created).toBe(10);
 
     expect(await formNumber(fixture.class5)).toBe(serial(11));
   });
 
-  it('should store a number of another shape and leave every counter alone', async () => {
-    const { fixture, importNumbers, counters, storedNumbers, formNumber } = await setUpInstitute();
+  it('should raise past the legacy counter only when the supplied number is higher', async () => {
+    const { fixture, importRows, setCounter, counters, formNumber } = await setUpInstitute();
+    await setCounter('adm_no', 7n);
 
-    const outcome = await importNumbers(['OLD-17']);
+    await importRows([serial(3)]);
+    expect(await counters()).toEqual({ adm_no: 7n, [PLAIN]: 7n });
+    expect(await formNumber(fixture.class5)).toBe(serial(8));
+
+    await importRows([serial(12)]);
+    expect(await counters()).toEqual({ adm_no: 7n, [PLAIN]: 12n });
+    expect(await formNumber(fixture.class5)).toBe(serial(13));
+  });
+
+  it('should store a number of another shape and leave every counter alone', async () => {
+    const { fixture, importRows, counters, storedNumbers, formNumber } = await setUpInstitute();
+
+    const outcome = await importRows(['OLD-17']);
     expect(outcome.created).toBe(1);
     expect(await storedNumbers()).toEqual(['OLD-17']);
     expect(await counters()).toEqual({});
@@ -286,28 +386,38 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
     expect(await formNumber(fixture.class5)).toBe(serial(1));
   });
 
-  it('should skip a taken number the counter does not know about', async () => {
-    const { fixture, importNumbers, setCounter, counters, formNumber } = await setUpInstitute();
-    // A register imported before ROV-367: the number is stored, the counter never moved past it.
-    await importNumbers([serial(5)]);
-    await setCounter(PLAIN, 4n);
+  it('should not let a far-out supplied number wall the series', async () => {
+    const { fixture, importRows, counters, formNumber } = await setUpInstitute();
 
-    expect(await formNumber(fixture.class5)).toBe(serial(6));
-    expect(await counters()).toEqual({ [PLAIN]: 6n });
+    const outcome = await importRows([`${YEAR}/${MAX_SEQUENCE_VALUE}`, `${YEAR}/1000000`]);
+    expect(outcome.created).toBe(2);
+    expect(await counters()).toEqual({});
+
+    expect(await formNumber(fixture.class5)).toBe(serial(1));
+  });
+
+  it('should cross a block of taken numbers in one step', async () => {
+    const { fixture, importRows, setCounter, counters, formNumber } = await setUpInstitute();
+    // A register imported before ROV-367: the numbers are stored, the counter never moved.
+    await importRows([serial(1), serial(2), serial(3), serial(40)]);
+    await setCounter(PLAIN, 0n);
+
+    expect(await formNumber(fixture.class5)).toBe(serial(41));
+    expect(await counters()).toEqual({ [PLAIN]: 41n });
   });
 
   it('should never lower the counter for a lower supplied number', async () => {
-    const { importNumbers, counters } = await setUpInstitute();
+    const { importRows, counters } = await setUpInstitute();
 
-    await importNumbers([serial(9), serial(2)]);
+    await importRows([serial(9), serial(2)]);
 
     expect(await counters()).toEqual({ [PLAIN]: 9n });
   });
 
   it("should leave counters alone for another year's or another prefix's number", async () => {
-    const { fixture, importNumbers, counters, formNumber } = await setUpInstitute();
+    const { fixture, importRows, counters, formNumber } = await setUpInstitute();
 
-    const outcome = await importNumbers([`${LAST_YEAR}/0050`, `N-${YEAR}/0050`, `${YEAR}/42`]);
+    const outcome = await importRows([`${LAST_YEAR}/0050`, `N-${YEAR}/0050`, `${YEAR}/42`]);
     expect(outcome.created).toBe(3);
     expect(await counters()).toEqual({});
 
@@ -322,7 +432,7 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
     await b.formNumber(b.fixture.class5);
     const before = await b.counters();
 
-    await a.importNumbers([serial(7)]);
+    await a.importRows([serial(7)]);
 
     expect(await a.counters()).toEqual({ [PLAIN]: 7n });
     expect(await b.counters()).toEqual(before);
@@ -330,76 +440,101 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
   });
 
   it('should keep numbers unique and the counter at the highest number under concurrency', async () => {
-    const { fixture, importNumbers, counters, storedNumbers, formNumber } = await setUpInstitute();
+    const { fixture, importRows, counters, storedNumbers, formNumber } = await setUpInstitute();
 
-    await Promise.all([
+    const [imported] = await Promise.all([
+      importRows([serial(3), serial(7), serial(14)]),
       ...Array.from({ length: 10 }, () => formNumber(fixture.class5)),
-      importNumbers([serial(3), serial(7), serial(14)]),
     ]);
 
+    expect(imported.errors).toEqual([]);
+    expect(imported.created + imported.skipped).toBe(3);
     const stored = await storedNumbers();
+    expect(stored).toHaveLength(10 + imported.created);
     expect(new Set(stored).size).toBe(stored.length);
     const highest = stored.reduce((max, n) => Math.max(max, Number(n.split('/')[1])), 0);
-    expect(highest).toBeGreaterThanOrEqual(14);
     expect(await counters()).toEqual({ [PLAIN]: BigInt(highest) });
   });
 
-  it('should refuse with ADMISSION_NUMBER_SERIES_EXHAUSTED when every number tried is taken', async () => {
-    const { inst, fixture, importNumbers, setCounter, counters } = await setUpInstitute();
-    await importNumbers([serial(1), serial(2)]);
+  it('should give the next free number when a generated number is saved by another admission at the same moment', async () => {
+    const { fixture, holdAdmission, formNumber, storedNumbers } = await setUpInstitute();
+    // A Nursery student carrying the number Class 5 will generate next: it fits no counter.
+    const held = await holdAdmission(serial(1), fixture.nursery);
+
+    const generated = formNumber(fixture.class5);
+    await someoneWaitsOnALock();
+    held.release();
+    expect((await held.done).kind).toBe('ok');
+
+    expect(await generated).toBe(serial(2));
+    expect(await storedNumbers()).toEqual([serial(1), serial(2)]);
+  });
+
+  it('should report an imported row as skipped when its number is saved at the same moment', async () => {
+    const { holdAdmission, fixture, importRows, storedNumbers } = await setUpInstitute();
+    const held = await holdAdmission(serial(5), fixture.nursery);
+
+    const imported = importRows([serial(5)]);
+    await someoneWaitsOnALock();
+    held.release();
+    await held.done;
+
+    expect(await imported).toEqual({ created: 0, skipped: 1, errors: [] });
+    expect(await storedNumbers()).toEqual([serial(5)]);
+  });
+
+  it('should answer ADMISSION_NUMBER_TAKEN for a supplied number taken at insert', async () => {
+    const { importRows, storedNumbers, newAccount, admitData, fixture } = await setUpInstitute();
+    await importRows([serial(1)]);
+    const userId = await newAccount();
+
+    await expect(
+      result.app.get(StudentRepository).admit(admitData(userId, fixture.class5, serial(1))),
+    ).rejects.toMatchObject({ code: ErrorCode.ADMISSION_NUMBER_TAKEN });
+    expect(await storedNumbers()).toEqual([serial(1)]);
+    await result.app.get(IdentityService).discardNewUser(userId);
+  });
+
+  it('should generate a number for an empty supplied number', async () => {
+    const { newAccount, admitData, fixture } = await setUpInstitute();
+
+    const admitted = await result.app
+      .get(StudentRepository)
+      .admit(admitData(await newAccount(), fixture.class5, ''));
+
+    expect(admitted).toMatchObject({ kind: 'ok', admissionNumber: serial(1) });
+  });
+
+  it('should refuse with ADMISSION_NUMBER_SERIES_EXHAUSTED after the last try', async () => {
+    const { inst, fixture, importRows, setCounter, counters } = await setUpInstitute();
+    await importRows([serial(1), serial(2)]);
     await setCounter(PLAIN, 0n);
 
     await expect(
       asAdmin((tx) =>
-        nextAdmissionNumber(tx, inst.tenantId, fixture.class5.standardId, { maxSkips: 1 }),
+        nextAdmissionNumber(tx, inst.tenantId, fixture.class5.standardId, { maxTries: 1 }),
       ),
     ).rejects.toMatchObject({ code: ErrorCode.ADMISSION_NUMBER_SERIES_EXHAUSTED });
     expect(await counters()).toEqual({ [PLAIN]: 0n });
   });
 
-  it('should answer ADMISSION_NUMBER_TAKEN, not an internal error, when the number is taken at insert', async () => {
-    const { inst, fixture, importNumbers, storedNumbers } = await setUpInstitute();
-    await importNumbers([serial(1)]);
-    const identity = result.app.get(IdentityService);
-    const { userId } = await identity.createUser({
-      email: `taken-${randomUUID()}@roviq.test`,
-      username: `taken-${randomUUID().slice(0, 12)}`,
-      actorId: inst.userId,
-    });
+  it('should refuse with ADMISSION_NUMBER_SERIES_EXHAUSTED when the counter is at its limit', async () => {
+    const { fixture, admitByForm, importRows, setCounter, counters, storedNumbers } =
+      await setUpInstitute();
+    await setCounter(PLAIN, MAX_SEQUENCE_VALUE);
 
-    await expect(
-      result.app.get(StudentRepository).admit({
-        tenantId: inst.tenantId,
-        userId,
-        actorId: inst.userId,
-        academicYearId: fixture.academicYearId,
-        standardId: fixture.class5.standardId,
-        sectionId: fixture.class5.sectionId,
-        tenantProfile: { firstName: { en: 'Clash' }, lastName: null, gender: Gender.FEMALE },
-        profile: {
-          admissionDate: '2026-11-26',
-          admissionClass: null,
-          admissionType: AdmissionType.NEW,
-          academicStatus: AcademicStatus.ENROLLED,
-          socialCategory: SocialCategory.GENERAL,
-          caste: null,
-          isMinority: false,
-          minorityType: null,
-          isBpl: false,
-          isCwsn: false,
-          cwsnType: null,
-          isRteAdmitted: false,
-          rteCertificate: null,
-          previousSchoolName: null,
-          previousSchoolBoard: null,
-          previousSchoolUdise: null,
-          incomingTcNumber: null,
-          incomingTcDate: null,
-        },
-        admissionNumber: serial(1),
-      }),
-    ).rejects.toMatchObject({ code: ErrorCode.ADMISSION_NUMBER_TAKEN });
-    expect(await storedNumbers()).toEqual([serial(1)]);
-    await identity.discardNewUser(userId);
+    const res = await admitByForm(fixture.class5);
+    expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.ADMISSION_NUMBER_SERIES_EXHAUSTED);
+
+    const outcome = await importRows([undefined]);
+    expect(outcome).toEqual({
+      created: 0,
+      skipped: 0,
+      errors: [
+        { rowNumber: 1, field: 'admission_number', reason: ROW_ADMISSION_NUMBERS_EXHAUSTED },
+      ],
+    });
+    expect(await storedNumbers()).toEqual([]);
+    expect(await counters()).toEqual({ [PLAIN]: MAX_SEQUENCE_VALUE });
   });
 });

@@ -144,7 +144,7 @@ export const ErrorCode = {
   HAS_ACTIVE_ENROLLMENTS: 'HAS_ACTIVE_ENROLLMENTS',
   /** A live student already has this admission number (restore, or a clash while admitting) */
   ADMISSION_NUMBER_TAKEN: 'ADMISSION_NUMBER_TAKEN',
-  /** Every number tried in the admission series was already taken; no number was issued */
+  /** The admission series has no free number left (every try taken, or the counter at its limit) */
   ADMISSION_NUMBER_SERIES_EXHAUSTED: 'ADMISSION_NUMBER_SERIES_EXHAUSTED',
   /** Cannot delete subject — assessments have been recorded against it */
   HAS_RECORDED_ASSESSMENTS: 'HAS_RECORDED_ASSESSMENTS',

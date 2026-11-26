@@ -6,6 +6,7 @@ export { refreshInstituteDefaultRoles } from './institute-default-roles';
 export { RoviqDrizzleLogger } from './logger';
 export {
   mapUniqueViolation,
+  pgErrorCode,
   type UniqueViolationErrors,
   uniqueViolationConstraint,
 } from './pg-errors';
@@ -30,9 +31,11 @@ export {
   admissionSeriesName,
   formatSequenceValue,
   LEGACY_ADMISSION_SEQUENCE,
+  MAX_SEQUENCE_VALUE,
   parseSequenceValue,
   resolveAdmissionPrefix,
   resolveAdmissionYear,
+  sequenceLiteralPrefix,
 } from './sequences/admission-number';
 export { notDeleted, restoreDeleted, softDelete } from './soft-delete';
 export { isValidTenantId } from './tenant-context';

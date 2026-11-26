@@ -1,14 +1,22 @@
 /**
  * ROV-275: a student is admitted in one institute transaction. A failure after the account is
- * made leaves no institute row, no gap in the admission series and no account behind.
+ * made leaves no institute row, no gap in the admission or roll number series, and no account
+ * behind.
  */
 import assert from 'node:assert/strict';
-import { DefaultRoles, ErrorCode } from '@roviq/common-types';
+import {
+  AcademicStatus,
+  AdmissionType,
+  DefaultRoles,
+  ErrorCode,
+  SocialCategory,
+} from '@roviq/common-types';
 import {
   academicYears,
   type DrizzleDB,
   memberships,
   mkAdminCtx,
+  pgErrorCode,
   phoneNumbers,
   roles,
   SYSTEM_USER_ID,
@@ -34,11 +42,33 @@ import {
 import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
+import { IdentityService } from '../../../auth/identity.service';
 import { StudentRepository } from '../repositories/student.repository';
 
 const ORIGIN = 'test:student-create-atomic';
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 const PHONE = '9876543210';
+
+const NEW_PROFILE = {
+  admissionDate: '2026-11-26',
+  admissionClass: null,
+  admissionType: AdmissionType.NEW,
+  academicStatus: AcademicStatus.ENROLLED,
+  socialCategory: SocialCategory.GENERAL,
+  caste: null,
+  isMinority: false,
+  minorityType: null,
+  isBpl: false,
+  isCwsn: false,
+  cwsnType: null,
+  isRteAdmitted: false,
+  rteCertificate: null,
+  previousSchoolName: null,
+  previousSchoolBoard: null,
+  previousSchoolUdise: null,
+  incomingTcNumber: null,
+  incomingTcDate: null,
+};
 
 const CREATE_STUDENT = /* GraphQL */ `
   mutation CreateStudent($input: CreateStudentInput!) {
@@ -254,32 +284,76 @@ describe('createStudent: one institute transaction (ROV-275)', () => {
     emit.mockRestore();
   });
 
-  it('should roll every institute row back when a database error is thrown inside the transaction', async () => {
+  it('should roll every institute row back when a database error is thrown after the profile insert', async () => {
     const existing = await create('Ishaan');
     expect(existing.errors).toBeUndefined();
-    // A counter at the bigint limit: taking the next number overflows in PostgreSQL after the
-    // membership and the institute's profile copy are already inserted. A stepped-back counter
-    // no longer fails, because generation skips a number a student already holds (ROV-367).
-    await asAdmin((tx) =>
-      tx
-        .update(tenantSequences)
-        .set({ currentValue: 9_223_372_036_854_775_807n })
-        .where(
-          and(
-            eq(tenantSequences.tenantId, inst.tenantId),
-            like(tenantSequences.sequenceName, 'adm_no%'),
-          ),
-        ),
-    );
+    assert(existing.data);
+    // The next roll number has 11 digits and does not fit `roll_number` (varchar 10): the
+    // enrolment insert fails after the membership, the profile copy, the admission number and
+    // the student profile are written.
+    const rollSeries = `roll_no:${place.sectionId}:${place.academicYearId}`;
+    const setRollCounter = (value: bigint) =>
+      asAdmin((tx) =>
+        tx
+          .insert(tenantSequences)
+          .values({ tenantId: inst.tenantId, sequenceName: rollSeries, currentValue: value })
+          .onConflictDoUpdate({
+            target: [tenantSequences.tenantId, tenantSequences.sequenceName],
+            set: { currentValue: value },
+          }),
+      );
+    const rollCounter = async () =>
+      (
+        await asAdmin((tx) =>
+          tx
+            .select({ value: tenantSequences.currentValue })
+            .from(tenantSequences)
+            .where(
+              and(
+                eq(tenantSequences.tenantId, inst.tenantId),
+                eq(tenantSequences.sequenceName, rollSeries),
+              ),
+            ),
+        )
+      )[0]?.value;
+    await setRollCounter(9_999_999_999n);
+    const identity = result.app.get(IdentityService);
+    const { userId } = await identity.createUser({
+      email: `atomic-${Date.now()}@roviq.test`,
+      username: `atomic-${Date.now()}`,
+      actorId: inst.userId,
+    });
+    const admit = () =>
+      result.app.get(StudentRepository).admit({
+        tenantId: inst.tenantId,
+        userId,
+        actorId: inst.userId,
+        ...place,
+        tenantProfile: { firstName: { en: 'Zoya' }, lastName: null },
+        profile: NEW_PROFILE,
+        admissionNumber: null,
+        assignRollNumber: true,
+      });
     const before = await written();
-    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
 
-    const res = await create('Zoya');
+    const failure = await admit().then(
+      () => null,
+      (error: unknown) => error,
+    );
 
-    expect(res.errors).toHaveLength(1);
-    expect(res.data).toBeNull();
+    expect(pgErrorCode(failure)).toBe('22001');
     expect(await written()).toEqual(before);
-    expect(emit).not.toHaveBeenCalled();
-    emit.mockRestore();
+    expect(await rollCounter()).toBe(9_999_999_999n);
+
+    // With the roll series back in range the same admission succeeds with the very next
+    // admission number: the failed attempt used none.
+    await setRollCounter(0n);
+    const admitted = await admit();
+    assert(admitted.kind === 'ok');
+    const [counter] = before.counters;
+    expect(counter.value).toBe(BigInt(existing.data.createStudent.admissionNumber.slice(-4)));
+    expect(admitted.admissionNumber).toBe(String(counter.value + 1n).padStart(4, '0'));
+    expect(await rollCounter()).toBe(1n);
+    expect((await written()).strength).toBe((before.strength ?? 0) + 1);
   });
 });

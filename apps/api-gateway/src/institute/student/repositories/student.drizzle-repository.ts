@@ -54,8 +54,7 @@ import type {
 
 const ORIGIN = 'service:student';
 
-// Restore and admission check the number first; only a student admitted at the same moment
-// with the same number gets here.
+// Restore checks the number first; only a student admitted at the same moment gets here.
 const ADMISSION_NUMBER_TAKEN: UniqueViolationErrors = {
   idx_student_admission_no_active: () =>
     new BusinessException(
@@ -73,7 +72,7 @@ export class StudentDrizzleRepository extends StudentRepository {
   admit(data: AdmitStudentData): Promise<AdmitStudentResult> {
     return withTenant(this.db, mkInstituteCtx(data.tenantId, ORIGIN), (tx) =>
       admitStudent(tx, data),
-    ).catch(mapUniqueViolation(ADMISSION_NUMBER_TAKEN));
+    );
   }
 
   checkAdmissionClass(tenantId: string, data: AdmissionClassData): Promise<AdmissionClassResult> {

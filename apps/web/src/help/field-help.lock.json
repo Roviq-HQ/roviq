@@ -146,10 +146,10 @@
     }
   },
   "displaySettings.sampleAdmissionNumber": {
-    "reviewedReason": "ROV-367: blank still gets the next number of the series; generation now also skips numbers a student already holds, which the copy does not contradict",
+    "reviewedReason": "ROV-367 review: blank still gets the next free number of the series; the jump past taken numbers and the overflow refusal do not contradict the copy",
     "targets": {
-      "apps/api-gateway/src/institute/student/admission-number.sequence.ts#nextAdmissionNumber": "dc513d7deb428790",
-      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "a2c5b913615c6bfd"
+      "apps/api-gateway/src/institute/student/admission-number.sequence.ts#nextAdmissionNumber": "96d06b70888b1dfe",
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "2c543fcc39b089cf"
     }
   },
   "groups.new.memberTypes": {
@@ -239,9 +239,9 @@
     }
   },
   "instituteSettings.config.optimalStrength": {
-    "reviewedReason": "ROV-367 changed only how admitStudent picks or records the admission number; section strength and its notification are unchanged",
+    "reviewedReason": "ROV-367 review changed how admitStudent inserts the profile (savepoint retry, supplied-number clash); section strength and its notification are unchanged",
     "targets": {
-      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "a2c5b913615c6bfd",
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "2c543fcc39b089cf",
       "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockSectionForPlacement": "37ca1a64a2a1d924",
       "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockStudentSections": "f4a41d4fe6a7c2f9",
       "apps/api-gateway/src/institute/student/section-norms.ts#sectionCapacityWarning": "8674a3b46ed2f6e6",

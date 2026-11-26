@@ -11,6 +11,12 @@ export function uniqueViolationConstraint(err: unknown): string | null {
   return err.cause.code === '23505' ? (err.cause.constraint ?? null) : null;
 }
 
+/** The SQLSTATE of a failed query (`22003` for a number out of range), or null for any other error. */
+export function pgErrorCode(err: unknown): string | null {
+  if (!(err instanceof DrizzleQueryError) || !(err.cause instanceof DatabaseError)) return null;
+  return err.cause.code ?? null;
+}
+
 /** For each unique constraint, the error a write that violates it is turned into. */
 export type UniqueViolationErrors = Readonly<Record<string, () => Error>>;
 
