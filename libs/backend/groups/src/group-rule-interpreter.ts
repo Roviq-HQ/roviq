@@ -49,9 +49,6 @@ const DIMENSION_TO_COLUMN: Record<string, string> = {
   medium: '"sections"."medium_of_instruction"',
 };
 
-/** Every `var` a group rule may name. */
-export const GROUP_RULE_DIMENSIONS: readonly string[] = Object.keys(DIMENSION_TO_COLUMN);
-
 /** Type for a JsonLogic rule — the input format stored in group_rules.rule */
 export type JsonLogicRule = Record<string, unknown>;
 

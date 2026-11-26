@@ -1292,6 +1292,9 @@ export const testIds = {
     newRulePreviewError: 'groups-new-rule-preview-error',
     newSubmitBtn: 'groups-new-submit-btn',
     newAccessDenied: 'groups-new-access-denied',
+    newRuleDimension: 'groups-new-rule-dimension',
+    newRuleOperator: 'groups-new-rule-operator',
+    newRuleValue: 'groups-new-rule-value',
     // Rule preview
     previewMember: (membershipId: string) => `groups-preview-member-${membershipId}`,
   },

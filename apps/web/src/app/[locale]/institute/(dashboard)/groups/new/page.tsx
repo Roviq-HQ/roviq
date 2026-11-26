@@ -1,6 +1,10 @@
 'use client';
 
-import { DOMAIN_GROUP_TYPE_VALUES, GROUP_MEMBERSHIP_TYPE_VALUES } from '@roviq/common-types';
+import {
+  DOMAIN_GROUP_TYPE_VALUES,
+  GROUP_MEMBERSHIP_TYPE_VALUES,
+  GROUP_RULE_DIMENSION_VALUES,
+} from '@roviq/common-types';
 import { extractGraphQLErrorCode, isNetworkError } from '@roviq/graphql';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
@@ -77,18 +81,7 @@ const { instituteGroups } = testIds;
 
 const MEMBER_TYPES = ['student', 'staff', 'guardian'] as const;
 
-const DIMENSION_OPTIONS = [
-  'gender',
-  'standard_id',
-  'section_id',
-  'social_category',
-  'is_rte_admitted',
-  'religion',
-  'is_cwsn',
-  'is_minority',
-  'is_bpl',
-  'mother_tongue',
-] as const;
+const DIMENSION_OPTIONS = GROUP_RULE_DIMENSION_VALUES;
 
 const OPERATOR_OPTIONS = ['==', '!=', 'in', '>', '<', '>=', '<='] as const;
 
@@ -776,7 +769,11 @@ function RuleNodeEditor({
               value={c.dimension}
               onValueChange={(v) => updateCondition(c.id, { dimension: v })}
             >
-              <SelectTrigger className="h-8 w-[180px]" aria-label={t('new.rule.dimension')}>
+              <SelectTrigger
+                className="h-8 w-[180px]"
+                aria-label={t('new.rule.dimension')}
+                data-testid={instituteGroups.newRuleDimension}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -791,7 +788,11 @@ function RuleNodeEditor({
               value={c.operator}
               onValueChange={(v) => updateCondition(c.id, { operator: v as Operator })}
             >
-              <SelectTrigger className="h-8 w-[100px]" aria-label={t('new.rule.operator')}>
+              <SelectTrigger
+                className="h-8 w-[100px]"
+                aria-label={t('new.rule.operator')}
+                data-testid={instituteGroups.newRuleOperator}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -808,6 +809,7 @@ function RuleNodeEditor({
               placeholder={t('new.rule.valuePlaceholder')}
               className="h-8 w-[200px]"
               aria-label={t('new.rule.value')}
+              data-testid={instituteGroups.newRuleValue}
             />
             <Button
               type="button"

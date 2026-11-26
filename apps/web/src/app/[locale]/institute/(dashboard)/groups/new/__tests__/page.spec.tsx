@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { GROUP_RULE_DIMENSION_VALUES } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +9,8 @@ import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import errorEn from '../../../../../../../../messages/en/error.json';
+import groupsEn from '../../../../../../../../messages/en/groups.json';
+import groupsHi from '../../../../../../../../messages/hi/groups.json';
 
 const { instituteGroups: ids } = testIds;
 
@@ -73,5 +76,56 @@ describe('NewGroupPage (ROV-358)', () => {
     );
     expect(toast.error).not.toHaveBeenCalled();
     expect(screen.queryByText('raw server text')).toBeNull();
+  });
+});
+
+describe('NewGroupPage rule builder dimensions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.createGroup.mockResolvedValue({ data: { createGroup: { id: 'group-1' } } });
+  });
+
+  const openRuleStep = async (bundle: typeof groupsEn) => {
+    const { basics } = bundle.new;
+    await userEvent.type(screen.getByRole('textbox', { name: basics.name }), 'Promoted');
+    await userEvent.click(screen.getByRole('combobox', { name: basics.type }));
+    await userEvent.click(await screen.findByRole('option', { name: bundle.types.CLUB }));
+    await userEvent.click(screen.getByRole('combobox', { name: basics.membershipType }));
+    await userEvent.click(
+      await screen.findByRole('option', { name: new RegExp(`^${bundle.membershipTypes.DYNAMIC}`) }),
+    );
+    await userEvent.click(screen.getByTestId(ids.newNextBtn));
+    await userEvent.click(await screen.findByTestId(ids.newRuleDimension));
+  };
+
+  it('should offer every dimension the rule interpreter accepts, in English', async () => {
+    renderWithProviders(<NewGroupPage />);
+    await openRuleStep(groupsEn);
+
+    const options = (await screen.findAllByRole('option')).map((o) => o.textContent);
+    expect(options).toEqual(GROUP_RULE_DIMENSION_VALUES.map((d) => groupsEn.dimensions[d]));
+  });
+
+  it('should offer every dimension with its Hindi label', async () => {
+    renderWithProviders(<NewGroupPage />, { locale: 'hi' });
+    await openRuleStep(groupsHi);
+
+    const options = (await screen.findAllByRole('option')).map((o) => o.textContent);
+    expect(options).toEqual(GROUP_RULE_DIMENSION_VALUES.map((d) => groupsHi.dimensions[d]));
+  });
+
+  it('should create a group whose rule tests the student status', async () => {
+    renderWithProviders(<NewGroupPage />);
+    await openRuleStep(groupsEn);
+    await userEvent.click(
+      await screen.findByRole('option', { name: groupsEn.dimensions.academic_status }),
+    );
+    await userEvent.type(screen.getByTestId(ids.newRuleValue), 'PROMOTED');
+    await userEvent.click(screen.getByRole('button', { name: /create/i }));
+
+    expect(mocks.createGroup).toHaveBeenCalledTimes(1);
+    expect(mocks.createGroup.mock.calls[0]?.[0].variables.input.rule).toEqual({
+      and: [{ '==': [{ var: 'academic_status' }, 'PROMOTED'] }],
+    });
   });
 });

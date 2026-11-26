@@ -1,6 +1,6 @@
 import { Controller, Inject, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
-import { GroupMembershipType } from '@roviq/common-types';
+import { GROUP_RULE_DIMENSION_VALUES, GroupMembershipType } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -9,11 +9,11 @@ import {
   mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
-import { GROUP_RULE_DIMENSIONS } from '@roviq/groups';
 import { EVENT_PATTERNS, eventPayloadSchemas, gatewayConsumer } from '@roviq/nats-jetstream';
 import { and, arrayOverlaps, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 
 const ORIGIN = 'consumer:group-invalidation';
+const RULE_DIMENSIONS: ReadonlySet<string> = new Set(GROUP_RULE_DIMENSION_VALUES);
 
 /**
  * Sets `groups.resolved_at = NULL` on groups whose members an event may have changed; the next
@@ -62,7 +62,7 @@ export class GroupInvalidationHandler {
       eventPayloadSchemas[EVENT_PATTERNS.STUDENT.updated].parse(data);
     const dimensions = changedFields
       .map((field) => field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`))
-      .filter((dimension) => GROUP_RULE_DIMENSIONS.includes(dimension));
+      .filter((dimension) => RULE_DIMENSIONS.has(dimension));
     if (dimensions.length > 0) await this.invalidateByDimensions(tenantId, dimensions);
   }
 
