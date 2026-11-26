@@ -58,8 +58,11 @@ To point an environment at a store:
 
 1. Create both buckets and set the variables.
 2. `pnpm storage:configure` applies the CORS rule and the lifecycle rules to the two existing
-   buckets and reads them back (`--dry-run` prints them as JSON for a store configured by hand).
-   It never creates a bucket or writes a bucket policy.
+   buckets, reads them back and exits 1 when the store did not keep one as written (`--dry-run`
+   prints them as JSON for a store configured by hand). Rules already on a bucket under other ids,
+   such as a version expiry or a replication rule, are kept; ours are replaced by id. It never
+   creates a bucket or writes a bucket policy. Run it with an administrative key that may read and
+   write bucket CORS and lifecycle configuration, not the app's key, which needs no such rights.
 3. `pnpm storage:check` must pass in full; it is the test of whether a store is usable. A check
    that cannot apply prints `SKIP` (the plain-http check against an http endpoint) and does not
    fail the run.
@@ -83,7 +86,8 @@ Required on any provider:
   expire `__storage-check__/` leftovers after one day.
 - **Versioning and erasure**: with versioning on, a deleted or erased file stays in the bucket as
   an old version until the lifecycle expires it. Expire non-current versions and delete markers
-  after a fixed number of days, and state that period wherever erasure is promised.
+  after a fixed number of days, and state that period wherever erasure is promised. A replica
+  bucket keeps versions of its own: give it the same expiry, or erased files live on there.
 - **Backups**: replicate or back up the private bucket; the database alone cannot restore files.
 - **Credentials**: an access key limited to these two buckets (get, put, delete, list, copy).
 - `/api/health` reports storage down when either bucket is missing or unreachable.

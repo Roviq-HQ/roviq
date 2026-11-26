@@ -12,10 +12,13 @@ export function parseOrigins(raw: string): string[] {
     .filter((origin) => origin.length > 0);
 }
 
+export const PORTAL_CORS_RULE_ID = 'roviq-portals';
+
 /** Browsers upload straight to the private bucket from the portals and download from it. */
 export function portalCorsRule(origins: string[]): CORSRule {
   if (origins.length === 0) throw new Error('ALLOWED_ORIGINS lists no portal origin');
   return {
+    ID: PORTAL_CORS_RULE_ID,
     AllowedOrigins: origins,
     AllowedMethods: ['PUT', 'GET'],
     AllowedHeaders: ['Content-Type'],
@@ -66,4 +69,104 @@ export function publicBucketLifecycle(): LifecycleRule[] {
       Expiration: { Days: 1 },
     },
   ];
+}
+
+/** What `storage:configure` writes to each of the two buckets. */
+export interface BucketPlan {
+  bucket: string;
+  cors: CORSRule[];
+  lifecycle: LifecycleRule[];
+}
+
+export function storagePlan(input: {
+  privateBucket: string;
+  publicBucket: string;
+  origins: string[];
+}): BucketPlan[] {
+  return [
+    {
+      bucket: input.privateBucket,
+      cors: [portalCorsRule(input.origins)],
+      lifecycle: privateBucketLifecycle(),
+    },
+    { bucket: input.publicBucket, cors: [], lifecycle: publicBucketLifecycle() },
+  ];
+}
+
+/**
+ * Rules someone else put on the bucket (replication, version expiry, a manual rule) are kept:
+ * ours replace only the rules with our ids. A rule without an id is kept unless it is a copy of
+ * one of ours (written before our rules had ids).
+ */
+export function mergeRules<T extends { ID?: string }>(
+  existing: T[],
+  ours: T[],
+): { rules: T[]; kept: T[] } {
+  const ourIds = new Set(ours.map((rule) => rule.ID));
+  const ourContents = new Set(ours.map(contentKey));
+  const kept = existing.filter((rule) =>
+    rule.ID === undefined ? !ourContents.has(contentKey(rule)) : !ourIds.has(rule.ID),
+  );
+  return { rules: [...kept, ...ours], kept };
+}
+
+/** A rule without its id, with keys in a fixed order: an unnamed copy of ours is ours. */
+function contentKey(rule: { ID?: string }): string {
+  const { ID: _id, ...content } = rule;
+  return JSON.stringify(content, (_key, value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      : value,
+  );
+}
+
+function sorted(values: string[] | undefined): string {
+  return [...(values ?? [])]
+    .map((value) => value.toLowerCase())
+    .sort()
+    .join(',');
+}
+
+function corsShape(rule: CORSRule): string {
+  return JSON.stringify([
+    sorted(rule.AllowedOrigins),
+    sorted(rule.AllowedMethods),
+    sorted(rule.AllowedHeaders),
+    sorted(rule.ExposeHeaders),
+    rule.MaxAgeSeconds ?? null,
+  ]);
+}
+
+// Stores return a rule's prefix either inside Filter or on the rule, and may drop an empty one.
+function lifecycleShape(rule: LifecycleRule): string {
+  return JSON.stringify([
+    rule.Status,
+    rule.Filter?.Prefix ?? rule.Prefix ?? '',
+    rule.Expiration?.Days ?? null,
+    rule.AbortIncompleteMultipartUpload?.DaysAfterInitiation ?? null,
+  ]);
+}
+
+/**
+ * Our rules the store did not keep as written, by id, after a read-back. A store that accepts a
+ * rule and silently drops part of it shows up here.
+ */
+export function ruleDifferences(input: {
+  plannedCors: CORSRule[];
+  appliedCors: CORSRule[];
+  plannedLifecycle: LifecycleRule[];
+  appliedLifecycle: LifecycleRule[];
+}): string[] {
+  const differences: string[] = [];
+  for (const planned of input.plannedCors) {
+    const applied = input.appliedCors.find((rule) => corsShape(rule) === corsShape(planned));
+    if (!applied) differences.push(`CORS rule ${planned.ID ?? '(no id)'}`);
+  }
+  for (const planned of input.plannedLifecycle) {
+    const applied = input.appliedLifecycle.find((rule) => rule.ID === planned.ID);
+    if (!applied || lifecycleShape(applied) !== lifecycleShape(planned)) {
+      differences.push(`lifecycle rule ${planned.ID ?? '(no id)'}`);
+    }
+  }
+  return differences;
 }
