@@ -108,6 +108,7 @@ import {
   MoveRight,
   Plus,
   ShieldCheck,
+  ShieldOff,
   Star,
   UserMinus,
   UserPlus,
@@ -129,6 +130,7 @@ import {
   type StudentHistoryItem,
   useStudentHistory,
 } from '../../../attendance/use-attendance';
+import { GuardianAccessButton } from '../../guardian-access-dialog';
 import { useLinkGuardianToStudent } from '../../guardians/use-guardians';
 import { PersonNameLink, usePersonDetailContext } from '../../person-detail-dialog';
 import { UnlinkGuardianButton } from '../../unlink-guardian-dialog';
@@ -154,7 +156,7 @@ import {
   StudentProfileReadOnly,
 } from './student-profile-read-only';
 
-const { instituteStudents } = testIds;
+const { institutePeople, instituteStudents } = testIds;
 /**
  * Document types enforced by the `chk_document_type` CHECK constraint on
  * `user_documents.type`. Must stay in sync with the Zod enum and with the
@@ -1536,6 +1538,8 @@ function GuardiansTab({
   studentName: string;
 }) {
   const t = useTranslations('students');
+  const tLinks = useTranslations('peopleLinks');
+  const { format } = useFormatDate();
   const resolveI18n = useI18nField();
   const { data, loading } = useStudentGuardians(studentProfileId);
   const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
@@ -1627,6 +1631,19 @@ function GuardiansTab({
                         {t('detail.guardians.emergency')}
                       </Badge>
                     )}
+                    {g.accessRevokedAt && (
+                      <Badge
+                        variant="outline"
+                        className="border-destructive/40 text-destructive"
+                        title={tLinks('access.revokedSince', {
+                          date: format(new Date(g.accessRevokedAt), 'dd/MM/yyyy'),
+                        })}
+                        data-testid={institutePeople.accessRevokedBadge(g.linkId)}
+                      >
+                        <ShieldOff aria-hidden="true" className="size-3" />
+                        {tLinks('access.revokedBadge')}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {t(`detail.guardians.relationships.${g.relationship}`, {
@@ -1650,13 +1667,23 @@ function GuardiansTab({
                     )}
                   </div>
                 </div>
-                <UnlinkGuardianButton
-                  linkId={g.linkId}
-                  studentProfileId={studentProfileId}
-                  guardianProfileId={g.guardianProfileId}
-                  studentName={studentName}
-                  guardianName={fullName}
-                />
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <GuardianAccessButton
+                    linkId={g.linkId}
+                    studentProfileId={studentProfileId}
+                    guardianProfileId={g.guardianProfileId}
+                    studentName={studentName}
+                    guardianName={fullName}
+                    revoked={Boolean(g.accessRevokedAt)}
+                  />
+                  <UnlinkGuardianButton
+                    linkId={g.linkId}
+                    studentProfileId={studentProfileId}
+                    guardianProfileId={g.guardianProfileId}
+                    studentName={studentName}
+                    guardianName={fullName}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -3283,6 +3283,11 @@ enum GuardianEducationLevel {
 """Student-guardian link with relationship details"""
 type GuardianLinkModel {
   """
+  When the institute closed this guardian's access to the student; null while access stands. A revoked guardian keeps the link but sees nothing of the student in the portal.
+  """
+  accessRevokedAt: DateTime
+
+  """
   True if this guardian is authorised to pick the student up from campus.
   """
   canPickup: Boolean!
@@ -3317,6 +3322,11 @@ type GuardianLinkModel {
 Student linked to a guardian, with resolved name/class/section and link metadata
 """
 type GuardianLinkedStudentModel {
+  """
+  When the institute closed this guardian's access to the student; null while access stands. A revoked guardian keeps the link but sees nothing of the student in the portal.
+  """
+  accessRevokedAt: DateTime
+
   """Institute-issued admission number. Plain string — never translated."""
   admissionNumber: String
 
@@ -4926,6 +4936,11 @@ type Mutation {
   restoreGuardian(id: ID!): Boolean!
 
   """
+  Open a guardian's access to a student again after it was revoked. Pickup and primary contact are not given back.
+  """
+  restoreGuardianAccess(input: RestoreGuardianAccessInput!): GuardianLinkModel!
+
+  """
   Restore an archived plan back to active. New subscriptions can be created against it again.
   """
   restorePlan(id: ID!): SubscriptionPlanModel!
@@ -4946,7 +4961,7 @@ type Mutation {
   revokeAllOtherSessions(currentRefreshToken: String!): Boolean!
 
   """
-  Revoke guardian access (divorce/separation). Sets can_pickup=false, preserves link for TC history.
+  Close a guardian's access to one student (separation, a custody order). The link stays on the student's record; the guardian loses every permission on the student, pickup and primary contact.
   """
   revokeGuardianAccess(input: RevokeGuardianAccessInput!): GuardianLinkModel!
   revokeSession(sessionId: String!): Boolean!
@@ -6722,6 +6737,14 @@ type ResellerUserProfileModel {
   profileImage: FileRef
 }
 
+"""
+Opens a guardian's access to a student again after it was revoked. Pickup and primary contact are not given back.
+"""
+input RestoreGuardianAccessInput {
+  guardianProfileId: ID!
+  studentProfileId: ID!
+}
+
 """PASS / FAIL / COMPARTMENT / ABSENT / PENDING."""
 enum ResultStatus {
   ABSENT
@@ -6732,7 +6755,7 @@ enum ResultStatus {
 }
 
 """
-Input for revoking a guardian's access to a student (divorce/separation/custody scenario). Unlike Unlink, this preserves the link row for audit purposes and sets access flags to false — the guardian can still be viewed in the student's guardian history but cannot pick up, receive notifications, or make payments.
+Closes a guardian's access to one student (separation, a custody order). Unlike unlink, the link stays on the student's record, marked as revoked. The guardian loses every permission on the student in the portal, pickup, primary contact, and messages about the student. Their other children are unaffected.
 """
 input RevokeGuardianAccessInput {
   guardianProfileId: ID!
@@ -7315,6 +7338,11 @@ input StudentFilterInput {
 Guardian linked to a student, joined with display name and link metadata
 """
 type StudentGuardianModel {
+  """
+  When the institute closed this guardian's access to the student; null while access stands. A revoked guardian keeps the link but sees nothing of the student in the portal.
+  """
+  accessRevokedAt: DateTime
+
   """True if this guardian is authorised to pick the student up."""
   canPickup: Boolean!
 

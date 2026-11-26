@@ -143,6 +143,7 @@ export class GuardianReadRepository {
           isEmergencyContact: studentGuardianLinksLive.isEmergencyContact,
           canPickup: studentGuardianLinksLive.canPickup,
           livesWith: studentGuardianLinksLive.livesWith,
+          accessRevokedAt: studentGuardianLinksLive.accessRevokedAt,
         })
         .from(studentGuardianLinksLive)
         .innerJoin(
@@ -197,6 +198,7 @@ export class GuardianReadRepository {
           isEmergencyContact: studentGuardianLinksLive.isEmergencyContact,
           canPickup: studentGuardianLinksLive.canPickup,
           livesWith: studentGuardianLinksLive.livesWith,
+          accessRevokedAt: studentGuardianLinksLive.accessRevokedAt,
         })
         .from(studentGuardianLinksLive)
         .innerJoin(

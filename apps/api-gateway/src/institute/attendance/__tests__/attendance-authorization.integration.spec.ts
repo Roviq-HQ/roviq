@@ -13,6 +13,7 @@ import {
   academicYears,
   attendanceEntries,
   attendanceSessions,
+  consentRecords,
   type DrizzleDB,
   guardianProfiles,
   leaves,
@@ -386,6 +387,7 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
       await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), async (tx) => {
         const tenantIds = [tenant.tenantId, foreignTenant.tenantId];
         await tx.delete(leaves).where(inArray(leaves.tenantId, tenantIds));
+        await tx.delete(consentRecords).where(inArray(consentRecords.tenantId, tenantIds));
         await tx.delete(attendanceEntries).where(inArray(attendanceEntries.tenantId, tenantIds));
         await tx.delete(attendanceSessions).where(inArray(attendanceSessions.tenantId, tenantIds));
         await tx
@@ -897,6 +899,281 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
       variables: { y: ids.year },
     });
     expect(response.errors?.map((error) => error.extensions?.code)).toEqual(['FORBIDDEN']);
+  });
+
+  describe('a guardian whose access to one child is revoked', () => {
+    const GET_STUDENT = 'query($id: ID!) { getStudent(id: $id) { id } }';
+    const CONSENT =
+      'query($id: ID!) { consentStatusForStudent(studentProfileId: $id) { purpose } }';
+    const MY_CONSENT = 'query { myConsentStatus { studentProfileId isGranted } }';
+    const GRANT = `mutation($id: ID!) {
+      grantConsent(input: { studentProfileId: $id, purpose: ACADEMIC_DATA_PROCESSING }) { id }
+    }`;
+    const WITHDRAW = `mutation($id: ID!) {
+      withdrawConsent(input: { studentProfileId: $id, purpose: ACADEMIC_DATA_PROCESSING }) { id }
+    }`;
+    const APPLY_LEAVE = `mutation($u: ID!, $d: DateOnly!) {
+      applyLeave(input: { userId: $u, startDate: $d, endDate: $d, type: CASUAL, reason: "Family function" }) { id }
+    }`;
+    const LEAVE = 'query($id: ID!) { leave(id: $id) { id } }';
+    const LEAVES = 'query($u: ID) { leaves(userId: $u) { id } }';
+    const CANCEL_LEAVE = 'mutation($id: ID!) { cancelLeave(id: $id) { id status } }';
+    const HISTORY =
+      'query($id: ID!, $d: String!) { attendanceStudentHistory(studentId: $id, startDate: $d, endDate: $d) { status } }';
+    const LINKS = `query($id: ID!) {
+      listStudentGuardians(studentProfileId: $id) { guardianProfileId accessRevokedAt canPickup }
+    }`;
+    const ACCESS = '{ guardianProfileId: $g, studentProfileId: $s }';
+    const REVOKE = `mutation($g: ID!, $s: ID!) {
+      revokeGuardianAccess(input: ${ACCESS}) { id accessRevokedAt canPickup isPrimaryContact }
+    }`;
+    const RESTORE = `mutation($g: ID!, $s: ID!) {
+      restoreGuardianAccess(input: ${ACCESS}) { id accessRevokedAt }
+    }`;
+    let guardian: Actor;
+    let guardianProfile = '';
+    let otherChildProfile = '';
+    let childLeave = '';
+    let otherChildLeave = '';
+
+    type Links = {
+      listStudentGuardians: {
+        guardianProfileId: string;
+        accessRevokedAt: string | null;
+        canPickup: boolean;
+      }[];
+    };
+
+    async function leaveIds(userId: string) {
+      const data = await query<{ leaves: { id: string }[] }>(guardian, LEAVES, { u: userId });
+      return data.leaves.map((row) => row.id);
+    }
+
+    async function ability() {
+      return app.app.get(AbilityFactory).createForUser({
+        userId: guardian.userId,
+        scope: 'institute',
+        tenantId: tenant.tenantId,
+        membershipId: guardian.membershipId,
+        roleId: guardian.roleId,
+      });
+    }
+
+    beforeAll(async () => {
+      guardian = await actor('parent');
+      await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), async (tx) => {
+        const t = tenant.tenantId;
+        const name = { firstName: { en: 'Guardian' } };
+        await tx.insert(userProfiles).values({ ...by, userId: guardian.userId, ...name });
+        await tx
+          .insert(tenantUserProfiles)
+          .values({ ...by, tenantId: t, userId: guardian.userId, ...name });
+        const [profile] = await tx
+          .insert(guardianProfiles)
+          .values({
+            tenantId: t,
+            userId: guardian.userId,
+            membershipId: guardian.membershipId,
+            ...by,
+          })
+          .returning();
+        guardianProfile = profile.id;
+        const [other] = await tx
+          .select({ id: studentProfiles.id })
+          .from(studentProfiles)
+          .where(eq(studentProfiles.membershipId, studentB.membershipId));
+        otherChildProfile = other.id;
+        await tx.insert(studentGuardianLinks).values(
+          [ids.childProfile, otherChildProfile].map((studentProfileId) => ({
+            ...by,
+            tenantId: t,
+            guardianProfileId: profile.id,
+            studentProfileId,
+            relationship: GuardianRelationship.FATHER,
+          })),
+        );
+      });
+      const mine = await query<{ applyLeave: { id: string } }>(guardian, APPLY_LEAVE, {
+        u: studentA.membershipId,
+        d: TODAY,
+      });
+      childLeave = mine.applyLeave.id;
+      const others = await query<{ applyLeave: { id: string } }>(guardian, APPLY_LEAVE, {
+        u: studentB.membershipId,
+        d: TODAY,
+      });
+      otherChildLeave = others.applyLeave.id;
+      await query(guardian, GRANT, { id: ids.childProfile });
+    });
+
+    // The block after this one counts the institute's leaves.
+    afterAll(async () => {
+      await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), (tx) =>
+        tx.delete(leaves).where(inArray(leaves.id, [childLeave, otherChildLeave])),
+      );
+    });
+
+    it('lets the guardian in for both children while access stands', async () => {
+      await query(guardian, GET_STUDENT, { id: ids.childProfile });
+      await query(guardian, GET_STUDENT, { id: otherChildProfile });
+      expect((await sectionIds(guardian)).sort()).toEqual([ids.sectionA, ids.sectionB].sort());
+      expect(await leaveIds(studentA.membershipId)).toEqual([childLeave]);
+      const consent = await query<{ myConsentStatus: { studentProfileId: string }[] }>(
+        guardian,
+        MY_CONSENT,
+      );
+      expect(consent.myConsentStatus.map((row) => row.studentProfileId)).toEqual([
+        ids.childProfile,
+      ]);
+    });
+
+    describe('after the revoke', () => {
+      beforeAll(async () => {
+        const data = await query<{
+          revokeGuardianAccess: {
+            accessRevokedAt: string | null;
+            canPickup: boolean;
+            isPrimaryContact: boolean;
+          };
+        }>(admin, REVOKE, { g: guardianProfile, s: ids.childProfile });
+        expect(data.revokeGuardianAccess.accessRevokedAt).not.toBeNull();
+        expect(data.revokeGuardianAccess.canPickup).toBe(false);
+        expect(data.revokeGuardianAccess.isPrimaryContact).toBe(false);
+      });
+
+      it('refuses the guardian every operation on that child', async () => {
+        const child = { id: ids.childProfile };
+        expect(await errorCodes(guardian, GET_STUDENT, child)).toEqual(['STUDENT_NOT_FOUND']);
+        expect(await errorCodes(guardian, CONSENT, child)).toEqual(['FORBIDDEN']);
+        expect(await errorCodes(guardian, GRANT, child)).toEqual(['FORBIDDEN']);
+        expect(await errorCodes(guardian, WITHDRAW, child)).toEqual(['FORBIDDEN']);
+        expect(
+          await errorCodes(guardian, APPLY_LEAVE, { u: studentA.membershipId, d: YESTERDAY }),
+        ).toEqual(['FORBIDDEN']);
+        expect(await errorCodes(guardian, LEAVE, { id: childLeave })).toEqual(['LEAVE_NOT_FOUND']);
+        expect(await errorCodes(guardian, CANCEL_LEAVE, { id: childLeave })).toEqual([
+          'LEAVE_NOT_FOUND',
+        ]);
+        expect(await leaveIds(studentA.membershipId)).toEqual([]);
+        const history = await query<{ attendanceStudentHistory: unknown[] }>(guardian, HISTORY, {
+          id: studentA.membershipId,
+          d: TODAY,
+        });
+        expect(history.attendanceStudentHistory).toEqual([]);
+        const consent = await query<{ myConsentStatus: unknown[] }>(guardian, MY_CONSENT);
+        expect(consent.myConsentStatus).toEqual([]);
+
+        const stored = await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), (tx) =>
+          Promise.all([
+            tx
+              .select({ id: leaves.id, status: leaves.status })
+              .from(leaves)
+              .where(eq(leaves.userId, studentA.membershipId)),
+            tx
+              .select({ isGranted: consentRecords.isGranted })
+              .from(consentRecords)
+              .where(eq(consentRecords.guardianProfileId, guardianProfile)),
+          ]),
+        );
+        expect(stored[0]).toEqual([{ id: childLeave, status: 'PENDING' }]);
+        expect(stored[1]).toEqual([{ isGranted: true }]);
+      });
+
+      it('gives the guardian no rule on that child and keeps the rules on the other', async () => {
+        const rules = await ability();
+        // A new object per check: CASL tags the object it is given with its subject type.
+        const of = (studentProfileId: string) => ({ studentProfileId });
+        const revoked = ids.childProfile;
+        expect(rules.can('read', subject('Student', { id: revoked }))).toBe(false);
+        expect(rules.can('read', subject('Attendance', of(revoked)))).toBe(false);
+        expect(
+          rules.can('read', subject('ReportCard', { ...of(revoked), status: 'PUBLISHED' })),
+        ).toBe(false);
+        expect(rules.can('create', subject('Leave', of(revoked)))).toBe(false);
+        expect(rules.can('read', subject('Leave', of(revoked)))).toBe(false);
+        expect(rules.can('withdraw', subject('Leave', { ...of(revoked), status: 'PENDING' }))).toBe(
+          false,
+        );
+        expect(rules.can('read', subject('Consent', of(revoked)))).toBe(false);
+        expect(rules.can('read', subject('Student', { id: otherChildProfile }))).toBe(true);
+        expect(
+          rules.can(
+            'read',
+            subject('ReportCard', { ...of(otherChildProfile), status: 'PUBLISHED' }),
+          ),
+        ).toBe(true);
+      });
+
+      it('leaves the other child as it was', async () => {
+        await query(guardian, GET_STUDENT, { id: otherChildProfile });
+        await query(guardian, CONSENT, { id: otherChildProfile });
+        expect(await sectionIds(guardian)).toEqual([ids.sectionB]);
+        expect(await leaveIds(studentB.membershipId)).toEqual([otherChildLeave]);
+        await query(guardian, LEAVE, { id: otherChildLeave });
+      });
+
+      it('keeps the link on the student record for staff, marked as revoked', async () => {
+        const data = await query<Links>(admin, LINKS, { id: ids.childProfile });
+        const link = data.listStudentGuardians.find((l) => l.guardianProfileId === guardianProfile);
+        expect(link?.accessRevokedAt).not.toBeNull();
+        expect(link?.canPickup).toBe(false);
+        const seen = await query<{ getGuardian: { id: string } }>(
+          teacher,
+          'query($id: ID!) { getGuardian(id: $id) { id } }',
+          { id: guardianProfile },
+        );
+        expect(seen.getGuardian.id).toBe(guardianProfile);
+      });
+
+      it('refuses revoke and restore to a role that cannot manage guardians', async () => {
+        const pair = { g: guardianProfile, s: otherChildProfile };
+        expect(await errorCodes(teacher, REVOKE, pair)).toEqual(['FORBIDDEN']);
+        expect(await errorCodes(teacher, RESTORE, pair)).toEqual(['FORBIDDEN']);
+        expect(await errorCodes(guardian, RESTORE, { ...pair, s: ids.childProfile })).toEqual([
+          'FORBIDDEN',
+        ]);
+      });
+
+      describe('and the restore', () => {
+        beforeAll(async () => {
+          const data = await query<{ restoreGuardianAccess: { accessRevokedAt: string | null } }>(
+            admin,
+            RESTORE,
+            { g: guardianProfile, s: ids.childProfile },
+          );
+          expect(data.restoreGuardianAccess.accessRevokedAt).toBeNull();
+        });
+
+        it('lets the guardian in again', async () => {
+          const child = { id: ids.childProfile };
+          await query(guardian, GET_STUDENT, child);
+          await query(guardian, CONSENT, child);
+          await query(guardian, WITHDRAW, child);
+          expect((await sectionIds(guardian)).sort()).toEqual([ids.sectionA, ids.sectionB].sort());
+          await query(guardian, LEAVE, { id: childLeave });
+          const cancelled = await query<{ cancelLeave: { status: string } }>(
+            guardian,
+            CANCEL_LEAVE,
+            { id: childLeave },
+          );
+          expect(cancelled.cancelLeave.status).toBe('CANCELLED');
+          const rules = await ability();
+          expect(rules.can('read', subject('Student', { id: ids.childProfile }))).toBe(true);
+        });
+
+        it('does not give pickup back by itself', async () => {
+          const data = await query<Links>(admin, LINKS, { id: ids.childProfile });
+          const link = data.listStudentGuardians.find(
+            (l) => l.guardianProfileId === guardianProfile,
+          );
+          expect(link).toEqual({
+            guardianProfileId: guardianProfile,
+            accessRevokedAt: null,
+            canPickup: false,
+          });
+        });
+      });
+    });
   });
 
   // Runs last: it removes the link the guardian tests above rely on.

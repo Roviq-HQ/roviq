@@ -37,7 +37,8 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 | `unlinkGuardianFromStudent` | Mutation | `Boolean` | `update Guardian` |
 | `listLinkedStudents` | Query | `[Student!]!` | `read Guardian` |
 | `listStudentGuardians` | Query | `[Guardian!]!` | `read Student` |
-| `revokeGuardianAccess` | Mutation | `Boolean` | `update Guardian` |
+| `revokeGuardianAccess` | Mutation | `GuardianLink` | `manage Guardian` |
+| `restoreGuardianAccess` | Mutation | `GuardianLink` | `manage Guardian` |
 | `resendStaffSignInDetails` | Mutation | `Boolean` | `update Staff` |
 | `resendGuardianSignInDetails` | Mutation | `Boolean` | `update Guardian` |
 
@@ -74,7 +75,7 @@ Resolvers live under [apps/api-gateway/src/institute/staff/](<../../apps/api-gat
 - [`staff_profiles`](<../../libs/database/src/schema/user-profiles/staff-profiles.ts>) — employee code, department, designation, status enum.
 - [`staff_qualifications`](<../../libs/database/src/schema/user-profiles/staff-qualifications.ts>) — degrees, institutions, years.
 - [`guardian_profiles`](<../../libs/database/src/schema/user-profiles/guardian-profiles.ts>) — relationship enum, occupation, portal access flag.
-- [`student_guardian_links`](<../../libs/database/src/schema/user-profiles/student-guardian-links.ts>) — many-to-many link table with `isPrimary`, `canPickup`, `notifyOn`.
+- [`student_guardian_links`](<../../libs/database/src/schema/user-profiles/student-guardian-links.ts>) — many-to-many link table with `isPrimaryContact`, `isEmergencyContact`, `canPickup`, `livesWith`, and `accessRevokedAt` / `accessRevokedBy` (see "Revoking and restoring access").
 - [`tenant_user_profiles`](<../../libs/database/src/schema/user-profiles/tenant-user-profiles.ts>) — the institute's own copy of the person's name, gender, date of birth and picture; joined on user and tenant. `user_profiles` is the account-level profile and is not read here (see `docs/auth.md` → "People and phone numbers").
 
 All tables spread `tenantColumns`; `student_guardian_links` uses `tenantPolicies()` for RLS.
@@ -140,11 +141,36 @@ gated by `update Guardian`). The dialog reads the student's guardians first, so 
 - **Only guardian** — Unlink is disabled with an explanation (`LAST_GUARDIAN_CANNOT_BE_DELETED`).
 - **Primary contact** — the user must pick the new primary contact from the student's other
   guardians (`newPrimaryGuardianId`). The server rejects a replacement that is not another live
-  guardian of that student (`REPLACEMENT_PRIMARY_GUARDIAN_INVALID`), and a replacement sent when
-  the unlinked guardian is not the primary.
+  guardian of that student or whose access is revoked (`REPLACEMENT_PRIMARY_GUARDIAN_INVALID`),
+  and a replacement sent when the unlinked guardian is not the primary.
 - The service locks the student's live links (`FOR UPDATE`), soft-deletes the link and promotes the
   replacement in **one transaction**, then emits `GUARDIAN.unlinked`. Links whose guardian profile
   is deleted do not count as another guardian, in unlink and in `deleteGuardian`.
+
+### Revoking and restoring access
+
+`revokeGuardianAccess` closes one guardian's access to one student (a separation, a custody
+order) and keeps the link on the student's record. It sets `access_revoked_at` and
+`access_revoked_by` and clears `can_pickup` and `is_primary_contact`. A CHECK keeps a revoked link
+from being the primary contact. `restoreGuardianAccess` clears the two columns; pickup and primary
+contact are not given back. Both need `manage Guardian`.
+
+A revoked link gives the guardian nothing for that student, and their other children are
+unaffected:
+
+| Where a link becomes access | Code |
+|---|---|
+| The guardian's permissions (`linkedStudentIds`: student, attendance, report cards, leave, consent) | `MembershipAbilityDrizzleRepository.findReadAssignments` |
+| Consent grant, withdraw and status | `ConsentDrizzleRepository.isGuardianLinkedToStudent`, `latestForGuardian` |
+| The children listed on the guardian's own profile | `ProfileDrizzleRepository.listGuardianChildren` |
+| Messages about the student, and whose consent a message needs | `RecipientReadDrizzleRepository`, `ConsentReadDrizzleRepository` (notification-service) |
+
+Staff still see the link: the Guardians tab of the student page shows an **Access revoked** badge
+and a **Restore access** button (`GuardianAccessButton` in
+[guardian-access-dialog.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/guardian-access-dialog.tsx>));
+a link with access shows **Revoke access**. Lists, exports and certificates keep reading the link.
+A new read of `student_guardian_links` that gives the guardian something must filter
+`access_revoked_at IS NULL`.
 
 ### Linked-person popup
 

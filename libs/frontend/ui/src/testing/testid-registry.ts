@@ -1455,6 +1455,14 @@ export const testIds = {
     unlinkLastGuardianNotice: 'guardian-unlink-last-guardian-notice',
     unlinkConfirmBtn: 'guardian-unlink-confirm-btn',
     unlinkCancelBtn: 'guardian-unlink-cancel-btn',
+    // Revoke and restore a guardian's access to one student
+    accessRevokedBadge: (linkId: string) => `guardian-access-revoked-badge-${linkId}`,
+    accessRevokeBtn: (linkId: string) => `guardian-access-revoke-btn-${linkId}`,
+    accessRestoreBtn: (linkId: string) => `guardian-access-restore-btn-${linkId}`,
+    accessDialog: 'guardian-access-dialog',
+    accessError: 'guardian-access-error',
+    accessConfirmBtn: 'guardian-access-confirm-btn',
+    accessCancelBtn: 'guardian-access-cancel-btn',
     // Sign-in details (staff and guardians)
     signInStatus: (profileId: string) => `sign-in-status-${profileId}`,
     resendSignInBtn: 'sign-in-resend-btn',

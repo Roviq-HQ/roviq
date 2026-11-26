@@ -287,6 +287,38 @@ describe('guardian order for alerts (integration)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('has no primary guardian'));
   });
 
+  it('should leave out a guardian whose access to the student is revoked', async () => {
+    const { student, guardians } = await makeFamily([
+      { primary: true, staff: 'no' },
+      { primary: false, staff: 'no' },
+    ]);
+    const [primary, revoked] = guardians;
+    assert(primary && revoked);
+    await withAdmin(db, mkAdminCtx(CTX), async (tx) => {
+      const profiles = await tx
+        .select({ id: guardianProfiles.id })
+        .from(guardianProfiles)
+        .where(inArray(guardianProfiles.membershipId, [revoked.membershipId]));
+      await tx
+        .update(studentGuardianLinks)
+        .set({ accessRevokedAt: new Date(), accessRevokedBy: institute.userId })
+        .where(
+          inArray(
+            studentGuardianLinks.guardianProfileId,
+            profiles.map((profile) => profile.id),
+          ),
+        );
+    });
+
+    expect(await orderOf(student)).toEqual([primary.userId]);
+    expect(
+      await recipients.isActiveGuardianOf(institute.tenantId, student.membershipId, revoked.userId),
+    ).toBe(false);
+    expect(
+      await recipients.isActiveGuardianOf(institute.tenantId, student.membershipId, primary.userId),
+    ).toBe(true);
+  });
+
   it("should resolve no guardian for another institute's student id", async () => {
     const { student } = await makeFamily([{ primary: true, staff: 'no' }]);
 

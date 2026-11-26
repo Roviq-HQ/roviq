@@ -1,0 +1,6 @@
+DROP VIEW "student_guardian_links_live";--> statement-breakpoint
+ALTER TABLE "student_guardian_links" ADD COLUMN "access_revoked_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "student_guardian_links" ADD COLUMN "access_revoked_by" uuid;--> statement-breakpoint
+ALTER TABLE "student_guardian_links" ADD CONSTRAINT "chk_guardian_link_revoked_not_primary" CHECK ("access_revoked_at" IS NULL OR "is_primary_contact" = false);--> statement-breakpoint
+ALTER TABLE "student_guardian_links" ADD CONSTRAINT "chk_guardian_link_revoked_by" CHECK (("access_revoked_at" IS NULL) = ("access_revoked_by" IS NULL));--> statement-breakpoint
+CREATE VIEW "student_guardian_links_live" WITH (security_invoker = true) AS (select "id", "student_profile_id", "guardian_profile_id", "relationship", "is_primary_contact", "is_emergency_contact", "can_pickup", "lives_with", "access_revoked_at", "access_revoked_by", "tenant_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at", "deleted_by", "version" from "student_guardian_links" where ("student_guardian_links"."deleted_at" is null));

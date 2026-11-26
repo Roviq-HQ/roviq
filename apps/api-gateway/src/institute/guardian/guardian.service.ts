@@ -16,6 +16,7 @@ import { englishOrFirst } from '../sign-in-details/sign-in-target';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
   LinkGuardianInput,
+  RestoreGuardianAccessInput,
   RevokeGuardianAccessInput,
   UnlinkGuardianInput,
 } from './dto/link-guardian.input';
@@ -43,12 +44,12 @@ function planUnlink(links: LockedGuardianLink[], input: UnlinkGuardianInput): Un
       'Cannot unlink primary contact without providing newPrimaryGuardianId',
     );
   const replacementLink = replacement
-    ? links.find((l) => l.guardianProfileId === replacement && l.id !== link.id)
+    ? links.find((l) => l.guardianProfileId === replacement && l.id !== link.id && !l.accessRevoked)
     : undefined;
   if (replacement && (!link.isPrimaryContact || !replacementLink))
     throw new BusinessException(
       ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID,
-      'newPrimaryGuardianId must be another guardian linked to this student, and only when unlinking the primary contact',
+      'newPrimaryGuardianId must be another guardian linked to this student whose access is not revoked, and only when unlinking the primary contact',
     );
 
   return { linkId: link.id, replacementLinkId: replacementLink?.id ?? null };
@@ -335,9 +336,8 @@ export class GuardianService {
   }
 
   /**
-   * Divorce/separation: revoke guardian access without deleting the link.
-   * Sets can_pickup=false, is_primary_contact=false. Link preserved for TC history.
-   * Only institute_admin can call this (CASL enforced at resolver level).
+   * Closes a guardian's access to one student (separation, a custody order) without removing
+   * the link: the guardian loses every permission on the student, pickup and primary contact.
    */
   async revokeAccess(input: RevokeGuardianAccessInput) {
     const updated = await this.repo.revokeAccess(
@@ -356,6 +356,22 @@ export class GuardianService {
       `Guardian access revoked: guardian=${input.guardianProfileId}, student=${input.studentProfileId}, reason=${input.reason ?? 'not specified'}`,
     );
 
+    return updated;
+  }
+
+  /** Opens the access again. Pickup and primary contact are not given back. */
+  async restoreAccess(input: RestoreGuardianAccessInput) {
+    const updated = await this.repo.restoreAccess(
+      this.tenantId,
+      input.studentProfileId,
+      input.guardianProfileId,
+      this.userId,
+    );
+    if (!updated)
+      throw new BusinessException(
+        ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+        'Guardian-student link not found',
+      );
     return updated;
   }
 

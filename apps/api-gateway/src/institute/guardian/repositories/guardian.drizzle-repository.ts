@@ -387,6 +387,7 @@ export class GuardianDrizzleRepository extends GuardianRepository {
           id: studentGuardianLinks.id,
           guardianProfileId: studentGuardianLinks.guardianProfileId,
           isPrimaryContact: studentGuardianLinks.isPrimaryContact,
+          accessRevoked: isNotNull(studentGuardianLinks.accessRevokedAt).mapWith(Boolean),
         })
         .from(studentGuardianLinks) // allow-base-read: FOR UPDATE row lock, filtered to live rows
         .innerJoin(
@@ -426,8 +427,33 @@ export class GuardianDrizzleRepository extends GuardianRepository {
         .set({
           canPickup: false,
           isPrimaryContact: false,
+          // A second revoke keeps the first date and name.
+          accessRevokedAt: sql`COALESCE(${studentGuardianLinks.accessRevokedAt}, now())`,
+          accessRevokedBy: sql`COALESCE(${studentGuardianLinks.accessRevokedBy}, ${actorId}::uuid)`,
           updatedBy: actorId,
         })
+        .where(
+          and(
+            eq(studentGuardianLinks.studentProfileId, studentProfileId),
+            eq(studentGuardianLinks.guardianProfileId, guardianProfileId),
+            isNull(studentGuardianLinks.deletedAt),
+          ),
+        )
+        .returning();
+      return rows[0] ?? null;
+    });
+  }
+
+  async restoreAccess(
+    tenantId: string,
+    studentProfileId: string,
+    guardianProfileId: string,
+    actorId: string,
+  ): Promise<StudentGuardianLinkRow | null> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const rows = await tx
+        .update(studentGuardianLinks)
+        .set({ accessRevokedAt: null, accessRevokedBy: null, updatedBy: actorId })
         .where(
           and(
             eq(studentGuardianLinks.studentProfileId, studentProfileId),

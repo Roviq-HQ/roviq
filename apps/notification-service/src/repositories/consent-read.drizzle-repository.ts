@@ -10,7 +10,7 @@ import {
   studentProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { ConsentReadRepository, type GuardianConsentState } from './consent-read.repository';
 
 const ORIGIN = 'repository:notification-consent';
@@ -51,7 +51,12 @@ export class ConsentReadDrizzleRepository extends ConsentReadRepository {
         const links = await tx
           .selectDistinct({ studentProfileId: studentGuardianLinksLive.studentProfileId })
           .from(studentGuardianLinksLive)
-          .where(inArray(studentGuardianLinksLive.guardianProfileId, guardianIds));
+          .where(
+            and(
+              inArray(studentGuardianLinksLive.guardianProfileId, guardianIds),
+              isNull(studentGuardianLinksLive.accessRevokedAt),
+            ),
+          );
         if (links.length === 0) return 'missing';
         studentIds = links.map((link) => link.studentProfileId);
       }

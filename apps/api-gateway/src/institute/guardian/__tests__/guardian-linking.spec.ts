@@ -38,8 +38,18 @@ describe('Guardian — Unlink Validation', () => {
     });
   }
 
-  const primaryG1 = { id: 'link-1', guardianProfileId: 'g1', isPrimaryContact: true };
-  const otherG2 = { id: 'link-2', guardianProfileId: 'g2', isPrimaryContact: false };
+  const primaryG1 = {
+    id: 'link-1',
+    guardianProfileId: 'g1',
+    isPrimaryContact: true,
+    accessRevoked: false,
+  };
+  const otherG2 = {
+    id: 'link-2',
+    guardianProfileId: 'g2',
+    isPrimaryContact: false,
+    accessRevoked: false,
+  };
 
   async function unlinkError(input: Parameters<typeof ctx.service.unlinkFromStudent>[0]) {
     const err = await ctx.service.unlinkFromStudent(input).catch((e: unknown) => e);
@@ -92,6 +102,18 @@ describe('Guardian — Unlink Validation', () => {
         guardianProfileId: 'g1',
         studentProfileId: 's1',
         newPrimaryGuardianId: 'g1',
+      }),
+    ).toBe(ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID);
+  });
+
+  it('unlinkFromStudent rejects a replacement whose access is revoked', async () => {
+    lockedLinks([primaryG1, { ...otherG2, accessRevoked: true }]);
+
+    expect(
+      await unlinkError({
+        guardianProfileId: 'g1',
+        studentProfileId: 's1',
+        newPrimaryGuardianId: 'g2',
       }),
     ).toBe(ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID);
   });
@@ -165,6 +187,41 @@ describe('Guardian — Revoke Access (Divorce)', () => {
 
     await expect(
       ctx.service.revokeAccess({ guardianProfileId: 'g1', studentProfileId: 's1' }),
+    ).rejects.toMatchObject({ code: ErrorCode.GUARDIAN_LINK_NOT_FOUND });
+  });
+});
+
+describe('Guardian — Restore Access', () => {
+  let ctx: ReturnType<typeof buildGuardianService>;
+
+  beforeEach(() => {
+    ctx = buildGuardianService();
+  });
+
+  it('restoreAccess returns the link with no revoke date', async () => {
+    vi.mocked(ctx.repo.restoreAccess).mockResolvedValue(
+      linkRow({ id: 'link-1', accessRevokedAt: null, accessRevokedBy: null }),
+    );
+
+    const result = await ctx.service.restoreAccess({
+      guardianProfileId: 'g1',
+      studentProfileId: 's1',
+    });
+
+    expect(result.accessRevokedAt).toBeNull();
+    expect(ctx.repo.restoreAccess).toHaveBeenCalledWith(
+      expect.any(String),
+      's1',
+      'g1',
+      expect.any(String),
+    );
+  });
+
+  it('restoreAccess throws if link not found', async () => {
+    vi.mocked(ctx.repo.restoreAccess).mockResolvedValue(null);
+
+    await expect(
+      ctx.service.restoreAccess({ guardianProfileId: 'g1', studentProfileId: 's1' }),
     ).rejects.toMatchObject({ code: ErrorCode.GUARDIAN_LINK_NOT_FOUND });
   });
 });

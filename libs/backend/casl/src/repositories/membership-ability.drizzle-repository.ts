@@ -12,7 +12,7 @@ import {
   timetablesLive,
   withAdmin,
 } from '@roviq/database';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { MembershipAbilityRepository } from './membership-ability.repository';
 import type { AbilitiesRecord } from './types';
 
@@ -76,6 +76,8 @@ export class MembershipAbilityDrizzleRepository extends MembershipAbilityReposit
             eq(studentGuardianLinksLive.tenantId, tenantId),
             eq(guardianProfilesLive.tenantId, tenantId),
             eq(studentProfilesLive.tenantId, tenantId),
+            // A link whose access the institute closed gives the guardian no rule on the student.
+            isNull(studentGuardianLinksLive.accessRevokedAt),
           ),
         );
       return {
