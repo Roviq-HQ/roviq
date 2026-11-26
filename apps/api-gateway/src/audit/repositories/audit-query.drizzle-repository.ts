@@ -130,8 +130,8 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
       const { whereClause, needsSessionJoin } = buildAuditConditions(tenantId, filter, after);
 
       // Aliases for actor and user JOINs (both reference the users table)
-      const actor = alias(users, 'actor');
-      const userAlias = alias(users, 'u');
+      const actor = alias(users, 'actor'); // allow-base-read: an entry keeps the name of a removed user
+      const userAlias = alias(users, 'u'); // allow-base-read: see above
 
       // Fetch first+1 to determine hasNextPage, with actor/user/institute names via LEFT JOIN
       let dataQuery = tx

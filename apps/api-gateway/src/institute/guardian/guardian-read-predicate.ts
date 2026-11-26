@@ -3,7 +3,7 @@ import type { AppAbility } from '@roviq/common-types';
 import {
   guardianProfilesLive,
   studentAcademicsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
 } from '@roviq/database';
 import { and, eq, exists, inArray, sql } from 'drizzle-orm';
@@ -12,7 +12,7 @@ import { activeAcademicYearIds } from '../student/student-read-predicate';
 
 const qb = new QueryBuilder();
 const scopeProfile = alias(guardianProfilesLive, 'guardian_scope_profile');
-const scopeLink = alias(studentGuardianLinks, 'guardian_scope_link');
+const scopeLink = alias(studentGuardianLinksLive, 'guardian_scope_link');
 const scopeStudent = alias(studentProfilesLive, 'guardian_scope_student');
 const scopeAcademic = alias(studentAcademicsLive, 'guardian_scope_academic');
 
