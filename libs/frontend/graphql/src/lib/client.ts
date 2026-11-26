@@ -12,7 +12,7 @@ import { createClient } from 'graphql-ws';
 import { from, Observable, type Subscription, switchMap } from 'rxjs';
 import type { LiveConnection } from './live-connection';
 import { tagNetworkFailures } from './network-fetch';
-import { resolveWsConnectionParams } from './ws-ticket';
+import { LiveSessionEndedError, resolveWsConnectionParams } from './ws-ticket';
 
 export interface ApolloClientConfig {
   httpUrl: string;
@@ -179,7 +179,7 @@ export function createApolloClient(config: ApolloClientConfig) {
         },
       });
     },
-    shouldRetry: () => true,
+    shouldRetry: shouldRetryLiveSocket,
     retryAttempts: Infinity,
     retryWait: async (retryCount) => {
       const delay = Math.min(1000 * 2 ** retryCount, 30000);
@@ -268,6 +268,11 @@ export function createApolloClient(config: ApolloClientConfig) {
   return apolloClient;
 }
 
+/** A socket is retried unless the session is over: asking again would only be refused. */
+export function shouldRetryLiveSocket(errOrCloseEvent: unknown): boolean {
+  return !(errOrCloseEvent instanceof LiveSessionEndedError);
+}
+
 function closeCode(event: unknown): number | undefined {
   return typeof event === 'object' &&
     event !== null &&
@@ -278,8 +283,9 @@ function closeCode(event: unknown): number | undefined {
 }
 
 /**
- * A subscription that fails because the session ended is held, not failed: the screen keeps
- * its data, and `live.resume()` after the next sign-in starts it again.
+ * A subscription whose socket gave up (the session ended, or graphql-ws met a close code it does
+ * not retry) is held, not failed: the screen keeps its data, and the next sign-in or a manual
+ * Reconnect starts it again. A GraphQL error from the server still reaches the screen.
  */
 export function resumeAfterSessionEnd(live: LiveConnection): ApolloLink {
   return new ApolloLink(
@@ -288,11 +294,21 @@ export function resumeAfterSessionEnd(live: LiveConnection): ApolloLink {
         let inner: Subscription | undefined;
         let forget: (() => void) | undefined;
         const start = () => {
+          // Connecting now would only be refused again; wait for the next sign-in.
+          if (live.isSessionEnded()) {
+            forget = live.holdUntilResume(start);
+            return;
+          }
           inner = forward(operation).subscribe({
             next: (value) => observer.next(value),
             error: (err: unknown) => {
-              if (live.isSessionEnded()) forget = live.holdUntilResume(start);
-              else observer.error(err);
+              // A GraphQL error is the server refusing this operation: the screen shows it.
+              if (CombinedGraphQLErrors.is(err) && !live.isSessionEnded()) {
+                observer.error(err);
+                return;
+              }
+              if (!live.isSessionEnded()) live.onGaveUp();
+              forget = live.holdUntilResume(start);
             },
             complete: () => observer.complete(),
           });

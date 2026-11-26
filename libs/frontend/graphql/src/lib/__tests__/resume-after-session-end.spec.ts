@@ -1,9 +1,10 @@
 import { ApolloClient, gql, InMemoryCache } from '@apollo/client/core';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { ApolloLink } from '@apollo/client/link';
 import { Observable } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { resumeAfterSessionEnd } from '../client';
-import { createLiveConnection } from '../live-connection';
+import { createLiveConnection, MANUAL_RECONNECT_AFTER } from '../live-connection';
 
 const SUBSCRIPTION = gql`
   subscription StudentChanged {
@@ -65,9 +66,10 @@ describe('resumeAfterSessionEnd', () => {
     expect(error).not.toHaveBeenCalled();
   });
 
-  it('passes any other error through', () => {
+  it('passes a GraphQL error from the server through', () => {
     const live = createLiveConnection();
-    const { link } = scriptedTerminal([(o) => o.error(new Error('bad query'))]);
+    const refused = new CombinedGraphQLErrors({ errors: [{ message: 'Forbidden' }] });
+    const { link } = scriptedTerminal([(o) => o.error(refused)]);
     const error = vi.fn();
 
     ApolloLink.execute(
@@ -78,7 +80,37 @@ describe('resumeAfterSessionEnd', () => {
       error,
     });
 
-    expect(error).toHaveBeenCalledWith(expect.objectContaining({ message: 'bad query' }));
+    expect(error).toHaveBeenCalledWith(refused);
+  });
+
+  it('holds a subscription whose socket gave up, offers Reconnect, and restarts it on Reconnect', () => {
+    const live = createLiveConnection();
+    live.onConnected();
+    const { link, subscribes } = scriptedTerminal([
+      (o) => o.error(new Error('Socket closed with event 1011 internal error')),
+      (o) => o.next({ data: { studentChanged: { id: 's3' } } }),
+    ]);
+    const next = vi.fn();
+    const error = vi.fn();
+
+    ApolloLink.execute(
+      resumeAfterSessionEnd(live).concat(link),
+      { query: SUBSCRIPTION },
+      { client },
+    ).subscribe({
+      next,
+      error,
+    });
+    expect(error).not.toHaveBeenCalled();
+    expect(live.getSnapshot()).toEqual({
+      status: 'reconnecting',
+      failedAttempts: MANUAL_RECONNECT_AFTER,
+    });
+
+    live.reconnectNow();
+
+    expect(subscribes).toHaveBeenCalledTimes(2);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('does not restart a held subscription the screen already left', () => {
@@ -99,5 +131,27 @@ describe('resumeAfterSessionEnd', () => {
     live.resume();
 
     expect(subscribes).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not connect a new subscription while the session is ended, and starts it on resume', () => {
+    const live = createLiveConnection();
+    live.onSessionEnded();
+    const { link, subscribes } = scriptedTerminal([
+      (o) => o.next({ data: { studentChanged: { id: 's4' } } }),
+    ]);
+    const next = vi.fn();
+
+    ApolloLink.execute(
+      resumeAfterSessionEnd(live).concat(link),
+      { query: SUBSCRIPTION },
+      { client },
+    ).subscribe({
+      next,
+    });
+    expect(subscribes).not.toHaveBeenCalled();
+
+    live.resume();
+    expect(subscribes).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });

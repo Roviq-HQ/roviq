@@ -1,4 +1,4 @@
-/** Thrown from `connectionParams` so graphql-ws closes with 4005, which it never retries. */
+/** Thrown from `connectionParams` when the session is over; the client's `shouldRetry` refuses it. */
 export class LiveSessionEndedError extends Error {
   constructor() {
     super('Live updates stopped: the session ended');
@@ -19,7 +19,7 @@ export interface WsTicketDeps {
 /**
  * The `connectionParams` of the WebSocket client. Returns `{ ticket }`, or `{}` when the ticket
  * service could not be reached so graphql-ws retries with backoff. Throws
- * `LiveSessionEndedError` when the session is over, which stops the retries.
+ * `LiveSessionEndedError` when the session is over.
  */
 export async function resolveWsConnectionParams(deps: WsTicketDeps): Promise<{ ticket?: string }> {
   const token = deps.getAccessToken();

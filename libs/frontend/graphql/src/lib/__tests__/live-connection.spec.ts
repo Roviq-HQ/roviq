@@ -134,4 +134,35 @@ describe('createLiveConnection', () => {
     live.onClosed(ABNORMAL);
     expect(listener).toHaveBeenCalledTimes(2);
   });
+
+  it('offers Reconnect at once when graphql-ws gave up, and reconnectNow restarts held work', () => {
+    const live = createLiveConnection();
+    const start = vi.fn();
+    live.onConnected();
+    live.onGaveUp();
+    live.holdUntilResume(start);
+    expect(live.getSnapshot()).toEqual({
+      status: 'reconnecting',
+      failedAttempts: MANUAL_RECONNECT_AFTER,
+    });
+
+    live.reconnectNow();
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the next wait when resume came before graphql-ws asked to wait', async () => {
+    const live = createLiveConnection();
+    live.onSessionEnded();
+    live.resume();
+    const waited = vi.fn();
+
+    void live.waitBeforeRetry(30_000).then(waited);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(waited).toHaveBeenCalledTimes(1);
+
+    const later = vi.fn();
+    void live.waitBeforeRetry(30_000).then(later);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(later).not.toHaveBeenCalled();
+  });
 });

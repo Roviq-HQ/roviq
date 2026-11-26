@@ -31,6 +31,8 @@ export interface LiveConnection {
   /** `code` 1000 is the client closing an unused socket, not a failure. */
   onClosed: (code: number | undefined) => void;
   onSessionEnded: () => void;
+  /** graphql-ws stopped retrying (a close code it treats as final); only a manual reconnect helps. */
+  onGaveUp: () => void;
   setOnline: (online: boolean) => void;
 }
 
@@ -57,7 +59,11 @@ export function createLiveConnection(initiallyOnline = true): LiveConnection {
     for (const listener of listeners) listener();
   };
 
+  // graphql-ws keeps counting failures across restarts, so the wait it asks for next can start
+  // after the reconnect was asked for: that one is skipped too.
+  let skipNextWait = false;
   const releaseWaits = () => {
+    skipNextWait = pendingWaits.size === 0;
     for (const release of [...pendingWaits]) release();
   };
 
@@ -68,6 +74,7 @@ export function createLiveConnection(initiallyOnline = true): LiveConnection {
       held.delete(start);
       start();
     }
+    releaseWaits();
   };
 
   return {
@@ -77,10 +84,7 @@ export function createLiveConnection(initiallyOnline = true): LiveConnection {
       return () => listeners.delete(listener);
     },
     reconnectNow: () => {
-      if (sessionEnded) {
-        resume();
-        return;
-      }
+      if (sessionEnded || held.size > 0) resume();
       releaseWaits();
     },
     resume,
@@ -91,6 +95,11 @@ export function createLiveConnection(initiallyOnline = true): LiveConnection {
     },
     waitBeforeRetry: (delayMs) =>
       new Promise<void>((resolve) => {
+        if (skipNextWait) {
+          skipNextWait = false;
+          resolve();
+          return;
+        }
         const release = () => {
           clearTimeout(timer);
           pendingWaits.delete(release);
@@ -126,6 +135,13 @@ export function createLiveConnection(initiallyOnline = true): LiveConnection {
     onSessionEnded: () => {
       sessionEnded = true;
       set({ status: 'session-ended' });
+    },
+    onGaveUp: () => {
+      if (sessionEnded) return;
+      set({
+        status: online ? 'reconnecting' : 'offline',
+        failedAttempts: Math.max(state.failedAttempts, MANUAL_RECONNECT_AFTER),
+      });
     },
     setOnline: (next) => {
       online = next;
