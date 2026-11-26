@@ -9,8 +9,8 @@ export const resellerInstituteNewHelp = defineFieldHelp('resellerInstitutes.new'
     },
     points: [
       {
-        en: 'Grouped institutes share branding defaults and roll up into consolidated reporting.',
-        hi: 'ग्रुप के संस्थान ब्रांडिंग के डिफ़ॉल्ट शेयर करते हैं और मिली-जुली रिपोर्टिंग में जुड़ते हैं।',
+        en: "The group is shown on the institute and lets you list a group's institutes together. Each institute keeps its own data and settings.",
+        hi: 'ग्रुप संस्थान पर दिखता है और इससे एक ग्रुप के संस्थान एक साथ लिस्ट होते हैं। हर संस्थान का डेटा और सेटिंग अलग रहती है।',
       },
       {
         en: 'Leave blank if this is a standalone client.',

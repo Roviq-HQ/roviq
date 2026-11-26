@@ -21,8 +21,8 @@ export const refundHelp = defineFieldHelp('resellerBilling.refund', {
   reason: {
     title: { en: 'Reason', hi: 'कारण' },
     body: {
-      en: 'Why the money is returned. It is needed for the audit and for the GST credit note.',
-      hi: 'पैसा क्यों लौटाया जा रहा है। यह ऑडिट और GST क्रेडिट नोट के लिए चाहिए।',
+      en: 'Why the money is returned. It is saved with the refund for anyone who checks it later.',
+      hi: 'पैसा क्यों लौटाया जा रहा है। यह रिफ़ंड के साथ सेव होता है, ताकि बाद में जाँचने वाले को पता रहे।',
     },
     points: [
       {
@@ -35,8 +35,8 @@ export const refundHelp = defineFieldHelp('resellerBilling.refund', {
       hi: 'डुप्लिकेट पेमेंट · 7 दिन की कूलिंग-ऑफ़ में एडमिशन वापस लिया · सर्विस नहीं मिली',
     },
     avoid: {
-      en: 'A generic reason like "Refund". It fails finance review and delays the payer.',
-      hi: '"रिफ़ंड" जैसा आम कारण। फ़ाइनेंस की जाँच में अटक जाता है और पेमेंट देने वाले को देर होती है।',
+      en: 'A generic reason like "Refund". Later nobody can tell why the money went back.',
+      hi: '"रिफ़ंड" जैसा आम कारण। बाद में कोई नहीं बता पाएगा कि पैसा क्यों लौटा।',
     },
   },
 });

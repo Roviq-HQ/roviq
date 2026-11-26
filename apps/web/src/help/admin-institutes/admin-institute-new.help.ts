@@ -9,12 +9,8 @@ export const adminInstituteNewHelp = defineFieldHelp('adminInstitutes.new', {
     },
     points: [
       {
-        en: 'Invoices are issued by the reseller, and their support team receives tickets first.',
-        hi: 'इनवॉइस रीसेलर जारी करता है और टिकट पहले उसकी सपोर्ट टीम को मिलते हैं।',
-      },
-      {
-        en: 'Their commission applies to every paid subscription.',
-        hi: 'हर पेड सब्सक्रिप्शन पर उनका कमीशन लगता है।',
+        en: "The institute's subscription and invoices come from this reseller's plans.",
+        hi: 'संस्थान का सब्सक्रिप्शन और इनवॉइस इसी रीसेलर के प्लान से बनते हैं।',
       },
       {
         en: 'Changing the reseller later is a contractual change and should route through finance.',
@@ -38,8 +34,8 @@ export const adminInstituteNewHelp = defineFieldHelp('adminInstitutes.new', {
     },
     points: [
       {
-        en: 'Grouped institutes can share branding, plan tiers and cross-institute analytics.',
-        hi: 'ग्रुप के संस्थान ब्रांडिंग, प्लान टियर और क्रॉस-संस्थान एनालिटिक्स शेयर कर सकते हैं।',
+        en: "The group is shown on the institute and lets you list a group's institutes together.",
+        hi: 'ग्रुप संस्थान पर दिखता है और इससे एक ग्रुप के संस्थान एक साथ लिस्ट होते हैं।',
       },
       {
         en: 'Each branch still keeps its own data.',
@@ -51,8 +47,8 @@ export const adminInstituteNewHelp = defineFieldHelp('adminInstitutes.new', {
       },
     ],
     example: {
-      en: "'DPS Group' can hold DPS-GBN-01, DPS-GBN-02, DPS-DLI-03. A parent with children in two branches can switch between them from one login.",
-      hi: "'DPS Group' में DPS-GBN-01, DPS-GBN-02, DPS-DLI-03 आ सकते हैं। दो ब्रांच में बच्चे वाला पेरेंट एक ही लॉग इन से दोनों में जा सकता है।",
+      en: "'DPS Group' can hold DPS-GBN-01, DPS-GBN-02, DPS-DLI-03.",
+      hi: "'DPS Group' में DPS-GBN-01, DPS-GBN-02, DPS-DLI-03 आ सकते हैं।",
     },
   },
 });

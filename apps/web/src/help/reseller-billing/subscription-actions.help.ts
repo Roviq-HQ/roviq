@@ -4,19 +4,19 @@ export const subscriptionActionsHelp = defineFieldHelp('resellerBilling.subscrip
   reason: {
     title: { en: 'Reason', hi: 'कारण' },
     body: {
-      en: 'Why this change is made. It goes into the subscription event log and the churn-reasons chart on the finance dashboard.',
-      hi: 'यह बदलाव क्यों हो रहा है। यह सब्सक्रिप्शन इवेंट लॉग और फ़ाइनेंस डैशबोर्ड के चर्न-रीज़न चार्ट में जाता है।',
+      en: 'Why this change is made. It is saved on the subscription as the pause or cancel reason.',
+      hi: 'यह बदलाव क्यों हो रहा है। यह सब्सक्रिप्शन पर रोकने या कैंसल करने के कारण की तरह सेव होता है।',
     },
     points: [
       {
-        en: 'It separates voluntary churn (price, missing feature) from involuntary churn (institute closed, moved).',
-        hi: 'इससे अपनी मर्ज़ी से छोड़ने (कीमत, फ़ीचर की कमी) और मजबूरी में छोड़ने (संस्थान बंद, शिफ़्ट) का फ़र्क दिखता है।',
-      },
-      {
-        en: 'Use the same wording for the same reason every time, so retention analysis stays useful.',
-        hi: 'एक ही कारण के लिए हर बार एक जैसे शब्द लिखें, ताकि रिटेंशन का एनालिसिस काम का रहे।',
+        en: 'Use the same wording for the same reason every time, so reasons can be compared later.',
+        hi: 'एक ही कारण के लिए हर बार एक जैसे शब्द लिखें, ताकि बाद में कारणों की तुलना हो सके।',
       },
     ],
+    example: {
+      en: 'Price too high · Institute closed · Moved to another software',
+      hi: 'कीमत ज़्यादा · संस्थान बंद · दूसरे सॉफ़्टवेयर पर चले गए',
+    },
   },
   proration: {
     title: { en: 'How proration is calculated', hi: 'प्रो-रेशन कैसे निकलता है' },
@@ -34,8 +34,8 @@ export const subscriptionActionsHelp = defineFieldHelp('resellerBilling.subscrip
         hi: 'नए प्लान का चार्ज: साइकिल के बचे दिन, नए प्लान के रोज़ के रेट से।',
       },
       {
-        en: 'The net difference is invoiced (if positive) or credited (if negative) at the next billing cycle.',
-        hi: 'बचा हुआ फ़र्क अगली बिलिंग साइकिल में इनवॉइस होता है (प्लस हो तो) या क्रेडिट होता है (माइनस हो तो)।',
+        en: 'The difference is saved with the plan change. Roviq does not add it to an invoice by itself.',
+        hi: 'यह फ़र्क प्लान बदलने के साथ सेव होता है। Roviq इसे अपने आप किसी इनवॉइस में नहीं जोड़ता।',
       },
     ],
   },

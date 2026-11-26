@@ -9,8 +9,12 @@ export const recordPaymentHelp = defineFieldHelp('resellerBilling.recordPayment'
     },
     points: [
       {
-        en: 'It decides which reconciliation report this payment appears in and whether it needs a manual check.',
-        hi: 'इससे तय होता है कि पेमेंट किस रिकंसिलिएशन रिपोर्ट में आएगा और उसकी मैनुअल जाँच चाहिए या नहीं।',
+        en: 'Saving the payment marks the invoice paid at once, whatever the method.',
+        hi: 'पेमेंट सेव करते ही इनवॉइस पेड हो जाता है, तरीका कोई भी हो।',
+      },
+      {
+        en: 'For cash, the payment is credited to you, the person recording it.',
+        hi: 'कैश में पेमेंट आपके नाम दर्ज होता है, यानी जो इसे रिकॉर्ड कर रहा है।',
       },
       {
         en: 'Pick the method you received, not the one on the invoice.',
@@ -20,16 +24,16 @@ export const recordPaymentHelp = defineFieldHelp('resellerBilling.recordPayment'
     options: helpOptions<'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI'>({
       CASH: { en: 'Counter receipt.', hi: 'काउंटर पर रिसीट।' },
       CHEQUE: {
-        en: 'The invoice is marked paid only after the cheque clears.',
-        hi: 'चेक क्लियर होने के बाद ही इनवॉइस पेड होता है।',
+        en: 'Record it only after the cheque clears, because saving marks the invoice paid.',
+        hi: 'चेक क्लियर होने के बाद ही रिकॉर्ड करें, क्योंकि सेव करते ही इनवॉइस पेड हो जाता है।',
       },
       BANK_TRANSFER: {
         en: 'NEFT, RTGS or IMPS straight to your account.',
         hi: 'NEFT, RTGS या IMPS सीधे आपके खाते में।',
       },
       UPI: {
-        en: 'Any UPI payment (PhonePe, GPay, Paytm). The UTR still needs a manual check.',
-        hi: 'कोई भी UPI पेमेंट (PhonePe, GPay, Paytm)। UTR की जाँच अभी मैनुअल करनी होती है।',
+        en: 'Any UPI payment (PhonePe, GPay, Paytm). Check the UTR in your bank app before recording it.',
+        hi: 'कोई भी UPI पेमेंट (PhonePe, GPay, Paytm)। रिकॉर्ड करने से पहले बैंक ऐप में UTR जाँच लें।',
       },
     }),
   },

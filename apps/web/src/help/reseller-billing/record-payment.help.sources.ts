@@ -5,7 +5,10 @@ const FORM =
   'apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/record-payment-dialog.tsx';
 
 export const recordPaymentHelpSources = {
-  method: [FORM],
+  method: [
+    FORM,
+    'ee/apps/api-gateway/src/billing/reseller/payment.service.ts#PaymentService.recordManualPayment',
+  ],
   receiptNumber: [FORM],
   collectionDate: [FORM],
 } satisfies HelpSources<typeof recordPaymentHelp>;

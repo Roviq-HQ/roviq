@@ -35,13 +35,13 @@ export const instituteNewHelp = defineFieldHelp('institutes.new', {
   type: {
     title: { en: 'Institute type', hi: 'संस्थान का टाइप' },
     body: {
-      en: 'What kind of institute this is. It decides the features, academic structure and fee models the institute gets.',
-      hi: 'यह किस तरह का संस्थान है। इससे तय होता है कि संस्थान को कौन से फ़ीचर, पढ़ाई का ढाँचा और फ़ीस मॉडल मिलेंगे।',
+      en: 'What kind of institute this is. It decides what Roviq sets up when the institute is created.',
+      hi: 'यह किस तरह का संस्थान है। इससे तय होता है कि संस्थान बनते समय Roviq क्या-क्या तैयार करता है।',
     },
     points: [
       {
-        en: 'It cannot be changed after creation, because the other type would break the data (classes, timetables, report cards).',
-        hi: 'बनने के बाद इसे बदला नहीं जा सकता, क्योंकि दूसरा टाइप डेटा (क्लास, टाइमटेबल, रिपोर्ट कार्ड) बिगाड़ देगा।',
+        en: 'It cannot be changed after the institute is created.',
+        hi: 'संस्थान बनने के बाद इसे बदला नहीं जा सकता।',
       },
       {
         en: 'A wrong choice means deleting the institute and requesting it again.',
@@ -50,16 +50,16 @@ export const instituteNewHelp = defineFieldHelp('institutes.new', {
     ],
     options: helpOptions<InstituteType>({
       SCHOOL: {
-        en: 'K-12 with classes, sections, timetables, report cards and boards. Has UDISE+, RTE and TC.',
-        hi: 'K-12: क्लास, सेक्शन, टाइमटेबल, रिपोर्ट कार्ड और बोर्ड। UDISE+, RTE और TC मिलते हैं।',
+        en: 'Classes and sections for the chosen departments, and the subjects of the board, are set up for you.',
+        hi: 'चुने गए विभागों की क्लास और सेक्शन, और बोर्ड के सब्जेक्ट अपने आप बन जाते हैं।',
       },
       COACHING: {
-        en: 'Test-prep centre with batches, courses and fee structures. No UDISE+ or TC.',
-        hi: 'बैच, कोर्स और फ़ीस वाला कोचिंग सेंटर। UDISE+ और TC नहीं मिलते।',
+        en: 'Nothing is set up; you add classes yourself. Academic years may overlap, for batches that run side by side.',
+        hi: 'कुछ पहले से नहीं बनता; क्लास आप खुद जोड़ते हैं। एकेडमिक ईयर एक-दूसरे पर चढ़ सकते हैं, ताकि साथ चलने वाले बैच बन सकें।',
       },
       LIBRARY: {
-        en: 'Lending or reading room with members, inventory and due dates. No class or exam features.',
-        hi: 'मेंबर, इन्वेंटरी और वापसी की तारीख वाली लाइब्रेरी। क्लास या परीक्षा के फ़ीचर नहीं मिलते।',
+        en: 'One Library class with Full Day and Half Day sections is set up for members.',
+        hi: 'मेंबर के लिए एक Library क्लास, Full Day और Half Day सेक्शन के साथ, बन जाती है।',
       },
     }),
   },
@@ -98,8 +98,12 @@ export const instituteNewHelp = defineFieldHelp('institutes.new', {
         hi: 'इससे पते में राज्यों की लिस्ट छँटती है।',
       },
       {
-        en: 'It decides the grading system, the report card format and whether UDISE+, APAAR and TC templates apply.',
-        hi: 'इससे ग्रेडिंग सिस्टम, रिपोर्ट कार्ड का फ़ॉर्मैट और UDISE+, APAAR व TC टेम्पलेट लगेंगे या नहीं, यह तय होता है।',
+        en: "When a School institute is set up, this board's subjects are added for you.",
+        hi: 'स्कूल वाला संस्थान बनते समय इस बोर्ड के सब्जेक्ट अपने आप जुड़ जाते हैं।',
+      },
+      {
+        en: 'It is printed with the affiliation number on certificates, and it decides which board-specific exports the institute gets, such as the BSEH staff statement.',
+        hi: 'यह सर्टिफिकेट पर अफ़िलिएशन नंबर के साथ छपता है, और इसी से तय होता है कि संस्थान को कौन से बोर्ड वाले एक्सपोर्ट मिलेंगे, जैसे BSEH स्टाफ स्टेटमेंट।',
       },
       {
         en: 'More boards can be added later under Board Affiliations.',

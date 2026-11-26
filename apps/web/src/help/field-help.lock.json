@@ -41,27 +41,27 @@
     }
   },
   "adminInstituteGroups.new.code": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "group page now passes plain type labels; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe"
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "8f47eb2b10b69dfa"
     }
   },
   "adminInstituteGroups.new.registrationNumber": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "group page now passes plain type labels; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe"
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "8f47eb2b10b69dfa"
     }
   },
   "adminInstituteGroups.new.registrationState": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "group page now passes plain type labels; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe"
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "8f47eb2b10b69dfa"
     }
   },
   "adminInstituteGroups.new.type": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "group page now passes plain type labels; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "8f47eb2b10b69dfa",
       "libs/shared/common-types/src/lib/enums/institute-group.ts": "285053dfa4a00221"
     }
   },
@@ -181,10 +181,22 @@
       "libs/shared/common-types/src/lib/enums/user-profile.ts#GUARDIAN_EDUCATION_LEVEL_VALUES": "bb2b7af5a999fd28"
     }
   },
-  "instituteSettings.address.stateFiltered": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+  "instituteSettings.address.coordinates": {
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/institute/(dashboard)/settings/institute/components/address-form.tsx#AddressForm": "3675ea414dc994a8"
+      "apps/web/src/app/[locale]/institute/(dashboard)/settings/institute/components/address-form.tsx#AddressForm": "98a88108b8960ea8"
+    }
+  },
+  "instituteSettings.address.postalCode": {
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/institute/(dashboard)/settings/institute/components/address-form.tsx#AddressForm": "98a88108b8960ea8"
+    }
+  },
+  "instituteSettings.address.stateFiltered": {
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/institute/(dashboard)/settings/institute/components/address-form.tsx#AddressForm": "98a88108b8960ea8"
     }
   },
   "instituteSettings.branding.primaryColor": {
@@ -261,9 +273,12 @@
     }
   },
   "institutes.new.board": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "board seeds subjects for School, filters states, prints on certificates, gates BSEH export",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts": "078b8062666cedf2",
+      "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts": "71cc76155e2b82b2",
+      "apps/api-gateway/src/institute/management/seed/institute-setup.service.ts#InstituteSetupService.seedAcademicStructure": "2e5846c3e3429e45",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43"
@@ -299,9 +314,11 @@
     }
   },
   "institutes.new.type": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "type only picks the setup seed (seedAcademicStructure) and coaching year overlap",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts": "0f4990b980d1fccc",
+      "apps/api-gateway/src/institute/management/seed/institute-setup.service.ts#InstituteSetupService.seedAcademicStructure": "2e5846c3e3429e45",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
@@ -310,39 +327,43 @@
     }
   },
   "resellerBilling.gateway.defaultGateway": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "59dca713c5ae3da4",
+      "ee/apps/api-gateway/src/billing/repositories/gateway-config.repository.ts#GatewayConfigRepository.clearDefault": "d22ba6cf40b6b9fb",
+      "ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts#PaymentGatewayConfigDrizzleRepository.findByInstituteId": "777e351a0c0d6ce8"
     }
   },
   "resellerBilling.gateway.keyId": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "59dca713c5ae3da4"
     }
   },
   "resellerBilling.gateway.keySecret": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "59dca713c5ae3da4"
     }
   },
   "resellerBilling.gateway.testMode": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "59dca713c5ae3da4",
+      "ee/apps/api-gateway/src/billing/reseller/gateway-config.service.ts#GatewayConfigService.createConfig": "54d9624b29b05aab",
+      "ee/apps/api-gateway/src/billing/reseller/gateway-config.service.ts#GatewayConfigService.updateConfig": "697639dd7bb50a50"
     }
   },
   "resellerBilling.gateway.vpa": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "59dca713c5ae3da4"
     }
   },
   "resellerBilling.gateway.webhookSecret": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "page change only translates provider names; help copy unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "59dca713c5ae3da4"
     }
   },
   "resellerBilling.plan.amount": {
@@ -364,15 +385,18 @@
     }
   },
   "resellerBilling.plan.limits": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "only FileService.assertWithinQuota enforces a limit; checkLimit has no caller",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "57fe1cafc489ae9a"
+      "apps/api-gateway/src/files/file.service.ts#FileService.assertWithinQuota": "ec4d098e8d518827",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "57fe1cafc489ae9a",
+      "libs/backend/entitlements/src/entitlement.service.ts#EntitlementService.checkLimit": "eb6aa5ac8ea55e18"
     }
   },
   "resellerBilling.plan.trialDays": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "assignPlan gives a trial on every new subscription when trialDays > 0; no once-per-plan check",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "57fe1cafc489ae9a"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "57fe1cafc489ae9a",
+      "ee/apps/api-gateway/src/billing/reseller/subscription.service.ts#SubscriptionService.assignPlan": "e67656e80baebf05"
     }
   },
   "resellerBilling.recordPayment.collectionDate": {
@@ -382,9 +406,10 @@
     }
   },
   "resellerBilling.recordPayment.method": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "recordManualPayment marks paid at once for every method; cash credited to the recorder",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/record-payment-dialog.tsx": "34e39013ead0c460"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/record-payment-dialog.tsx": "34e39013ead0c460",
+      "ee/apps/api-gateway/src/billing/reseller/payment.service.ts#PaymentService.recordManualPayment": "5721cb1767f01728"
     }
   },
   "resellerBilling.recordPayment.receiptNumber": {
@@ -406,15 +431,18 @@
     }
   },
   "resellerBilling.subscriptionActions.proration": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "changePlan stores the delta in metadata; nothing invoices or credits it",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/subscriptions/change-plan-dialog.tsx": "dd934e13af5ef2b8"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/subscriptions/change-plan-dialog.tsx": "dd934e13af5ef2b8",
+      "ee/apps/api-gateway/src/billing/reseller/subscription.service.ts#SubscriptionService.changePlan": "c800f1e20ed2d609"
     }
   },
   "resellerBilling.subscriptionActions.reason": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "reason stored as pauseReason/cancelReason only; no churn chart",
     "targets": {
-      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/subscriptions/subscription-action-dialog.tsx": "8feee9aba5e7cc18"
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/subscriptions/subscription-action-dialog.tsx": "8feee9aba5e7cc18",
+      "ee/apps/api-gateway/src/billing/reseller/subscription.service.ts#SubscriptionService.cancelSubscription": "53a8acc9d07a6a83",
+      "ee/apps/api-gateway/src/billing/reseller/subscription.service.ts#SubscriptionService.pauseSubscription": "a9114e5890400bec"
     }
   },
   "resellerInstitutes.new.group": {

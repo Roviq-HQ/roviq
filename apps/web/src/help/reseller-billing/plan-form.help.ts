@@ -48,10 +48,6 @@ export const planFormHelp = defineFieldHelp('resellerBilling.plan', {
         en: 'Longer intervals usually give a discount and fewer failed payments, but tie the institute in for longer.',
         hi: 'लंबा अंतराल आम तौर पर डिस्काउंट देता है और फ़ेल पेमेंट कम करता है, पर संस्थान ज़्यादा समय के लिए बँध जाता है।',
       },
-      {
-        en: 'Switching in the middle of a cycle creates a prorated invoice.',
-        hi: 'साइकिल के बीच में बदलने पर प्रो-रेटेड इनवॉइस बनता है।',
-      },
     ],
     options: helpOptions<'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL'>({
       MONTHLY: { en: 'Every month. Most flexible.', hi: 'हर महीने। सबसे आसान।' },
@@ -74,12 +70,8 @@ export const planFormHelp = defineFieldHelp('resellerBilling.plan', {
     },
     points: [
       {
-        en: 'A trial is given once per institute per plan.',
-        hi: 'ट्रायल हर संस्थान को हर प्लान पर एक ही बार मिलता है।',
-      },
-      {
-        en: 'Giving the plan again after the trial ended starts paid billing at once.',
-        hi: 'ट्रायल खत्म होने के बाद वही प्लान दोबारा देने पर पेड बिलिंग तुरंत शुरू हो जाती है।',
+        en: 'Every new subscription to this plan starts with this many free days, even for an institute that had a trial before.',
+        hi: 'इस प्लान का हर नया सब्सक्रिप्शन इतने मुफ़्त दिनों से शुरू होता है, चाहे संस्थान पहले ट्रायल ले चुका हो।',
       },
       {
         en: 'Leave 0 if the sale was done offline and the institute pays from day one.',
@@ -90,17 +82,21 @@ export const planFormHelp = defineFieldHelp('resellerBilling.plan', {
   limits: {
     title: { en: 'Capacity limits', hi: 'क्षमता की सीमा' },
     body: {
-      en: 'Hard caps the platform enforces for this plan.',
-      hi: 'इस प्लान पर प्लेटफ़ॉर्म की तरफ़ से लगी पक्की सीमाएँ।',
+      en: 'The most each institute on this plan may use.',
+      hi: 'इस प्लान पर हर संस्थान ज़्यादा से ज़्यादा कितना इस्तेमाल कर सकता है।',
     },
     points: [
       {
-        en: 'When an institute hits a limit, the next create action is blocked with an error that points to the Upgrade page.',
-        hi: 'सीमा पर पहुँचने पर अगला नया रिकॉर्ड बनाना रुक जाता है और एरर में अपग्रेड पेज बताया जाता है।',
+        en: 'Roviq checks the storage limit: an upload that would go past it is refused.',
+        hi: 'Roviq स्टोरेज की सीमा जाँचता है: जो फ़ाइल सीमा पार कराए, वह अपलोड नहीं होती।',
       },
       {
-        en: 'Leave a field blank for unlimited (enterprise).',
-        hi: 'कोई फ़ील्ड खाली छोड़ने पर वह अनलिमिटेड होती है (एंटरप्राइज़)।',
+        en: 'The student and staff limits are saved with the plan but not checked when someone is added.',
+        hi: 'स्टूडेंट और स्टाफ की सीमा प्लान में सेव होती है, पर किसी को जोड़ते समय जाँची नहीं जाती।',
+      },
+      {
+        en: 'Leave a field blank for unlimited.',
+        hi: 'कोई फ़ील्ड खाली छोड़ने पर वह अनलिमिटेड होती है।',
       },
       {
         en: 'Limits apply per institute, not across all institutes on the plan.',
@@ -108,8 +104,8 @@ export const planFormHelp = defineFieldHelp('resellerBilling.plan', {
       },
     ],
     example: {
-      en: 'A Starter plan: 200 students, 20 staff, 500 MB storage. At 201 students, adding a student is blocked and an upgrade is offered.',
-      hi: 'स्टार्टर प्लान: 200 स्टूडेंट, 20 स्टाफ, 500 MB स्टोरेज। 201वाँ स्टूडेंट जोड़ने पर रुक जाता है और अपग्रेड का सुझाव दिखता है।',
+      en: 'A Starter plan: 200 students, 20 staff, 500 MB storage.',
+      hi: 'स्टार्टर प्लान: 200 स्टूडेंट, 20 स्टाफ, 500 MB स्टोरेज।',
     },
   },
 });

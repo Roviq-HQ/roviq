@@ -8,6 +8,14 @@ export const gatewayConfigHelpSources = {
   keyId: [FORM],
   keySecret: [FORM],
   webhookSecret: [FORM],
-  testMode: [FORM],
-  defaultGateway: [FORM],
+  testMode: [
+    FORM,
+    'ee/apps/api-gateway/src/billing/reseller/gateway-config.service.ts#GatewayConfigService.createConfig',
+    'ee/apps/api-gateway/src/billing/reseller/gateway-config.service.ts#GatewayConfigService.updateConfig',
+  ],
+  defaultGateway: [
+    FORM,
+    'ee/apps/api-gateway/src/billing/repositories/gateway-config.repository.ts#GatewayConfigRepository.clearDefault',
+    'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts#PaymentGatewayConfigDrizzleRepository.findByInstituteId',
+  ],
 } satisfies HelpSources<typeof gatewayConfigHelp>;

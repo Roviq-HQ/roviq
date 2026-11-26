@@ -28,12 +28,8 @@ export const instituteGroupNewHelp = defineFieldHelp('adminInstituteGroups.new',
     },
     points: [
       {
-        en: 'It decides which registration fields are expected and how invoices are taxed (trusts and societies are often exempt; chains and franchises are not).',
-        hi: 'इससे तय होता है कि कौन सी रजिस्ट्रेशन जानकारी चाहिए और इनवॉइस पर टैक्स कैसे लगेगा (ट्रस्ट और सोसाइटी अक्सर छूट में होते हैं; चेन और फ़्रैंचाइज़ी नहीं)।',
-      },
-      {
-        en: 'It also decides whether the group can claim CSR and Section 80G benefits.',
-        hi: 'इसी से तय होता है कि ग्रुप CSR और सेक्शन 80G के फ़ायदे ले सकता है या नहीं।',
+        en: 'Roviq records it on the group and lets you filter groups by it; it does not change billing or tax.',
+        hi: 'Roviq इसे ग्रुप पर सेव करता है और इससे ग्रुप फ़िल्टर कर सकते हैं; इससे बिलिंग या टैक्स नहीं बदलता।',
       },
       {
         en: 'If the group is registered as one type but works like another, go by the registration.',
@@ -54,8 +50,8 @@ export const instituteGroupNewHelp = defineFieldHelp('adminInstituteGroups.new',
         hi: 'एक मैनेजमेंट और ब्रांड के कई संस्थान, ट्रस्ट या सोसाइटी होना ज़रूरी नहीं।',
       },
       FRANCHISE: {
-        en: 'A brand owner licenses brand, curriculum and standards to independent operators. Each franchisee is billed separately.',
-        hi: 'ब्रांड का मालिक अलग-अलग ऑपरेटर को ब्रांड, करिकुलम और स्टैंडर्ड का लाइसेंस देता है। हर फ़्रैंचाइज़ी का बिल अलग बनता है।',
+        en: 'A brand owner licenses brand, curriculum and standards to independent operators.',
+        hi: 'ब्रांड का मालिक अलग-अलग ऑपरेटर को ब्रांड, करिकुलम और स्टैंडर्ड का लाइसेंस देता है।',
       },
     }),
   },
@@ -67,8 +63,8 @@ export const instituteGroupNewHelp = defineFieldHelp('adminInstituteGroups.new',
     },
     points: [
       {
-        en: 'Needed if invoices should show the legal entity, or to claim tax exemptions or issue 80G donation receipts.',
-        hi: 'यह तब चाहिए जब इनवॉइस पर कानूनी संस्था का नाम दिखाना हो, टैक्स छूट लेनी हो या 80G डोनेशन रिसीट देनी हो।',
+        en: 'Copy it exactly from the registration certificate, so the record matches the papers.',
+        hi: 'इसे रजिस्ट्रेशन सर्टिफिकेट से हूबहू लिखें, ताकि रिकॉर्ड काग़ज़ों से मिले।',
       },
       {
         en: 'Optional for Chain and Franchise groups registered as companies.',

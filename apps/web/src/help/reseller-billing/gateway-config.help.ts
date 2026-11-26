@@ -9,8 +9,8 @@ export const gatewayConfigHelp = defineFieldHelp('resellerBilling.gateway', {
     },
     points: [
       {
-        en: 'It is shown to payers on the Pay via UPI screen and printed on invoices.',
-        hi: 'यह पेमेंट करने वाले को "UPI से पे करें" स्क्रीन पर दिखता है और इनवॉइस पर छपता है।',
+        en: 'Your institutes see it on their invoices as the UPI address to pay to.',
+        hi: 'आपके संस्थान इसे अपने इनवॉइस पर, पेमेंट भेजने के UPI एड्रेस की तरह देखते हैं।',
       },
       {
         en: 'The bank must support UPI Collect on this address: check before publishing.',
@@ -77,38 +77,34 @@ export const gatewayConfigHelp = defineFieldHelp('resellerBilling.gateway', {
   testMode: {
     title: { en: 'Test mode', hi: 'टेस्ट मोड' },
     body: {
-      en: 'Marks this config as sandbox. It never charges real money.',
-      hi: 'इस कॉन्फ़िग को सैंडबॉक्स मार्क करता है। इससे असली पैसा नहीं कटता।',
+      en: 'A label that says these are test keys. Roviq saves it but does not change how payments go through.',
+      hi: 'एक लेबल, जो बताता है कि ये टेस्ट की हैं। Roviq इसे सेव करता है, पर पेमेंट का तरीका नहीं बदलता।',
     },
     points: [
       {
-        en: 'Test-mode gateways accept fake cards and make receipts that are clearly marked as test.',
-        hi: 'टेस्ट मोड के गेटवे नकली कार्ड लेते हैं और ऐसी रिसीट बनाते हैं जिन पर टेस्ट साफ़ लिखा होता है।',
+        en: 'Whether real money moves depends on the keys: test keys from the gateway take only test payments.',
+        hi: 'असली पैसा कटेगा या नहीं, यह की से तय होता है: गेटवे की टेस्ट की सिर्फ़ टेस्ट पेमेंट लेती हैं।',
       },
       {
-        en: 'Turn it on only for test keys.',
-        hi: 'इसे सिर्फ़ टेस्ट की के लिए चालू करें।',
+        en: 'Turn it on only for test keys, so everyone can see which config is for testing.',
+        hi: 'इसे सिर्फ़ टेस्ट की के लिए चालू करें, ताकि सबको पता रहे कि कौन सा कॉन्फ़िग टेस्ट के लिए है।',
       },
     ],
-    avoid: {
-      en: 'Turning it on for a live key. All future charges will fail.',
-      hi: 'लाइव की पर इसे चालू करना। आगे के सारे चार्ज फ़ेल हो जाएँगे।',
-    },
   },
   defaultGateway: {
     title: { en: 'Default gateway', hi: 'डिफ़ॉल्ट गेटवे' },
     body: {
-      en: 'Used for new subscriptions where no gateway is chosen.',
-      hi: 'नए सब्सक्रिप्शन में जहाँ गेटवे नहीं चुना गया, वहाँ यही लगता है।',
+      en: 'The gateway that takes the online payments of all your institutes.',
+      hi: 'वह गेटवे जिससे आपके सभी संस्थानों के ऑनलाइन पेमेंट आते हैं।',
     },
     points: [
       {
-        en: 'Only one gateway per provider can be the default: marking this one unmarks the old one.',
-        hi: 'हर प्रोवाइडर का एक ही गेटवे डिफ़ॉल्ट हो सकता है: इसे चुनने पर पुराना हट जाता है।',
+        en: 'Only one gateway can be the default: marking this one unmarks the old one.',
+        hi: 'एक ही गेटवे डिफ़ॉल्ट हो सकता है: इसे चुनने पर पुराना हट जाता है।',
       },
       {
-        en: 'Existing subscriptions keep their gateway when the default changes.',
-        hi: 'डिफ़ॉल्ट बदलने पर पुराने सब्सक्रिप्शन अपना गेटवे रखते हैं।',
+        en: 'Changing the default moves every later payment, existing subscriptions included, to the new gateway.',
+        hi: 'डिफ़ॉल्ट बदलने पर आगे के सारे पेमेंट, पुराने सब्सक्रिप्शन के भी, नए गेटवे से होते हैं।',
       },
     ],
   },
