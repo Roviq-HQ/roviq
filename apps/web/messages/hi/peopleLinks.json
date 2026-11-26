@@ -1,9 +1,9 @@
 {
-  "openDetails": "{name} का विवरण खोलें",
+  "openDetails": "{name} की डिटेल्स खोलें",
   "dialog": {
-    "studentTitle": "स्टूडेंट विवरण",
-    "guardianTitle": "अभिभावक विवरण",
-    "description": "जुड़े हुए स्टूडेंट या अभिभावक का विवरण। पिछले पेज पर लौटने के लिए बंद करें।",
+    "studentTitle": "स्टूडेंट डिटेल्स",
+    "guardianTitle": "अभिभावक डिटेल्स",
+    "description": "जुड़े हुए स्टूडेंट या अभिभावक की डिटेल्स। पिछले पेज पर लौटने के लिए बंद करें।",
     "back": "वापस",
     "openFullPage": "पूरा पेज खोलें"
   },
@@ -18,7 +18,7 @@
     "lastGuardian": "{guardian} {student} के एकमात्र अभिभावक हैं। पहले कोई दूसरा अभिभावक जोड़ें, फिर {guardian} को अनलिंक करें।",
     "confirm": "अनलिंक करें",
     "unlinking": "अनलिंक हो रहा है…",
-    "cancel": "रद्द करें",
+    "cancel": "कैंसल करें",
     "success": "{guardian} को {student} से अनलिंक किया गया",
     "failed": "{guardian} को अनलिंक नहीं किया जा सका",
     "errors": {

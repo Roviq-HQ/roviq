@@ -1,6 +1,6 @@
 {
   "title": "संस्थान",
-  "description": "अपने रीसेलर अकाउंट के तहत संस्थानों का मैनेज करें।",
+  "description": "अपने रीसेलर अकाउंट के तहत संस्थान मैनेज करें।",
   "requestInstitute": "नया संस्थान रिक्वेस्ट करें",
   "tabs": {
     "all": "सभी संस्थान",
@@ -9,15 +9,15 @@
   "columns": {
     "name": "नाम",
     "code": "कोड",
-    "type": "प्रकार",
-    "status": "स्थिति",
+    "type": "टाइप",
+    "status": "स्टेटस",
     "group": "ग्रुप",
     "createdAt": "बनाया गया"
   },
   "types": {
-    "SCHOOL": "विद्यालय",
+    "SCHOOL": "स्कूल",
     "COACHING": "कोचिंग",
-    "LIBRARY": "पुस्तकालय"
+    "LIBRARY": "लाइब्रेरी"
   },
   "statuses": {
     "PENDING_APPROVAL": "अप्रूवल लंबित",
@@ -29,14 +29,14 @@
   },
   "filters": {
     "search": "नाम या कोड से खोजें…",
-    "status": "स्थिति",
-    "type": "प्रकार",
+    "status": "स्टेटस",
+    "type": "टाइप",
     "group": "ग्रुप",
     "clearFilters": "फ़िल्टर साफ़ करें",
-    "allStatuses": "सभी स्थितियां",
-    "allTypes": "सभी प्रकार",
+    "allStatuses": "सभी स्टेटस",
+    "allTypes": "सभी टाइप",
     "allGroups": "सभी ग्रुप",
-    "groupPlaceholder": "ग्रुप द्वारा फ़िल्टर करें…"
+    "groupPlaceholder": "ग्रुप के हिसाब से फ़िल्टर करें…"
   },
   "empty": {
     "title": "कोई संस्थान नहीं मिला",
@@ -54,7 +54,7 @@
   "pendingBanner": "प्लेटफ़ॉर्म एडमिन की अप्रूवल की प्रतीक्षा में। अप्रूव होने पर आपको सूचित किया जाएगा।",
   "setupBanner": "संस्थान सेटअप प्रगति पर है।",
   "detail": {
-    "title": "संस्थान विवरण",
+    "title": "संस्थान डिटेल्स",
     "tabs": {
       "overview": "अवलोकन",
       "academic": "एकेडमिक संरचना",
@@ -69,36 +69,36 @@
     "address": "पता",
     "phones": "फ़ोन नंबर",
     "emails": "ईमेल पते",
-    "primary": "प्राथमिक",
+    "primary": "मुख्य",
     "whatsapp": "व्हाट्सऐप",
     "identifiers": "नियामक आईडी",
     "affiliations": "बोर्ड संबद्धताएं",
     "fieldName": "नाम",
     "fieldCode": "कोड",
-    "fieldType": "प्रकार",
+    "fieldType": "टाइप",
     "fieldFramework": "ढांचा",
     "fieldTimezone": "समय क्षेत्र",
     "fieldCurrency": "मुद्रा",
-    "identifierType": "प्रकार",
+    "identifierType": "टाइप",
     "identifierValue": "मान",
     "identifierIssuedBy": "जारीकर्ता",
     "identifierValidUntil": "तक वैध",
     "affiliationBoard": "बोर्ड",
-    "affiliationStatus": "स्थिति",
+    "affiliationStatus": "स्टेटस",
     "affiliationNumber": "संख्या",
     "affiliationLevel": "स्तर",
     "affiliationValidUntil": "तक वैध",
     "academicStructure": "एकेडमिक संरचना",
     "noStandards": "अभी तक कोई एकेडमिक संरचना नहीं।",
     "complianceData": "अनुपालन डेटा",
-    "complianceDescription": "इस संस्थान के लिए केवल पढ़ने योग्य नियामक डेटा।",
+    "complianceDescription": "इस संस्थान के लिए सिर्फ़ पढ़ने योग्य नियामक डेटा।",
     "noComplianceData": "कोई अनुपालन डेटा उपलब्ध नहीं।",
     "auditPlaceholder": "इस संस्थान के ऑडिट लॉग यहां प्रदर्शित होंगे।",
     "notFound": "संस्थान नहीं मिला।",
     "setupProgress": "सेटअप प्रगति पर है…",
     "firstAdmin": {
       "title": "पहला एडमिन",
-      "description": "सेटअप चलने पर लॉगिन विवरण प्राप्त करता है।",
+      "description": "सेटअप चलने पर लॉगिन डिटेल्स लेता है।",
       "name": "नाम",
       "email": "ईमेल",
       "phone": "मोबाइल",
@@ -115,8 +115,8 @@
     "suspendReasonPlaceholder": "बताएं कि इस संस्थान को क्यों सस्पेंड किया जा रहा है…",
     "reactivateTitle": "संस्थान दोबारा ऐक्टिव करें",
     "reactivateDescription": "यह संस्थान फिर से ऐक्टिव हो जाएगा।",
-    "confirm": "पुष्टि करें",
-    "cancel": "रद्द करें",
+    "confirm": "कन्फ़र्म करें",
+    "cancel": "कैंसल करें",
     "success": "कार्रवाई सफल।",
     "error": "कार्रवाई फ़ेल।"
   },
@@ -128,8 +128,8 @@
     "code": "संस्थान कोड",
     "codePlaceholder": "जैसे DPS-GBN-01",
     "codeDescription": "यूनिक आईडी।",
-    "type": "संस्थान प्रकार",
-    "typePlaceholder": "प्रकार चुनें",
+    "type": "संस्थान टाइप",
+    "typePlaceholder": "टाइप चुनें",
     "structureFramework": "संरचना ढांचा",
     "structureFrameworkDescription": "NEP 5+3+3+4 संरचना का पालन करता है।",
     "board": "बोर्ड",
@@ -144,15 +144,15 @@
       "SENIOR_SECONDARY": "सीनियर सेकेंडरी (क्लास 11–12)"
     },
     "group": "संस्थान ग्रुप",
-    "groupDescription": "वैकल्पिक ग्रुप (ट्रस्ट या चेन) जिससे यह संस्थान जुड़ा है।",
-    "groupPlaceholder": "ग्रुप का नाम दर्ज करें (वैकल्पिक)",
+    "groupDescription": "ग्रुप (ट्रस्ट या चेन) जिससे यह संस्थान जुड़ा है (ज़रूरी नहीं)।",
+    "groupPlaceholder": "ग्रुप का नाम दर्ज करें (ज़रूरी नहीं)",
     "noGroup": "कोई ग्रुप नहीं",
-    "contact": "संपर्क विवरण",
+    "contact": "संपर्क डिटेल्स",
     "address": "पता",
     "submit": "रिक्वेस्ट सबमिट करें",
     "submitting": "सबमिट हो रहा है…",
     "success": "संस्थान रिक्वेस्ट सबमिट। प्लेटफ़ॉर्म एडमिन की अप्रूवल की प्रतीक्षा में।",
-    "error": "संस्थान रिक्वेस्ट सबमिट करने में फ़ेल।",
+    "error": "संस्थान रिक्वेस्ट सबमिट नहीं हो सका।",
     "codeDuplicate": "इस कोड वाला संस्थान पहले से मौजूद है।",
     "frameworks": {
       "NEP": "NEP (5+3+3+4)",
@@ -167,7 +167,7 @@
     "countryCode": "कोड",
     "phoneNumber": "फ़ोन नंबर",
     "phonePlaceholder": "9876543210",
-    "isPrimary": "प्राथमिक",
+    "isPrimary": "मुख्य",
     "isWhatsappEnabled": "व्हाट्सऐप",
     "phoneLabel": "लेबल",
     "phoneLabelPlaceholder": "जैसे रिसेप्शन",
@@ -175,12 +175,12 @@
     "removePhone": "हटाएं",
     "emailAddress": "ईमेल",
     "emailPlaceholder": "admin@institute.edu.in",
-    "emailIsPrimary": "प्राथमिक",
+    "emailIsPrimary": "मुख्य",
     "emailLabel": "लेबल",
     "emailLabelPlaceholder": "जैसे प्रशासन",
     "addEmail": "ईमेल जोड़ें",
     "removeEmail": "हटाएं",
-    "line1": "पता पंक्ति 1",
+    "line1": "पता लाइन 1",
     "line1Placeholder": "भवन / गली",
     "city": "शहर",
     "cityPlaceholder": "जैसे गुरुग्राम",
@@ -191,7 +191,7 @@
     "postalCode": "पिन कोड",
     "postalCodePlaceholder": "जैसे 122001",
     "errors": {
-      "invalidInput": "कुछ विवरण अमान्य हैं। चिह्नित फ़ील्ड जाँचें और फिर से कोशिश करें।",
+      "invalidInput": "कुछ जानकारी गलत है। चिह्नित फ़ील्ड जाँचें और फिर से कोशिश करें।",
       "groupNotFound": "चयनित संस्थान ग्रुप नहीं मिला।",
       "forbidden": "आपको संस्थान की रिक्वेस्ट करने की अनुमति नहीं है।"
     },
@@ -204,9 +204,9 @@
       "emailPlaceholder": "principal@example.com",
       "phone": "मोबाइल नंबर",
       "phonePlaceholder": "9876543210",
-      "firstNameRequired": "पहला नाम आवश्यक है।",
+      "firstNameRequired": "पहला नाम ज़रूरी है।",
       "emailInvalid": "मान्य ईमेल पता दर्ज करें।",
-      "unavailable": "पहले एडमिन का यह विवरण उपयोग नहीं किया जा सकता। कोई दूसरा ईमेल या मोबाइल नंबर दर्ज करें। अगर इस व्यक्ति का Roviq अकाउंट पहले से है, तो उनसे पहले अपने अकाउंट पेज पर ईमेल वेरिफ़ाई करने को कहें।",
+      "unavailable": "पहले एडमिन की यह जानकारी इस्तेमाल नहीं की जा सकती। कोई दूसरा ईमेल या मोबाइल नंबर दर्ज करें। अगर इस व्यक्ति का Roviq अकाउंट पहले से है, तो उनसे पहले अपने अकाउंट पेज पर ईमेल वेरिफ़ाई करने को कहें।",
       "phoneInvalid": "मोबाइल नंबर ठीक 10 अंकों का होना चाहिए।"
     }
   },
@@ -221,7 +221,7 @@
     "columns": {
       "name": "नाम",
       "code": "कोड",
-      "type": "प्रकार",
+      "type": "टाइप",
       "count": "संस्थान"
     },
     "empty": {
@@ -234,8 +234,8 @@
       "namePlaceholder": "जैसे दिल्ली पब्लिक स्कूल ट्रस्ट",
       "code": "ग्रुप कोड",
       "codePlaceholder": "जैसे dps-trust",
-      "type": "ग्रुप प्रकार",
-      "typePlaceholder": "प्रकार चुनें",
+      "type": "ग्रुप टाइप",
+      "typePlaceholder": "टाइप चुनें",
       "submit": "ग्रुप बनाएं",
       "creating": "बना रहे हैं…",
       "success": "संस्थान ग्रुप बनाया गया।",
@@ -258,9 +258,9 @@
       "adding": "जोड़ा जा रहा है…",
       "success": "संस्थान ग्रुप में जोड़ दिया गया।",
       "error": "संस्थान नहीं जोड़ा जा सका।",
-      "notAllowed": "यह संस्थान पहले से ऐसे ग्रुप में है जिसे आप मैनेज्ड नहीं करते।"
+      "notAllowed": "यह संस्थान पहले से ऐसे ग्रुप में है जिसे आप मैनेज नहीं करते।"
     },
-    "managedByPlatform": "Roviq द्वारा मैनेज्ड"
+    "managedByPlatform": "Roviq मैनेज करता है"
   },
   "users": {
     "title": "मेंबर",
@@ -271,9 +271,9 @@
     "columns": {
       "name": "नाम",
       "username": "रोविक आईडी",
-      "status": "स्थिति",
+      "status": "स्टेटस",
       "actions": "कार्रवाइयाँ",
-      "role": "भूमिका"
+      "role": "रोल"
     },
     "statuses": {
       "ACTIVE": "ऐक्टिव",

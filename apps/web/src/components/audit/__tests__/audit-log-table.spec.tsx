@@ -214,7 +214,7 @@ describe('AuditLogTable', () => {
   it('translates the impersonation badge', () => {
     renderTable({ logs: [makeLog({ impersonatorId: 'imp-1' })] }, 'hi');
 
-    expect(screen.getByText('Asha Verma द्वारा प्रतिरूपित')).toBeInTheDocument();
+    expect(screen.getByText('Asha Verma ने इम्पर्सोनेट किया')).toBeInTheDocument();
     expect(screen.queryByText(/Impersonated by/)).not.toBeInTheDocument();
   });
 

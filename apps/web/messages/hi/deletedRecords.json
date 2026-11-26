@@ -40,7 +40,7 @@
   "restoreTitle": "{name} को बहाल करें",
   "restored": "{name} बहाल किया गया",
   "deleted": "{name} हटाया गया",
-  "undo": "पूर्ववत करें",
+  "undo": "वापस लें",
   "confirmDelete": "हटाएँ",
   "deleting": "हटाया जा रहा है…",
   "loadFailed": "हटाए गए रिकॉर्ड लोड नहीं हो सके",

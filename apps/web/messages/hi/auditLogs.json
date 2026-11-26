@@ -5,7 +5,7 @@
     "timestamp": "समय",
     "actor": "कर्ता",
     "action": "कार्रवाई",
-    "actionType": "प्रकार",
+    "actionType": "टाइप",
     "entityType": "इकाई",
     "entityId": "इकाई ID",
     "source": "स्रोत",
@@ -17,21 +17,21 @@
   "resellerTier": {
     "FULL_MANAGEMENT": "पूर्ण मैनेजमेंट",
     "SUPPORT_MANAGEMENT": "सहायता",
-    "READ_ONLY": "केवल-पढ़ने योग्य"
+    "READ_ONLY": "सिर्फ़-पढ़ने योग्य"
   },
   "filters": {
-    "entityType": "इकाई प्रकार",
-    "actionType": "कार्रवाई प्रकार",
+    "entityType": "इकाई टाइप",
+    "actionType": "कार्रवाई टाइप",
     "userId": "यूज़र ID",
     "institute": "संस्थान",
     "search": "खोजें...",
     "dateFrom": "से",
     "dateTo": "तक",
     "clearFilters": "फ़िल्टर हटाएँ",
-    "impersonatorScope": "प्रतिरूपक स्कोप",
-    "actionTypesSelected": "{count} प्रकार चुने गए",
+    "impersonatorScope": "इम्पर्सोनेट करने वाले का स्कोप",
+    "actionTypesSelected": "{count} टाइप चुने गए",
     "clearSelection": "चयन हटाएं",
-    "clearEntityType": "एंटिटी प्रकार हटाएं",
+    "clearEntityType": "एंटिटी टाइप हटाएं",
     "clearInstitute": "संस्थान हटाएं"
   },
   "scopes": {
@@ -60,16 +60,16 @@
   "emptyFilteredTitle": "कोई मेल खाने वाला ऑडिट लॉग नहीं",
   "emptyFilteredDescription": "आपके वर्तमान फ़िल्टर से कोई ऑडिट लॉग मेल नहीं अकाउंट। फ़िल्टर बदलें या हटाएँ।",
   "detail": {
-    "title": "ऑडिट लॉग विवरण",
-    "description": "ऑडिट इवेंट का पूर्ण विवरण।",
+    "title": "ऑडिट लॉग डिटेल्स",
+    "description": "ऑडिट इवेंट की पूरी जानकारी।",
     "id": "ID",
     "tenantId": "संस्थान ID",
     "userId": "यूज़र ID",
     "actorId": "कर्ता ID",
-    "impersonatorId": "प्रतिरूपक ID",
+    "impersonatorId": "इम्पर्सोनेट करने वाले की ID",
     "action": "कार्रवाई",
-    "actionType": "कार्रवाई प्रकार",
-    "entityType": "इकाई प्रकार",
+    "actionType": "कार्रवाई टाइप",
+    "entityType": "इकाई टाइप",
     "entityId": "इकाई ID",
     "changes": "परिवर्तन",
     "metadata": "मेटाडेटा",
@@ -78,8 +78,8 @@
     "userAgent": "यूज़र एजेंट",
     "source": "स्रोत",
     "createdAt": "बनाया गया",
-    "impersonated": "प्रतिरूपित",
-    "viewSession": "सेशन विवरण देखें",
+    "impersonated": "इम्पर्सोनेट किया गया",
+    "viewSession": "सेशन डिटेल्स देखें",
     "noChanges": "कोई परिवर्तन दर्ज नहीं।",
     "noMetadata": "कोई मेटाडेटा नहीं।",
     "viewTrace": "ट्रेस देखें",
@@ -91,11 +91,11 @@
   },
   "session": {
     "title": "इम्पर्सोनेशन सेशन",
-    "description": "इम्पर्सोनेशन सेशन और उसके दौरान की गई कार्रवाइयों का पूर्ण विवरण।",
+    "description": "इम्पर्सोनेशन सेशन और उसके दौरान की गई कार्रवाइयों की पूरी जानकारी।",
     "loading": "सेशन लोड हो रहा है…",
     "notFound": "सेशन नहीं मिला।",
-    "impersonator": "प्रतिरूपक",
-    "impersonatorRole": "प्रतिरूपक भूमिका",
+    "impersonator": "इम्पर्सोनेट करने वाला",
+    "impersonatorRole": "इम्पर्सोनेट करने वाले का रोल",
     "targetUser": "लक्ष्य यूज़र",
     "institute": "संस्थान",
     "reason": "कारण",
@@ -140,7 +140,7 @@
     "clear": "एंटिटी आईडी खोज हटाएं"
   },
   "accessDenied": "आपको ऑडिट लॉग देखने की अनुमति नहीं है।",
-  "errorTitle": "ऑडिट लॉग लोड करने में फ़ेल",
+  "errorTitle": "ऑडिट लॉग लोड नहीं हो सका",
   "errorRetry": "दोबारा कोशिश करें",
   "entityTimeline": {
     "title": "गतिविधि इतिहास",
@@ -160,7 +160,7 @@
     "newValue": "नया मान"
   },
   "impersonation": {
-    "badge": "{name} द्वारा प्रतिरूपित",
+    "badge": "{name} ने इम्पर्सोनेट किया",
     "tooltip": "यह कार्रवाई {name} ({scope}) ने इम्पर्सोनेशन के ज़रिए की",
     "tooltipWithUser": "यह कार्रवाई {name} ({scope}) ने {userName} का इम्पर्सोनेशन करते हुए की",
     "scopeLabels": {

@@ -21,23 +21,23 @@
     "email": "ईमेल",
     "phone": "मुख्य फ़ोन",
     "memberships": "संस्थान",
-    "status": "स्थिति",
+    "status": "स्टेटस",
     "createdAt": "बनाया गया",
     "lastActive": "अंतिम ऐक्टिविटी"
   },
   "filters": {
     "search": "नाम, Roviq ID, ईमेल या फ़ोन से छाँटें",
-    "allStatuses": "सभी स्थितियाँ",
-    "scopeLabel": "मेंबरशिप का प्रकार",
+    "allStatuses": "सभी स्टेटस",
+    "scopeLabel": "मेंबरशिप का टाइप",
     "scope": {
       "institute": "संस्थान",
       "reseller": "रीसेलर",
       "platform": "प्लेटफ़ॉर्म"
     },
     "scopeHint": {
-      "institute": "केवल संस्थान मेंबरशिप वाले यूज़र दिखाएँ",
-      "reseller": "केवल रीसेलर टीम के मेंबर दिखाएँ",
-      "platform": "केवल Roviq प्लेटफ़ॉर्म स्टाफ़ दिखाएँ"
+      "institute": "सिर्फ़ संस्थान मेंबरशिप वाले यूज़र दिखाएँ",
+      "reseller": "सिर्फ़ रीसेलर टीम के मेंबर दिखाएँ",
+      "platform": "सिर्फ़ Roviq प्लेटफ़ॉर्म स्टाफ़ दिखाएँ"
     },
     "createdAfter": "इस तारीख या बाद में बना",
     "createdBefore": "इस तारीख या पहले बना",
@@ -89,7 +89,7 @@
     "roviqId": "Roviq ID",
     "email": "ईमेल",
     "phone": "मुख्य फ़ोन",
-    "dateOfBirth": "जन्म तिथि",
+    "dateOfBirth": "जन्म तारीख",
     "gender": "लिंग",
     "nationality": "राष्ट्रीयता",
     "joined": "अकाउंट बना",
@@ -110,15 +110,15 @@
     "columns": {
       "institute": "संस्थान",
       "reseller": "रीसेलर",
-      "role": "भूमिका",
-      "status": "स्थिति",
+      "role": "रोल",
+      "status": "स्टेटस",
       "joined": "जुड़े",
       "actions": "कार्य"
     },
     "statuses": {
       "ACTIVE": "ऐक्टिव",
       "SUSPENDED": "सस्पेंडेड",
-      "REVOKED": "रद्द"
+      "REVOKED": "कैंसल"
     },
     "active": "ऐक्टिव",
     "inactive": "इनऐक्टिव",
@@ -127,12 +127,12 @@
   },
   "identity": {
     "empty": "कोई पहचान दस्तावेज़ दर्ज नहीं है।",
-    "maskingNote": "आधार के केवल अंतिम 4 अंक दिखते हैं। पूरा आधार और PAN नंबर ब्राउज़र को कभी नहीं भेजा जाता।",
+    "maskingNote": "आधार के सिर्फ़ अंतिम 4 अंक दिखते हैं। पूरा आधार और PAN नंबर ब्राउज़र को कभी नहीं भेजा जाता।",
     "hidden": "छिपा हुआ",
     "verified": "वेरिफ़ाइड",
     "unverified": "वेरिफ़ाइड नहीं",
     "columns": {
-      "type": "प्रकार",
+      "type": "टाइप",
       "value": "नंबर",
       "verified": "वेरिफ़िकेशन",
       "issuingAuthority": "जारीकर्ता"

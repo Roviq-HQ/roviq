@@ -72,6 +72,7 @@ Every Hindi string the app shows (message files, help topics, notification and e
 - Keep simple Hindi for ordinary words (नया, बदलें, चुनें, खाली छोड़ें, पहली बार, वापस).
 - Never use textbook words a reader would have to look up, such as पहचानकर्ता, अद्वितीय, अनुमोदन, रसीद, स्थानांतरण, प्रमाणपत्र, पार्श्व प्रवेश, प्रविष्टि, संशोधित.
 - No emoji in copy; icons come from the components.
+- A borrowed English verb takes its bare form before कर: मैनेज करें, रजिस्टर किया, never मैनेज्ड करें.
 - One word for one concept, in every file. The words below are the ones the app uses; add a row when a new concept needs one.
 - Registered templates (WhatsApp, DLT SMS) keep the text they were approved with; a new Hindi text needs a new template name (`…_v2`).
 
@@ -107,6 +108,14 @@ Every Hindi string the app shows (message files, help topics, notification and e
 | सक्रिय, निष्क्रिय | ऐक्टिव, इनऐक्टिव |
 | विफल, पुनः प्रयास | फ़ेल, दोबारा कोशिश |
 | अद्वितीय, पहचानकर्ता, प्रविष्टि | यूनिक, आईडी, एंट्री |
+| भूमिका | रोल |
+| संग्रहित, संग्रहीत (archive) | आर्काइव |
+| तिथि, प्रारंभ तिथि, समाप्ति तिथि | तारीख, शुरू की तारीख, आखिरी तारीख |
+| पूर्ववत | वापस (वापस लें, वापस नहीं किया जा सकता) |
+| प्रतिरूपण, प्रतिरूपित | इम्पर्सोनेशन, इम्पर्सोनेट किया |
+| विद्यालय, पुस्तकालय (institute type) | स्कूल, लाइब्रेरी |
+| वैकल्पिक, आवश्यक | ज़रूरी नहीं, ज़रूरी |
+| केवल, उपयोग | सिर्फ़, इस्तेमाल |
 
 ## Field help
 

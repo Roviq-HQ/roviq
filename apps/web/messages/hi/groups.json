@@ -4,7 +4,7 @@
   "accessDenied": "आपको ग्रुप देखने की अनुमति नहीं है।",
   "actions": {
     "create": "ग्रुप जोड़ें",
-    "cancel": "रद्द करें",
+    "cancel": "कैंसल करें",
     "close": "बंद करें",
     "save": "सेव करें",
     "saving": "सेव किया जा रहा है…",
@@ -43,7 +43,7 @@
   },
   "columns": {
     "name": "नाम",
-    "type": "प्रकार",
+    "type": "टाइप",
     "membershipType": "मेंबरशिप",
     "memberCount": "मेंबर",
     "lastResolved": "अंतिम रीफ्रेश",
@@ -51,9 +51,9 @@
   },
   "filters": {
     "searchPlaceholder": "ग्रुप खोजें…",
-    "allTypes": "सभी प्रकार",
+    "allTypes": "सभी टाइप",
     "allMembershipTypes": "सभी मेंबरशिप",
-    "typesSelected": "{count} प्रकार चुने गए",
+    "typesSelected": "{count} टाइप चुने गए",
     "membershipSelected": "{count} मेंबरशिप चुनी गईं",
     "clear": "फ़िल्टर साफ़ करें"
   },
@@ -65,14 +65,14 @@
   },
   "pagination": {
     "window": "{total} में से {start}–{end}",
-    "rowsPerPage": "प्रति पेज पंक्तियाँ",
+    "rowsPerPage": "प्रति पेज रो",
     "prev": "पिछला पेज",
     "next": "अगला पेज"
   },
   "bulk": {
     "selected": "{count, plural, one {# ग्रुप चुना गया} other {# ग्रुप चुने गए}}",
     "selectAllOnPage": "इस पेज पर सभी चुनें",
-    "selectRow": "पंक्ति चुनें",
+    "selectRow": "रो चुनें",
     "clearSelection": "चयन साफ़ करें"
   },
   "dimensions": {
@@ -108,7 +108,7 @@
     "resolveButton": "मेंबर रीफ्रेश करें",
     "resolving": "रीफ्रेश हो रहा है…",
     "resolveSuccess": "मेंबर सूची रीफ्रेश की गई",
-    "resolveError": "मेंबर रीफ्रेश करने में फ़ेल",
+    "resolveError": "मेंबर रीफ्रेश नहीं हो सका",
     "actions": {
       "live": "लाइव"
     },
@@ -135,19 +135,19 @@
     },
     "rules": {
       "title": "गतिशील नियम",
-      "description": "वर्तमान नियम संस्करण {version}। JsonLogic अभिव्यक्ति संपादित करें और सेव करने से पहले रिज़ल्ट पूर्वावलोकन करें।",
-      "editButton": "नियम संपादित करें",
+      "description": "वर्तमान नियम संस्करण {version}। JsonLogic एक्सप्रेशन बदलें और सेव करने से पहले रिज़ल्ट पूर्वावलोकन करें।",
+      "editButton": "नियम बदलें",
       "placeholderJson": "{\n  \"and\": [\n    { \"==\": [{ \"var\": \"gender\" }, \"female\"] }\n  ]\n}",
       "previewError": "नियम पूर्वावलोकन फ़ेल",
       "saveSuccess": "नियम अद्यतन किया गया",
-      "saveError": "नियम सेव करने में फ़ेल",
+      "saveError": "नियम सेव नहीं हो सका",
       "errors": {
         "invalidJson": "नियम मान्य JSON होना चाहिए",
         "mustBeObject": "नियम एक JSON ऑब्जेक्ट होना चाहिए"
       },
       "dialog": {
-        "title": "नियम संपादित करें",
-        "description": "JsonLogic अभिव्यक्ति संपादित करें। सेव करने से पहले रिज़ल्ट पूर्वावलोकन करें।",
+        "title": "नियम बदलें",
+        "description": "JsonLogic एक्सप्रेशन बदलें। सेव करने से पहले रिज़ल्ट पूर्वावलोकन करें।",
         "ruleLabel": "नियम (JsonLogic JSON)",
         "preview": "पूर्वावलोकन",
         "previewing": "पूर्वावलोकन हो रहा है…",
@@ -172,18 +172,18 @@
     },
     "basics": {
       "sectionTitle": "ग्रुप मूल बातें",
-      "sectionDescription": "नाम, प्रकार, और कौन मेंबर हो सकता है।",
+      "sectionDescription": "नाम, टाइप, और कौन मेंबर हो सकता है।",
       "name": "ग्रुप का नाम",
       "namePlaceholder": "जैसे क्लास 10-ए, विज्ञान क्लब, परिवहन मार्ग 1",
-      "type": "ग्रुप प्रकार",
-      "typePlaceholder": "एक प्रकार चुनें",
-      "membershipType": "मेंबरशिप प्रकार",
+      "type": "ग्रुप टाइप",
+      "typePlaceholder": "एक टाइप चुनें",
+      "membershipType": "मेंबरशिप टाइप",
       "memberTypes": "कौन मेंबर हो सकता है",
       "memberTypesHelp": "कम से कम एक चुनें",
       "errors": {
-        "nameRequired": "ग्रुप का नाम आवश्यक है",
-        "typeRequired": "एक ग्रुप प्रकार चुनें",
-        "memberTypesRequired": "कम से कम एक मेंबर प्रकार चुनें"
+        "nameRequired": "ग्रुप का नाम ज़रूरी है",
+        "typeRequired": "एक ग्रुप टाइप चुनें",
+        "memberTypesRequired": "कम से कम एक मेंबर टाइप चुनें"
       }
     },
     "rule": {
