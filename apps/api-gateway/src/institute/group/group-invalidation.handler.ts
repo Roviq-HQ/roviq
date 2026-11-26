@@ -25,6 +25,13 @@ export class GroupInvalidationHandler {
 
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
 
+  /** A new student can match a rule on any dimension. */
+  @EventPattern(EVENT_PATTERNS.STUDENT.admitted, gatewayConsumer(EVENT_PATTERNS.STUDENT.admitted))
+  async onStudentAdmitted(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.admitted].parse(data);
+    await this.invalidateByDimensions(tenantId, [...GROUP_RULE_DIMENSION_VALUES]);
+  }
+
   @EventPattern(EVENT_PATTERNS.STUDENT.enrolled, gatewayConsumer(EVENT_PATTERNS.STUDENT.enrolled))
   async onStudentEnrolled(@Payload() data: unknown): Promise<void> {
     const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.enrolled].parse(data);

@@ -3,13 +3,19 @@
  * unresolved. Each event is produced by its real operation and fed to the handler.
  */
 import { randomUUID } from 'node:crypto';
-import { DomainGroupType, GroupMembershipType } from '@roviq/common-types';
+import {
+  DomainGroupType,
+  Gender,
+  GROUP_RULE_DIMENSION_VALUES,
+  GroupMembershipType,
+} from '@roviq/common-types';
 import {
   academicYears,
   type DrizzleDB,
   groupRules,
   groups,
   mkAdminCtx,
+  roles,
   SYSTEM_USER_ID,
   sections,
   standards,
@@ -97,6 +103,15 @@ function addSection(db: DrizzleDB, tenantId: string) {
         ...audit,
       })
       .returning({ id: sections.id });
+    await tx.insert(roles).values({
+      name: { en: 'student' },
+      scope: 'institute',
+      tenantId,
+      abilities: [],
+      isDefault: false,
+      isSystem: false,
+      ...audit,
+    });
     return { academicYearId: year.id, standardId: standard.id, sectionId: section.id };
   });
 }
@@ -177,5 +192,29 @@ describe('GroupInvalidationHandler (integration)', () => {
       gender: 'resolved',
     });
     expect(await stateOf(theirs)).toEqual({ shift: 'resolved', medium: 'resolved' });
+  });
+
+  it('should mark every student dimension group of this institute unresolved when a student is admitted', async () => {
+    const inst = await createTestInstitute(result.db);
+    const placement = await addSection(result.db, inst.tenantId);
+    const mine = await addGroups(result.db, inst.tenantId, [...GROUP_RULE_DIMENSION_VALUES]);
+    const theirs = await addGroups(result.db, other.tenantId, ['gender', 'section_id']);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: /* GraphQL */ `
+        mutation CreateStudent($input: CreateStudentInput!) { createStudent(input: $input) { id } }`,
+      token: tokenFor(inst),
+      variables: {
+        input: { firstName: { en: 'Asha' }, gender: Gender.FEMALE, ...placement },
+      },
+    });
+    expect(response.errors).toBeUndefined();
+    await handler.onStudentAdmitted(emittedOnce(emit, EVENT_PATTERNS.STUDENT.admitted));
+
+    expect(await stateOf(mine)).toEqual(
+      Object.fromEntries(GROUP_RULE_DIMENSION_VALUES.map((d) => [d, 'unresolved'])),
+    );
+    expect(await stateOf(theirs)).toEqual({ gender: 'resolved', section_id: 'resolved' });
   });
 });
