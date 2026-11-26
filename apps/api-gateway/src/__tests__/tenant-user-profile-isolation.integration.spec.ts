@@ -23,6 +23,7 @@ import {
   studentProfiles,
   tenantUserProfiles,
   userProfiles,
+  users,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -493,6 +494,86 @@ describe('Per-institute profiles and phone numbers (integration)', () => {
     });
   });
 
+  describe('the institute that created an account (ROV-372)', () => {
+    const originOf = async (userId: string) => {
+      const [row] = await asAdmin((tx) =>
+        tx.select({ originTenantId: users.originTenantId }).from(users).where(eq(users.id, userId)),
+      );
+      return row?.originTenantId;
+    };
+
+    it('is recorded for a student, a guardian and a staff member the institute creates', async () => {
+      const student = await createStudent(b);
+      const guardian = await createGuardian(b, { phone: mobile() });
+      const staff = await createStaff(b, { phone: mobile() });
+      assert(student.data && guardian.data && staff.data);
+
+      for (const userId of [
+        student.data.createStudent.userId,
+        guardian.data.createGuardian.userId,
+        staff.data.createStaffMember.userId,
+      ]) {
+        expect(await originOf(userId)).toBe(b.base.tenantId);
+      }
+    });
+
+    it("refuses institute A a membership for institute B's person, and writes nothing", async () => {
+      const guardian = await createGuardian(b, { phone: mobile() });
+      assert(guardian.data);
+      const personOfB = guardian.data.createGuardian.userId;
+
+      await expect(
+        identity.createMembership({
+          userId: personOfB,
+          scope: 'institute',
+          tenantId: a.base.tenantId,
+          roleId: a.parentRoleId,
+          actorId: a.base.userId,
+        }),
+      ).rejects.toThrow(/membership/);
+
+      expect(await membershipsIn(personOfB, a.base.tenantId)).toEqual([]);
+      expect((await copiesOf(personOfB)).has(a.base.tenantId)).toBe(false);
+    });
+
+    it('refuses an institute a membership for an account no institute created', async () => {
+      const handle = `platform-made-${randomUUID().slice(0, 8)}`;
+      const { userId } = await identity.createUser({
+        email: `${handle}@test.local`,
+        username: handle,
+        actorId: SYSTEM_USER_ID,
+        originTenantId: null,
+      });
+
+      await expect(
+        identity.createMembership({
+          userId,
+          scope: 'institute',
+          tenantId: a.base.tenantId,
+          roleId: a.parentRoleId,
+          actorId: a.base.userId,
+        }),
+      ).rejects.toThrow(/membership/);
+      expect(await membershipsIn(userId, a.base.tenantId)).toEqual([]);
+    });
+
+    it('adds a first-admin membership only for the user the institute names', async () => {
+      const guardian = await createGuardian(b, { phone: mobile() });
+      assert(guardian.data);
+      const notTheFirstAdmin = guardian.data.createGuardian.userId;
+
+      const refused = await identity.createFirstAdminMembership({
+        userId: notTheFirstAdmin,
+        tenantId: a.base.tenantId,
+        roleId: a.parentRoleId,
+        actorId: SYSTEM_USER_ID,
+      });
+
+      expect(refused).toBeNull();
+      expect(await membershipsIn(notTheFirstAdmin, a.base.tenantId)).toEqual([]);
+    });
+  });
+
   describe('a person who belongs to two institutes', () => {
     let personId: string;
     const studentProfileIn: Record<string, string> = {};
@@ -505,16 +586,23 @@ describe('Per-institute profiles and phone numbers (integration)', () => {
         email: `${handle}@test.local`,
         username: handle,
         actorId: SYSTEM_USER_ID,
+        originTenantId: null,
       }));
       await identity.ensureUserProfile(personId, { firstName: 'Account' }, SYSTEM_USER_ID);
       for (const inst of [a, b]) {
-        const student = await identity.createMembership({
-          userId: personId,
-          scope: 'institute',
-          tenantId: inst.base.tenantId,
-          roleId: inst.studentRoleId,
-          actorId: SYSTEM_USER_ID,
-        });
+        // Only the platform role can add an existing account to an institute; once the person
+        // is an active member, the institute itself adds the second role.
+        const [student] = await asAdmin((tx) =>
+          tx
+            .insert(memberships)
+            .values({
+              userId: personId,
+              tenantId: inst.base.tenantId,
+              roleId: inst.studentRoleId,
+              ...BY,
+            })
+            .returning({ membershipId: memberships.id }),
+        );
         const parent = await identity.createMembership({
           userId: personId,
           scope: 'institute',

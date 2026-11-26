@@ -72,7 +72,7 @@ export class StudentService {
     assertAdmissionClass(await this.repository.checkAdmissionClass(tenantId, admissionClass));
 
     // A typed number never identifies an existing account (SF-053): every student is a new user.
-    const userId = await this.createUser(input.phone, actorId);
+    const userId = await this.createUser(tenantId, input.phone, actorId);
     const name = { firstName: input.firstName, lastName: input.lastName };
     let admitted: AdmitStudentResult;
     try {
@@ -552,7 +552,11 @@ export class StudentService {
     }
   }
 
-  private async createUser(phone: string | undefined, actorId: string): Promise<string> {
+  private async createUser(
+    tenantId: string,
+    phone: string | undefined,
+    actorId: string,
+  ): Promise<string> {
     const suffix = crypto.randomUUID().slice(0, 12);
     const { userId } = await this.identityService.createUser({
       email: `student-${suffix}@roviq.placeholder`,
@@ -560,6 +564,7 @@ export class StudentService {
       // Unverified contact data: it may repeat across users and never links accounts.
       phone: phone ? { countryCode: '+91', number: phone } : undefined,
       actorId,
+      originTenantId: tenantId,
     });
     return userId;
   }

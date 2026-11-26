@@ -416,9 +416,13 @@ A mobile number is not a person: one parent's number is on several children, num
 | The typed number is stored as unverified contact data and may repeat across users. Only a verified number has one owner, and a number a user changes on their own profile becomes unverified. | Partial unique index `phone_numbers_country_code_number_key` (`WHERE is_verified = true AND deleted_at IS NULL`) |
 | Each institute keeps its own copy of a person's name, demographics and picture. Another institute of the same person cannot read or change it. | `tenant_user_profiles` (tenant RLS, unique on `tenant_id, user_id`), written by `ensureTenantUserProfile` / `updateTenantUserProfile` inside `withTenant` |
 | `user_profiles` is the account-level name and picture. Institute code creates it with the user and never changes it afterwards; only the user does (`updateMyProfile`, `setMyProfilePhoto`). The platform and reseller portals read it. | `IdentityService.ensureUserProfile` (insert only); `roviq_app` has no write policy on the table |
-| A membership created through `IdentityService.createMembership` (an institute's first admin, for example) gets the institute copy from the account name. | `IdentityService.createMembership` |
+| A membership created through `IdentityService` gets the institute copy from the account name. | `IdentityService.createMembership`, `IdentityService.createFirstAdminMembership` |
+| `users.origin_tenant_id` names the institute whose staff created an account. It is empty for an account the platform or a reseller created, it never changes, and no institute or reseller role can read or write it. | Every institute path passes `originTenantId` to `IdentityService.createUser` (student, staff, guardian, bulk import, the admission workflow, bots); trigger `users_keep_origin_tenant`; column grants on `users` |
+| The institute role adds a membership only for an account its own institute created, or for a person who is already an active member there (a second role). Any other insert is refused by PostgreSQL. A membership never moves to another user or institute. | Triggers `memberships_guard_user` and `memberships_keep_user_and_tenant` |
+| An institute's first admin is an account the platform or a reseller created. Its membership is written as the platform role, and only when the institute's `first_admin_user_id` is that user. | `IdentityService.createFirstAdminMembership`, called by the institute setup |
+| An institute reads the account tables (`users`, `phone_numbers`, `user_profiles`, the person's addresses, identifiers and documents, and user-level files) only for a person with a membership there that is not deleted. After a membership is deleted the institute keeps its own copy and nothing else. | The `*_app_select` policies of those tables and `filePolicies` (`AND m.deleted_at IS NULL`) |
 
-Until a person can claim an account by OTP, a person in two institutes has two logins.
+Until a person can claim an account by OTP, a person in two institutes has two logins. Only the platform role can add an existing account to a second institute.
 
 ## CASL Authorization
 

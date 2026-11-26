@@ -118,6 +118,7 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       username: FIRST_ADMIN.email,
       phone: { countryCode: '+91', number: FIRST_ADMIN.phone },
       actorId: SYSTEM_USER_ID,
+      originTenantId: null,
     });
     await identity.ensureUserProfile(userId, FIRST_ADMIN, SYSTEM_USER_ID);
     await withAdmin(result.db, mkAdminCtx('test:first-admin'), async (tx) => {
@@ -376,6 +377,7 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       username: `phone-holder-${randomUUID().slice(0, 8)}`,
       phone: { countryCode: '+91', number: sharedPhone },
       actorId: owner.userId,
+      originTenantId: null,
     });
     const email = `shared-phone-${randomUUID().slice(0, 8)}@institute.test`;
 
@@ -406,6 +408,7 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       username: `phone-owner-${randomUUID().slice(0, 8)}`,
       phone: { countryCode: '+91', number: otherPhone },
       actorId: SYSTEM_USER_ID,
+      originTenantId: null,
     });
 
     const id = await requestInstitute({
@@ -425,7 +428,12 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
   it('refuses an account whose email is not verified, unless the same person created it', async () => {
     // Someone else created this account and may hold its password (SF-045).
     const squatted = `squatted-${randomUUID().slice(0, 8)}@institute.test`;
-    await identity.createUser({ email: squatted, username: squatted, actorId: SYSTEM_USER_ID });
+    await identity.createUser({
+      email: squatted,
+      username: squatted,
+      actorId: SYSTEM_USER_ID,
+      originTenantId: null,
+    });
     const request = (email: string, slug: string) =>
       gqlRequest<{ resellerCreateInstituteRequest: { id: string } }>(result.httpServer, {
         query: CREATE_REQUEST,
@@ -476,6 +484,7 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       email: `other-${randomUUID().slice(0, 8)}@institute.test`,
       username: email,
       actorId: SYSTEM_USER_ID,
+      originTenantId: null,
     });
     const slug = `first-admin-taken-${randomUUID().slice(0, 8)}`;
 

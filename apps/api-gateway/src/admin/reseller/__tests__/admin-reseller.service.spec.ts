@@ -530,6 +530,8 @@ describe('AdminResellerService', () => {
         email: 'admin@acme.test',
         username: 'admin@acme.test',
         actorId: ACTOR_ID,
+        // A reseller's first admin is created by the platform, not by an institute.
+        originTenantId: null,
       });
       expect(identityService.createMembership).toHaveBeenCalledWith({
         userId: 'new-user-id',
@@ -671,6 +673,8 @@ describe('AdminResellerService', () => {
         email: 'admin@acme.test',
         username: 'admin@acme.test',
         actorId: ACTOR_ID,
+        // A reseller's first admin is created by the platform, not by an institute.
+        originTenantId: null,
       });
     });
 

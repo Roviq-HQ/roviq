@@ -44,6 +44,8 @@ export interface CreateBotUserData {
   email: string;
   passwordHash: string;
   createdBy: string;
+  /** The institute the bot is created for. */
+  tenantId: string;
 }
 
 export interface CreateBotMembershipData {

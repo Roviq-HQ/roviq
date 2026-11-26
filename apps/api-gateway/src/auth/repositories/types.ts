@@ -157,6 +157,8 @@ export interface NewUserRecord {
   /** Stored as the account's primary phone, unverified. */
   phone: { countryCode: string; number: string } | null;
   actorId: string;
+  /** The institute creating the account; null for the platform and resellers. */
+  originTenantId: string | null;
 }
 
 export interface NewInstituteMembership {

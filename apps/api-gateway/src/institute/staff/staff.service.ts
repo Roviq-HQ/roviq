@@ -98,6 +98,7 @@ export class StaffService {
       username,
       phone,
       actorId,
+      originTenantId: tenantId,
     });
 
     // The account is platform-level and written first; every institute row is one transaction.

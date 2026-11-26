@@ -157,7 +157,7 @@ reads the same value. Tenant context and audit consumers use this request value.
 
 - **Platform-level (custom RLS):** `users`, `institutes`, `institute_groups`, `resellers` — have per-role policies instead of tenant-scoped policies
 - **Tenant-scoped (RLS via `tenantPolicies()`):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, `academic_years`, `standards`, `sections`, `subjects`, `institute_branding`, `institute_configs`, `institute_identifiers`, `institute_affiliations`, `timetables`, `timetable_sections`, `timetable_periods`, `timetable_entries`, `timetable_day_overrides`, and all business data
-- Membership links User↔Institute. One user can have memberships in multiple institutes.
+- Membership links User↔Institute. The institute role inserts one only for a user its own institute created or an active member (`docs/auth.md` → "People and phone numbers").
 
 ### Three DB Contexts
 

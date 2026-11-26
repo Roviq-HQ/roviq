@@ -300,6 +300,7 @@ describe('Institute setup: approval workflow and direct creation (integration)',
       email,
       username: email,
       actorId: SYSTEM_USER_ID,
+      originTenantId: null,
     });
     await result.app.get(UserRepository).updatePassword(userId, await hash('a-real-password'));
     const [before] = await usersWithEmail(result.db, email);

@@ -717,6 +717,7 @@ describe('Admission applications (integration)', () => {
       username: `outsider-${outsiderSeed}`,
       phone: { countryCode: '+91', number: outsiderPhone },
       actorId,
+      originTenantId: null,
     });
     const admit = async (seed: string) => {
       const formData = {

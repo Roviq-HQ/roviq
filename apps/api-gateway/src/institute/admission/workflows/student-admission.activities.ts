@@ -183,7 +183,9 @@ export function createStudentAdmissionActivities(
             .limit(1),
       );
       const userId =
-        existing?.id ?? (await identityService.createUser({ email, username, actorId })).userId;
+        existing?.id ??
+        (await identityService.createUser({ email, username, actorId, originTenantId: tenantId }))
+          .userId;
 
       const firstNameStr = (formData.firstName ??
         formData.first_name ??
@@ -344,6 +346,7 @@ export function createStudentAdmissionActivities(
           // Unverified contact data: it may repeat across users and never links accounts.
           phone,
           actorId: createdBy,
+          originTenantId: tenantId,
         });
         return { userId: newId, created: { username, tempPassword } };
       })();

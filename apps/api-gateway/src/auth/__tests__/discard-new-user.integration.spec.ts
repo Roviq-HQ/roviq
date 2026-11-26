@@ -41,6 +41,7 @@ describe('IdentityService.discardNewUser (ROV-275)', () => {
       username: `discard-${suffix}`,
       phone: { countryCode: '+91', number: '9123456780' },
       actorId: SYSTEM_USER_ID,
+      originTenantId: null,
     });
     await identity.ensureUserProfile(userId, { firstName: 'Tara' }, SYSTEM_USER_ID);
     return userId;

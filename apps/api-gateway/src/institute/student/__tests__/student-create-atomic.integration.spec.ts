@@ -322,6 +322,7 @@ describe('createStudent: one institute transaction (ROV-275)', () => {
       email: `atomic-${Date.now()}@roviq.test`,
       username: `atomic-${Date.now()}`,
       actorId: inst.userId,
+      originTenantId: inst.tenantId,
     });
     const admit = () =>
       result.app.get(StudentRepository).admit({

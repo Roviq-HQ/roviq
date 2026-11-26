@@ -100,9 +100,8 @@ export class InstituteSetupService {
 
     const roleId = await this.instituteAdminRoleId(instituteId);
     if (!(await this.identity.findInstituteMembership(userId, instituteId, roleId))) {
-      await this.identity.createMembership({
+      await this.identity.createFirstAdminMembership({
         userId,
-        scope: 'institute',
         tenantId: instituteId,
         roleId,
         actorId,

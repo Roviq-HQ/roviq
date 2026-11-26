@@ -48,6 +48,11 @@ export abstract class IdentityRepository {
    * account name when the account has a profile. Returns the membership id.
    */
   abstract insertInstituteMembership(membership: NewInstituteMembership): Promise<string>;
+  /**
+   * The same two writes as the platform, only when the institute's `first_admin_user_id` is this
+   * user. Null when it is not.
+   */
+  abstract insertFirstAdminMembership(membership: NewInstituteMembership): Promise<string | null>;
   abstract insertResellerMembership(membership: NewResellerMembership): Promise<string>;
   abstract insertPlatformMembership(membership: NewPlatformMembership): Promise<string>;
 }
