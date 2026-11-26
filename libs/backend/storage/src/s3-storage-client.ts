@@ -41,6 +41,10 @@ export class S3StorageClient extends StorageClient {
     const shared = {
       region: config.getOrThrow<string>('S3_REGION'),
       forcePathStyle: true,
+      // By default the SDK puts a CRC32 of an empty body into every presigned PUT URL, which a
+      // strict store checks against the browser's upload and refuses.
+      requestChecksumCalculation: 'WHEN_REQUIRED' as const,
+      responseChecksumValidation: 'WHEN_REQUIRED' as const,
       credentials: {
         accessKeyId: config.getOrThrow<string>('S3_ACCESS_KEY'),
         secretAccessKey: config.getOrThrow<string>('S3_SECRET_KEY'),
