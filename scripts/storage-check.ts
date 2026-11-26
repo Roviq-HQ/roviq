@@ -64,6 +64,7 @@ const prefix = `${STORAGE_CHECK_PREFIX}${randomUUID()}`;
 const pendingKey = `${prefix}/pending/प्रमाण पत्र.pdf`;
 const finalKey = `${prefix}/final.pdf`;
 const publicKey = `${prefix}/logo.pdf`;
+const anonymousKey = `${prefix}/anonymous.txt`;
 const PDF = Buffer.from('%PDF-1.7\nstorage check');
 const failures: string[] = [];
 let skipped = 0;
@@ -265,16 +266,15 @@ async function main(): Promise<void> {
     return true;
   });
   await check('public bucket refuses a write without sign-in', async () => {
-    const key = `${prefix}/anonymous.txt`;
-    const res = await fetch(`${publicEndpoint}/${publicBucket}/${key}`, {
+    const res = await fetch(`${publicEndpoint}/${publicBucket}/${anonymousKey}`, {
       method: 'PUT',
       body: 'anonymous',
       headers: { 'Content-Type': 'text/plain' },
     });
-    return res.status >= 400 && !(await exists(publicBucket, key));
+    return res.status >= 400 && !(await exists(publicBucket, anonymousKey));
   });
   if (publicEndpoint.startsWith('https://')) {
-    await check('a download link over plain http is refused', async () => {
+    await check('a download link over plain http is not served', async () => {
       const plain = (await presignGet()).replace(/^https:/, 'http:');
       try {
         return (await fetch(plain, { redirect: 'manual' })).status !== 200;
@@ -283,7 +283,7 @@ async function main(): Promise<void> {
       }
     });
   } else {
-    skip('a download link over plain http is refused', 'S3_PUBLIC_ENDPOINT is not https');
+    skip('a download link over plain http is not served', 'S3_PUBLIC_ENDPOINT is not https');
   }
 
   await check('batch delete removes objects and tolerates a missing key', async () => {
@@ -304,7 +304,8 @@ async function main(): Promise<void> {
     await server.send(
       new DeleteObjectsCommand({
         Bucket: publicBucket,
-        Delete: { Objects: [{ Key: publicKey }], Quiet: true },
+        // The anonymous write is removed too, in case the bucket wrongly accepted it.
+        Delete: { Objects: [{ Key: publicKey }, { Key: anonymousKey }], Quiet: true },
       }),
     );
     return (res.Errors ?? []).length === 0 && !(await exists(privateBucket, finalKey));
