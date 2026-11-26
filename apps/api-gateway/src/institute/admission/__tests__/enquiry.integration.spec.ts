@@ -298,6 +298,58 @@ describe('Admission enquiries (integration)', () => {
     expect(response.data?.updateEnquiry.assignedTo).toBe(assignee);
   });
 
+  it.each([
+    ['a null student name', { studentName: null }],
+    ['a blank class', { classRequested: '' }],
+    ['a null parent name', { parentName: null }],
+    ['a null parent phone', { parentPhone: null }],
+    ['a 21-character class', { classRequested: 'Class 5 Science Grp A' }],
+    ['a malformed email', { parentEmail: 'not-an-email' }],
+  ])('updateEnquiry: refuses %s with VALIDATION_FAILED and changes nothing', async (_, input) => {
+    const create = await gqlRequest<CreateEnquiryResponse>(result.httpServer, {
+      query: CREATE_ENQUIRY,
+      token: instituteToken,
+      variables: {
+        input: {
+          studentName: 'Rhea Kapoor',
+          classRequested: 'Class 4',
+          parentName: 'Nisha Kapoor',
+          parentPhone: '9988776644',
+          parentRelation: 'MOTHER',
+        },
+      },
+    });
+    const enquiryId = create.data?.createEnquiry.id as string;
+    expect(enquiryId).toBeTruthy();
+
+    const response = await gqlRequest<UpdateEnquiryResponse>(result.httpServer, {
+      query: UPDATE_ENQUIRY,
+      token: instituteToken,
+      variables: { id: enquiryId, input },
+    });
+
+    expect(response.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+    const [row] = await withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx
+        .select({
+          studentName: enquiries.studentName,
+          classRequested: enquiries.classRequested,
+          parentName: enquiries.parentName,
+          parentPhone: enquiries.parentPhone,
+          parentEmail: enquiries.parentEmail,
+        })
+        .from(enquiries)
+        .where(eq(enquiries.id, enquiryId)),
+    );
+    expect(row).toEqual({
+      studentName: 'Rhea Kapoor',
+      classRequested: 'Class 4',
+      parentName: 'Nisha Kapoor',
+      parentPhone: '9988776644',
+      parentEmail: null,
+    });
+  });
+
   it('convertEnquiryToApplication: creates application and updates enquiry status', async () => {
     const create = await gqlRequest<CreateEnquiryResponse>(result.httpServer, {
       query: CREATE_ENQUIRY,
@@ -497,7 +549,8 @@ describe('Enquiry numbers (integration)', () => {
         },
       },
     );
-    expect(failed.errors).toBeDefined();
+    // The unique index refuses the insert; nothing maps that violation to a business code.
+    expect(failed.errors?.[0]?.extensions?.code).toBe('INTERNAL_ERROR');
     expect(await counter(fresh.tenantId)).toEqual([{ value: 2n, format: 'ENQ-{value:06d}' }]);
     expect(await enquiryCount()).toBe(before);
 

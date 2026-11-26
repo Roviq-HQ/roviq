@@ -138,11 +138,13 @@ export class CreateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   specialNeeds?: string;
 
   @Field({ nullable: true, description: 'Additional internal notes for the admissions team.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 
   @Field({ nullable: true, description: 'Scheduled follow-up date (ISO date YYYY-MM-DD).' })

@@ -5,20 +5,24 @@ import {
   IsDateString,
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 @InputType({
   description:
-    'Fields that can be updated on an existing admission enquiry. All fields are optional.',
+    'Fields that can be updated on an existing admission enquiry. All fields are optional; ' +
+    'studentName, classRequested, parentName and parentPhone may be left out but not cleared.',
 })
 export class UpdateEnquiryInput {
   @Field({ nullable: true, description: 'Name of the prospective student.' })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MaxLength(200)
   studentName?: string;
@@ -28,7 +32,8 @@ export class UpdateEnquiryInput {
     description:
       'Requested class or grade, e.g. "Nursery", "LKG", "Class 5"; at most 20 characters.',
   })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MaxLength(20)
   classRequested?: string;
@@ -37,13 +42,15 @@ export class UpdateEnquiryInput {
     nullable: true,
     description: 'Name of the parent or guardian who submitted the enquiry.',
   })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MaxLength(200)
   parentName?: string;
 
   @Field({ nullable: true, description: '10-digit Indian mobile number (without +91 prefix).' })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @Matches(/^[6-9]\d{9}$/, {
     message: 'parentPhone must be a 10-digit Indian mobile starting with 6-9',
@@ -77,6 +84,7 @@ export class UpdateEnquiryInput {
   @Field({ nullable: true, description: 'Internal notes for the admissions team.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 
   @Field(() => EnquirySource, {
@@ -116,5 +124,6 @@ export class UpdateEnquiryInput {
   @Field({ nullable: true, description: 'Any special educational needs or disabilities to note.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   specialNeeds?: string;
 }

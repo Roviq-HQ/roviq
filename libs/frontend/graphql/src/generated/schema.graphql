@@ -8085,7 +8085,7 @@ input UpdateBotInput {
 }
 
 """
-Fields that can be updated on an existing admission enquiry. All fields are optional.
+Fields that can be updated on an existing admission enquiry. All fields are optional; studentName, classRequested, parentName and parentPhone may be left out but not cleared.
 """
 input UpdateEnquiryInput {
   """Staff member responsible for following up on this enquiry."""
