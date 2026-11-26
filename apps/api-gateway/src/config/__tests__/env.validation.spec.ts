@@ -22,6 +22,15 @@ const BASE = {
   ALLOWED_ORIGINS: 'http://localhost:4200',
 };
 const REAL_KEY = 'ab'.repeat(32);
+/** Storage as production needs it: https, its own domain, two buckets. */
+const PROD = {
+  ...BASE,
+  S3_ENDPOINT: 'http://object-storage:9000',
+  S3_PUBLIC_ENDPOINT: 'https://storage.example.test',
+  S3_PUBLIC_BASE_URL: 'https://files.example.test',
+  ALLOWED_ORIGINS: 'https://app.example.test,https://admin.app.example.test',
+  MESSAGING_ENCRYPTION_KEY: REAL_KEY,
+};
 
 describe('api-gateway env validation: MESSAGING_ENCRYPTION_KEY', () => {
   it('should fill in the development key in development and test when it is unset', () => {
@@ -44,9 +53,7 @@ describe('api-gateway env validation: MESSAGING_ENCRYPTION_KEY', () => {
   });
 
   it('should keep a key that is set', () => {
-    expect(validate({ ...BASE, MESSAGING_ENCRYPTION_KEY: REAL_KEY }).MESSAGING_ENCRYPTION_KEY).toBe(
-      REAL_KEY,
-    );
+    expect(validate(PROD).MESSAGING_ENCRYPTION_KEY).toBe(REAL_KEY);
   });
 
   it.each([
@@ -73,10 +80,7 @@ describe('api-gateway env validation: MESSAGING_ENCRYPTION_KEY', () => {
   });
 
   it('should accept a real key in production', () => {
-    expect(
-      validate({ ...BASE, NODE_ENV: 'production', MESSAGING_ENCRYPTION_KEY: REAL_KEY })
-        .MESSAGING_ENCRYPTION_KEY,
-    ).toBe(REAL_KEY);
+    expect(validate({ ...PROD, NODE_ENV: 'production' }).MESSAGING_ENCRYPTION_KEY).toBe(REAL_KEY);
   });
 
   it.each([
@@ -125,5 +129,81 @@ describe('api-gateway env validation: telemetry variables', () => {
     expect(() => validate({ ...TEST_ENV, OPENOBSERVE_URL: 'openobserve:5080/x y' })).toThrow(
       /OPENOBSERVE_URL/,
     );
+  });
+});
+
+describe('api-gateway env validation: object storage outside development and test', () => {
+  const PRODUCTION = { ...PROD, NODE_ENV: 'production' };
+
+  it('should accept https browser endpoints on their own domain with a private server endpoint', () => {
+    expect(() => validate(PRODUCTION)).not.toThrow();
+    expect(() =>
+      validate({ ...PRODUCTION, S3_ENDPOINT: 'https://s3.storage.example.test' }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    'S3_PUBLIC_ENDPOINT',
+    'S3_PUBLIC_BASE_URL',
+  ] as const)('should refuse a plain http %s', (name) => {
+    expect(() => validate({ ...PRODUCTION, [name]: 'http://storage.example.test' })).toThrow(
+      `${name} — must be https outside development and test`,
+    );
+  });
+
+  it('should refuse a plain http server endpoint on a public host', () => {
+    expect(() =>
+      validate({ ...PRODUCTION, S3_ENDPOINT: 'http://s3.storage.example.test' }),
+    ).toThrow('S3_ENDPOINT — must be https unless it is a private host');
+  });
+
+  it.each([
+    'S3_PUBLIC_ENDPOINT',
+    'S3_PUBLIC_BASE_URL',
+  ] as const)('should refuse %s on a portal host', (name) => {
+    expect(() =>
+      validate({ ...PRODUCTION, [name]: 'https://admin.app.example.test/files' }),
+    ).toThrow(`${name} — must not be a portal host from ALLOWED_ORIGINS`);
+  });
+
+  it.each([
+    'S3_PUBLIC_ENDPOINT',
+    'S3_PUBLIC_BASE_URL',
+  ] as const)('should refuse %s on a subdomain of a portal host', (name) => {
+    expect(() => validate({ ...PRODUCTION, [name]: 'https://files.app.example.test' })).toThrow(
+      `${name} — must not be a portal host from ALLOWED_ORIGINS or its subdomain`,
+    );
+  });
+
+  it('should refuse a portal host even when the portal origin names a port', () => {
+    expect(() =>
+      validate({
+        ...PRODUCTION,
+        ALLOWED_ORIGINS: 'https://app.example.test:8443',
+        S3_PUBLIC_BASE_URL: 'https://app.example.test/files',
+      }),
+    ).toThrow('S3_PUBLIC_BASE_URL — must not be a portal host from ALLOWED_ORIGINS');
+  });
+
+  it('should accept a plain http server endpoint on 127.0.0.1', () => {
+    expect(() => validate({ ...PRODUCTION, S3_ENDPOINT: 'http://127.0.0.1:9000' })).not.toThrow();
+  });
+
+  it('should accept a storage domain that only ends like a portal host', () => {
+    expect(() =>
+      validate({ ...PRODUCTION, S3_PUBLIC_BASE_URL: 'https://files-app.example.test' }),
+    ).not.toThrow();
+  });
+
+  it('should refuse one bucket for both private and public files', () => {
+    expect(() =>
+      validate({ ...PRODUCTION, S3_BUCKET_PUBLIC: PRODUCTION.S3_BUCKET_PRIVATE }),
+    ).toThrow('S3_BUCKET_PUBLIC — must differ from S3_BUCKET_PRIVATE');
+  });
+
+  it('should leave the http dev store alone in development and test', () => {
+    for (const nodeEnv of ['development', 'test']) {
+      expect(() => validate({ ...BASE, NODE_ENV: nodeEnv })).not.toThrow();
+    }
   });
 });

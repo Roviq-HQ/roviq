@@ -4,7 +4,8 @@
 #   STAGING_ENV_FILE=<env file> scripts/staging/staging-deploy.sh <commit, branch or tag>
 #
 # Order: export the commit, build its images, back up, start the infrastructure, set the runtime
-# role's password, migrate, essential seed, buckets, first admin, start the apps, smoke-check
+# role's password, check an external object store, migrate, essential seed, buckets (in-stack store
+# only), first admin, start the apps, smoke-check
 # through the public names. A failure after the migration puts the previous release's apps back;
 # when that release cannot run on the migrated schema, restore the backup printed above.
 set -euo pipefail
@@ -39,6 +40,15 @@ cp "$REL/docker/init-db.sh" "$STAGING_STATE_DIR/init-db.sh"
 [[ -d "$REL/scripts/staging" ]] || { log "$SHA has no scripts/staging: it predates staging"; exit 1; }
 mkdir -p "$STAGING_STATE_DIR/bin"
 cp "$REL"/scripts/staging/*.sh "$STAGING_STATE_DIR/bin/"
+
+# A switch to an external store starts from a release that has the override, so its backup and its
+# rollback understand the mode (docs/deployment.md → "Staging").
+if external_store && [[ -n "$PREVIOUS" && "$PREVIOUS" != "$SHA" ]] &&
+    ! has_external_store_support "$RELEASES_DIR/$PREVIOUS"; then
+    log "$PREVIOUS has no external object store support. Deploy $SHA with"
+    log "STAGING_OBJECT_STORE=in-stack first, then switch to external."
+    exit 1
+fi
 
 # ── 2. Build the images ──────────────────────────────────────
 build() {
@@ -91,6 +101,12 @@ rollback() {
 }
 trap rollback EXIT
 
+if external_store; then
+    # Before the migration: a store that fails its check stops the deploy with nothing changed.
+    log "Checking the external object store"
+    stg_compose "$REL" run --rm -w /app migrator pnpm run storage:check
+fi
+
 log "Running migrations"
 stg_compose "$REL" run --rm migrator
 migrated=true
@@ -98,8 +114,14 @@ migrated=true
 printf '%s\n' '\getenv pw POSTGRES_AUDIT_WRITER_PASSWORD' "ALTER ROLE roviq_audit_writer PASSWORD :'pw';" |
     stg_compose "$REL" exec -T -e POSTGRES_AUDIT_WRITER_PASSWORD postgres \
         psql -q -v ON_ERROR_STOP=1 -U roviq -d roviq >/dev/null
-log "Essential seed and buckets"
-stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:init'
+if external_store; then
+    # An external store's buckets and rules are set up outside the stack.
+    log "Essential seed"
+    stg_compose "$REL" run --rm -w /app migrator pnpm run db:seed:essential
+else
+    log "Essential seed and buckets"
+    stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:init'
+fi
 log "First platform admin"
 ADMIN_FILE="$STAGING_STATE_DIR/first-admin-password"
 ADMIN_OUT="$(stg_compose "$REL" run --rm -T -w /app migrator \

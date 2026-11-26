@@ -65,6 +65,7 @@
     "storage:init": "pnpx tsx scripts/storage-init.ts",
     "observability:load": ". scripts/instance-env.sh && pnpx tsx scripts/observability-load.ts",
     "storage:check": "pnpx tsx scripts/storage-check.ts",
+    "storage:configure": "pnpx tsx scripts/storage-configure.ts",
     "db:studio": "nx run database:db:studio",
     "e2e:up": "scripts/e2e-compose.sh up -d --build --wait --remove-orphans",
     "e2e:clean": "scripts/e2e-compose.sh run --rm --no-deps migrate-and-seed",

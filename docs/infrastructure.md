@@ -111,7 +111,9 @@ host open presigned URLs.
 - **Acceptance check**: `pnpm storage:check` (`scripts/storage-check.ts`) tests the store behind
   the `S3_*` variables for everything the app relies on (uploads refused when size or type
   differ, server-side copy, private bucket closed to anonymous reads, stable signed URLs). Run it
-  before pointing any environment at a new provider or a new RustFS version.
+  before pointing any environment at a new provider or a new RustFS version. A staging or
+  production store gets its CORS and lifecycle rules from `pnpm storage:configure`
+  (`docs/deployment.md` → "Object storage").
 - **Why not MinIO**: MinIO stopped publishing community images in 2025; `quay.io/minio/minio`
   and `minio/minio` can no longer be pulled. The application talks plain S3
   (`@aws-sdk/client-s3`) and uses nothing provider-specific.

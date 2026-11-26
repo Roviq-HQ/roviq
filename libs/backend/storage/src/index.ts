@@ -1,4 +1,5 @@
 export { FakeStorageClient } from './fake-storage-client';
+export { S3_CHECKSUM_OPTIONS } from './s3-checksum-options';
 export { S3StorageClient } from './s3-storage-client';
 export { StorageModule } from './storage.module';
 export {

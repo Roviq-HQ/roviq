@@ -13,6 +13,7 @@ import {
   PutBucketPolicyCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { parseOrigins, portalCorsRule, S3_CHECKSUM_OPTIONS } from './lib/storage-rules';
 
 if (process.env.NODE_ENV === 'production') {
   console.error('storage:init is for dev and e2e only.');
@@ -32,15 +33,13 @@ const privateBucket = required('S3_BUCKET_PRIVATE', process.env.S3_BUCKET_PRIVAT
 const publicBucket = required('S3_BUCKET_PUBLIC', process.env.S3_BUCKET_PUBLIC);
 
 // Browsers upload straight to storage from these origins; without a CORS rule they are refused.
-const portalOrigins = required('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS)
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter((origin) => origin.length > 0);
+const portalOrigins = parseOrigins(required('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS));
 
 const client = new S3Client({
   endpoint,
   region: required('S3_REGION', process.env.S3_REGION),
   forcePathStyle: true,
+  ...S3_CHECKSUM_OPTIONS,
   credentials: {
     accessKeyId: required('S3_ACCESS_KEY', process.env.S3_ACCESS_KEY),
     secretAccessKey: required('S3_SECRET_KEY', process.env.S3_SECRET_KEY),
@@ -80,17 +79,7 @@ async function init(): Promise<void> {
   await client.send(
     new PutBucketCorsCommand({
       Bucket: privateBucket,
-      CORSConfiguration: {
-        CORSRules: [
-          {
-            AllowedOrigins: portalOrigins,
-            AllowedMethods: ['PUT', 'GET'],
-            AllowedHeaders: ['Content-Type'],
-            ExposeHeaders: ['ETag'],
-            MaxAgeSeconds: 3600,
-          },
-        ],
-      },
+      CORSConfiguration: { CORSRules: [portalCorsRule(portalOrigins)] },
     }),
   );
   console.info(`Bucket ${privateBucket} accepts uploads from ${portalOrigins.join(', ')}`);
