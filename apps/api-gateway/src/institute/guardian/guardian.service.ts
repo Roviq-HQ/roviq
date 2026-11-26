@@ -112,6 +112,7 @@ export class GuardianService {
       username,
       phone,
       actorId,
+      originTenantId: tenantId,
     });
     const newUser = { id: newUserId };
     await this.identityService.ensureUserProfile(

@@ -383,7 +383,13 @@ async function createUser(
   // Unverified contact data: siblings share a parent's number and each is still a new user.
   const phone = row.phone ? { countryCode: '+91', number: row.phone } : undefined;
 
-  const { userId } = await identityService.createUser({ email, username, phone, actorId });
+  const { userId } = await identityService.createUser({
+    email,
+    username,
+    phone,
+    actorId,
+    originTenantId: tenantId,
+  });
   return userId;
 }
 

@@ -47,6 +47,7 @@ describe('IdentityService.createUser (ROV-362)', () => {
       username: `create-${suffix}`,
       phone: { countryCode: '+91', number: '9123456781' },
       actorId: SYSTEM_USER_ID,
+      originTenantId: null,
     });
 
     const phones = await asAdmin((tx) =>
@@ -70,6 +71,7 @@ describe('IdentityService.createUser (ROV-362)', () => {
         username: `create-${suffix}`,
         phone: { countryCode: '+91', number: '91234\u000056782' },
         actorId: SYSTEM_USER_ID,
+        originTenantId: null,
       }),
     ).rejects.toThrow();
 

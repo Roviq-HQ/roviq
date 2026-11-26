@@ -92,8 +92,8 @@ export const entityPolicies = (tableName: string) => [
 
 /**
  * RLS policies for personal-data tables keyed by `user_id` with no `tenant_id`.
- * A row is readable only where its user holds a membership; writes are admin-only
- * because one user's row is shared by every institute they belong to.
+ * A row is readable only where its user holds a membership that is not deleted; writes are
+ * admin-only because one user's row is shared by every institute they belong to.
  */
 export const userScopedPolicies = (tableName: string) => [
   pgPolicy(`${tableName}_app_select`, {
@@ -102,6 +102,7 @@ export const userScopedPolicies = (tableName: string) => [
     using: sql`user_id IN (
       SELECT m.user_id FROM memberships m
       WHERE m.tenant_id = current_setting('app.current_tenant_id', true)::uuid
+        AND m.deleted_at IS NULL
     )`,
   }),
   pgPolicy(`${tableName}_reseller_read`, {
@@ -111,6 +112,7 @@ export const userScopedPolicies = (tableName: string) => [
       SELECT m.user_id FROM memberships m
       JOIN institutes i ON i.id = m.tenant_id
       WHERE i.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+        AND m.deleted_at IS NULL
     ) OR user_id IN (
       SELECT rm.user_id FROM reseller_memberships rm
       WHERE rm.reseller_id = current_setting('app.current_reseller_id', true)::uuid
@@ -126,10 +128,11 @@ export const userScopedPolicies = (tableName: string) => [
 
 /** A file that belongs to a person, not to an institute or reseller (a profile picture). */
 const userLevelFile = sql`tenant_id IS NULL AND reseller_id IS NULL`;
-/** The person a user-level file is about is a member of the current institute. */
+/** The person a user-level file is about is a current member of the current institute. */
 const subjectInCurrentTenant = sql`subject_user_id IN (
   SELECT m.user_id FROM memberships m
   WHERE m.tenant_id = current_setting('app.current_tenant_id', true)::uuid
+    AND m.deleted_at IS NULL
 )`;
 const ownTenantFile = sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`;
 const appFileAccess = sql`${ownTenantFile} OR (${userLevelFile} AND ${subjectInCurrentTenant})`;
@@ -171,6 +174,7 @@ export const filePolicies = (tableName: string) => [
           SELECT m.user_id FROM memberships m
           JOIN institutes i ON i.id = m.tenant_id
           WHERE i.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+            AND m.deleted_at IS NULL
         )
         OR subject_user_id IN (
           SELECT rm.user_id FROM reseller_memberships rm

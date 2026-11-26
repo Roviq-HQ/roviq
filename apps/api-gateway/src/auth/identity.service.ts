@@ -21,6 +21,12 @@ export interface CreateUserInput {
   lastName?: string;
   /** Recorded as created_by — `SYSTEM_USER_ID` for unattended flows. */
   actorId: string;
+  /**
+   * The institute whose staff are creating this account, from the request or workflow context;
+   * null when the platform or a reseller creates it. The institute role can add a membership
+   * only for an account that names it here.
+   */
+  originTenantId: string | null;
 }
 
 export interface CreateUserResult {
@@ -179,6 +185,7 @@ export class IdentityService {
       username: email,
       phone: newUser.phone,
       actorId,
+      originTenantId: null,
     });
     return { kind: 'created', userId: created.userId, email, tempPassword: created.tempPassword };
   }
@@ -264,6 +271,7 @@ export class IdentityService {
       passwordHash,
       phone: input.phone ?? null,
       actorId: input.actorId,
+      originTenantId: input.originTenantId,
     });
 
     return { userId, tempPassword };
@@ -314,6 +322,21 @@ export class IdentityService {
     return { membershipId, scope: 'platform' };
   }
 
+  /**
+   * Makes an institute's first admin a member of it. The account was created by the platform
+   * or a reseller, so the institute role cannot add it; this runs as the platform and writes
+   * only when the institute names this user as its first admin. Null when it does not.
+   */
+  async createFirstAdminMembership(input: {
+    userId: string;
+    tenantId: string;
+    roleId: string;
+    actorId: string;
+  }): Promise<{ membershipId: string } | null> {
+    const membershipId = await this.repo.insertFirstAdminMembership({ ...input, abilities: [] });
+    return membershipId !== null ? { membershipId } : null;
+  }
+
   async createUserWithMembership(
     input: CreateUserWithMembershipInput,
   ): Promise<CreateUserWithMembershipResult> {
@@ -324,6 +347,7 @@ export class IdentityService {
       firstName: input.firstName,
       lastName: input.lastName,
       actorId: input.actorId,
+      originTenantId: input.originTenantId,
     });
 
     const membership = await this.createMembership({

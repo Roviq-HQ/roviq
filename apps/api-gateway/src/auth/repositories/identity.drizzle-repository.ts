@@ -3,6 +3,7 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  institutesLive,
   mapUniqueViolation,
   memberships,
   membershipsLive,
@@ -52,6 +53,44 @@ const EMAIL_TAKEN: UniqueViolationErrors = {
   users_email_key: () =>
     new BusinessException(ErrorCode.EMAIL_TAKEN, 'This email is already used by an account'),
 };
+
+/**
+ * The membership, then the institute's own copy of the account name when the account has a
+ * profile. Returns the membership id.
+ */
+async function insertMembershipWithProfile(
+  tx: DrizzleDB,
+  input: NewInstituteMembership,
+): Promise<string> {
+  const [membership] = await tx
+    .insert(memberships)
+    .values({
+      userId: input.userId,
+      tenantId: input.tenantId,
+      roleId: input.roleId,
+      status: 'ACTIVE',
+      abilities: input.abilities,
+      createdBy: input.actorId,
+      updatedBy: input.actorId,
+    })
+    .returning({ id: memberships.id });
+  // The institute's own copy of the person's name starts from the account name.
+  const [account] = await tx
+    .select({ firstName: userProfilesLive.firstName, lastName: userProfilesLive.lastName })
+    .from(userProfilesLive)
+    .where(eq(userProfilesLive.userId, input.userId))
+    .limit(1);
+  if (account) {
+    await ensureTenantUserProfile(tx, {
+      tenantId: input.tenantId,
+      userId: input.userId,
+      actorId: input.actorId,
+      firstName: account.firstName,
+      lastName: account.lastName,
+    });
+  }
+  return membership.id;
+}
 
 @Injectable()
 export class IdentityDrizzleRepository extends IdentityRepository {
@@ -248,6 +287,7 @@ export class IdentityDrizzleRepository extends IdentityRepository {
           username: user.username,
           passwordHash: user.passwordHash,
           mustChangePassword: true,
+          originTenantId: user.originTenantId,
         })
         .returning({ id: users.id });
       if (user.phone) {
@@ -266,45 +306,26 @@ export class IdentityDrizzleRepository extends IdentityRepository {
   }
 
   async insertInstituteMembership(input: NewInstituteMembership): Promise<string> {
-    const tenantId = input.tenantId;
-    const [row] = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:identity'),
-      async (tx) => {
-        const [membership] = await tx
-          .insert(memberships)
-          .values({
-            userId: input.userId,
-            tenantId,
-            roleId: input.roleId,
-            status: 'ACTIVE',
-            abilities: input.abilities,
-            createdBy: input.actorId,
-            updatedBy: input.actorId,
-          })
-          .returning({ id: memberships.id });
-        // The institute's own copy of the person's name starts from the account name.
-        const [account] = await tx
-          .select({
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
-          })
-          .from(userProfilesLive)
-          .where(eq(userProfilesLive.userId, input.userId))
-          .limit(1);
-        if (account) {
-          await ensureTenantUserProfile(tx, {
-            tenantId,
-            userId: input.userId,
-            actorId: input.actorId,
-            firstName: account.firstName,
-            lastName: account.lastName,
-          });
-        }
-        return [membership];
-      },
+    return withTenant(this.db, mkInstituteCtx(input.tenantId, 'service:identity'), (tx) =>
+      insertMembershipWithProfile(tx, input),
     );
-    return row.id;
+  }
+
+  async insertFirstAdminMembership(input: NewInstituteMembership): Promise<string | null> {
+    return withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
+      const [institute] = await tx
+        .select({ id: institutesLive.id })
+        .from(institutesLive)
+        .where(
+          and(
+            eq(institutesLive.id, input.tenantId),
+            eq(institutesLive.firstAdminUserId, input.userId),
+          ),
+        )
+        .limit(1);
+      if (!institute) return null;
+      return insertMembershipWithProfile(tx, input);
+    });
   }
 
   async insertResellerMembership(input: NewResellerMembership): Promise<string> {

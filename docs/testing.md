@@ -111,6 +111,12 @@ Further rules the database enforces, tested in DB:
 - An impersonation session can be opened only by someone with active access of that scope to the target institute (a reseller only into its own institutes). It cannot be re-pointed or extended.
 - `roviq_app` reads only the sessions in its own institute and `roviq_reseller` only those in its own institutes. Neither can write any.
 
+Tested in `libs/database/src/__tests__/membership-insert-rule.integration.spec.ts`:
+
+- `roviq_app` inserts a membership only for a user its own institute created (`users.origin_tenant_id`) or for an active member of that institute. `roviq_admin` is exempt.
+- A membership cannot move to another user or institute, and `users.origin_tenant_id` cannot change, for any role.
+- An institute stops reading a person's account tables once their membership is deleted.
+
 The E2E sections keep the numbering used when the suite was first written, which is one higher than the issue's from 16 on.
 
 CI runs the database and session specs as the named step **Auth Security Invariants** in the `test` job, before the full integration suite. The E2E spec runs in the `e2e-api` job.

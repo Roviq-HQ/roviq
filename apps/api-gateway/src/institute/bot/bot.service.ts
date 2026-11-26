@@ -41,6 +41,7 @@ export class BotService {
       email: botEmail,
       passwordHash,
       createdBy,
+      tenantId,
     });
 
     // 3. Find or create bot role for this tenant

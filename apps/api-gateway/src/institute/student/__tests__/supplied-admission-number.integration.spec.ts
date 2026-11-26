@@ -259,6 +259,7 @@ describe('Supplied admission numbers (ROV-367, integration)', () => {
         email: `adm-${randomUUID()}@roviq.test`,
         username: `adm-${randomUUID().slice(0, 12)}`,
         actorId: inst.userId,
+        originTenantId: inst.tenantId,
       });
       return userId;
     };

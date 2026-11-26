@@ -180,6 +180,7 @@ export class BotProfileDrizzleRepository extends BotProfileRepository {
           username: data.username,
           email: data.email,
           passwordHash: data.passwordHash,
+          originTenantId: data.tenantId,
         })
         .returning({ id: users.id });
       return created;

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   integer,
@@ -13,6 +14,7 @@ import {
 import { entityColumns } from '../common/columns';
 import { formHelpMode, userStatus } from '../common/enums';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
+import { institutes } from '../tenant/institutes';
 
 export const users = pgTable(
   'users',
@@ -40,13 +42,24 @@ export const users = pgTable(
     tokenVersion: integer('token_version').default(0).notNull(),
     /** How much field help forms show this account. Read only by its owner; not on users_live. */
     formHelpMode: formHelpMode('form_help_mode').default('ICON_AND_HINT').notNull(),
+    /**
+     * The institute whose staff created this account; NULL when the platform or a reseller did.
+     * Fixed at insert (trigger `users_keep_origin_tenant`). The institute role may add a
+     * membership only for an account it created (trigger `memberships_guard_user`). Granted to
+     * no institute or reseller role and not on users_live.
+     */
+    originTenantId: uuid('origin_tenant_id').references((): AnyPgColumn => institutes.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
     ...entityColumns,
   },
   (table) => [
     check('users_preferred_locale_check', sql`${table.preferredLocale} IN ('en', 'hi')`),
     uniqueIndex('users_email_key').using('btree', table.email.asc().nullsLast()),
     uniqueIndex('users_username_key').using('btree', table.username.asc().nullsLast()),
-    // An institute reads its members; a reseller reads its institutes' members and its team.
+    // An institute reads its current members; a reseller reads its institutes' current members
+    // and its team. A deleted membership gives no access.
     // password_hash and token_version are not granted to either role (column grants, ROV-279).
     pgPolicy('users_app_select', {
       for: 'select',
@@ -54,6 +67,7 @@ export const users = pgTable(
       using: sql`id IN (
         SELECT m.user_id FROM memberships m
         WHERE m.tenant_id = current_setting('app.current_tenant_id', true)::uuid
+          AND m.deleted_at IS NULL
       )`,
     }),
     pgPolicy('users_reseller_select', {
@@ -63,6 +77,7 @@ export const users = pgTable(
         SELECT m.user_id FROM memberships m
         JOIN institutes i ON i.id = m.tenant_id
         WHERE i.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+          AND m.deleted_at IS NULL
       ) OR id IN (
         SELECT rm.user_id FROM reseller_memberships rm
         WHERE rm.reseller_id = current_setting('app.current_reseller_id', true)::uuid
