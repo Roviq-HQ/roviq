@@ -97,7 +97,7 @@
     "DETAINED": "Detained",
     "TRANSFERRED_OUT": "Transferred Out",
     "DROPPED_OUT": "Dropped Out",
-    "PASSED_OUT": "Passed Out",
+    "PASSOUT": "Passed Out",
     "GRADUATED": "Graduated",
     "WITHDRAWN": "Withdrawn",
     "SUSPENDED": "Suspended",
