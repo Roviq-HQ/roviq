@@ -44,12 +44,12 @@
       "OTHER": "अन्य"
     },
     "educationLevels": {
-      "ILLITERATE": "कोई औपचारिक शिक्षा नहीं",
+      "ILLITERATE": "पढ़ाई नहीं की",
       "PRIMARY": "प्राइमरी (क्लास 5 तक)",
-      "SECONDARY": "माध्यमिक (क्लास 10 / 12)",
-      "GRADUATE": "स्नातक",
-      "POST_GRADUATE": "स्नातकोत्तर",
-      "PROFESSIONAL": "व्यावसायिक (MBBS, LLB, CA आदि)"
+      "SECONDARY": "सेकेंडरी (क्लास 10 / 12)",
+      "GRADUATE": "ग्रेजुएट",
+      "POST_GRADUATE": "पोस्ट ग्रेजुएट",
+      "PROFESSIONAL": "प्रोफ़ेशनल (MBBS, LLB, CA वगैरह)"
     },
     "errors": {
       "firstNameRequired": "कृपया अभिभावक का प्रथम नाम दर्ज करें",
@@ -179,12 +179,12 @@
     }
   },
   "educationLevels": {
-    "ILLITERATE": "कोई औपचारिक शिक्षा नहीं",
+    "ILLITERATE": "पढ़ाई नहीं की",
     "PRIMARY": "प्राइमरी (क्लास 5 तक)",
-    "SECONDARY": "माध्यमिक (क्लास 10 / 12)",
-    "GRADUATE": "स्नातक",
-    "POST_GRADUATE": "स्नातकोत्तर",
-    "PROFESSIONAL": "व्यावसायिक (MBBS, LLB, CA आदि)"
+    "SECONDARY": "सेकेंडरी (क्लास 10 / 12)",
+    "GRADUATE": "ग्रेजुएट",
+    "POST_GRADUATE": "पोस्ट ग्रेजुएट",
+    "PROFESSIONAL": "प्रोफ़ेशनल (MBBS, LLB, CA वगैरह)"
   },
   "loading": "अभिभावक लोड हो रहे हैं...",
   "errorLoading": "अभिभावक लोड नहीं हो सके",
