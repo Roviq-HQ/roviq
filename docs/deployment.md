@@ -46,12 +46,23 @@ The full list of database-enforced rules and the tests that prove them is in `do
 ## Object storage
 
 The gateway needs an S3-compatible store and all eight `S3_*` variables (see `.env.example`);
-it refuses to start without them. Production uses a managed service: **AWS S3 or Cloudflare R2**
-(not decided as of 2026-11-19). Dev and CI use RustFS. Buckets are created by infrastructure,
-never by the app.
+it refuses to start without them. Production uses a managed S3-compatible service; dev and CI use
+RustFS. Buckets are created by infrastructure, never by the app.
 
-Before pointing an environment at a provider, create both buckets, set the variables and run
-`pnpm storage:check`. It must pass in full; it is the test of whether a provider is usable.
+Outside development and test the gateway also refuses to start when `S3_PUBLIC_ENDPOINT` or
+`S3_PUBLIC_BASE_URL` is not https or is a portal host from `ALLOWED_ORIGINS`, when `S3_ENDPOINT` is
+plain http to anything but a private host (a service name or `127.0.0.1`), or when both buckets
+have the same name.
+
+To point an environment at a store:
+
+1. Create both buckets and set the variables.
+2. `pnpm storage:configure` applies the CORS rule and the lifecycle rules to the two existing
+   buckets and reads them back (`--dry-run` prints them as JSON for a store configured by hand).
+   It never creates a bucket or writes a bucket policy.
+3. `pnpm storage:check` must pass in full; it is the test of whether a store is usable. A check
+   that cannot apply prints `SKIP` (the plain-http check against an http endpoint) and does not
+   fail the run.
 
 Required on any provider:
 
@@ -62,12 +73,17 @@ Required on any provider:
   for that host. **`S3_PUBLIC_BASE_URL`** is the public bucket's base URL; put a CDN there.
 - **CORS** on the private bucket: allow `PUT` and `GET` from the three portal origins only, with
   the `Content-Type` request header. Without it every browser upload fails, while server-side
-  tests still pass. `scripts/storage-init.ts` shows the exact rule used in dev.
+  tests still pass. The rule is in `scripts/lib/storage-rules.ts`, shared by `storage:init` (dev)
+  and `storage:configure`.
 - **Separate origin**: serve storage from a domain that is not a portal domain, so an uploaded
   file can never run script in a portal's origin.
 - **Encryption at rest** and TLS only.
-- **Lifecycle**: abort incomplete multipart uploads after one day. Do not enable versioning
-  without a plan for erasure requests, which must remove every version.
+- **Lifecycle** (`storage:configure`): abort incomplete multipart uploads after one day, expire
+  abandoned uploads under `pending/` after two days (the app's sweeper removes them after one), and
+  expire `__storage-check__/` leftovers after one day.
+- **Versioning and erasure**: with versioning on, a deleted or erased file stays in the bucket as
+  an old version until the lifecycle expires it. Expire non-current versions and delete markers
+  after a fixed number of days, and state that period wherever erasure is promised.
 - **Backups**: replicate or back up the private bucket; the database alone cannot restore files.
 - **Credentials**: an access key limited to these two buckets (get, put, delete, list, copy).
 - `/api/health` reports storage down when either bucket is missing or unreachable.
@@ -85,7 +101,10 @@ Provider notes:
 
 The R2 column is from Cloudflare's documentation and has not been run against this codebase.
 `pnpm storage:check` decides: in particular it proves that a presigned upload is refused when the
-body's size or type differs from what was signed, which the upload design depends on.
+body's size or type differs from what was signed, which the upload design depends on, and that the
+upload URL carries no checksum parameter. The S3 clients compute checksums only when an operation
+requires one: by default the SDK signs a CRC32 of an empty body into every presigned upload URL,
+which a strict store compares with the real upload and refuses.
 
 ## Malware scanning of uploads
 
@@ -479,9 +498,10 @@ shares with other sites (ROV-337). The repository holds what does not depend on 
 | File | What it does |
 |---|---|
 | `docker/compose.staging.yaml` | Override of `docker/compose.app.yaml`: no published port (the metrics store and the workflow console are bound to `127.0.0.1`), pinned infrastructure images, bounded logs, persistent volumes for the object store and NATS, a mail catcher with its own sign-in, and the web app, the API, object storage and the mail catcher on the proxy's external network as `roviq-lab-web`, `roviq-lab-api`, `roviq-lab-storage` and `roviq-lab-mail` |
-| `scripts/staging/staging-deploy.sh <ref>` | Exports the commit with `git archive`, builds its four images (tagged with the commit), backs up, starts the infrastructure, sets the runtime role's password, runs `drizzle-kit migrate`, the essential seed, `pnpm storage:init` and `pnpm admin:create`, starts the apps and checks the API health and the three portals through their public names. A failure after the migration starts the previous release's apps again |
-| `scripts/staging/staging-backup.sh` | Stops the apps, dumps the `roviq`, `temporal` and `temporal_visibility` databases and the roles, archives the object store, writes a manifest of the release and its image ids, starts the apps again, and removes backups older than `STAGING_BACKUP_KEEP_DAYS` |
-| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill) |
+| `docker/compose.staging-external-store.yaml` | Added after `compose.staging.yaml` when `STAGING_OBJECT_STORE=external`: the in-stack object store is not started and the gateway and the migrator take every `S3_*` value from the env file |
+| `scripts/staging/staging-deploy.sh <ref>` | Exports the commit with `git archive`, builds its four images (tagged with the commit), backs up, starts the infrastructure, sets the runtime role's password, runs `drizzle-kit migrate`, the essential seed, `pnpm storage:init` (with an external store, `pnpm storage:check` instead) and `pnpm admin:create`, starts the apps and checks the API health and the three portals through their public names. A failure after the migration starts the previous release's apps again |
+| `scripts/staging/staging-backup.sh` | Stops the apps, dumps the `roviq`, `temporal` and `temporal_visibility` databases and the roles, archives the in-stack object store (an external store keeps its own versions and is not copied), writes a manifest of the release, the object store mode and its image ids, starts the apps again, and removes backups older than `STAGING_BACKUP_KEEP_DAYS` |
+| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill). With an external store it restores and starts the databases only: apps started there would share the live buckets, and the restored file sweeper could delete objects the live stack still uses |
 | `scripts/create-platform-admin.ts` (`pnpm admin:create`) | Creates the first platform admin on a database that has only the essential seed, with a random password that must be changed at first sign-in; does nothing once a platform admin exists |
 
 Every script reads the env file named by `STAGING_ENV_FILE`. Besides the app secrets, it sets
@@ -490,6 +510,10 @@ first admin's password file), `STAGING_IMAGE_PREFIX`, `STAGING_PROXY_NETWORK`, `
 (the certificate authority of the proxy's certificate, trusted by the web app's server side),
 `STAGING_API_URL`, `STAGING_WEB_HOSTS`, `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_EMAIL`,
 `STAGING_MAIL_UI_AUTH`, `STAGING_METRICS_PORT` and `STAGING_WORKFLOWS_PORT`.
+`STAGING_OBJECT_STORE` is `in-stack` (the default: RustFS in the stack) or `external`; with
+`external` the env file also holds all eight `S3_*` values of the store, whose buckets are set up as
+in "Object storage" above. A release without `docker/compose.staging-external-store.yaml` cannot
+be deployed with an external store.
 
 What staging shows about any environment:
 
