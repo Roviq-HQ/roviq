@@ -257,17 +257,17 @@ describe('createStudent: one institute transaction (ROV-275)', () => {
   it('should roll every institute row back when a database error is thrown inside the transaction', async () => {
     const existing = await create('Ishaan');
     expect(existing.errors).toBeUndefined();
-    // Step the series back by one: the next number repeats Ishaan's and the unique index throws
-    // after the membership and the institute's profile copy are already inserted.
+    // A counter at the bigint limit: taking the next number overflows in PostgreSQL after the
+    // membership and the institute's profile copy are already inserted. A stepped-back counter
+    // no longer fails, because generation skips a number a student already holds (ROV-367).
     await asAdmin((tx) =>
       tx
         .update(tenantSequences)
-        .set({ currentValue: sql`${tenantSequences.currentValue} - 1` })
+        .set({ currentValue: 9_223_372_036_854_775_807n })
         .where(
           and(
             eq(tenantSequences.tenantId, inst.tenantId),
             like(tenantSequences.sequenceName, 'adm_no%'),
-            sql`${tenantSequences.currentValue} > 0`,
           ),
         ),
     );

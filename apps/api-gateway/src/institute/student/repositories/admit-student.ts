@@ -11,7 +11,7 @@ import {
   ensureTenantUserProfile,
   type TenantUserProfileFields,
 } from '../../../auth/tenant-user-profile';
-import { nextAdmissionNumber } from '../admission-number.sequence';
+import { nextAdmissionNumber, recordSuppliedAdmissionNumber } from '../admission-number.sequence';
 import { findYearAndClass, findYearAndStandard } from './class-lookup';
 import { lockSectionForPlacement, strengthChange } from './section-strength';
 import type {
@@ -82,8 +82,13 @@ export async function admitStudent(
     .returning({ id: memberships.id });
   await ensureTenantUserProfile(tx, { tenantId, userId, actorId, ...data.tenantProfile });
 
-  const admissionNumber =
-    data.admissionNumber ?? (await nextAdmissionNumber(tx, tenantId, data.standardId));
+  let admissionNumber: string;
+  if (data.admissionNumber) {
+    admissionNumber = data.admissionNumber;
+    await recordSuppliedAdmissionNumber(tx, tenantId, data.standardId, admissionNumber);
+  } else {
+    admissionNumber = await nextAdmissionNumber(tx, tenantId, data.standardId);
+  }
   const [profile] = await tx
     .insert(studentProfiles)
     .values({

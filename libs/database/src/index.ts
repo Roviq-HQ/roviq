@@ -30,6 +30,7 @@ export {
   admissionSeriesName,
   formatSequenceValue,
   LEGACY_ADMISSION_SEQUENCE,
+  parseSequenceValue,
   resolveAdmissionPrefix,
   resolveAdmissionYear,
 } from './sequences/admission-number';

@@ -84,3 +84,41 @@ export function formatSequenceValue(
       parts.value.toString().padStart(width ? Number(width) : 0, '0'),
     );
 }
+
+const TEMPLATE_TOKEN = /\{prefix\}|\{year\}|\{value(?::0\d+d)?\}/g;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The serial inside `value` when it is exactly what the series would print for that serial, else
+ * null. A number of another prefix, year or shape never matches, so it can never raise a counter.
+ */
+export function parseSequenceValue(
+  template: string,
+  parts: { prefix: string; year: string },
+  value: string,
+): bigint | null {
+  let pattern = '';
+  let hasValue = false;
+  let last = 0;
+  for (const match of template.matchAll(TEMPLATE_TOKEN)) {
+    pattern += escapeRegExp(template.slice(last, match.index));
+    if (match[0] === '{prefix}') pattern += escapeRegExp(parts.prefix);
+    else if (match[0] === '{year}') pattern += escapeRegExp(parts.year);
+    else {
+      pattern += hasValue ? '\\1' : '(\\d+)';
+      hasValue = true;
+    }
+    last = match.index + match[0].length;
+  }
+  pattern += escapeRegExp(template.slice(last));
+  if (!hasValue) return null;
+
+  const digits = new RegExp(`^${pattern}$`).exec(value)?.[1];
+  if (digits === undefined) return null;
+  const serial = BigInt(digits);
+  if (serial === 0n) return null;
+  return formatSequenceValue(template, { ...parts, value: serial }) === value ? serial : null;
+}

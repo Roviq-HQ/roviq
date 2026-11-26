@@ -59,6 +59,7 @@
   "GUARDIAN_ALREADY_LINKED": "This guardian is already linked to this student.",
   "STUDENT_NOT_FOUND": "This student no longer exists. Refresh the page.",
   "ADMISSION_NUMBER_TAKEN": "Another student already has this admission number. Use a different one.",
+  "ADMISSION_NUMBER_SERIES_EXHAUSTED": "No free admission number was found: the next 1,000 numbers in this class's series are all taken, so the student was not added. Give the student an admission number in an import file, or ask Roviq support to change your institute's admission number format.",
   "SECTION_REQUIRED": "Choose a section, then try again.",
   "SECTION_STANDARD_MISMATCH": "This section belongs to a different standard. Choose a section of the right standard.",
   "INVALID_LOCALE_SETTINGS": "Choose the supported languages, including English and the default language.",

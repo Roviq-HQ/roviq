@@ -3,6 +3,7 @@ import type { AdmissionNumberConfig } from '../../schema/tenant/institute-config
 import {
   admissionSeriesName,
   formatSequenceValue,
+  parseSequenceValue,
   resolveAdmissionPrefix,
   resolveAdmissionYear,
 } from '../admission-number';
@@ -112,5 +113,69 @@ describe('formatSequenceValue', () => {
     expect(formatSequenceValue('{value:04d}', { prefix: '', year: '', value: 123456n })).toBe(
       '123456',
     );
+  });
+});
+
+describe('parseSequenceValue', () => {
+  const FORMAT = '{prefix}{year}/{value:04d}';
+  const N_2026 = { prefix: 'N-', year: '2026' };
+  const PLAIN_2026 = { prefix: '', year: '2026' };
+
+  it('should read serial 42 from N-2026/0042 in the N- series of 2026', () => {
+    expect(parseSequenceValue(FORMAT, N_2026, 'N-2026/0042')).toBe(42n);
+  });
+
+  it('should read a serial wider than the padding, as formatSequenceValue prints it', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/123456')).toBe(123456n);
+  });
+
+  it('should refuse a number of another prefix', () => {
+    expect(parseSequenceValue(FORMAT, N_2026, 'L-2026/0042')).toBeNull();
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, 'N-2026/0042')).toBeNull();
+  });
+
+  it('should refuse a number of another year', () => {
+    expect(parseSequenceValue(FORMAT, N_2026, 'N-2025/0042')).toBeNull();
+  });
+
+  it('should refuse a number of another shape', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, 'OLD-17')).toBeNull();
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026-0042')).toBeNull();
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/0042 ')).toBeNull();
+  });
+
+  it('should refuse a number the series would print differently (missing padding)', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/42')).toBeNull();
+  });
+
+  it('should refuse serial zero, which the series never issues', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/0000')).toBeNull();
+  });
+
+  it('should treat regex characters in the prefix and the template as plain text', () => {
+    expect(parseSequenceValue('{prefix}{value:03d}', { prefix: 'A.', year: '' }, 'A.007')).toBe(7n);
+    expect(
+      parseSequenceValue('{prefix}{value:03d}', { prefix: 'A.', year: '' }, 'AX007'),
+    ).toBeNull();
+    expect(parseSequenceValue('ADM({year})-{value}', PLAIN_2026, 'ADM(2026)-9')).toBe(9n);
+  });
+
+  it('should read an unpadded {value} and a YY-YY year', () => {
+    expect(parseSequenceValue('{year}/{value}', { prefix: '', year: '25-26' }, '25-26/17')).toBe(
+      17n,
+    );
+  });
+
+  it('should return null for a template with no value placeholder', () => {
+    expect(parseSequenceValue('{prefix}{year}', N_2026, 'N-2026')).toBeNull();
+  });
+
+  it('should read back every number formatSequenceValue prints', () => {
+    for (const format of [FORMAT, '{prefix}{value:04d}', '{year}{value:06d}', 'S-{value}']) {
+      for (const value of [1n, 9n, 10n, 999n, 1000n, 10_000n, 123_456_789n]) {
+        const printed = formatSequenceValue(format, { ...N_2026, value });
+        expect(parseSequenceValue(format, N_2026, printed)).toBe(value);
+      }
+    }
   });
 });
