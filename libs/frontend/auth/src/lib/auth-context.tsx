@@ -131,6 +131,24 @@ export function AuthProvider({
   });
 
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshInFlightRef = React.useRef<{
+    refreshToken: string;
+    result: ReturnType<AuthProviderProps['refreshMutation']>;
+  } | null>(null);
+  // The server rotates the refresh token and treats a second use of the old one as theft,
+  // revoking every session: callers holding the same token must share one request.
+  const refreshOnce = React.useCallback(
+    (refreshToken: string) => {
+      const inFlight = refreshInFlightRef.current;
+      if (inFlight?.refreshToken === refreshToken) return inFlight.result;
+      const result = refreshMutation(refreshToken).finally(() => {
+        if (refreshInFlightRef.current?.result === result) refreshInFlightRef.current = null;
+      });
+      refreshInFlightRef.current = { refreshToken, result };
+      return result;
+    },
+    [refreshMutation],
+  );
   // True while the session comes only from storage: the server may have revoked it since.
   const unverifiedSessionRef = React.useRef(false);
   const prevTenantIdRef = React.useRef<string | undefined>(undefined);
@@ -179,7 +197,7 @@ export function AuthProvider({
           try {
             const refreshToken = tokenStorage.getRefreshToken();
             if (!refreshToken) return;
-            const result = await refreshMutation(refreshToken);
+            const result = await refreshOnce(refreshToken);
             tokenStorage.setTokens({
               accessToken: result.accessToken,
               refreshToken: result.refreshToken,
@@ -217,7 +235,7 @@ export function AuthProvider({
         // Invalid token, ignore
       }
     },
-    [refreshMutation, onAuthError, tokenStorage],
+    [refreshOnce, onAuthError, tokenStorage],
   );
 
   // Restore session on mount
@@ -264,7 +282,7 @@ export function AuthProvider({
       setMemberships(tokenStorage.getMemberships());
       scheduleRefresh(accessToken);
     } else if (refreshToken) {
-      refreshMutation(refreshToken)
+      refreshOnce(refreshToken)
         .then((result) => {
           tokenStorage.setTokens({
             accessToken: result.accessToken,
@@ -306,7 +324,7 @@ export function AuthProvider({
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [currentUserQuery, refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [currentUserQuery, refreshOnce, scheduleRefresh, tokenStorage]);
 
   const handleLoginResult = React.useCallback(
     async (result: LoginResult) => {
@@ -483,7 +501,7 @@ export function AuthProvider({
   const refreshSession = React.useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
     if (!refreshToken) throw new Error('No refresh token');
-    const result = await refreshMutation(refreshToken).catch((err: unknown) => {
+    const result = await refreshOnce(refreshToken).catch((err: unknown) => {
       // The server ended the session before the token ran out (revoked, account suspended).
       // Without this the page stays up showing empty data and no way to sign in again.
       if (isAppError(err, 'SESSION_EXPIRED')) setSessionExpired(true);
@@ -504,7 +522,7 @@ export function AuthProvider({
       isLoading: false,
     });
     scheduleRefresh(result.accessToken);
-  }, [refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [refreshOnce, scheduleRefresh, tokenStorage]);
 
   const verifySession = React.useCallback(async () => {
     if (typeof window !== 'undefined' && sessionStorage.getItem('roviq-impersonation-token')) {
@@ -517,7 +535,7 @@ export function AuthProvider({
       return false;
     }
     try {
-      const result = await refreshMutation(refreshToken);
+      const result = await refreshOnce(refreshToken);
       tokenStorage.setTokens({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
@@ -536,7 +554,7 @@ export function AuthProvider({
       clearAllState();
       return false;
     }
-  }, [clearAllState, refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [clearAllState, refreshOnce, scheduleRefresh, tokenStorage]);
 
   const getAccessToken = React.useCallback(() => {
     // Prefer impersonation token if present (sessionStorage, dies with tab)

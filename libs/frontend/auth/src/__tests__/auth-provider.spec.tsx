@@ -591,3 +591,88 @@ describe('AuthProvider — impersonation tab', () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 });
+
+describe('AuthProvider — one refresh request per refresh token', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-old');
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+  });
+
+  it('sends one refresh when two callers refresh at once with the same token', async () => {
+    const props = makeDefaultProps();
+    let resolveRefresh: (value: LoginResult) => void = () => {};
+    props.refreshMutation.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    let both: Promise<unknown> = Promise.resolve();
+    act(() => {
+      both = Promise.all([result.current.refreshSession(), result.current.refreshSession()]);
+    });
+    await act(async () => {
+      resolveRefresh({
+        accessToken: makeJwt(FUTURE),
+        refreshToken: 'rt-rotated',
+        user: MOCK_USER,
+      } as LoginResult);
+      await both;
+    });
+
+    expect(props.refreshMutation).toHaveBeenCalledTimes(1);
+    expect(props.refreshMutation).toHaveBeenCalledWith('rt-old');
+    expect(localStorage.getItem('roviq-institute-refresh-token')).toBe('rt-rotated');
+  });
+
+  it('sends a new request once the first one settled, with the rotated token', async () => {
+    const props = makeDefaultProps();
+    props.refreshMutation
+      .mockResolvedValueOnce({
+        accessToken: makeJwt(FUTURE),
+        refreshToken: 'rt-2',
+        user: MOCK_USER,
+      })
+      .mockResolvedValueOnce({
+        accessToken: makeJwt(FUTURE),
+        refreshToken: 'rt-3',
+        user: MOCK_USER,
+      });
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(() => result.current.refreshSession());
+    await act(() => result.current.refreshSession());
+
+    expect(props.refreshMutation).toHaveBeenNthCalledWith(1, 'rt-old');
+    expect(props.refreshMutation).toHaveBeenNthCalledWith(2, 'rt-2');
+  });
+
+  it('lets a later call try again after a shared refresh failed', async () => {
+    const props = makeDefaultProps();
+    props.refreshMutation.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
+      accessToken: makeJwt(FUTURE),
+      refreshToken: 'rt-2',
+      user: MOCK_USER,
+    });
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(async () => {
+      const outcomes = await Promise.allSettled([
+        result.current.refreshSession(),
+        result.current.refreshSession(),
+      ]);
+      expect(outcomes.map((o) => o.status)).toEqual(['rejected', 'rejected']);
+    });
+    await act(() => result.current.refreshSession());
+
+    expect(props.refreshMutation).toHaveBeenCalledTimes(2);
+  });
+});
