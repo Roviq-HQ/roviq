@@ -206,6 +206,27 @@ const GET_INVOICE = `
   }
 `;
 
+const GET_INVOICE_PAID = `
+  query InvoicePaid($instituteId: ID, $first: Int) {
+    invoices(instituteId: $instituteId, first: $first) {
+      id
+      status
+      totalAmount
+      paidAmount
+    }
+  }
+`;
+
+const INVOICE_PAYMENTS = `
+  query InvoicePayments($invoiceId: ID!) {
+    invoicePayments(invoiceId: $invoiceId) {
+      gatewayPaymentId
+      amountPaise
+      status
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -848,6 +869,61 @@ describe('Billing E2E', () => {
       const updated = after.find((i) => i.id === invoice.id);
       expect(updated, `invoice ${invoice.id} disappeared after webhook`).toBeDefined();
       expect(updated?.status).toBe('PAID');
+    });
+
+    it('should record one payment when the gateway delivers the same webhook twice', async () => {
+      await ensureGatewayConfig();
+
+      await cancelExistingSubscription(resellerToken, tenant1);
+      const plan = await createPlan(resellerToken, {
+        name: 'Vitest Webhook Replay Plan',
+        amount: '49900',
+        maxStudents: 100,
+      });
+      await assignPlan(resellerToken, tenant1, plan.id);
+
+      const invoicesRes = await gql<{ invoices: InvoiceModel[] }>(
+        GET_INVOICE,
+        { instituteId: tenant1, first: 5 },
+        resellerToken,
+      );
+      expect(invoicesRes.errors).toBeUndefined();
+      const invoice = invoicesRes.data?.invoices[0];
+      assert(invoice);
+      expect(invoice.status).not.toBe('PAID');
+
+      const gatewayPaymentId = `pay_vitest_replay_${Date.now()}`;
+      const webhook = {
+        resellerId: SEED_IDS.RESELLER_DIRECT,
+        invoiceId: invoice.id,
+        tenantId: tenant1,
+        amountPaise: Number(invoice.totalAmount),
+        status: 'captured' as const,
+        gatewayPaymentId,
+        webhookSecret: WEBHOOK_SECRET,
+      };
+      const first = await simulatePaymentWebhook(webhook);
+      const second = await simulatePaymentWebhook(webhook);
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+
+      const paymentsRes = await gql<{
+        invoicePayments: Pick<PaymentModel, 'gatewayPaymentId' | 'amountPaise' | 'status'>[];
+      }>(INVOICE_PAYMENTS, { invoiceId: invoice.id }, resellerToken);
+      expect(paymentsRes.errors).toBeUndefined();
+      const recorded = (paymentsRes.data?.invoicePayments ?? []).filter(
+        (p) => p.gatewayPaymentId === gatewayPaymentId,
+      );
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]?.amountPaise).toBe(invoice.totalAmount);
+
+      const afterRes = await gql<{
+        invoices: Pick<InvoiceModel, 'id' | 'status' | 'totalAmount' | 'paidAmount'>[];
+      }>(GET_INVOICE_PAID, { instituteId: tenant1, first: 5 }, resellerToken);
+      expect(afterRes.errors).toBeUndefined();
+      const updated = afterRes.data?.invoices.find((i) => i.id === invoice.id);
+      expect(updated?.status).toBe('PAID');
+      expect(updated?.paidAmount).toBe(invoice.totalAmount);
     });
 
     it('should reject a webhook with an invalid signature', async () => {
