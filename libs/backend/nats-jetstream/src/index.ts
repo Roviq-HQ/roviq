@@ -35,6 +35,7 @@ export {
   eventPayloadSchemas,
   flatEventSchemas,
 } from './streams/event-schemas';
+export { type GatewayConsumer, gatewayConsumer } from './streams/gateway-consumer';
 // Streams
 export {
   AUDIT_LOG_CONSUMER,

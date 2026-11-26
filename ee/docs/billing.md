@@ -140,6 +140,16 @@ GraphQL subscriptions in `billing-subscriptions.resolver.ts`. Each event carries
 
 Delivery is filtered on the `tenantId` / `resellerId` inside the event, so the event schemas in `event-schemas.ts` require both ids on `BILLING.subscription.status_changed`, `BILLING.payment.status_changed`, `BILLING.payment.succeeded` and `BILLING.invoice.generated`. An event without them is delivered to nobody.
 
+## Reseller deletion
+
+Deleting a reseller (`adminDeleteReseller`) moves its institutes to Roviq Direct and emits `RESELLER.status_changed` with `newStatus: DELETED`. `ResellerDeletionConsumer` starts `resellerDeletionCleanupWorkflow` on the `billing-automation` task queue with the workflow id `reseller-deletion-cleanup-<resellerId>-<deletedAt in ms>`. Temporal refuses a second start of that id, so a redelivered event starts nothing, while a later deletion of the same reseller id gets its own cleanup. The activity `cleanupResellerDeletion`, in one transaction as `roviq_admin`:
+
+- moves every subscription of the reseller to Roviq Direct. A moved subscription keeps its plan and price and renews on it; a platform admin can move it to a Roviq Direct plan by hand;
+- sets the reseller's `ACTIVE` plans and gateway configs to `INACTIVE`, which blocks new subscriptions on them;
+- leaves invoices and payments on the original reseller.
+
+Rows are written with `updated_by = SYSTEM_USER_ID`. A second run changes nothing and reports zero counts. The cleanup runs only where `BILLING_WORKER_ENABLED=true`; without it the workflow waits in Temporal.
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -153,6 +163,7 @@ Delivery is filtered on the `tenantId` / `resellerId` inside the event, so the e
 | `CASHFREE_API_VERSION` | For Cashfree | API version (e.g., `2025-01-01`) |
 | `BILLING_RETURN_URL` | Yes (EE) | Institute portal URL that subscription checkout returns to (e.g., `http://localhost:4200/billing/subscriptions`). Its origin is also used for the Cashfree invoice return, `/billing/invoices/:id?order_id=…` |
 | `ROVIQ_EE` | Yes | Set to `true` to load BillingModule |
+| `BILLING_WORKER_ENABLED` | On one gateway (EE) | `true` runs the billing worker (task queue `billing-automation`), which runs the reseller deletion cleanup |
 
 ## Testing
 

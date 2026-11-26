@@ -227,6 +227,9 @@ services:
       INSTITUTE_SETUP_WORKER_ENABLED: "true"
       # Monthly audit partition worker; its schedule fires on the 25th, so tests never race it.
       AUDIT_PARTITION_WORKER_ENABLED: "true"
+      # Embedded Temporal worker so a deleted reseller's billing moves to Roviq Direct. No billing
+      # cron is scheduled anywhere, so it runs only the workflows a test starts.
+      BILLING_WORKER_ENABLED: "true"
       # E2E-specific overrides
       API_GATEWAY_PORT: "3004"
       ALLOWED_ORIGINS: "http://localhost:${E2E_API_PORT:-3004},http://localhost:${E2E_WEB_PORT:-4201},http://admin.localhost:${E2E_WEB_PORT:-4201},http://reseller.localhost:${E2E_WEB_PORT:-4201}"

@@ -17,8 +17,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client, Connection } from '@temporalio/client';
-
-const TASK_QUEUE = 'billing-automation';
+import { BILLING_TASK_QUEUE } from './billing.constants';
 
 @Injectable()
 export class BillingScheduleService {
@@ -72,7 +71,7 @@ export class BillingScheduleService {
           action: {
             type: 'startWorkflow',
             workflowType: sched.workflow,
-            taskQueue: TASK_QUEUE,
+            taskQueue: BILLING_TASK_QUEUE,
             workflowId: `${sched.id}-${Date.now()}`,
           },
           memo: { description: sched.description },

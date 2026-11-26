@@ -15,6 +15,7 @@ const SCAN_ROOTS = [join(ROOT, 'apps'), join(ROOT, 'ee')];
 /** Values exported by `@roviq/database` that are not a way to reach the database. */
 export const ALLOWED_VALUE_IMPORTS: ReadonlySet<string> = new Set([
   'SYSTEM_USER_ID',
+  'ROVIQ_DIRECT_RESELLER_ID',
   // Pure helpers: pick a display string from an i18n object, validate a contact object.
   'i18nDisplay',
   'instituteContactSchema',

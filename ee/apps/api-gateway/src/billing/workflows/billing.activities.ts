@@ -1,5 +1,13 @@
 import { Logger } from '@nestjs/common';
-import { type DrizzleDB, mkAdminCtx, withAdmin } from '@roviq/database';
+import { ResellerStatus } from '@roviq/common-types';
+import {
+  type DrizzleDB,
+  mkAdminCtx,
+  ROVIQ_DIRECT_RESELLER_ID,
+  resellers,
+  SYSTEM_USER_ID,
+  withAdmin,
+} from '@roviq/database';
 import { BillingPeriod } from '@roviq/domain';
 import type { BillingInterval } from '@roviq/ee-billing-types';
 import { gatewayConfigs, invoices, payments, plans, subscriptions } from '@roviq/ee-database';
@@ -13,8 +21,6 @@ const GRACE_PERIOD_DAYS = 7;
 const RENEWAL_LEAD_DAYS = 7;
 /** Trial reminder 3 days before expiry */
 const TRIAL_REMINDER_DAYS = 3;
-/** Roviq Direct reseller ID for orphaned subscriptions */
-const ROVIQ_DIRECT_ID = '00000000-0000-7000-a000-000000000011';
 
 export interface BillingActivities {
   /** Find subscriptions nearing renewal and generate invoices */
@@ -106,8 +112,8 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
               },
             ],
             taxBreakdown: { gst: { rate: 18, amount: tax, sacCode: '998393' } },
-            createdBy: 'SYSTEM',
-            updatedBy: 'SYSTEM',
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
           });
           invoicesGenerated++;
         }
@@ -128,7 +134,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
             cancelledAt: new Date(),
             cancelReason: 'Grace period expired',
             updatedAt: new Date(),
-            updatedBy: 'SYSTEM',
+            updatedBy: SYSTEM_USER_ID,
           })
           .where(
             and(eq(subscriptions.status, 'PAST_DUE'), lte(subscriptions.updatedAt, graceExpiry)),
@@ -148,7 +154,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
         // Expire trials past their end date
         const expired = await tx
           .update(subscriptions)
-          .set({ status: 'EXPIRED', updatedAt: now, updatedBy: 'SYSTEM' })
+          .set({ status: 'EXPIRED', updatedAt: now, updatedBy: SYSTEM_USER_ID })
           .where(and(eq(subscriptions.status, 'TRIALING'), lte(subscriptions.trialEndsAt, now)))
           .returning({ id: subscriptions.id });
 
@@ -175,7 +181,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
 
         const result = await tx
           .update(invoices)
-          .set({ status: 'OVERDUE', updatedAt: now, updatedBy: 'SYSTEM' })
+          .set({ status: 'OVERDUE', updatedAt: now, updatedBy: SYSTEM_USER_ID })
           .where(and(eq(invoices.status, 'SENT'), lte(invoices.dueAt, now)))
           .returning({ id: invoices.id });
 
@@ -186,25 +192,50 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
 
     async cleanupResellerDeletion(resellerId: string) {
       return withAdmin(db, mkAdminCtx('workflow:billing'), async (tx) => {
+        const [reseller] = await tx
+          .select({ status: resellers.status })
+          .from(resellers) // allow-base-read: the Live view hides the deleted reseller this needs
+          .where(eq(resellers.id, resellerId));
+        if (reseller?.status !== ResellerStatus.DELETED) {
+          logger.warn(`Reseller ${resellerId} is not deleted; billing cleanup skipped`);
+          return { subscriptionsTransferred: 0, plansDeactivated: 0, configsDeactivated: 0 };
+        }
+
         // Transfer subscriptions to Roviq Direct
         const transferred = await tx
           .update(subscriptions)
-          .set({ resellerId: ROVIQ_DIRECT_ID, updatedAt: new Date(), updatedBy: 'SYSTEM' })
+          .set({
+            resellerId: ROVIQ_DIRECT_RESELLER_ID,
+            updatedAt: new Date(),
+            updatedBy: SYSTEM_USER_ID,
+          })
           .where(eq(subscriptions.resellerId, resellerId))
           .returning({ id: subscriptions.id });
 
         // Deactivate plans
         const deactivated = await tx
           .update(plans)
-          .set({ status: 'INACTIVE', updatedAt: new Date(), updatedBy: 'SYSTEM' })
-          .where(and(eq(plans.resellerId, resellerId), isNull(plans.deletedAt)))
+          .set({ status: 'INACTIVE', updatedAt: new Date(), updatedBy: SYSTEM_USER_ID })
+          .where(
+            and(
+              eq(plans.resellerId, resellerId),
+              eq(plans.status, 'ACTIVE'),
+              isNull(plans.deletedAt),
+            ),
+          )
           .returning({ id: plans.id });
 
         // Deactivate gateway configs
         const configs = await tx
           .update(gatewayConfigs)
-          .set({ status: 'INACTIVE', updatedAt: new Date(), updatedBy: 'SYSTEM' })
-          .where(and(eq(gatewayConfigs.resellerId, resellerId), isNull(gatewayConfigs.deletedAt)))
+          .set({ status: 'INACTIVE', updatedAt: new Date(), updatedBy: SYSTEM_USER_ID })
+          .where(
+            and(
+              eq(gatewayConfigs.resellerId, resellerId),
+              eq(gatewayConfigs.status, 'ACTIVE'),
+              isNull(gatewayConfigs.deletedAt),
+            ),
+          )
           .returning({ id: gatewayConfigs.id });
 
         // Historical invoices retain original resellerId (audit trail)
@@ -245,7 +276,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
               failedAt: now,
               failureReason: 'UPI verification expired after 24h',
               updatedAt: now,
-              updatedBy: 'SYSTEM',
+              updatedBy: SYSTEM_USER_ID,
             })
             .where(eq(payments.id, payment.id));
 
@@ -267,7 +298,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
                 paidAmount: clampedPaid,
                 status: newStatus,
                 updatedAt: now,
-                updatedBy: 'SYSTEM',
+                updatedBy: SYSTEM_USER_ID,
               })
               .where(eq(invoices.id, invoice.id));
 
@@ -286,7 +317,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
             if (sub) {
               await tx
                 .update(subscriptions)
-                .set({ status: 'PAST_DUE', updatedAt: now, updatedBy: 'SYSTEM' })
+                .set({ status: 'PAST_DUE', updatedAt: now, updatedBy: SYSTEM_USER_ID })
                 .where(eq(subscriptions.id, sub.id));
 
               logger.log(`Reverted subscription ${sub.id} to PAST_DUE after UPI expiry`);

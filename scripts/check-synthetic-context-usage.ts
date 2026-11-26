@@ -287,6 +287,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts',
   'ee/apps/api-gateway/src/billing/subscription-reader.impl.ts',
   'ee/apps/api-gateway/src/billing/workflows/billing.activities.ts',
+  // ROV-295: billing activity fixtures, written and read back in a transaction that is rolled back.
+  'ee/apps/api-gateway/src/billing/__tests__/billing-activities.integration.spec.ts',
   'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts',
   'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts',
   'libs/backend/casl/src/repositories/role.drizzle-repository.ts',

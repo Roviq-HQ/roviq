@@ -1,5 +1,5 @@
-import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { describe, expect, it } from 'vitest';
+import { EVENT_PATTERNS } from '../event-patterns';
 import { gatewayConsumer } from '../gateway-consumer';
 
 describe('gatewayConsumer', () => {

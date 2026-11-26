@@ -1,6 +1,5 @@
 /**
- * ResellerDeletionBillingCleanup — triggered by reseller.deleted NATS event
- *
+ * Started by `ResellerDeletionConsumer` when `RESELLER.status_changed` reports DELETED.
  * Transfers subscriptions to Roviq Direct, deactivates plans + configs.
  * Historical invoices retain original resellerId (audit trail).
  */

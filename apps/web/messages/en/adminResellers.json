@@ -118,7 +118,7 @@
     "unsuspendDescription": "This will restore the reseller to active status and allow staff to log in again.",
     "unsuspendConfirm": "Yes, Unsuspend",
     "deleteTitle": "Delete Reseller",
-    "deleteDescription": "This will permanently remove this reseller. All institutes must be reassigned before deletion. This action cannot be undone.",
+    "deleteDescription": "This permanently removes this reseller. Its institutes move to Roviq Direct and keep working; its staff lose access. This cannot be undone.",
     "deleteConfirm": "Yes, Delete",
     "deleteGracePeriod": "Resellers can only be deleted 30 days after suspension.",
     "editSuccess": "Reseller updated.",

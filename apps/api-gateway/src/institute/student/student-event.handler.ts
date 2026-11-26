@@ -9,9 +9,8 @@ import {
   studentAcademics,
   withTenant,
 } from '@roviq/database';
-import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
+import { EVENT_PATTERNS, eventPayloadSchemas, gatewayConsumer } from '@roviq/nats-jetstream';
 import { and, eq, isNull, notExists } from 'drizzle-orm';
-import { gatewayConsumer } from '../../common/events/gateway-consumer';
 import { rollOverStudents } from './year-rollover';
 
 const ORIGIN = 'consumer:student-event.handler';
