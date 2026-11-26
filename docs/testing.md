@@ -131,7 +131,7 @@ The tables are in `e2e/api-gateway-e2e/src/two-institute-queries.ts`:
 | `KIND_BY_NAME`, `KIND_BY_PATH` | which table an id argument names | a required argument has no rule |
 | `VALUE_BY_PATH` | fixed values for required arguments that are not ids | the same |
 | `NOT_CALLED` | queries that cannot be called, with the reason | an entry names a query that no longer exists |
-| `WITHOUT_DATA` | queries that answer no caller with data, with the reason (mostly a kind the seed has no row of) | a query answers nobody with data and is not listed, or is listed and returns data |
+| `WITHOUT_DATA` | queries that answer no caller with data, with the reason (mostly a kind the seed has no row of) | a query answers nobody with data and is not listed |
 | `EXPECTED_TO_FAIL` | queries whose check does not pass yet | a listed query passes |
 
 A new query needs no entry when its id arguments use the names in `KIND_BY_NAME`. Set `TWO_INSTITUTE_REPORT=<file>` to write every call's result as JSON.

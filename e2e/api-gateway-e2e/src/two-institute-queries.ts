@@ -96,8 +96,8 @@ export const NOT_CALLED: Readonly<Record<string, string>> = {};
 
 /**
  * Queries that are called but answer no caller with data, each with the reason. Platform
- * queries (`admin…`) are not listed: no caller here may call them. A query in this list that
- * starts returning data fails the spec until it is removed.
+ * queries (`admin…`) are not listed: no caller here may call them. A listed query may still
+ * return data in a full run, where other specs create rows the seed lacks; it is scanned then.
  */
 export const WITHOUT_DATA: Readonly<Record<string, string>> = {
   bulkImportProgress: 'needs the id of an import workflow that is running',

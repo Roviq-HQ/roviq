@@ -311,7 +311,5 @@ describe('Two-institute response scan', () => {
       (name) => !answered(name) && !platformOnly(name) && !(name in WITHOUT_DATA),
     );
     expect(silent, 'fix the arguments, or add the query to WITHOUT_DATA').toEqual([]);
-    const stale = Object.keys(WITHOUT_DATA).filter((name) => answered(name));
-    expect(stale, 'these now return data: remove them from WITHOUT_DATA').toEqual([]);
   });
 });
