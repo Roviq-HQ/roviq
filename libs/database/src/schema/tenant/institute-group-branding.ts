@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { pgPolicy, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
-import { entityPolicies } from '../common/rls-policies';
+import { roviqAdmin, roviqApp } from '../common/rls-policies';
 import { files } from '../storage/files';
 import { instituteGroups } from './institute-groups';
 
@@ -28,6 +28,21 @@ export const instituteGroupBranding = pgTable(
   },
   (table) => [
     uniqueIndex('institute_group_branding_group_id_key').on(table.groupId),
-    ...entityPolicies('institute_group_branding'),
+
+    // Written by the platform only; an institute reads the branding of its own group.
+    pgPolicy('institute_group_branding_admin_all', {
+      for: 'all',
+      to: roviqAdmin,
+      using: sql`true`,
+      withCheck: sql`true`,
+    }),
+    pgPolicy('institute_group_branding_app_select', {
+      for: 'select',
+      to: roviqApp,
+      using: sql`group_id = (
+        SELECT group_id FROM institutes
+        WHERE id = current_setting('app.current_tenant_id', true)::uuid
+      )`,
+    }),
   ],
 );

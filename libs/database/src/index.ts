@@ -20,7 +20,6 @@ export {
 export * from './schema';
 export {
   entityPolicies,
-  immutableEntityPolicies,
   roviqAdmin,
   roviqApp,
   roviqReseller,
