@@ -1297,6 +1297,7 @@ export const testIds = {
     newBackBtn: 'groups-new-back-btn',
     newMembersSearchInput: 'groups-new-members-search-input',
     newNoCandidates: 'groups-new-no-candidates',
+    newPickedCount: 'groups-new-picked-count',
     newNoSelection: 'groups-new-no-selection',
     newPrevBtn: 'groups-new-prev-btn',
     newNextBtn: 'groups-new-next-btn',

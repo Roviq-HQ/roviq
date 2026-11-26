@@ -107,7 +107,7 @@ export class CreateGroupInput {
   @IsArray()
   @ArrayMaxSize(500)
   @ArrayUnique()
-  @IsUUID(undefined, { each: true })
+  @IsUUID('all', { each: true })
   memberMembershipIds?: string[];
 }
 

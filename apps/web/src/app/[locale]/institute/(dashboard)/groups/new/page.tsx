@@ -866,6 +866,9 @@ function RuleNodeEditor({
 
 // ─── Step 3: Members ────────────────────────────────────────────────────────
 
+/** `createGroup` takes at most this many hand-picked members (`CreateGroupInput`). */
+const MAX_PICKED_MEMBERS = 500;
+
 function MembersStep({
   memberTypes,
   selected,
@@ -879,8 +882,9 @@ function MembersStep({
   const [searchInput, setSearchInput] = React.useState('');
   const debouncedSearch = useDebounce(searchInput, 250);
 
+  const full = selected.length >= MAX_PICKED_MEMBERS;
   const addMember = (m: SelectedMember) => {
-    if (selected.some((s) => s.membershipId === m.membershipId)) return;
+    if (full || selected.some((s) => s.membershipId === m.membershipId)) return;
     onSelectedChange([...selected, m]);
   };
 
@@ -912,18 +916,29 @@ function MembersStep({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">
             {memberTypes.includes('student') && (
-              <StudentCandidates search={debouncedSearch} onAdd={addMember} />
+              <StudentCandidates search={debouncedSearch} onAdd={addMember} full={full} />
             )}
             {memberTypes.includes('staff') && (
-              <StaffCandidates search={debouncedSearch} onAdd={addMember} />
+              <StaffCandidates search={debouncedSearch} onAdd={addMember} full={full} />
             )}
             {memberTypes.includes('guardian') && (
-              <GuardianCandidates search={debouncedSearch} onAdd={addMember} />
+              <GuardianCandidates search={debouncedSearch} onAdd={addMember} full={full} />
             )}
           </div>
 
           <div className="space-y-2 rounded-md border p-3">
-            <p className="text-sm font-medium">{t('new.members.selectedMembers')}</p>
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-medium">{t('new.members.selectedMembers')}</p>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid={instituteGroups.newPickedCount}
+              >
+                {t('new.members.pickedCount', {
+                  count: selected.length,
+                  max: MAX_PICKED_MEMBERS,
+                })}
+              </p>
+            </div>
             {selected.length === 0 ? (
               <p
                 className="text-sm text-muted-foreground"
@@ -968,19 +983,25 @@ function MembersStep({
 function StudentCandidates({
   search,
   onAdd,
+  full,
 }: {
   search: string;
   onAdd: (m: SelectedMember) => void;
+  /** The picker is at its limit: Add is off. */
+  full: boolean;
 }) {
   const t = useTranslations('groups');
   const ti = useI18nField();
   const { students, loading } = useStudents({ search: search || undefined, first: 20 });
+  // A student without an institute membership cannot be a group member.
+  const pickable = students.flatMap((s) =>
+    s.membershipId ? [{ ...s, membershipId: s.membershipId }] : [],
+  );
 
   return (
-    <CandidateList title={t('memberTypes.student')} loading={loading} empty={students.length === 0}>
-      {students.map((s) => {
+    <CandidateList title={t('memberTypes.student')} loading={loading} empty={pickable.length === 0}>
+      {pickable.map((s) => {
         const { membershipId } = s;
-        if (!membershipId) return null;
         const first = ti(s.firstName) ?? '';
         const last = ti(s.lastName ?? undefined) ?? '';
         const displayName = `${first} ${last}`.trim() || s.admissionNumber || s.id;
@@ -988,6 +1009,7 @@ function StudentCandidates({
           <CandidateRow
             key={s.id}
             label={`${displayName} · ${s.admissionNumber}`}
+            disabled={full}
             onAdd={() => onAdd({ membershipId, memberType: 'student', displayName })}
           />
         );
@@ -999,9 +1021,12 @@ function StudentCandidates({
 function StaffCandidates({
   search,
   onAdd,
+  full,
 }: {
   search: string;
   onAdd: (m: SelectedMember) => void;
+  /** The picker is at its limit: Add is off. */
+  full: boolean;
 }) {
   const t = useTranslations('groups');
   const ti = useI18nField();
@@ -1017,6 +1042,7 @@ function StaffCandidates({
           <CandidateRow
             key={s.id}
             label={displayName}
+            disabled={full}
             onAdd={() => onAdd({ membershipId: s.membershipId, memberType: 'staff', displayName })}
           />
         );
@@ -1028,9 +1054,12 @@ function StaffCandidates({
 function GuardianCandidates({
   search,
   onAdd,
+  full,
 }: {
   search: string;
   onAdd: (m: SelectedMember) => void;
+  /** The picker is at its limit: Add is off. */
+  full: boolean;
 }) {
   const t = useTranslations('groups');
   const ti = useI18nField();
@@ -1051,6 +1080,7 @@ function GuardianCandidates({
           <CandidateRow
             key={g.id}
             label={displayName}
+            disabled={full}
             onAdd={() =>
               onAdd({ membershipId: g.membershipId, memberType: 'guardian', displayName })
             }
@@ -1094,7 +1124,15 @@ function CandidateList({
   );
 }
 
-function CandidateRow({ label, onAdd }: { label: string; onAdd: () => void }) {
+function CandidateRow({
+  label,
+  onAdd,
+  disabled,
+}: {
+  label: string;
+  onAdd: () => void;
+  disabled: boolean;
+}) {
   const t = useTranslations('groups');
   return (
     <li className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
@@ -1104,8 +1142,13 @@ function CandidateRow({ label, onAdd }: { label: string; onAdd: () => void }) {
         variant="ghost"
         size="sm"
         onClick={onAdd}
+        disabled={disabled}
         aria-label={t('new.members.addMember')}
-        title={t('new.members.addMember')}
+        title={
+          disabled
+            ? t('new.members.pickerFull', { max: MAX_PICKED_MEMBERS })
+            : t('new.members.addMember')
+        }
       >
         <UserPlus className="size-4" />
         {t('new.members.addMember')}

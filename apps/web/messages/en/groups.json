@@ -214,7 +214,9 @@
       "selectedMembers": "Selected members",
       "noSelection": "No members selected yet.",
       "noCandidates": "No candidates found.",
-      "candidatePlaceholder": "Member picker is backed by list queries; pick candidates below."
+      "candidatePlaceholder": "Member picker is backed by list queries; pick candidates below.",
+      "pickedCount": "{count} of {max} picked",
+      "pickerFull": "At most {max} members can be picked when a group is created. Remove one to pick another."
     },
     "createSuccess": "Group created",
     "ruleEmpty": {

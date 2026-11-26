@@ -70,7 +70,6 @@ const GUARDIAN_DETAIL_QUERY = gql`
   query InstituteGuardian($id: ID!) {
     getGuardian(id: $id) {
       ${GUARDIAN_LIST_FIELDS}
-      membershipId
     }
   }
 `;

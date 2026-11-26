@@ -11,7 +11,7 @@ const watchers = new WeakMap<object, Map<string, () => void>>();
  *
  * TanStack Form only clears an error it did not receive from a validator when the same
  * validator slot next reports one, so a hand-set error sticks after the user fixes the value
- * and keeps the submit button disabled. The error therefore goes in the dedicated `onServer`
+ * and refuses every submit. The error therefore goes in the dedicated `onServer`
  * slot (never rewritten by the form's own validators) and the field value is watched here.
  * `alsoClearOnChangeOf` names other fields the server derived its verdict from. The message
  * survives the field being unmounted and mounted again.

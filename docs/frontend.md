@@ -170,7 +170,7 @@ Client-side auth state management:
 Apollo Client setup:
 - HTTP + WebSocket split link
 - Auth link (injects Bearer token)
-- Error link: a 401 refreshes the session and retries. A query that cannot reach the server shows one translated toast (`error.networkTitle`, `error.network`, passed to `GraphQLProvider` as `networkErrorLabels`). A mutation that cannot reach the server shows nothing here: its caller reports the failure, in the form or in its own toast (`isNetworkError(error)` tells a lost connection from another failure)
+- Error link: a 401 refreshes the session and retries. A query or subscription (any operation but a mutation) that cannot reach the server shows one translated toast (`error.networkTitle`, `error.network`, passed to `GraphQLProvider` as `networkErrorLabels`). A mutation that cannot reach the server shows nothing here: its caller reports the failure, in the form or in its own toast (`isNetworkError(error)` tells a lost connection from another failure)
 - Cache normalization for core entities
 - Load-more pagination: every paginated query field needs a merge policy in `client.ts`, or `fetchMore` replaces page 1 instead of appending. Top-level `first`/`after` args use `relayStylePagination([...])`; connections that take the cursor inside `filter` (`adminListUsers`, `adminListResellers`, `adminListInstitutes`) use `filterCursorPagination()`
 

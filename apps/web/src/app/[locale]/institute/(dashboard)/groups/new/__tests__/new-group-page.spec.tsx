@@ -6,7 +6,7 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import errorEn from '../../../../../../../../messages/en/error.json';
 import groupsEn from '../../../../../../../../messages/en/groups.json';
 import groupsHi from '../../../../../../../../messages/hi/groups.json';
@@ -37,8 +37,13 @@ const STAFF = {
   employeeId: 'EMP-1',
 };
 
+const studentList = vi.hoisted(() => ({ withoutMembership: false }));
+
 vi.mock('../../../people/students/use-students', () => ({
-  useStudents: () => ({ students: [STUDENT], loading: false }),
+  useStudents: () => ({
+    students: [studentList.withoutMembership ? { ...STUDENT, membershipId: null } : STUDENT],
+    loading: false,
+  }),
 }));
 vi.mock('../../../people/staff/use-staff', () => ({
   useStaff: () => ({ staff: [STAFF], loading: false }),
@@ -360,6 +365,31 @@ describe('NewGroupPage members', () => {
     await addCandidate(m, 'Ravi Nair');
 
     expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
+  });
+});
+
+describe('NewGroupPage members picker', () => {
+  afterEach(() => {
+    studentList.withoutMembership = false;
+  });
+
+  it('should show how many members are picked out of the limit', async () => {
+    const m = renderPage();
+    await toMembersStep(m);
+    expect(screen.getByTestId(ids.newPickedCount)).toHaveTextContent('0 of 500 picked');
+
+    await addCandidate(m, 'Asha Verma · ADM-1');
+
+    expect(screen.getByTestId(ids.newPickedCount)).toHaveTextContent('1 of 500 picked');
+  });
+
+  it('should show the no-candidates row when no student found has a membership', async () => {
+    studentList.withoutMembership = true;
+    const m = renderPage();
+    await toMembersStep(m);
+
+    expect(screen.queryByText('Asha Verma · ADM-1')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(ids.newNoCandidates)).toHaveLength(1);
   });
 });
 

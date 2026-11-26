@@ -72,7 +72,7 @@ export class GroupDrizzleRepository extends GroupRepository {
 
       // Same for memberships: another institute's id must not reach group_members. RLS hides
       // it from the view, so it answers like an id that does not exist.
-      const memberIds = [...new Set(data.memberMembershipIds)];
+      const memberIds = data.memberMembershipIds;
       if (memberIds.length > 0) {
         const found = await tx
           .select({ id: membershipsLive.id })
