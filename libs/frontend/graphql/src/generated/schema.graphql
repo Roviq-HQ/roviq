@@ -1792,7 +1792,9 @@ input CreateEnquiryInput {
   """Staff member assigned to follow up on this enquiry."""
   assignedTo: ID
 
-  """Requested class or grade, e.g. "Nursery", "LKG", "Class 5"."""
+  """
+  Requested class or grade, e.g. "Nursery", "LKG", "Class 5"; at most 20 characters.
+  """
   classRequested: String!
 
   """Date of birth of the prospective student (ISO date YYYY-MM-DD)."""
@@ -8089,7 +8091,9 @@ input UpdateEnquiryInput {
   """Staff member responsible for following up on this enquiry."""
   assignedTo: ID
 
-  """Requested class or grade, e.g. "Nursery", "LKG", "Class 5"."""
+  """
+  Requested class or grade, e.g. "Nursery", "LKG", "Class 5"; at most 20 characters.
+  """
   classRequested: String
 
   """Scheduled follow-up date (ISO date YYYY-MM-DD)."""

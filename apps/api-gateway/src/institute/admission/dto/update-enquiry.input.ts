@@ -3,11 +3,13 @@ import { EnquirySource, EnquiryStatus } from '@roviq/common-types';
 import {
   IsBoolean,
   IsDateString,
+  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
 } from 'class-validator';
 
 @InputType({
@@ -18,14 +20,17 @@ export class UpdateEnquiryInput {
   @Field({ nullable: true, description: 'Name of the prospective student.' })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   studentName?: string;
 
   @Field({
     nullable: true,
-    description: 'Requested class or grade, e.g. "Nursery", "LKG", "Class 5".',
+    description:
+      'Requested class or grade, e.g. "Nursery", "LKG", "Class 5"; at most 20 characters.',
   })
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   classRequested?: string;
 
   @Field({
@@ -34,6 +39,7 @@ export class UpdateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   parentName?: string;
 
   @Field({ nullable: true, description: '10-digit Indian mobile number (without +91 prefix).' })
@@ -46,7 +52,8 @@ export class UpdateEnquiryInput {
 
   @Field({ nullable: true, description: 'Parent contact email address.' })
   @IsOptional()
-  @IsString()
+  @IsEmail()
+  @MaxLength(320)
   parentEmail?: string;
 
   @Field(() => EnquiryStatus, { nullable: true, description: 'Lifecycle status of this enquiry.' })
@@ -86,6 +93,7 @@ export class UpdateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   referredBy?: string;
 
   @Field({
@@ -102,6 +110,7 @@ export class UpdateEnquiryInput {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   siblingAdmissionNo?: string;
 
   @Field({ nullable: true, description: 'Any special educational needs or disabilities to note.' })

@@ -96,13 +96,15 @@
         "parentRelationRequired": "Choose how this person is related to the student",
         "parentPhoneInvalid": "Enter a 10-digit Indian mobile starting with 6-9",
         "emailInvalid": "Enter a valid email",
-        "generic": "Could not create enquiry. Please try again."
+        "generic": "Could not create enquiry. Please try again.",
+        "tooLong": "Use at most {max} characters"
       },
       "submit": "Create enquiry",
       "submitting": "Creating...",
       "cancel": "Cancel",
       "success": "Enquiry created.",
-      "duplicateWarning": "A similar enquiry already exists for this parent phone and class."
+      "duplicateWarning": "A similar enquiry already exists for this parent phone and class.",
+      "classRequestedLimit": "Up to 20 characters, e.g. Class 5"
     },
     "convertDialog": {
       "title": "Convert to application",

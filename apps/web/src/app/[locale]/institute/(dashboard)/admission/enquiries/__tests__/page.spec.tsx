@@ -179,6 +179,23 @@ describe('EnquiriesPage (component)', () => {
     expect(createEnquiry).not.toHaveBeenCalled();
   });
 
+  it('refuses a class name longer than 20 characters with the limit under the field', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId('enquiries-new-btn'));
+    await userEvent.type(await screen.findByTestId('enquiry-student-name-input'), 'Diya Patel');
+    await userEvent.type(screen.getByTestId('enquiry-class-input'), 'Class 5 Science Section A');
+    await userEvent.type(screen.getByTestId('enquiry-parent-name-input'), 'Meera Patel');
+    await userEvent.type(screen.getByTestId('enquiry-parent-phone-input'), '9876543210');
+
+    expect(screen.getByText(messagesEn.enquiries.newForm.classRequestedLimit)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('enquiry-form-submit-btn'));
+
+    expect(
+      await screen.findByText(messagesEn.enquiries.newForm.errors.tooLong.replace('{max}', '20')),
+    ).toBeInTheDocument();
+    expect(createEnquiry).not.toHaveBeenCalled();
+  });
+
   it('marks the relationship as required and says so once it is left empty', async () => {
     renderPage();
     await userEvent.click(screen.getByTestId('enquiries-new-btn'));

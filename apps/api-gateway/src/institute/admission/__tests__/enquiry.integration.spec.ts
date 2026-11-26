@@ -447,4 +447,28 @@ describe('Enquiry numbers (integration)', () => {
     ]);
     expect(await counter(third.tenantId)).toEqual([{ value: 5n, format: 'ENQ-{value:06d}' }]);
   });
+
+  it('a class name longer than its column is refused before a number is taken', async () => {
+    const fresh = await createTestInstitute(result.db);
+    const response = await gqlRequest<{ createEnquiry: { enquiryNumber: string } }>(
+      result.httpServer,
+      {
+        query: CREATE_NUMBERED,
+        token: tokenOf(fresh),
+        variables: {
+          input: {
+            studentName: 'Too long class',
+            classRequested: 'Class 5 Science Section Alpha',
+            parentName: 'Parent',
+            parentPhone: '9876500099',
+            parentRelation: 'FATHER',
+          },
+        },
+      },
+    );
+
+    expect(response.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+    expect(await counter(fresh.tenantId)).toEqual([]);
+    expect(await enquire(fresh, 9)).toBe('ENQ-000001');
+  });
 });
