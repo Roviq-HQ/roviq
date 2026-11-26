@@ -79,7 +79,7 @@ Required on any provider:
   readable without sign-in at `S3_PUBLIC_BASE_URL` (objects only, no listing); behind a CDN the
   bucket itself can stay closed. The public bucket holds branding and nothing else.
 - **`S3_PUBLIC_ENDPOINT`** must be the address browsers reach, because presigned URLs are signed
-  for that host. **`S3_PUBLIC_BASE_URL`** is the public bucket's base URL; put a CDN there.
+  for that host. **`S3_PUBLIC_BASE_URL`** is the public bucket's base URL: the bucket's own https address, or a CDN in front of it.
 - **CORS** on the private bucket: allow `PUT` and `GET` from the three portal origins only, with
   the `Content-Type` request header. Without it every browser upload fails, while server-side
   tests still pass. The rule is in `scripts/lib/storage-rules.ts`, shared by `storage:init` (dev)
@@ -104,8 +104,8 @@ Provider notes:
 |---|---|---|
 | `S3_REGION` | `ap-south-1` (Mumbai) | `auto` |
 | `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` | `https://s3.ap-south-1.amazonaws.com` | `https://<account-id>.r2.cloudflarestorage.com` |
-| Public bucket | all public access blocked; served only through CloudFront with origin access control (OAC), the bucket policy allowing `s3:GetObject` to that distribution alone (`AWS:SourceArn`). A new AWS account must be verified by AWS Support before it can create a CloudFront distribution | no bucket policies: connect a custom domain to the bucket (public access) |
-| `S3_PUBLIC_BASE_URL` | the distribution's domain (or a custom domain on it) | the custom domain |
+| Public bucket | either served directly: block public ACLs, allow a bucket policy granting `s3:GetObject` on `<bucket>/*` to everyone (no `s3:ListBucket`, no writes) plus a deny for requests without TLS; or behind CloudFront with origin access control (OAC), the bucket fully blocked and its policy allowing `s3:GetObject` to that distribution alone (`AWS:SourceArn`). A new AWS account must be verified by AWS Support before it can create a CloudFront distribution | no bucket policies: connect a custom domain to the bucket (public access) |
+| `S3_PUBLIC_BASE_URL` | served directly: `https://<bucket>.s3.ap-south-1.amazonaws.com`; behind CloudFront: the distribution's domain (or a custom domain on it) | the custom domain |
 | Data location | stays in the Mumbai region | pick the location or jurisdiction when creating the bucket; confirm it meets the data-residency position for student records before choosing R2 |
 | Cost shape | storage plus per-GB download fees | lower storage price, no download fees |
 
