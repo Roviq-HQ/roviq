@@ -75,6 +75,7 @@ import {
   useCreateGroup,
   usePreviewGroupRule,
 } from '../use-groups';
+import { RuleValueInput } from './rule-value-input';
 
 const { instituteGroups } = testIds;
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -767,7 +768,7 @@ function RuleNodeEditor({
           <div key={c.id} className="flex flex-wrap items-center gap-2">
             <Select
               value={c.dimension}
-              onValueChange={(v) => updateCondition(c.id, { dimension: v })}
+              onValueChange={(v) => updateCondition(c.id, { dimension: v, value: '' })}
             >
               <SelectTrigger
                 className="h-8 w-[180px]"
@@ -803,13 +804,10 @@ function RuleNodeEditor({
                 ))}
               </SelectContent>
             </Select>
-            <Input
+            <RuleValueInput
+              dimension={c.dimension}
               value={c.value}
-              onChange={(e) => updateCondition(c.id, { value: e.target.value })}
-              placeholder={t('new.rule.valuePlaceholder')}
-              className="h-8 w-[200px]"
-              aria-label={t('new.rule.value')}
-              data-testid={instituteGroups.newRuleValue}
+              onChange={(value) => updateCondition(c.id, { value })}
             />
             <Button
               type="button"

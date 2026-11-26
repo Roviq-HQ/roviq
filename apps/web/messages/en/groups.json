@@ -96,6 +96,19 @@
     "shift": "Shift",
     "medium": "Medium of instruction"
   },
+  "ruleValues": {
+    "boolean": {
+      "true": "Yes",
+      "false": "No"
+    },
+    "stream": {
+      "SCIENCE_PCM": "Science (PCM)",
+      "SCIENCE_PCB": "Science (PCB)",
+      "COMMERCE": "Commerce",
+      "ARTS": "Arts",
+      "VOCATIONAL": "Vocational"
+    }
+  },
   "operators": {
     "eq": "equals",
     "neq": "not equals",
@@ -203,6 +216,7 @@
       "operator": "Operator",
       "value": "Value",
       "valuePlaceholder": "Enter value",
+      "chooseValue": "Choose a value",
       "addCondition": "Add condition",
       "addGroup": "Add nested group",
       "removeCondition": "Remove condition",
