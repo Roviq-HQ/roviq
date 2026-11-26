@@ -183,6 +183,24 @@ describe('StudentService (unit)', () => {
       });
     });
 
+    it('should list the fields the update set, without version, in STUDENT.updated', async () => {
+      repository.updateProfile.mockResolvedValue({ strength: [] });
+      readRepository.findForMutation.mockResolvedValue(buildStudent());
+
+      await service.update('student-1', {
+        version: 2,
+        socialCategory: SocialCategory.OBC,
+        isRteAdmitted: true,
+        religion: undefined,
+      });
+
+      const updated = vi
+        .mocked(eventBus.emit)
+        .mock.calls.filter(([pattern]) => pattern === 'STUDENT.updated');
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.[1]).toHaveProperty('changedFields', ['socialCategory', 'isRteAdmitted']);
+    });
+
     it('should not emit STUDENT.statusChanged when academicStatus is not changed', async () => {
       repository.updateProfile.mockResolvedValue({ strength: [] });
       readRepository.findForMutation.mockResolvedValue(buildStudent());

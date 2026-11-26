@@ -69,7 +69,8 @@ const STUDENT_SCHEMAS = {
     reason: str.nullable(),
     tenantId: uuid,
   }),
-  'STUDENT.updated': tenantBase.catchall(z.unknown()),
+  // The whole updated student, plus the input fields the update set (group invalidation).
+  'STUDENT.updated': tenantBase.extend({ changedFields: z.array(str) }).catchall(z.unknown()),
   'STUDENT.section_changed': z.object({
     studentProfileId: uuid,
     oldSectionId: uuid,

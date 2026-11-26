@@ -35,7 +35,7 @@ import {
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
-import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
 import {
   createInstituteToken,
   createIntegrationApp,
@@ -388,12 +388,12 @@ describe('Student status changes and dynamic groups (integration)', () => {
   const addGroups = (tenantId: string) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), async (tx) => {
       const audit = { tenantId, createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
-      const [byStatus, byStandard, bySection] = await tx
+      const [byStatus, byStandard, bySection, byGender] = await tx
         .insert(groups)
         .values(
-          ['By status', 'By standard', 'By section'].map((name) => ({
+          ['By status', 'By standard', 'By section', 'By gender'].map((name) => ({
             ...audit,
-            name,
+            name: `${name} ${randomUUID().slice(0, 8)}`,
             groupType: DomainGroupType.CLUB,
             membershipType: GroupMembershipType.DYNAMIC,
             resolvedAt: new Date(),
@@ -419,8 +419,19 @@ describe('Student status changes and dynamic groups (integration)', () => {
           rule: { '==': [{ var: 'section_id' }, randomUUID()] },
           ruleDimensions: ['section_id'],
         },
+        {
+          ...audit,
+          groupId: byGender.id,
+          rule: { '==': [{ var: 'gender' }, Gender.FEMALE] },
+          ruleDimensions: ['gender'],
+        },
       ]);
-      return { byStatus: byStatus.id, byStandard: byStandard.id, bySection: bySection.id };
+      return {
+        byStatus: byStatus.id,
+        byStandard: byStandard.id,
+        bySection: bySection.id,
+        byGender: byGender.id,
+      };
     });
 
   const stateOf = async (ids: string[]) => {
@@ -506,11 +517,77 @@ describe('Student status changes and dynamic groups (integration)', () => {
         [mine.byStatus, 'unresolved'],
         [mine.byStandard, 'resolved'],
         [mine.bySection, 'resolved'],
+        [mine.byGender, 'resolved'],
         [theirs.byStatus, 'resolved'],
         [theirs.byStandard, 'resolved'],
         [theirs.bySection, 'resolved'],
+        [theirs.byGender, 'resolved'],
       ]),
     );
+  });
+
+  it('should mark only the gender groups of this institute unresolved when updateStudent edits gender', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const mine = await addGroups(inst.tenantId);
+    const theirs = await addGroups(other.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    const response = await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: {
+        id: student.studentProfileId,
+        input: { version, gender: Gender.FEMALE, firstName: { en: 'Asha' } },
+      },
+    });
+    expect(response.errors).toBeUndefined();
+    const updates = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
+    expect(updates).toHaveLength(1);
+    const [payload] = updates;
+    expect(
+      eventPayloadSchemas[EVENT_PATTERNS.STUDENT.updated].parse(payload).changedFields.sort(),
+    ).toEqual(['firstName', 'gender']);
+    expect(emitted(emit, EVENT_PATTERNS.STUDENT.statusChanged)).toEqual([]);
+
+    await groupHandler.onStudentUpdated(payload);
+
+    expect(await stateOf([...Object.values(mine), ...Object.values(theirs)])).toEqual(
+      new Map([
+        [mine.byStatus, 'resolved'],
+        [mine.byStandard, 'resolved'],
+        [mine.bySection, 'resolved'],
+        [mine.byGender, 'unresolved'],
+        [theirs.byStatus, 'resolved'],
+        [theirs.byStandard, 'resolved'],
+        [theirs.bySection, 'resolved'],
+        [theirs.byGender, 'resolved'],
+      ]),
+    );
+  });
+
+  it('should leave every group resolved when updateStudent edits only fields no rule uses', async () => {
+    const inst = await createTestInstitute(result.db);
+    const student = await createStudentFixture(result.db, inst.tenantId);
+    const { version } = await statusOf(student.studentProfileId);
+    const mine = await addGroups(inst.tenantId);
+    const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+    await gqlRequest(result.httpServer, {
+      query: UPDATE,
+      token: tokenFor(inst),
+      variables: { id: student.studentProfileId, input: { version, bloodGroup: 'O+' } },
+    });
+    const [payload] = emitted(emit, EVENT_PATTERNS.STUDENT.updated);
+    await groupHandler.onStudentUpdated(payload);
+
+    expect([...(await stateOf(Object.values(mine))).values()]).toEqual([
+      'resolved',
+      'resolved',
+      'resolved',
+      'resolved',
+    ]);
   });
 
   it('should emit nothing and keep the status on a refused transition', async () => {

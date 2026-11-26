@@ -308,7 +308,14 @@ export class StudentService {
     // `studentsInTenantUpdated` both filter on payload.tenantId. Emit the
     // full student so the filter matches and `@Subscription(() => StudentModel)`
     // can resolve any selected field on the client side.
-    this.eventBus.emit(EVENT_PATTERNS.STUDENT.updated, { ...updatedStudent, tenantId });
+    const changedFields = Object.entries(input)
+      .filter(([field, value]) => field !== 'version' && value !== undefined)
+      .map(([field]) => field);
+    this.eventBus.emit(EVENT_PATTERNS.STUDENT.updated, {
+      ...updatedStudent,
+      changedFields,
+      tenantId,
+    });
 
     return updatedStudent;
   }

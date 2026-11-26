@@ -9,6 +9,7 @@ import {
   mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
+import { GROUP_RULE_DIMENSIONS } from '@roviq/groups';
 import { EVENT_PATTERNS, eventPayloadSchemas, gatewayConsumer } from '@roviq/nats-jetstream';
 import { and, arrayOverlaps, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 
@@ -52,6 +53,17 @@ export class GroupInvalidationHandler {
   async onStudentStatusChanged(@Payload() data: unknown): Promise<void> {
     const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.statusChanged].parse(data);
     await this.invalidateByDimensions(tenantId, ['academic_status']);
+  }
+
+  /** Invalidates only the rule dimensions the update set: `isRteAdmitted` → `is_rte_admitted`. */
+  @EventPattern(EVENT_PATTERNS.STUDENT.updated, gatewayConsumer(EVENT_PATTERNS.STUDENT.updated))
+  async onStudentUpdated(@Payload() data: unknown): Promise<void> {
+    const { tenantId, changedFields } =
+      eventPayloadSchemas[EVENT_PATTERNS.STUDENT.updated].parse(data);
+    const dimensions = changedFields
+      .map((field) => field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`))
+      .filter((dimension) => GROUP_RULE_DIMENSIONS.includes(dimension));
+    if (dimensions.length > 0) await this.invalidateByDimensions(tenantId, dimensions);
   }
 
   /** A student who left drops out of every rule-based group. */
