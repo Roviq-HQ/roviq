@@ -140,10 +140,77 @@ const envSchema = z
           'MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused unless NODE_ENV is development or test; generate one with: openssl rand -hex 32',
       });
     }
+    for (const issue of storageIssues(env)) ctx.addIssue({ code: 'custom', ...issue });
   });
 
 function isDevOrTest(nodeEnv: string | undefined): boolean {
   return nodeEnv === 'development' || nodeEnv === 'test';
+}
+
+function urlOrNull(value: string | undefined): URL | null {
+  if (!value) return null;
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+/** A Docker service name or loopback: the server reaches the store on a private network. */
+function isPrivateHost(host: string): boolean {
+  return !host.includes('.') || host === '127.0.0.1';
+}
+
+/** Storage rules outside development and test (docs/deployment.md → "Object storage"). */
+function storageIssues(env: {
+  S3_ENDPOINT?: string;
+  S3_PUBLIC_ENDPOINT?: string;
+  S3_PUBLIC_BASE_URL?: string;
+  S3_BUCKET_PRIVATE?: string;
+  S3_BUCKET_PUBLIC?: string;
+  ALLOWED_ORIGINS?: string;
+}): { path: string[]; message: string }[] {
+  const issues: { path: string[]; message: string }[] = [];
+  const portalHosts = new Set(
+    (env.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => urlOrNull(origin.trim())?.hostname)
+      .filter((host): host is string => host !== undefined),
+  );
+
+  const server = urlOrNull(env.S3_ENDPOINT);
+  if (server && server.protocol !== 'https:' && !isPrivateHost(server.hostname)) {
+    issues.push({
+      path: ['S3_ENDPOINT'],
+      message:
+        'S3_ENDPOINT — must be https unless it is a private host (a service name or 127.0.0.1)',
+    });
+  }
+  // Browsers open these: plain http leaks every signed link, and a portal host would let an
+  // uploaded file run script in that portal's origin.
+  for (const name of ['S3_PUBLIC_ENDPOINT', 'S3_PUBLIC_BASE_URL'] as const) {
+    const url = urlOrNull(env[name]);
+    if (!url) continue;
+    if (url.protocol !== 'https:') {
+      issues.push({
+        path: [name],
+        message: `${name} — must be https outside development and test`,
+      });
+    }
+    if (portalHosts.has(url.hostname)) {
+      issues.push({
+        path: [name],
+        message: `${name} — must not be a portal host from ALLOWED_ORIGINS; serve storage from its own domain`,
+      });
+    }
+  }
+  if (env.S3_BUCKET_PRIVATE && env.S3_BUCKET_PRIVATE === env.S3_BUCKET_PUBLIC) {
+    issues.push({
+      path: ['S3_BUCKET_PUBLIC'],
+      message: 'S3_BUCKET_PUBLIC — must differ from S3_BUCKET_PRIVATE',
+    });
+  }
+  return issues;
 }
 
 export function validate(config: Record<string, unknown>) {
