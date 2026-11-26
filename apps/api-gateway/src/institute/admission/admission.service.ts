@@ -113,9 +113,7 @@ export class AdmissionService {
       input.classRequested,
     );
 
-    const enquiryNumber = await this.repository.nextEnquiryNumber(tenantId);
-
-    const enquiry = await this.repository.createEnquiry(tenantId, actorId, enquiryNumber, {
+    const enquiry = await this.repository.createEnquiry(tenantId, actorId, {
       studentName: input.studentName,
       dateOfBirth: input.dateOfBirth ?? null,
       gender: input.gender ?? null,

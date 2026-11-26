@@ -12,11 +12,11 @@ import {
   mkInstituteCtx,
   sectionsLive,
   standardsLive,
-  tenantSequences,
   withTenant,
 } from '@roviq/database';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { toApplicationModel, toEnquiryModel } from '../admission-records';
+import { nextEnquiryNumber } from '../enquiry-number.sequence';
 import { AdmissionRepository } from './admission.repository';
 import type {
   ApplicationRecord,
@@ -55,32 +55,13 @@ export class AdmissionDrizzleRepository extends AdmissionRepository {
     return duplicates.length > 0;
   }
 
-  nextEnquiryNumber(tenantId: string): Promise<string> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      await tx
-        .insert(tenantSequences)
-        .values({
-          tenantId,
-          sequenceName: 'enq_no',
-          currentValue: 0n,
-          formatTemplate: 'ENQ-{value:06d}',
-        })
-        .onConflictDoNothing();
-      const result = await tx.execute(
-        sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'enq_no')`,
-      );
-      const row = result.rows[0] as { next_val: string; formatted: string };
-      return row.formatted || `ENQ-${row.next_val}`;
-    });
-  }
-
   async createEnquiry(
     tenantId: string,
     actorId: string,
-    enquiryNumber: string,
     data: NewEnquiryData,
   ): Promise<EnquiryRecord> {
     const rows = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const enquiryNumber = await nextEnquiryNumber(tx, tenantId);
       return tx
         .insert(enquiries)
         .values({

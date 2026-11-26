@@ -10,6 +10,7 @@ import { AdmissionApplicationStatus, EnquirySource, EnquiryStatus } from '@roviq
 import {
   academicYears,
   type DrizzleDB,
+  enquiries,
   mkAdminCtx,
   SYSTEM_USER_ID,
   standards,
@@ -446,6 +447,66 @@ describe('Enquiry numbers (integration)', () => {
       'ENQ-000005',
     ]);
     expect(await counter(third.tenantId)).toEqual([{ value: 5n, format: 'ENQ-{value:06d}' }]);
+  });
+
+  it('a failed insert does not use up a number', async () => {
+    const fresh = await createTestInstitute(result.db);
+    const untouched = await counter(second.tenantId);
+    expect(await enquire(fresh, 10)).toBe('ENQ-000001');
+    expect(await enquire(fresh, 11)).toBe('ENQ-000002');
+
+    // A row already holding the next number makes the insert fail on the unique index.
+    const [blocker] = await withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx
+        .insert(enquiries)
+        .values({
+          tenantId: fresh.tenantId,
+          enquiryNumber: 'ENQ-000003',
+          studentName: 'Blocker',
+          classRequested: 'Class 1',
+          parentName: 'Parent',
+          parentPhone: '9876500098',
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: enquiries.id }),
+    );
+    const enquiryCount = () =>
+      withAdmin(result.db, mkAdminCtx('test:enquiry'), async (tx) => {
+        const rows = await tx
+          .select({ id: enquiries.id })
+          .from(enquiries)
+          .where(eq(enquiries.tenantId, fresh.tenantId));
+        return rows.length;
+      });
+    const before = await enquiryCount();
+
+    const failed = await gqlRequest<{ createEnquiry: { enquiryNumber: string } }>(
+      result.httpServer,
+      {
+        query: CREATE_NUMBERED,
+        token: tokenOf(fresh),
+        variables: {
+          input: {
+            studentName: 'Refused by the index',
+            classRequested: 'Class 1',
+            parentName: 'Parent',
+            parentPhone: '9876500012',
+            parentRelation: 'FATHER',
+          },
+        },
+      },
+    );
+    expect(failed.errors).toBeDefined();
+    expect(await counter(fresh.tenantId)).toEqual([{ value: 2n, format: 'ENQ-{value:06d}' }]);
+    expect(await enquiryCount()).toBe(before);
+
+    await withAdmin(result.db, mkAdminCtx('test:enquiry'), (tx) =>
+      tx.update(enquiries).set({ enquiryNumber: null }).where(eq(enquiries.id, blocker.id)),
+    );
+    expect(await enquire(fresh, 13)).toBe('ENQ-000003');
+    expect(await counter(fresh.tenantId)).toEqual([{ value: 3n, format: 'ENQ-{value:06d}' }]);
+    expect(await counter(second.tenantId)).toEqual(untouched);
   });
 
   it('a class name longer than its column is refused before a number is taken', async () => {
