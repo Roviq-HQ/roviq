@@ -74,6 +74,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/examination/__tests__/report-card-own-access.integration.spec.ts',
   'apps/api-gateway/src/institute/group/__tests__/group-crud.integration.spec.ts',
   'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/group/__tests__/group-invalidation.integration.spec.ts',
   'apps/api-gateway/src/institute/guardian/__tests__/guardian-create-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
   // ROV-358: a parent role and a student for the repeated-link test.

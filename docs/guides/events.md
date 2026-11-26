@@ -183,6 +183,7 @@ interceptor do not run for event deliveries (they read a request an event does n
 | Subject | Handlers | Effect |
 | ------- | -------- | ------ |
 | `ACADEMIC_YEAR.activated` | `StudentEventHandler`, `GroupInvalidationHandler` | Continuing students get a row in the new year by the year-end promotion rule below; dynamic groups are invalidated |
+| `SECTION.updated` | `GroupInvalidationHandler` | Groups whose rules use `shift` or `medium` get `resolved_at = NULL` |
 | `SECTION.deleted` | `StudentEventHandler`, `GroupInvalidationHandler` | The deleted section's `student_academics` rows are soft-deleted; section-based groups are invalidated |
 | `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.statusChanged`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` (`academic_status` for `STUDENT.statusChanged`) |
 | `STUDENT.updated` | `GroupInvalidationHandler` | Groups whose rules use a field the update set (`changedFields`, `gender` → `gender`, `isRteAdmitted` → `is_rte_admitted`) get `resolved_at = NULL`; fields no rule can name invalidate nothing |

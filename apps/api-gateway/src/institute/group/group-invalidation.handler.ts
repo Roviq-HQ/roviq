@@ -91,6 +91,13 @@ export class GroupInvalidationHandler {
     await this.invalidateAllDynamic(tenantId);
   }
 
+  /** A section's shift or medium is read by rules through the student's placement. */
+  @EventPattern(EVENT_PATTERNS.SECTION.updated, gatewayConsumer(EVENT_PATTERNS.SECTION.updated))
+  async onSectionUpdated(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.SECTION.updated].parse(data);
+    await this.invalidateByDimensions(tenantId, ['shift', 'medium']);
+  }
+
   @EventPattern(EVENT_PATTERNS.SECTION.deleted, gatewayConsumer(EVENT_PATTERNS.SECTION.deleted))
   async onSectionDeleted(@Payload() data: unknown): Promise<void> {
     const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.SECTION.deleted].parse(data);
