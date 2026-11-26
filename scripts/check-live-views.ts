@@ -8,8 +8,8 @@
  * the view; writes (`.insert`, `.update`, `.delete`, `softDelete`) target the
  * base table.
  *
- * This script scans `apps/` and `ee/apps/` for `.from(<baseTable>)` and
- * `.<kind>Join(<baseTable>, …)` where
+ * This script scans `apps/`, `ee/apps/` and `libs/backend/` for `.from(<baseTable>)`,
+ * `.<kind>Join(<baseTable>, …)` and `alias(<baseTable>, …)` where
  * `<baseTable>` is a known soft-deletable name. Allowed exceptions:
  *   1. The line is part of an INSERT/UPDATE/DELETE chain (write-side).
  *   2. The file lives under `**\/__tests__\/**` (mocks aren't enforced).
@@ -39,7 +39,10 @@ const SCAN_ROOTS = [
   'apps/api-gateway/src',
   'ee/apps/api-gateway/src',
   'apps/notification-service/src',
+  'libs/backend',
 ];
+// Test fixtures, not application code.
+const SKIP_ROOTS = ['libs/backend/testing'];
 
 interface Hit {
   file: string;
@@ -69,7 +72,7 @@ function listFiles(): string[] {
   for (const root of SCAN_ROOTS) {
     walk(join(ROOT, root), all);
   }
-  return all;
+  return all.filter((file) => !SKIP_ROOTS.some((skip) => file.startsWith(join(ROOT, skip))));
 }
 
 export function findBaseTableReads(text: string, tables: readonly string[]): Omit<Hit, 'file'>[] {
@@ -79,7 +82,8 @@ export function findBaseTableReads(text: string, tables: readonly string[]): Omi
   for (const table of tables) {
     // `\s*` spans newlines: Biome wraps long joins so the table lands on the
     // line after `.leftJoin(`. Trailing `)` or `,` avoids matching `<table>Live`.
-    const re = new RegExp(`\\.(from|\\w+Join)\\(\\s*${table}\\s*[),]`, 'g');
+    // `alias(<table>, …)` counts: the alias is what a later `.from` or join names.
+    const re = new RegExp(`(\\.(from|\\w+Join)|\\balias)\\(\\s*${table}\\s*[),]`, 'g');
     for (const match of text.matchAll(re)) {
       const start = lineAt(match.index);
       const end = lineAt(match.index + match[0].length);
