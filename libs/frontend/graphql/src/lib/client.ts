@@ -182,7 +182,7 @@ export function createApolloClient(config: ApolloClientConfig) {
     shouldRetry: shouldRetryLiveSocket,
     retryAttempts: Infinity,
     retryWait: async (retryCount) => {
-      const delay = Math.min(1000 * 2 ** retryCount, 30000);
+      const delay = retryDelay(retryCount);
       if (live) return live.waitBeforeRetry(delay);
       await new Promise((resolve) => setTimeout(resolve, delay));
     },
@@ -328,6 +328,15 @@ function longestEdges(value: unknown, depth = 0): number {
   for (const child of Object.values(value))
     longest = Math.max(longest, longestEdges(child, depth + 1));
   return longest;
+}
+
+/**
+ * Backoff before the next socket attempt: doubling up to 30 s, with half of it random so the
+ * tabs of a whole institute do not reconnect at the same moment after a server restart.
+ */
+export function retryDelay(retryCount: number, random: () => number = Math.random): number {
+  const ceiling = Math.min(1000 * 2 ** retryCount, 30_000);
+  return Math.round(ceiling / 2 + random() * (ceiling / 2));
 }
 
 /** A socket is retried unless the session is over: asking again would only be refused. */
