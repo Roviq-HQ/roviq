@@ -1,12 +1,14 @@
 'use client';
 
+import { useI18nField } from '@roviq/i18n';
 import { Button, useAppForm } from '@roviq/ui';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { z } from 'zod';
-import { useAuth } from './auth-context';
+import { type ReAuthOutcome, useAuth } from './auth-context';
 import { presentAuthError } from './auth-error-feedback';
 import { type AuthErrorLabels, isPasskeySupported } from './error-utils';
+import type { MembershipInfo } from './types';
 
 export interface ReAuthFormLabels {
   password?: string;
@@ -18,6 +20,8 @@ export interface ReAuthFormLabels {
   passwordRequired?: string;
   loginFailed?: string;
   switchAccount?: string;
+  /** Heading over the institutes to pick when the last one is not among the person's any more. */
+  chooseInstitute?: string;
   /** Translated copy per error code / client failure; `loginFailed` covers unknown codes. */
   errors?: AuthErrorLabels;
 }
@@ -32,6 +36,7 @@ const DEFAULT_LABELS: Required<Omit<ReAuthFormLabels, 'errors'>> = {
   passwordRequired: 'Password is required',
   loginFailed: 'Login failed. Please try again.',
   switchAccount: 'Switch account',
+  chooseInstitute: 'Choose an institute to continue',
 };
 
 interface ReAuthFormProps {
@@ -42,8 +47,16 @@ interface ReAuthFormProps {
 }
 
 export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReAuthFormProps) {
-  const { login, loginWithPasskey } = useAuth();
+  const { reAuthenticate, completeReAuthentication } = useAuth();
   const [isPasskeyLoading, setIsPasskeyLoading] = React.useState(false);
+  const [choices, setChoices] = React.useState<MembershipInfo[] | null>(null);
+  const [choosing, setChoosing] = React.useState<string | null>(null);
+
+  // A person of several institutes is put back into the one they were in, on this page.
+  const finish = (outcome: ReAuthOutcome) => {
+    if (outcome.kind === 'chooseInstitute') setChoices(outcome.memberships);
+    else onSuccess?.();
+  };
   const [error, setError] = React.useState<string | null>(null);
 
   const l = { ...DEFAULT_LABELS, ...labels };
@@ -60,8 +73,7 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        await login({ username, password: value.password });
-        onSuccess?.();
+        finish(await reAuthenticate({ username, password: value.password }));
       } catch (err) {
         presentAuthError(err, {
           labels: errorLabels,
@@ -83,8 +95,7 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
     }
     setIsPasskeyLoading(true);
     try {
-      await loginWithPasskey();
-      onSuccess?.();
+      finish(await reAuthenticate('passkey'));
     } catch (err) {
       presentAuthError(err, {
         labels: errorLabels,
@@ -96,7 +107,32 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
     }
   };
 
+  const choose = async (membershipId: string) => {
+    setError(null);
+    setChoosing(membershipId);
+    try {
+      await completeReAuthentication(membershipId);
+      onSuccess?.();
+    } catch (err) {
+      presentAuthError(err, { labels: errorLabels, onInline: setError });
+    } finally {
+      setChoosing(null);
+    }
+  };
+
   const initials = username.charAt(0).toUpperCase();
+
+  if (choices) {
+    return (
+      <InstituteChoices
+        choices={choices}
+        heading={l.chooseInstitute}
+        error={error}
+        choosing={choosing}
+        onChoose={(membershipId) => void choose(membershipId)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -177,6 +213,51 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
         )}
         {isPasskeyLoading ? l.signingIn : l.signInWithPasskey}
       </Button>
+    </div>
+  );
+}
+
+function InstituteChoices({
+  choices,
+  heading,
+  error,
+  choosing,
+  onChoose,
+}: {
+  choices: MembershipInfo[];
+  heading: string;
+  error: string | null;
+  choosing: string | null;
+  onChoose: (membershipId: string) => void;
+}) {
+  const ti = useI18nField();
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">{heading}</p>
+      {error && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
+      <div className="space-y-2">
+        {choices.map((m) => (
+          <Button
+            key={m.membershipId}
+            type="button"
+            variant="outline"
+            className="w-full justify-start"
+            disabled={choosing !== null}
+            onClick={() => onChoose(m.membershipId)}
+            data-institute-name={ti(m.instituteName)}
+          >
+            {choosing === m.membershipId && <Loader2 className="size-4 animate-spin" />}
+            {ti(m.instituteName)}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

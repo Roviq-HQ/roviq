@@ -121,7 +121,13 @@ graphql-ws connections never carry the JWT. The client exchanges its access toke
 2. The client opens the socket with `connectionParams: { ticket }`. `onConnect` in `app.module.ts` calls `consumeWsTicket`, which reads and deletes the key in one `GETDEL`, so a ticket works once even when two sockets race on it.
 3. The user is put on `ctx.extra.user` and copied to `req.user` by the GraphQL `context()` wrapper, so `@CurrentUser()`, scope guards and CASL work as on HTTP.
 
-A missing, malformed, unknown, expired or reused ticket closes the socket with code 4403. The stored user is validated on the way in and out (`ws-ticket.store.ts`) and keeps `isImpersonated`, `impersonationSessionId` and `mustChangePassword`, which `ImpersonationSessionGuard` and `MustChangePasswordGuard` read on the subscription path. On reconnect the frontend (`libs/frontend/graphql/src/lib/client.ts`) fetches a new ticket.
+A missing, malformed, unknown, expired or reused ticket closes the socket with code 4403. The stored user is validated on the way in and out (`ws-ticket.store.ts`) and keeps `isImpersonated`, `impersonationSessionId` and `mustChangePassword`, which `ImpersonationSessionGuard` and `MustChangePasswordGuard` read on the subscription path. On every connect and reconnect the frontend fetches a new ticket (`libs/frontend/graphql/src/lib/ws-ticket.ts`):
+
+- A 401 refreshes the access token once and asks again. If the server refuses the refresh (`isRefreshRefused`: `SESSION_EXPIRED`, `UNAUTHENTICATED` and the like) or refuses the new token too, the session has ended: the client stops retrying (`connectionParams` throws `LiveSessionEndedError`, which the client's `shouldRetry` refuses), live subscriptions are held rather than failed, and the next sign-in restarts them (`RefetchAfterReLogin` calls `resume()`).
+- In an impersonation tab a 401 ends the impersonation; there is no refresh token to try.
+- A network error, another status, or a refresh that could not be made (network, server error) keeps the socket retrying with backoff.
+
+The web app never sends a refresh token twice. In a tab, everything that asks for a refresh (the timer, an HTTP request refused as `UNAUTHENTICATED`, the ticket) shares one request per refresh token (`AuthProvider`). The refresh token is shared by the tabs of a portal through `localStorage`, while each tab keeps its own access token, so tabs take turns under a browser lock (`navigator.locks`, where the browser has it) and each reads the refresh token again once it holds the lock. A replayed rotated token would make the server revoke every session of the user.
 
 ## Session Management
 

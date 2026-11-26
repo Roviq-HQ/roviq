@@ -9,8 +9,10 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition, relayStylePagination } from '@apollo/client/utilities';
 import { OperationTypeNode } from 'graphql';
 import { createClient } from 'graphql-ws';
-import { from, type Observable, switchMap } from 'rxjs';
+import { from, Observable, type Subscription, switchMap } from 'rxjs';
+import type { LiveConnection } from './live-connection';
 import { tagNetworkFailures } from './network-fetch';
+import { LiveSessionEndedError, resolveWsConnectionParams } from './ws-ticket';
 
 export interface ApolloClientConfig {
   httpUrl: string;
@@ -29,12 +31,16 @@ export interface ApolloClientConfig {
   apiUrl?: string;
   /** Called to refresh the access token. If provided, auth errors retry once after refresh. */
   onTokenRefresh?: () => Promise<string | null>;
+  /** State of the live-updates socket, shown by the app; also lets it reconnect and resume. */
+  live?: LiveConnection;
 }
+
+const IMPERSONATION_TOKEN_KEY = 'roviq-impersonation-token';
 
 /** Handle an impersonation-ended GraphQL error: clear session storage and notify. */
 function handleImpersonationEnded(config: ApolloClientConfig): void {
   if (typeof window !== 'undefined') {
-    sessionStorage.removeItem('roviq-impersonation-token');
+    sessionStorage.removeItem(IMPERSONATION_TOKEN_KEY);
   }
   config.onImpersonationEnded?.();
 }
@@ -149,39 +155,48 @@ export function createApolloClient(config: ApolloClientConfig) {
     return undefined;
   });
 
-  const wsLink = new GraphQLWsLink(
-    createClient({
-      url: config.wsUrl,
-      connectionParams: async () => {
-        if (config.apiUrl) {
-          const accessToken = config.getAccessToken();
-          if (accessToken) {
-            // The api-gateway uses a global prefix of `api` (set in main.ts),
-            // so the controller `@Controller('auth')` resolves to
-            // `/api/auth/ws-ticket`. Callers pass the bare origin
-            // (e.g. `http://localhost:3005`) as `apiUrl`, so the prefix
-            // must be added here. Stripping a possibly-already-suffixed
-            // `/api` keeps this safe whether or not the caller pre-prefixed.
-            const apiBase = config.apiUrl.replace(/\/api$/, '');
-            const response = await fetch(`${apiBase}/api/auth/ws-ticket`, {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            });
-            if (response.ok) {
-              const { ticket } = await response.json();
-              return { ticket };
-            }
-          }
-        }
-        return {};
-      },
-      shouldRetry: () => true,
-      retryAttempts: Infinity,
-      retryWait: async (retryCount) => {
-        const delay = Math.min(1000 * 2 ** retryCount, 30000);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      },
-    }),
-  );
+  const live = config.live;
+  // Assigned below; the socket's `connected` event needs it to refetch after a reconnect.
+  let apolloClient: ApolloClient | undefined;
+
+  const wsClient = createClient({
+    url: config.wsUrl,
+    connectionParams: async () => {
+      if (!config.apiUrl) return {};
+      return resolveWsConnectionParams({
+        apiUrl: config.apiUrl,
+        getAccessToken: config.getAccessToken,
+        isImpersonating: () =>
+          typeof window !== 'undefined' && sessionStorage.getItem(IMPERSONATION_TOKEN_KEY) !== null,
+        refreshToken: config.onTokenRefresh,
+        onSessionEnded: () => {
+          live?.onSessionEnded();
+          config.onAuthError();
+        },
+        onImpersonationEnded: () => {
+          live?.onSessionEnded('impersonation');
+          handleImpersonationEnded(config);
+        },
+      });
+    },
+    shouldRetry: shouldRetryLiveSocket,
+    retryAttempts: Infinity,
+    retryWait: async (retryCount) => {
+      const delay = retryDelay(retryCount);
+      if (live) return live.waitBeforeRetry(delay);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    },
+    on: live
+      ? liveSocketHandlers(live, () => {
+          if (apolloClient) void refetchQueriesOnScreen(apolloClient);
+        })
+      : undefined,
+  });
+  live?.setTerminate(() => wsClient.terminate());
+
+  const wsLink = live
+    ? resumeAfterSessionEnd(live).concat(new GraphQLWsLink(wsClient))
+    : new GraphQLWsLink(wsClient);
 
   const httpChain = errorLink.concat(authLink).concat(httpLink);
 
@@ -224,7 +239,7 @@ export function createApolloClient(config: ApolloClientConfig) {
     },
   });
 
-  return new ApolloClient({
+  apolloClient = new ApolloClient({
     link,
     cache,
     defaultOptions: {
@@ -233,4 +248,147 @@ export function createApolloClient(config: ApolloClientConfig) {
       },
     },
   });
+  return apolloClient;
+}
+
+/**
+ * The socket events that keep `live` current. After a reconnect the queries on screen are
+ * refetched once (events sent while the socket was down are lost); a re-login that refetched a
+ * moment ago counts as that refetch.
+ */
+export function liveSocketHandlers(
+  live: LiveConnection,
+  refetchOnScreen: () => void,
+): {
+  connecting: () => void;
+  connected: (socket: unknown, payload: unknown, wasRetry: boolean) => void;
+  closed: (event: unknown) => void;
+} {
+  return {
+    connecting: () => live.onConnecting(),
+    connected: (_socket, _payload, wasRetry) => {
+      const before = live.getSnapshot().status;
+      live.onConnected();
+      const missedEvents =
+        wasRetry || before === 'reconnecting' || before === 'offline' || before === 'stopped';
+      if (missedEvents && live.claimRefetch()) refetchOnScreen();
+    },
+    closed: (event) => live.onClosed(closeCode(event)),
+  };
+}
+
+/** Keeps `live` in step with the browser's connectivity; returns a function that stops it. */
+export function bindBrowserConnectivity(
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'>,
+  live: LiveConnection,
+): () => void {
+  const goOffline = () => {
+    live.setOnline(false);
+    // A dead socket can look open for minutes; dropping it starts the retries at once.
+    live.terminate();
+  };
+  const goOnline = () => live.setOnline(true);
+  target.addEventListener('offline', goOffline);
+  target.addEventListener('online', goOnline);
+  return () => {
+    target.removeEventListener('offline', goOffline);
+    target.removeEventListener('online', goOnline);
+  };
+}
+
+/**
+ * Refetches the active queries, except a list the person has already paged past its first page:
+ * refetching its first page would drop the pages below and lose their place.
+ */
+export function refetchQueriesOnScreen(client: ApolloClient) {
+  return client.refetchQueries({
+    include: 'active',
+    onQueryUpdated: (query) => !loadedPastFirstPage(query.variables, query.getCurrentResult().data),
+  });
+}
+
+export function loadedPastFirstPage(variables: unknown, data: unknown): boolean {
+  const first = pageSize(variables);
+  if (first === undefined) return false;
+  return longestEdges(data) > first;
+}
+
+function pageSize(variables: unknown): number | undefined {
+  if (!isRecord(variables)) return undefined;
+  if (typeof variables.first === 'number') return variables.first;
+  if (isRecord(variables.filter) && typeof variables.filter.first === 'number') {
+    return variables.filter.first;
+  }
+  return undefined;
+}
+
+function longestEdges(value: unknown, depth = 0): number {
+  if (!isRecord(value) || depth > 4) return 0;
+  let longest = Array.isArray(value.edges) ? value.edges.length : 0;
+  for (const child of Object.values(value))
+    longest = Math.max(longest, longestEdges(child, depth + 1));
+  return longest;
+}
+
+/**
+ * Backoff before the next socket attempt: doubling up to 30 s, with half of it random so the
+ * tabs of a whole institute do not reconnect at the same moment after a server restart.
+ */
+export function retryDelay(retryCount: number, random: () => number = Math.random): number {
+  const ceiling = Math.min(1000 * 2 ** retryCount, 30_000);
+  return Math.round(ceiling / 2 + random() * (ceiling / 2));
+}
+
+/** A socket is retried unless the session is over: asking again would only be refused. */
+export function shouldRetryLiveSocket(errOrCloseEvent: unknown): boolean {
+  return !(errOrCloseEvent instanceof LiveSessionEndedError);
+}
+
+function closeCode(event: unknown): number | undefined {
+  return typeof event === 'object' &&
+    event !== null &&
+    'code' in event &&
+    typeof event.code === 'number'
+    ? event.code
+    : undefined;
+}
+
+/**
+ * A subscription whose socket gave up (the session ended, or graphql-ws met a close code it does
+ * not retry) is held, not failed: the screen keeps its data, and the next sign-in or a manual
+ * Reconnect starts it again. A GraphQL error from the server still reaches the screen.
+ */
+export function resumeAfterSessionEnd(live: LiveConnection): ApolloLink {
+  return new ApolloLink(
+    (operation, forward) =>
+      new Observable<ApolloLink.Result>((observer) => {
+        let inner: Subscription | undefined;
+        let forget: (() => void) | undefined;
+        const start = () => {
+          // Connecting now would only be refused again; wait for the next sign-in.
+          if (live.isSessionEnded()) {
+            forget = live.holdUntilResume(start);
+            return;
+          }
+          inner = forward(operation).subscribe({
+            next: (value) => observer.next(value),
+            error: (err: unknown) => {
+              // A GraphQL error is the server refusing this operation: the screen shows it.
+              if (CombinedGraphQLErrors.is(err) && !live.isSessionEnded()) {
+                observer.error(err);
+                return;
+              }
+              if (!live.isSessionEnded()) live.onGaveUp();
+              forget = live.holdUntilResume(start);
+            },
+            complete: () => observer.complete(),
+          });
+        };
+        start();
+        return () => {
+          inner?.unsubscribe();
+          forget?.();
+        };
+      }),
+  );
 }

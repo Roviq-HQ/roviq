@@ -106,6 +106,8 @@ export interface LayoutConfig {
   instituteSwitcher?: InstituteSwitcherConfig;
   /** Topbar notification bell; the app supplies it because it fetches its own data. */
   notificationBell?: ReactNode;
+  /** Topbar state of the live-updates connection; the app supplies it. */
+  connectionIndicator?: ReactNode;
   /**
    * First group of the command palette, opened by the top-bar Quick actions button. The user's
    * pinned pages follow it; a destination is listed once.

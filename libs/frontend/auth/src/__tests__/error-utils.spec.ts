@@ -7,6 +7,7 @@ import {
   DEFAULT_AUTH_ERROR_LABELS,
   extractErrorCode,
   isAppError,
+  isRefreshRefused,
   resolveAuthErrorMessage,
 } from '../lib/error-utils';
 
@@ -111,5 +112,23 @@ describe('resolveAuthErrorMessage', () => {
     for (const key of [...AUTH_ERROR_CODES, ...AUTH_CLIENT_ERROR_KINDS]) {
       expect(DEFAULT_AUTH_ERROR_LABELS[key]).not.toBe('');
     }
+  });
+});
+
+describe('isRefreshRefused', () => {
+  it.each([
+    'SESSION_EXPIRED',
+    'UNAUTHENTICATED',
+    'ACCOUNT_INACTIVE',
+    'PASSWORD_CHANGED',
+  ])('is true when the server refused the refresh with %s', (code) => {
+    expect(isRefreshRefused(new AuthRequestError('refused', code))).toBe(true);
+  });
+
+  it('is false when the refresh could not be made', () => {
+    expect(isRefreshRefused(new TypeError('Failed to fetch'))).toBe(false);
+    expect(isRefreshRefused(new SyntaxError('Unexpected token < in JSON'))).toBe(false);
+    expect(isRefreshRefused(new AuthRequestError('boom', 'INTERNAL_SERVER_ERROR'))).toBe(false);
+    expect(isRefreshRefused(new AuthRequestError('boom', null))).toBe(false);
   });
 });

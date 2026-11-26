@@ -12,6 +12,10 @@ export {
   extractGraphQLErrorCode,
   isNetworkError,
 } from './lib/extract-graphql-error';
+export {
+  type LiveConnectionStatus,
+  MANUAL_RECONNECT_AFTER,
+} from './lib/live-connection';
 export { NetworkFetchError } from './lib/network-fetch';
-export { GraphQLProvider } from './lib/provider';
+export { GraphQLProvider, type LiveConnectionHandle, useLiveConnection } from './lib/provider';
 export { useEdition } from './lib/use-edition';

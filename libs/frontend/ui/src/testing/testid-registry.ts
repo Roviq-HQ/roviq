@@ -532,6 +532,13 @@ export const testIds = {
     closeBtn: 'impersonation-exchange-close-btn',
   },
 
+  // ── Live updates: banner and top-bar indicator (ROV-287) ──────────────
+  liveUpdates: {
+    banner: 'live-updates-banner',
+    reconnectBtn: 'live-updates-reconnect-btn',
+    indicator: 'live-updates-indicator',
+  },
+
   // ── Impersonation: banner in the impersonated tab ─────────────────────
   impersonationBanner: {
     banner: 'impersonation-banner',

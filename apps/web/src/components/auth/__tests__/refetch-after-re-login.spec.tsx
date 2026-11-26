@@ -7,6 +7,11 @@ import { RefetchAfterReLogin } from '../refetch-after-re-login';
 
 const auth = vi.hoisted(() => ({ sessionRestores: 0 }));
 vi.mock('@roviq/auth', () => ({ useAuth: () => auth }));
+const live = vi.hoisted(() => ({ resume: vi.fn(), noteRefetched: vi.fn() }));
+vi.mock('@roviq/graphql', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@roviq/graphql')>()),
+  useLiveConnection: () => live,
+}));
 
 function renderWith(client: ApolloClient) {
   const view = render(
@@ -27,6 +32,8 @@ describe('RefetchAfterReLogin', () => {
 
   beforeEach(() => {
     auth.sessionRestores = 0;
+    live.resume.mockReset();
+    live.noteRefetched.mockReset();
     client = new ApolloClient({ cache: new InMemoryCache(), link: ApolloLink.empty() });
   });
 
@@ -41,5 +48,17 @@ describe('RefetchAfterReLogin', () => {
 
     expect(refetch).toHaveBeenCalledTimes(1);
     expect(refetch).toHaveBeenCalledWith({ include: 'active' });
+  });
+
+  it('should restart the live updates that stopped with the session, once per restore', () => {
+    const rerender = renderWith(client);
+    expect(live.resume).not.toHaveBeenCalled();
+
+    auth.sessionRestores = 1;
+    rerender();
+    rerender();
+
+    expect(live.resume).toHaveBeenCalledTimes(1);
+    expect(live.noteRefetched).toHaveBeenCalledTimes(1);
   });
 });

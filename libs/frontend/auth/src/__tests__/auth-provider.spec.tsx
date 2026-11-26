@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../lib/auth-context';
+import { AuthRequestError } from '../lib/error-utils';
 import type { AuthUser, LoginResult, MembershipInfo } from '../lib/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -580,5 +581,189 @@ describe('AuthProvider — impersonation tab', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(currentUserQuery).not.toHaveBeenCalled();
     expect(result.current.isAuthenticated).toBe(false);
+  });
+});
+
+describe('AuthProvider — one refresh request per refresh token', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-old');
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+  });
+
+  it('sends one refresh when two callers refresh at once with the same token', async () => {
+    const props = makeDefaultProps();
+    let resolveRefresh: (value: LoginResult) => void = () => {};
+    props.refreshMutation.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    let both: Promise<unknown> = Promise.resolve();
+    act(() => {
+      both = Promise.all([result.current.refreshSession(), result.current.refreshSession()]);
+    });
+    await act(async () => {
+      resolveRefresh({
+        accessToken: makeJwt(FUTURE),
+        refreshToken: 'rt-rotated',
+        user: MOCK_USER,
+      } as LoginResult);
+      await both;
+    });
+
+    expect(props.refreshMutation).toHaveBeenCalledTimes(1);
+    expect(props.refreshMutation).toHaveBeenCalledWith('rt-old');
+    expect(localStorage.getItem('roviq-institute-refresh-token')).toBe('rt-rotated');
+  });
+
+  it('sends a new request once the first one settled, with the rotated token', async () => {
+    const props = makeDefaultProps();
+    props.refreshMutation
+      .mockResolvedValueOnce({
+        accessToken: makeJwt(FUTURE),
+        refreshToken: 'rt-2',
+        user: MOCK_USER,
+      })
+      .mockResolvedValueOnce({
+        accessToken: makeJwt(FUTURE),
+        refreshToken: 'rt-3',
+        user: MOCK_USER,
+      });
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(() => result.current.refreshSession());
+    await act(() => result.current.refreshSession());
+
+    expect(props.refreshMutation).toHaveBeenNthCalledWith(1, 'rt-old');
+    expect(props.refreshMutation).toHaveBeenNthCalledWith(2, 'rt-2');
+  });
+
+  it('lets a later call try again after a shared refresh failed', async () => {
+    const props = makeDefaultProps();
+    props.refreshMutation.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
+      accessToken: makeJwt(FUTURE),
+      refreshToken: 'rt-2',
+      user: MOCK_USER,
+    });
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(async () => {
+      const outcomes = await Promise.allSettled([
+        result.current.refreshSession(),
+        result.current.refreshSession(),
+      ]);
+      expect(outcomes.map((o) => o.status)).toEqual(['rejected', 'rejected']);
+    });
+    await act(() => result.current.refreshSession());
+
+    expect(props.refreshMutation).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('AuthProvider — re-login from the session-expired dialog, several institutes', () => {
+  const SELECTION = {
+    requiresInstituteSelection: true,
+    selectionToken: 'sel-token',
+    memberships: MOCK_MEMBERSHIPS,
+  } as LoginResult;
+
+  async function expireSessionIn(tenantId: string) {
+    sessionStorage.clear();
+    localStorage.clear();
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-old');
+    localStorage.setItem('roviq-institute-user', JSON.stringify({ ...MOCK_USER, tenantId }));
+    const props = makeDefaultProps();
+    props.refreshMutation.mockRejectedValue(new AuthRequestError('revoked', 'SESSION_EXPIRED'));
+    props.loginMutation.mockResolvedValue(SELECTION);
+    const view = renderUseAuth(props);
+    await waitFor(() => expect(view.result.current.isAuthenticated).toBe(true));
+    await act(async () => {
+      await view.result.current.refreshSession().catch(() => {});
+    });
+    expect(view.result.current.sessionExpired).toBe(true);
+    return { ...view, props };
+  }
+
+  it('signs back into the institute the person was in, without the institute picker page', async () => {
+    const { result, props } = await expireSessionIn('t2');
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.reAuthenticate({ username: 'priya.admin', password: 'pw' });
+    });
+
+    expect(outcome).toEqual({ kind: 'signed-in' });
+    expect(props.selectInstituteMutation).toHaveBeenCalledWith('sel-token', 'm2');
+    expect(result.current.needsInstituteSelection).toBe(false);
+    expect(result.current.isAuthenticated).toBe(true);
+  });
+
+  it('lists the institutes when the one the person was in is not among theirs any more', async () => {
+    const { result, props } = await expireSessionIn('t-gone');
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.reAuthenticate({ username: 'priya.admin', password: 'pw' });
+    });
+    expect(outcome).toEqual({ kind: 'chooseInstitute', memberships: MOCK_MEMBERSHIPS });
+    expect(props.selectInstituteMutation).not.toHaveBeenCalled();
+    expect(result.current.needsInstituteSelection).toBe(false);
+
+    await act(() => result.current.completeReAuthentication('m1'));
+    expect(props.selectInstituteMutation).toHaveBeenCalledWith('sel-token', 'm1');
+  });
+});
+
+describe('AuthProvider — refreshes take turns across tabs', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('waits for the browser lock and then refreshes with the token another tab just stored', async () => {
+    sessionStorage.clear();
+    localStorage.clear();
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-old');
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+
+    let releaseLock: () => void = () => {};
+    const request = vi.fn(
+      (_name: string, callback: () => Promise<unknown>) =>
+        new Promise((resolve, reject) => {
+          releaseLock = () => void callback().then(resolve, reject);
+        }),
+    );
+    vi.stubGlobal('navigator', { ...navigator, locks: { request } });
+
+    const props = makeDefaultProps();
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    let done: Promise<void> = Promise.resolve();
+    act(() => {
+      done = result.current.refreshSession();
+    });
+    expect(request).toHaveBeenCalledWith('roviq-token-refresh:institute', expect.any(Function));
+    expect(props.refreshMutation).not.toHaveBeenCalled();
+
+    // Another tab rotated the shared refresh token while this one waited.
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-from-other-tab');
+    await act(async () => {
+      releaseLock();
+      await done;
+    });
+
+    expect(props.refreshMutation).toHaveBeenCalledTimes(1);
+    expect(props.refreshMutation).toHaveBeenCalledWith('rt-from-other-tab');
   });
 });

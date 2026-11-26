@@ -29,6 +29,14 @@ interface AuthContextValue extends AuthState {
   markPasswordChangeRequired: () => void;
   login: (input: LoginInput) => Promise<void>;
   loginWithPasskey: () => Promise<void>;
+  /**
+   * Signs the same person back in from the session-expired dialog without leaving the page. A
+   * person of several institutes goes back into the one they were in; if it is not among their
+   * memberships any more, the outcome lists the institutes to choose from.
+   */
+  reAuthenticate: (input: LoginInput | 'passkey') => Promise<ReAuthOutcome>;
+  /** Finishes a re-authentication that returned `chooseInstitute`. */
+  completeReAuthentication: (membershipId: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   /**
@@ -44,6 +52,10 @@ interface AuthContextValue extends AuthState {
   notifyImpersonationEnded: () => void;
   clearImpersonationEnded: () => void;
 }
+
+export type ReAuthOutcome =
+  | { kind: 'signed-in' }
+  | { kind: 'chooseInstitute'; memberships: MembershipInfo[] };
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
@@ -131,6 +143,31 @@ export function AuthProvider({
   });
 
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshInFlightRef = React.useRef<{
+    refreshToken: string;
+    result: ReturnType<AuthProviderProps['refreshMutation']>;
+  } | null>(null);
+  // The server rotates the refresh token and treats a second use of the old one as theft,
+  // revoking every session. In this tab, callers holding the same token share one request.
+  // Across tabs (the refresh token is shared through localStorage) refreshes take turns under a
+  // browser lock and each reads the token again once it holds the lock, so a tab never sends a
+  // token another tab has just rotated.
+  const refreshOnce = React.useCallback(
+    (refreshToken: string) => {
+      const inFlight = refreshInFlightRef.current;
+      if (inFlight?.refreshToken === refreshToken) return inFlight.result;
+      const send = () => refreshMutation(tokenStorage.getRefreshToken() ?? refreshToken);
+      const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+      const result = (locks ? locks.request(`roviq-token-refresh:${scope}`, send) : send()).finally(
+        () => {
+          if (refreshInFlightRef.current?.result === result) refreshInFlightRef.current = null;
+        },
+      );
+      refreshInFlightRef.current = { refreshToken, result };
+      return result;
+    },
+    [refreshMutation, scope, tokenStorage],
+  );
   // True while the session comes only from storage: the server may have revoked it since.
   const unverifiedSessionRef = React.useRef(false);
   const prevTenantIdRef = React.useRef<string | undefined>(undefined);
@@ -179,7 +216,7 @@ export function AuthProvider({
           try {
             const refreshToken = tokenStorage.getRefreshToken();
             if (!refreshToken) return;
-            const result = await refreshMutation(refreshToken);
+            const result = await refreshOnce(refreshToken);
             tokenStorage.setTokens({
               accessToken: result.accessToken,
               refreshToken: result.refreshToken,
@@ -217,7 +254,7 @@ export function AuthProvider({
         // Invalid token, ignore
       }
     },
-    [refreshMutation, onAuthError, tokenStorage],
+    [refreshOnce, onAuthError, tokenStorage],
   );
 
   // Restore session on mount
@@ -264,7 +301,7 @@ export function AuthProvider({
       setMemberships(tokenStorage.getMemberships());
       scheduleRefresh(accessToken);
     } else if (refreshToken) {
-      refreshMutation(refreshToken)
+      refreshOnce(refreshToken)
         .then((result) => {
           tokenStorage.setTokens({
             accessToken: result.accessToken,
@@ -306,7 +343,7 @@ export function AuthProvider({
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [currentUserQuery, refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [currentUserQuery, refreshOnce, scheduleRefresh, tokenStorage]);
 
   const handleLoginResult = React.useCallback(
     async (result: LoginResult) => {
@@ -371,14 +408,10 @@ export function AuthProvider({
     });
   }, [tokenStorage]);
 
-  const selectInstitute = React.useCallback(
-    async (membershipId: string) => {
-      if (!pendingSelectionToken) {
-        clearAllState();
-        throw new AuthRequestError('Session expired', 'SESSION_EXPIRED');
-      }
-
-      const result = await selectInstituteMutation(pendingSelectionToken, membershipId).catch(
+  /** Exchanges a selection token for the session of one membership and stores it. */
+  const applySelection = React.useCallback(
+    async (selectionToken: string, membershipId: string) => {
+      const result = await selectInstituteMutation(selectionToken, membershipId).catch(
         (err: unknown) => {
           // The selection token is single-purpose and short-lived; once the
           // server rejects it the only way forward is a fresh login.
@@ -391,10 +424,6 @@ export function AuthProvider({
         refreshToken: result.refreshToken,
       });
       tokenStorage.setUser(result.user);
-      // Keep memberships in storage — needed by the institute switcher
-      // after page reload. Only clear the selection state.
-      setNeedsInstituteSelection(false);
-      setPendingSelectionToken(null);
       setState({
         user: result.user,
         tokens: {
@@ -406,7 +435,62 @@ export function AuthProvider({
       });
       scheduleRefresh(result.accessToken);
     },
-    [selectInstituteMutation, pendingSelectionToken, scheduleRefresh, clearAllState, tokenStorage],
+    [selectInstituteMutation, scheduleRefresh, clearAllState, tokenStorage],
+  );
+
+  const selectInstitute = React.useCallback(
+    async (membershipId: string) => {
+      if (!pendingSelectionToken) {
+        clearAllState();
+        throw new AuthRequestError('Session expired', 'SESSION_EXPIRED');
+      }
+      await applySelection(pendingSelectionToken, membershipId);
+      // Keep memberships in storage — needed by the institute switcher
+      // after page reload. Only clear the selection state.
+      setNeedsInstituteSelection(false);
+      setPendingSelectionToken(null);
+    },
+    [applySelection, pendingSelectionToken, clearAllState],
+  );
+
+  // The selection token of a dialog re-login waiting for the person to pick an institute. Kept
+  // out of `pendingSelectionToken` so the app does not navigate to the institute picker page.
+  const reAuthSelectionRef = React.useRef<string | null>(null);
+
+  const reAuthenticate = React.useCallback(
+    async (input: LoginInput | 'passkey'): Promise<ReAuthOutcome> => {
+      let result: LoginResult;
+      if (input === 'passkey') {
+        if (!passkeyLoginMutation) throw new Error('Passkey login is not configured');
+        result = await passkeyLoginMutation();
+      } else {
+        result = await loginMutation(input);
+      }
+      if (!(result.requiresInstituteSelection && result.memberships && result.selectionToken)) {
+        await handleLoginResult(result);
+        return { kind: 'signed-in' };
+      }
+      tokenStorage.setMemberships(result.memberships);
+      setMemberships(result.memberships);
+      const same = result.memberships.find((m) => m.tenantId === prevTenantIdRef.current);
+      if (same) {
+        await applySelection(result.selectionToken, same.membershipId);
+        return { kind: 'signed-in' };
+      }
+      reAuthSelectionRef.current = result.selectionToken;
+      return { kind: 'chooseInstitute', memberships: result.memberships };
+    },
+    [applySelection, handleLoginResult, loginMutation, passkeyLoginMutation, tokenStorage],
+  );
+
+  const completeReAuthentication = React.useCallback(
+    async (membershipId: string) => {
+      const selectionToken = reAuthSelectionRef.current;
+      if (!selectionToken) throw new AuthRequestError('Session expired', 'SESSION_EXPIRED');
+      await applySelection(selectionToken, membershipId);
+      reAuthSelectionRef.current = null;
+    },
+    [applySelection],
   );
 
   const switchInstitute = React.useCallback(
@@ -482,8 +566,8 @@ export function AuthProvider({
 
   const refreshSession = React.useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
-    if (!refreshToken) throw new Error('No refresh token');
-    const result = await refreshMutation(refreshToken).catch((err: unknown) => {
+    if (!refreshToken) throw new AuthRequestError('No refresh token', 'SESSION_EXPIRED');
+    const result = await refreshOnce(refreshToken).catch((err: unknown) => {
       // The server ended the session before the token ran out (revoked, account suspended).
       // Without this the page stays up showing empty data and no way to sign in again.
       if (isAppError(err, 'SESSION_EXPIRED')) setSessionExpired(true);
@@ -504,7 +588,7 @@ export function AuthProvider({
       isLoading: false,
     });
     scheduleRefresh(result.accessToken);
-  }, [refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [refreshOnce, scheduleRefresh, tokenStorage]);
 
   const verifySession = React.useCallback(async () => {
     if (typeof window !== 'undefined' && sessionStorage.getItem('roviq-impersonation-token')) {
@@ -517,7 +601,7 @@ export function AuthProvider({
       return false;
     }
     try {
-      const result = await refreshMutation(refreshToken);
+      const result = await refreshOnce(refreshToken);
       tokenStorage.setTokens({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
@@ -536,7 +620,7 @@ export function AuthProvider({
       clearAllState();
       return false;
     }
-  }, [clearAllState, refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [clearAllState, refreshOnce, scheduleRefresh, tokenStorage]);
 
   const getAccessToken = React.useCallback(() => {
     // Prefer impersonation token if present (sessionStorage, dies with tab)
@@ -657,6 +741,8 @@ export function AuthProvider({
       markPasswordChangeRequired,
       login,
       loginWithPasskey,
+      reAuthenticate,
+      completeReAuthentication,
       logout,
       refreshSession,
       verifySession,
@@ -685,6 +771,8 @@ export function AuthProvider({
       markPasswordChangeRequired,
       login,
       loginWithPasskey,
+      reAuthenticate,
+      completeReAuthentication,
       logout,
       refreshSession,
       verifySession,

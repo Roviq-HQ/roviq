@@ -12,6 +12,8 @@ import {
 } from '@web/components/display-settings/display-settings-context';
 import { ImpersonationBannerView } from '@web/components/impersonation/impersonation-banner';
 import { useImpersonationSession } from '@web/components/impersonation/use-impersonation-session';
+import { LiveConnectionIndicator } from '@web/components/live-updates/live-connection-indicator';
+import { LiveUpdatesBanner } from '@web/components/live-updates/live-updates-banner';
 import { NotificationBell } from '@web/components/notifications/notification-bell';
 import { useRoleName } from '@web/hooks/use-role-name';
 import {
@@ -286,6 +288,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     logoutLabel: impersonation.active ? tAuth('exitImpersonation') : undefined,
     instituteSwitcher,
     notificationBell: <NotificationBell />,
+    connectionIndicator: <LiveConnectionIndicator />,
     quickActions: [
       {
         id: 'display-settings',
@@ -450,7 +453,10 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           <AdminLayout
             config={config}
             banner={
-              impersonation.active ? <ImpersonationBannerView session={impersonation} /> : undefined
+              <>
+                {impersonation.active && <ImpersonationBannerView session={impersonation} />}
+                <LiveUpdatesBanner />
+              </>
             }
           >
             {children}

@@ -8,6 +8,7 @@ export {
   classifyClientError,
   extractErrorCode,
   isAppError,
+  isRefreshRefused,
   resolveAuthErrorMessage,
 } from './lib/error-utils';
 export { checkIsImpersonated, decodeJwt, isTokenExpired } from './lib/jwt-decode';

@@ -8,6 +8,8 @@ import {
   DisplaySettingsProvider,
   useDisplaySettings,
 } from '@web/components/display-settings/display-settings-context';
+import { LiveConnectionIndicator } from '@web/components/live-updates/live-connection-indicator';
+import { LiveUpdatesBanner } from '@web/components/live-updates/live-updates-banner';
 import { NotificationBell } from '@web/components/notifications/notification-bell';
 import {
   Activity,
@@ -104,6 +106,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     user: user ? { username: user.username, email: user.email } : undefined,
     onLogout: signOut,
     notificationBell: <NotificationBell />,
+    connectionIndicator: <LiveConnectionIndicator />,
     quickActions: [
       {
         id: 'display-settings',
@@ -157,7 +160,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AbilityProvider rules={user?.abilityRules ?? []}>
-      <AdminLayout config={config}>{children}</AdminLayout>
+      <AdminLayout config={config} banner={<LiveUpdatesBanner />}>
+        {children}
+      </AdminLayout>
     </AbilityProvider>
   );
 }

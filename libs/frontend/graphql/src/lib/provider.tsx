@@ -3,7 +3,12 @@
 import { ApolloProvider as BaseApolloProvider } from '@apollo/client/react';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { createApolloClient } from './client';
+import { bindBrowserConnectivity, createApolloClient } from './client';
+import {
+  createLiveConnection,
+  type LiveConnection,
+  type LiveConnectionState,
+} from './live-connection';
 
 interface GraphQLProviderProps {
   httpUrl: string;
@@ -42,9 +47,14 @@ export function GraphQLProvider({
   const labelsRef = React.useRef(networkErrorLabels);
   labelsRef.current = networkErrorLabels;
   const clientRef = React.useRef<ReturnType<typeof createApolloClient> | null>(null);
+  const liveRef = React.useRef<LiveConnection | null>(null);
 
   if (!clientRef.current) {
+    liveRef.current = createLiveConnection(
+      typeof navigator === 'undefined' ? true : navigator.onLine,
+    );
     clientRef.current = createApolloClient({
+      live: liveRef.current,
       httpUrl,
       wsUrl,
       getAccessToken,
@@ -63,5 +73,53 @@ export function GraphQLProvider({
     });
   }
 
-  return <BaseApolloProvider client={clientRef.current}>{children}</BaseApolloProvider>;
+  React.useEffect(() => {
+    const live = liveRef.current;
+    if (!live) return;
+    return bindBrowserConnectivity(window, live);
+  }, []);
+
+  return (
+    <LiveConnectionContext.Provider value={liveRef.current}>
+      <BaseApolloProvider client={clientRef.current}>{children}</BaseApolloProvider>
+    </LiveConnectionContext.Provider>
+  );
+}
+
+export interface LiveConnectionHandle extends LiveConnectionState {
+  /** Connects now instead of waiting for the next retry. */
+  reconnectNow: () => void;
+  /** Restarts live updates that stopped when the session ended. */
+  resume: () => void;
+  /** Tells the connection the screen was just reloaded, so the next reconnect does not again. */
+  noteRefetched: () => void;
+}
+
+const IDLE: LiveConnectionState = { status: 'idle', failedAttempts: 0 };
+const noop = () => {};
+
+/** State of the live-updates socket. Outside a `GraphQLProvider` it stays idle. */
+export function useLiveConnection(): LiveConnectionHandle {
+  const live = React.useContext(LiveConnectionContext);
+  const state = React.useSyncExternalStore(
+    live?.subscribe ?? subscribeNever,
+    live?.getSnapshot ?? getIdle,
+    getIdle,
+  );
+  return {
+    ...state,
+    reconnectNow: live?.reconnectNow ?? noop,
+    resume: live?.resume ?? noop,
+    noteRefetched: live ? () => void live.claimRefetch() : noop,
+  };
+}
+
+const LiveConnectionContext = React.createContext<LiveConnection | null>(null);
+
+function subscribeNever() {
+  return noop;
+}
+
+function getIdle() {
+  return IDLE;
 }
