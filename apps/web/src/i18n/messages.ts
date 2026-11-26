@@ -31,6 +31,7 @@ import enInstituteBilling from '../../messages/en/instituteBilling.json';
 import enInstituteGroups from '../../messages/en/instituteGroups.json';
 import enInstituteSettings from '../../messages/en/instituteSettings.json';
 import enLeave from '../../messages/en/leave.json';
+import enLiveUpdates from '../../messages/en/liveUpdates.json';
 import enLocale from '../../messages/en/locale.json';
 import enNav from '../../messages/en/nav.json';
 import enNotificationDelivery from '../../messages/en/notificationDelivery.json';
@@ -83,6 +84,7 @@ import hiInstituteBilling from '../../messages/hi/instituteBilling.json';
 import hiInstituteGroups from '../../messages/hi/instituteGroups.json';
 import hiInstituteSettings from '../../messages/hi/instituteSettings.json';
 import hiLeave from '../../messages/hi/leave.json';
+import hiLiveUpdates from '../../messages/hi/liveUpdates.json';
 import hiLocale from '../../messages/hi/locale.json';
 import hiNav from '../../messages/hi/nav.json';
 import hiNotificationDelivery from '../../messages/hi/notificationDelivery.json';
@@ -139,6 +141,7 @@ const en = {
   instituteGroups: enInstituteGroups,
   instituteSettings: enInstituteSettings,
   leave: enLeave,
+  liveUpdates: enLiveUpdates,
   locale: enLocale,
   nav: enNav,
   notificationDelivery: enNotificationDelivery,
@@ -194,6 +197,7 @@ const hi = {
   instituteGroups: hiInstituteGroups,
   instituteSettings: hiInstituteSettings,
   leave: hiLeave,
+  liveUpdates: hiLiveUpdates,
   locale: hiLocale,
   nav: hiNav,
   notificationDelivery: hiNotificationDelivery,

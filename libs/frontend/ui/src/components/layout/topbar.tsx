@@ -197,6 +197,7 @@ export function Topbar({
       </div>
       <div className="ms-auto flex shrink-0 items-center gap-1">
         <QuickActionsButton onClick={onOpenQuickActions} />
+        {config.connectionIndicator}
         {config.notificationBell}
         <ThemeToggle />
         <div className="hidden xl:block">

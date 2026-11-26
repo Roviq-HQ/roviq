@@ -1,0 +1,24 @@
+{
+  "reconnecting": {
+    "title": "Live updates paused.",
+    "description": "This page stopped receiving changes made by others, so what you see may be out of date. Reconnecting now; this message goes away once live updates are back.",
+    "stillFailing": "Still not connected after {count} attempts. Check this device's internet connection, then press Reconnect."
+  },
+  "offline": {
+    "title": "You're offline.",
+    "description": "This device lost its internet connection. Pages show what was loaded before, and changes cannot be saved. Check Wi-Fi or mobile data; this message goes away when you're back online."
+  },
+  "sessionEnded": {
+    "title": "Live updates stopped.",
+    "description": "Your sign-in ended, so this page no longer receives changes made by others. Sign in again, or press Reconnect. Live updates start again once you're signed in."
+  },
+  "reconnect": "Reconnect",
+  "reconnectTitle": "Connect to live updates now instead of waiting",
+  "indicator": {
+    "connected": "Live updates on",
+    "connecting": "Connecting to live updates",
+    "reconnecting": "Live updates paused, reconnecting",
+    "offline": "Offline: no internet connection",
+    "sessionEnded": "Live updates stopped: sign in again"
+  }
+}
