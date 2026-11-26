@@ -410,15 +410,6 @@ describe('AuthProvider — impersonation', () => {
   });
 });
 
-// ── ImpersonationBanner component ─────────────────────────────────────────────
-
-describe('ImpersonationBanner', () => {
-  it.todo('renders banner when isImpersonated is true (component not yet found in codebase)');
-  it.todo('hides banner when not impersonating');
-  it.todo('shows exit impersonation button that calls notifyImpersonationEnded');
-  it.todo('shows impersonator name in the banner');
-});
-
 describe('account language preference', () => {
   beforeEach(() => {
     localStorage.clear();

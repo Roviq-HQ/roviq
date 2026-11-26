@@ -15,15 +15,8 @@
  *  - Scope rejection: institute token cannot create a subscription plan
  *  - Gateway payment: an institute verifies its own order (stub gateway), not another's
  *
- * Left as `it.todo()` with rationale:
- *  - Webhook idempotency (needs a signed webhook payload specific to
- *    Razorpay/Cashfree adapters)
- *  - Reseller deletion cleanup (not yet implemented as a domain mutation)
- *  - Suspension/reactivation flow end-to-end (requires triggering the NATS
- *    `BILLING.subscription.cancelled` handler + institute suspension — crosses
- *    module boundaries and is best exercised via the e2e layer)
- *  - Plan change proration (exercised at the service unit-test layer; the
- *    integration test here would just re-verify the same arithmetic)
+ * Covered elsewhere: webhook replay (`billing.api-e2e.spec.ts`), reseller deletion cleanup
+ * (`billing-activities.integration.spec.ts`), proration arithmetic (`subscription.service.spec.ts`).
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
@@ -854,20 +847,6 @@ describe('Billing Integration', () => {
     });
   });
 
-  describe('Webhook idempotency', () => {
-    // Webhook controllers parse provider-specific signed payloads. Best
-    // exercised via the adapter-level unit tests (already green) plus an
-    // e2e-api test that POSTs to `/api/webhook/razorpay` with a real body.
-    it.todo('duplicate webhook with same gatewayPaymentId creates only one payment');
-  });
-
-  describe('Reseller deletion cleanup', () => {
-    // `deleteReseller` is not yet exposed as a domain mutation — the reseller
-    // lifecycle is managed at the platform scope and has no corresponding
-    // billing-side cleanup resolver to integration-test yet.
-    it.todo('transfers subscriptions, deactivates plans+configs, preserves invoices');
-  });
-
   describe('Billing suspension/reactivation', () => {
     // The suspend path is triggered by a NATS event consumer
     // (`BillingEventConsumer.onModuleInit` subscribes to
@@ -876,12 +855,5 @@ describe('Billing Integration', () => {
     // of the consumer — both cross the module boundary and belong in a
     // dedicated consumer test.
     it.todo('cancel subscription → institute suspended → pay → reactivated');
-  });
-
-  describe('Plan change proration', () => {
-    // Proration arithmetic lives in `SubscriptionService.changePlan` and has
-    // full coverage at the unit-test layer. An integration test would not
-    // exercise additional integration surface (no new RLS, no new guards).
-    it.todo('mid-cycle plan change generates correct proration line item');
   });
 });
