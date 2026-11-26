@@ -30,7 +30,7 @@ export class ApplicationResolver {
   ) {}
 
   @Query(() => ApplicationConnection, { description: 'List applications with filters' })
-  @CheckAbility({ action: 'read', subject: 'Application' })
+  @CheckAbility({ action: 'read', subject: 'Application', rows: 'scoped' })
   async listApplications(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: ApplicationFilterInput,
@@ -39,7 +39,7 @@ export class ApplicationResolver {
   }
 
   @Query(() => ApplicationModel, { description: 'Get application by ID' })
-  @CheckAbility({ action: 'read', subject: 'Application' })
+  @CheckAbility({ action: 'read', subject: 'Application', rows: 'scoped' })
   async getApplication(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -48,7 +48,7 @@ export class ApplicationResolver {
   }
 
   @Query(() => AdmissionStatisticsModel, { description: 'Admission funnel statistics' })
-  @CheckAbility({ action: 'read', subject: 'Application' })
+  @CheckAbility({ action: 'read', subject: 'Application', rows: 'scoped' })
   async admissionStatistics(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: AdmissionStatisticsFilterInput,
@@ -121,7 +121,7 @@ export class ApplicationResolver {
       );
     },
   })
-  @CheckAbility({ action: 'read', subject: 'Application' })
+  @CheckAbility({ action: 'read', subject: 'Application', rows: 'scoped' })
   applicationStatusChanged() {
     return pubSub.asyncIterableIterator('APPLICATION.status_changed');
   }

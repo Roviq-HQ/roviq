@@ -54,7 +54,7 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, between, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { ExaminationRepository } from './examination.repository';
-import { reportCardInstanceInScope } from './report-card-scope';
+import { reportCardInScope, reportCardInstanceInScope } from './report-card-scope';
 import type {
   AttendanceTally,
   CoScholasticAreaRecord,
@@ -1386,13 +1386,31 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
     }).catch(mapUniqueViolation(REPORT_CARD_TAKEN));
   }
 
-  async listReportCards(academicYearId: string): Promise<ReportCardRecord[]> {
+  async listReportCards(academicYearId: string, ability: AppAbility): Promise<ReportCardRecord[]> {
     return withTenant(this.db, this.ctx(), async (tx) => {
       return tx
         .select()
         .from(reportCardsLive)
-        .where(eq(reportCardsLive.academicYearId, academicYearId))
+        .where(
+          and(
+            eq(reportCardsLive.academicYearId, academicYearId),
+            reportCardInScope(ability, reportCardsLive.id),
+          ),
+        )
         .orderBy(desc(reportCardsLive.createdAt)) as Promise<ReportCardRecord[]>;
+    });
+  }
+
+  async findReadableReportCardById(
+    id: string,
+    ability: AppAbility,
+  ): Promise<ReportCardRecord | null> {
+    return withTenant(this.db, this.ctx(), async (tx) => {
+      const rows = await tx
+        .select()
+        .from(reportCardsLive)
+        .where(and(eq(reportCardsLive.id, id), reportCardInScope(ability, reportCardsLive.id)));
+      return (rows[0] as ReportCardRecord | undefined) ?? null;
     });
   }
 

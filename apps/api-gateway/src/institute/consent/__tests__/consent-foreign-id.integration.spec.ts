@@ -260,7 +260,7 @@ describe('consent: a student of another institute (ROV-293)', () => {
   });
 
   // ROV-217: a parent's consent rule covers only their linked children.
-  it("consentStatusForStudent should answer a parent for their own child and refuse another family's", async () => {
+  it("consentStatusForStudent, grantConsent, withdrawConsent and myConsentStatus should answer a parent for their own child and refuse another family's", async () => {
     const { parentToken, ownChildId, otherChildId } = await asAdmin(async (tx) => {
       const [parentRole] = await tx
         .insert(roles)
@@ -307,6 +307,39 @@ describe('consent: a student of another institute (ROV-293)', () => {
     });
     expect(other.errors?.[0]?.extensions?.code).toBe(ErrorCode.FORBIDDEN);
     expect(other.data).toBeNull();
+
+    // grantConsent, withdrawConsent and myConsentStatus follow the same family line.
+    const consentsFor = (studentProfileId: string) =>
+      asAdmin((tx) =>
+        tx
+          .select({ id: consentRecords.id })
+          .from(consentRecords)
+          .where(eq(consentRecords.studentProfileId, studentProfileId)),
+      );
+    const otherBefore = await consentsFor(otherChildId);
+    for (const query of [GRANT, WITHDRAW]) {
+      const refused = await gqlRequest(result.httpServer, {
+        query,
+        variables: { studentProfileId: otherChildId },
+        token: parentToken,
+      });
+      expect(refused.errors?.[0]?.extensions?.code).toBe(ErrorCode.FORBIDDEN);
+      expect(refused.data).toBeNull();
+    }
+    expect(await consentsFor(otherChildId)).toEqual(otherBefore);
+
+    const granted = await gqlRequest(result.httpServer, {
+      query: GRANT,
+      variables: { studentProfileId: ownChildId },
+      token: parentToken,
+    });
+    expect(granted.errors).toBeUndefined();
+    const mine = await gqlRequest<{ myConsentStatus: { studentProfileId: string }[] }>(
+      result.httpServer,
+      { query: '{ myConsentStatus { studentProfileId purpose } }', token: parentToken },
+    );
+    expect(mine.errors).toBeUndefined();
+    expect(mine.data?.myConsentStatus.map((row) => row.studentProfileId)).toEqual([ownChildId]);
   });
 
   it('grantConsent refuses a purpose in the old lowercase form before writing (ROV-227)', async () => {

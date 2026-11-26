@@ -36,6 +36,8 @@ const INSTANCE = `query ($reportCardId: ID!, $studentProfileId: ID!) {
   reportCardInstance(reportCardId: $reportCardId, studentProfileId: $studentProfileId) { id }
 }`;
 const PDF = 'query ($id: ID!) { reportCardPdf(instanceId: $id) }';
+const CARDS = 'query ($yearId: ID!) { reportCards(academicYearId: $yearId) { id } }';
+const CARD = 'query ($id: ID!) { reportCard(id: $id) { id } }';
 
 describe('report cards: a student and a parent read only their own (ROV-217)', () => {
   let result: IntegrationAppResult;
@@ -178,6 +180,39 @@ describe('report cards: a student and a parent read only their own (ROV-217)', (
     expect(await instanceIds(fx.generatedCardId, token())).toEqual([]);
   });
 
+  it('should list every report card of the year to staff who manage them', async () => {
+    const res = await ask<{ reportCards: { id: string }[] }>(
+      CARDS,
+      { yearId: fx.yearId },
+      staffToken,
+    );
+    expect(res.errors).toBeUndefined();
+    expect(res.data?.reportCards.map((row) => row.id).sort()).toEqual(
+      [fx.draftCardId, fx.generatedCardId, fx.spareCardId].sort(),
+    );
+  });
+
+  it.each([
+    ['student', () => studentToken],
+    ['parent', () => parentToken],
+  ])('should list to a %s only the report card that holds a published card of their own student', async (_who, token) => {
+    const res = await ask<{ reportCards: { id: string }[] }>(CARDS, { yearId: fx.yearId }, token());
+    expect(res.errors).toBeUndefined();
+    expect(res.data?.reportCards.map((row) => row.id)).toEqual([fx.draftCardId]);
+  });
+
+  it.each([
+    ['student', () => studentToken],
+    ['parent', () => parentToken],
+  ])('should refuse a %s a report card with no published card of their own student', async (_who, token) => {
+    const own = await ask<{ reportCard: { id: string } }>(CARD, { id: fx.draftCardId }, token());
+    expect(own.data?.reportCard.id).toBe(fx.draftCardId);
+
+    const refused = await ask(CARD, { id: fx.generatedCardId }, token());
+    expect(refused.errors?.[0]?.extensions?.code).toBe(ErrorCode.REPORT_CARD_NOT_FOUND);
+    expect(refused.data).toBeNull();
+  });
+
   it.each([
     ['student', () => studentToken],
     ['parent', () => parentToken],
@@ -212,5 +247,17 @@ describe('report cards: a student and a parent read only their own (ROV-217)', (
       expect(refused.errors?.[0]?.extensions?.code).toBe(ErrorCode.REPORT_CARD_NOT_FOUND);
       expect(refused.data).toBeNull();
     }
+  });
+
+  it('should answer myReportCards with the published cards of the signed-in student only', async () => {
+    const MINE = '{ myReportCards { id } }';
+    const own = await ask<{ myReportCards: { id: string }[] }>(MINE, {}, studentToken);
+    expect(own.errors).toBeUndefined();
+    expect(own.data?.myReportCards.map((row) => row.id)).toEqual([ownPublished]);
+
+    // A parent is not a student: the query reads the caller's own student profile.
+    const parent = await ask<{ myReportCards: { id: string }[] }>(MINE, {}, parentToken);
+    expect(parent.errors).toBeUndefined();
+    expect(parent.data?.myReportCards).toEqual([]);
   });
 });

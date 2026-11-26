@@ -36,9 +36,11 @@ import {
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
+import { AdmissionQueryService } from '../institute/admission/admission-query.service';
+import { StudentQueryService } from '../institute/student/student-query.service';
 
 interface Actor extends TestTeacher {
   token: string;
@@ -81,6 +83,17 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
   let limitedAdmissions: Actor;
   let hiddenApplicationId: string;
   let enquiryId: string;
+
+  /** The request user the JWT strategy builds for this actor, for code called outside HTTP. */
+  const authUser = (who: Actor) => ({
+    _scope: 'institute' as const,
+    scope: 'institute' as const,
+    type: 'access' as const,
+    userId: who.userId,
+    tenantId: tenant.tenantId,
+    membershipId: who.membershipId,
+    roleId: who.roleId,
+  });
 
   async function actor(
     role: DefaultRole,
@@ -526,6 +539,49 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
       edges: [{ node: { id: enquiryId } }],
     });
   });
+  it('applies conditional admission access to admissionStatistics, listApplicationDocuments and the enquiryCreated and applicationStatusChanged events', async () => {
+    const stats = await gqlRequest<{
+      admissionStatistics: { totalEnquiries: number; totalApplications: number };
+    }>(app.httpServer, {
+      token: limitedAdmissions.token,
+      query: '{ admissionStatistics { totalEnquiries totalApplications } }',
+    });
+    expect(stats.errors).toBeUndefined();
+    expect(stats.data?.admissionStatistics).toEqual({ totalEnquiries: 1, totalApplications: 1 });
+
+    const DOCUMENTS = 'query($id: ID!) { listApplicationDocuments(applicationId: $id) { id } }';
+    const own = await gqlRequest(app.httpServer, {
+      token: limitedAdmissions.token,
+      query: DOCUMENTS,
+      variables: { id: applicationId },
+    });
+    expect(own.errors).toBeUndefined();
+    const hidden = await gqlRequest(app.httpServer, {
+      token: limitedAdmissions.token,
+      query: DOCUMENTS,
+      variables: { id: hiddenApplicationId },
+    });
+    expect(hidden.errors?.map((error) => error.message)).toEqual(['Application not found']);
+    expect(hidden.data).toBeNull();
+
+    const [hiddenEnquiry] = await withAdmin(
+      app.db,
+      mkAdminCtx('test:student-read-authorization'),
+      (tx) =>
+        tx
+          .select({ id: enquiries.id })
+          .from(enquiries)
+          .where(and(eq(enquiries.tenantId, tenant.tenantId), ne(enquiries.id, enquiryId))),
+    );
+    assert(hiddenEnquiry);
+    const queries = app.app.get(AdmissionQueryService);
+    const context = () => ({ req: { user: authUser(limitedAdmissions) } });
+    expect(await queries.filterEvent(applicationId, 'Application', context())).toBe(true);
+    expect(await queries.filterEvent(hiddenApplicationId, 'Application', context())).toBe(false);
+    expect(await queries.filterEvent(enquiryId, 'Enquiry', context())).toBe(true);
+    expect(await queries.filterEvent(hiddenEnquiry.id, 'Enquiry', context())).toBe(false);
+  });
+
   it('masks sensitive fields in mutation responses', async () => {
     const current = await gqlRequest<{ getStudent: { version: number } }>(app.httpServer, {
       token: principal.token,
@@ -643,6 +699,16 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
           currentSectionName: null,
         })),
     );
+  });
+
+  it('delivers studentUpdated and studentsInTenantUpdated events only for students the caller may read', async () => {
+    const queries = app.app.get(StudentQueryService);
+    const context = (who: Actor) => ({ req: { user: authUser(who) } });
+    for (const who of [teacher, student, parent]) {
+      expect(await queries.filterEvent(studentIds[0], context(who))).toBe(true);
+      expect(await queries.filterEvent(studentIds[1], context(who))).toBe(false);
+    }
+    expect(await queries.filterEvent(studentIds[1], context(principal))).toBe(true);
   });
 
   it('revokes parent visibility as soon as the guardian link is removed', async () => {

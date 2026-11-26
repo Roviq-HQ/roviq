@@ -36,7 +36,7 @@ export class GuardianResolver {
   @Query(() => [GuardianModel], {
     description: 'List all guardians in this institute, with optional free-text search',
   })
-  @CheckAbility({ action: 'read', subject: 'Guardian' })
+  @CheckAbility({ action: 'read', subject: 'Guardian', rows: 'scoped' })
   async listGuardians(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: ListGuardiansFilterInput,
@@ -48,7 +48,7 @@ export class GuardianResolver {
     description:
       'List students linked to a single guardian, with resolved class/section + link metadata. Used by the Linked Children tab on the guardian detail page.',
   })
-  @CheckAbility({ action: 'read', subject: 'Guardian' })
+  @CheckAbility({ action: 'read', subject: 'Guardian', rows: 'scoped' })
   async listLinkedStudents(
     @Args('guardianProfileId', { type: () => ID }) guardianProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -60,7 +60,7 @@ export class GuardianResolver {
     description:
       'List guardians linked to a single student, with relationship and contact metadata. Used by the Guardians tab on the student detail page.',
   })
-  @CheckAbility({ action: 'read', subject: 'Guardian' })
+  @CheckAbility({ action: 'read', subject: 'Guardian', rows: 'scoped' })
   async listStudentGuardians(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -69,7 +69,7 @@ export class GuardianResolver {
   }
 
   @Query(() => GuardianModel, { description: 'Get a guardian by ID' })
-  @CheckAbility({ action: 'read', subject: 'Guardian' })
+  @CheckAbility({ action: 'read', subject: 'Guardian', rows: 'scoped' })
   async getGuardian(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,

@@ -17,6 +17,18 @@ export function reportCardInstanceInScope(
   ability: AppAbility,
   instanceId: AnyColumn,
 ): SQL | undefined {
+  return instanceInScope(ability, scopeInstance.id, instanceId);
+}
+
+/**
+ * True for the report cards the ability may read. A restricted ability reads a report card
+ * only through an instance it may read; undefined when the ability is unrestricted.
+ */
+export function reportCardInScope(ability: AppAbility, reportCardId: AnyColumn): SQL | undefined {
+  return instanceInScope(ability, scopeInstance.reportCardId, reportCardId);
+}
+
+function instanceInScope(ability: AppAbility, key: AnyColumn, value: AnyColumn): SQL | undefined {
   const allowed = caslToSqlWhere(ability, 'read', 'ReportCard', {
     id: scopeInstance.id,
     tenantId: scopeInstance.tenantId,
@@ -33,6 +45,6 @@ export function reportCardInstanceInScope(
       .select({ one: sql`1` })
       .from(scopeInstance)
       .innerJoin(scopeStudent, eq(scopeStudent.id, scopeInstance.studentProfileId))
-      .where(and(eq(scopeInstance.id, instanceId), allowed)),
+      .where(and(eq(key, value), allowed)),
   );
 }

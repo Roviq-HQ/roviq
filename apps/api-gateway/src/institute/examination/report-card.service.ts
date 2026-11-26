@@ -40,8 +40,14 @@ export class ReportCardService {
     return this.repo.updateReportCard(id, data);
   }
 
-  listReportCards(academicYearId: string): Promise<ReportCardRecord[]> {
-    return this.repo.listReportCards(academicYearId);
+  listReportCards(academicYearId: string, ability: AppAbility): Promise<ReportCardRecord[]> {
+    return this.repo.listReportCards(academicYearId, ability);
+  }
+
+  async getReadableReportCard(id: string, ability: AppAbility): Promise<ReportCardRecord> {
+    const card = await this.repo.findReadableReportCardById(id, ability);
+    if (!card) throw new BusinessException(ErrorCode.REPORT_CARD_NOT_FOUND, `Report card ${id}`);
+    return card;
   }
 
   async getReportCard(id: string): Promise<ReportCardRecord> {

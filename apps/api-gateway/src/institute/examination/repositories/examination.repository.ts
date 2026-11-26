@@ -153,7 +153,17 @@ export abstract class ExaminationRepository {
     id: string,
     data: Partial<CreateReportCardData>,
   ): Promise<ReportCardRecord>;
-  abstract listReportCards(academicYearId: string): Promise<ReportCardRecord[]>;
+  /** The year's report cards the ability may read. */
+  abstract listReportCards(
+    academicYearId: string,
+    ability: AppAbility,
+  ): Promise<ReportCardRecord[]>;
+  /** A report card the ability may read; null when it is missing or outside the ability. */
+  abstract findReadableReportCardById(
+    id: string,
+    ability: AppAbility,
+  ): Promise<ReportCardRecord | null>;
+  /** For callers that manage report cards: no row rule is applied. */
   abstract findReportCardById(id: string): Promise<ReportCardRecord | null>;
   abstract setReportCardStatus(id: string, status: ReportCardStatus): Promise<ReportCardRecord>;
   abstract softDeleteReportCard(id: string): Promise<void>;

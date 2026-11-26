@@ -110,6 +110,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - `mk*Ctx()` only in workflow activities, seeders, event-consumer repos, integration fixtures (`pnpm check:synthetic-context-usage`)
 - `ability.can()`, never role checks · scope decorators at class level, not `APP_GUARD` · `GqlAuthGuard` from `@roviq/auth-backend`
 - Every `@CheckAbility` pair must be reachable by a role, every grant used (`ability-coverage.spec.ts`)
+- An operation that applies a role's row condition declares `rows: 'scoped'` on `@CheckAbility` and is listed in `row-scope-coverage.ts`; without it the guard refuses a conditional role (`row-scope-coverage.spec.ts`)
 - Reads from `<table>Live` views, writes to the base table · new soft-deletable table needs a `*Live` view, every `pgTable` needs RLS · ``.default(sql`uuidv7()`)``
 - A schema change reaches a database only through a generated migration; an index, foreign key or unique rule the schema can express is declared there, not in custom SQL (`pnpm check:migrations`)
 - An alert on one event reads a gauge, never `increase()` or `rate()` of a counter: a series born at 1 has no increase, so the first event after a restart is lost

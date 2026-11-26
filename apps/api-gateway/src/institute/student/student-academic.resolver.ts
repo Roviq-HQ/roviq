@@ -27,7 +27,7 @@ export class StudentAcademicResolver {
     description:
       'Year-by-year academic history for a single student (Academics tab on detail page).',
   })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   async listStudentAcademics(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
