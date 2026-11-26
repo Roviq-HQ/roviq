@@ -10,5 +10,5 @@ description: Use when fixing a bug, investigating a test failure, or diagnosing 
 3. **Write the failing test first** when the bug can be shown in a test, and watch it fail for the right reason.
 4. **Fix the cause** with the smallest change that is a proper fix. No workaround, no nearby clean-up. If the proper fix is large, say so and propose it.
 5. **Verify**: the new test passes, the spec files around the change pass, `pnpm lint:fix` is clean, and the flow works in the browser.
-6. **Commit it on its own**, apart from any feature work. A fix to test tooling also gets an entry in `docs/changelogs/testing-troubleshooting.md`; a security bug gets an entry in the Linear "Security Findings Log".
+6. **Commit it on its own**, apart from any feature work. A fix to test tooling also gets an entry in `docs/changelogs/testing-troubleshooting.md`; a security bug gets an entry in the Linear "Security Findings Log", and its commit, branch and pull request say what changes, never what was wrong ([SECPV]).
 7. **Report** the cause, the fix and the test in three lines.

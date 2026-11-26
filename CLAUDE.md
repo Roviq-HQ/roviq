@@ -5,6 +5,7 @@ Multi-tenant institute management SaaS. Users are "Roviqians", usernames are "Ro
 - **Say "institute", never "school" or "organization"**, everywhere: code, comments, docs, UI, Linear. The infra word is **"tenant"** (`tenant_id`, RLS, `withTenant()`, JWT claims, NATS headers).
 - **Not in production yet.** You may reset the database, alter any migration, and rewrite code written by older models to cut bugs, tighten security or reduce debt. Use that freedom inside the issue you are working on; a rewrite or redesign that no issue asks for is a proposal to the user first.
 - **Linear issues and this repository are public.** Hosting, provider, cost and backup details go in a Linear document, never in an issue, a comment, a commit or `docs/`.
+- **Security findings stay out of everything public**: an issue, a comment, a commit, a branch or migration name, a pull request and `docs/`. None of them describes a vulnerability, names an `SF-NNN` entry or gives steps to exploit one. The detail lives in the Linear document "Security Findings Log" and in private plan documents; the public title says what changes, not what was wrong. A fixed finding may be described once its fix is merged, and after launch once it is deployed.
 - **No personal information in anything public**: an issue, a comment, a commit, a pull request or `docs/`. That covers a person's name, e-mail, phone and location, and the developer's own computer: its hardware, memory, paths, user name and what else runs on it. Say "the development machine" and give the setting, not the measurement.
 
 ## What to work on
@@ -65,6 +66,7 @@ Full text of a rule: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules.m
 - [LNFST] Linear first. See "What to work on".
 - [PXERR] A pre-existing bug is fixed now, in its own commit; a bigger one is raised with the user.
 - [SECLG] Every security finding is appended to the Linear document "Security Findings Log" as an `SF-NNN` entry. Append only; a status change is a new entry. Read it before a security review.
+- [SECPV] A security finding is written only in Linear documents. Issue, commit, branch, migration and pull request names are neutral and carry no `SF-NNN`.
 - [RSBFC] Stuck on a library or an error? Look it up (web search and Context7, both) before wrapping it in try-catch.
 - [NTESC] No `any`, `as unknown`, `as never`.
 - [NTLSA] Never weaken an assertion to make a test pass: fix the fixture.
