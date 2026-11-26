@@ -183,6 +183,15 @@ reads the same value. Tenant context and audit consumers use this request value.
 - Condition placeholders (`${user.id}`, `${user.tenantId}`) resolved at request time
 - Same `AppAction`/`AppSubject` types shared between backend and frontend via `@roviq/common-types`
 
+### Response scope check
+
+A last check after the guards, RLS and the ability rules, in case one of them is wrong. `ResponseScopeInterceptor` (`apps/api-gateway/src/common/response-scope/`) is a global interceptor on every root query and mutation. When the caller is institute scope it walks the value the resolver returned and compares every `tenantId` / `tenant_id` in it with the caller's institute; for a reseller caller it compares every `resellerId` / `reseller_id` with the caller's reseller. It reads the resolver's value, not the GraphQL response, so a column the client did not select is checked too.
+
+- A mismatch is logged at error level with the operation, the caller's scope and the two ids (no row data), counted in the gauge `api_foreign_scope_responses_recent` (label `scope`, the last 15 minutes of this process, 0 included), and refused with `INTERNAL_ERROR`. The alert `api_foreign_scope_response` reads the gauge; its runbook is [A response was refused by the scope check](runbooks/response-scope-check.md).
+- `RESPONSE_SCOPE_CHECK` sets the mode: `refuse` (default, in every environment), `report` (log and count, still send) or `off`.
+- Not checked: platform callers, an institute caller's `resellerId`, a reseller caller's `tenantId` (it reads many institutes), field resolvers, subscriptions, and anything beyond 8 levels or 50,000 objects of one result (a warning is logged when a result is cut short). A refused mutation has already committed its write.
+- `FOREIGN_SCOPE_ALLOWED` (`response-scope.allowlist.ts`) names root operations that may carry a foreign id, each with its reason. Its one entry is `switchInstitute`, which answers with the caller's own session in the institute being switched to. An entry switches the check off for that operation and needs a security review.
+
 ### NestJS Build: @nx/js:tsc (not webpack)
 
 - NestJS apps use `@nx/js:tsc` executor for builds

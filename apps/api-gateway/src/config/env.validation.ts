@@ -86,6 +86,8 @@ const envSchema = z
     FILE_SCANNER: z.enum(['clamav', 'eicar', 'off']).optional(),
     CLAMAV_HOST: z.string().optional(),
     CLAMAV_PORT: z.coerce.number().optional(),
+    // Results that carry another institute's or reseller's id; unset means refuse
+    RESPONSE_SCOPE_CHECK: z.enum(['refuse', 'report', 'off']).optional(),
 
     // Telemetry and OpenObserve (docs/deployment.md → "Telemetry and shutdown"). Unset endpoint: telemetry off.
     OTEL_EXPORTER_OTLP_ENDPOINT: z

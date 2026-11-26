@@ -154,6 +154,14 @@ To turn scanning on:
   student import). ClamAV recognises EICAR only at the start of a file, so an EICAR string
   placed after a PDF header is reported clean.
 
+## Response scope check
+
+The api-gateway refuses a result that carries another institute's or reseller's id
+(`docs/architecture.md` → "Response scope check"). Nothing needs setting: with
+`RESPONSE_SCOPE_CHECK` unset the mode is `refuse`. Set `report` on every api-gateway only while a
+wrong refusal is being fixed, and never `off` in production. Load the alert
+`api_foreign_scope_response` with `pnpm observability:load`.
+
 ## Telemetry and shutdown
 
 - **OpenObserve** stores logs, metrics and traces and runs the dashboards and alerts

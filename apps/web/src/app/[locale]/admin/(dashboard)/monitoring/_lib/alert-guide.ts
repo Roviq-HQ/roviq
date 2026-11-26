@@ -27,6 +27,7 @@ export const ALERT_TARGET_PATH: Record<AlertTarget, string> = {
 
 /** One entry for each rule file in `docker/openobserve/alerts/` (a unit test keeps them equal). */
 export const ALERT_TARGET: Record<string, AlertTarget> = {
+  api_foreign_scope_response: 'logs',
   audit_consumer_lag: 'streams',
   audit_dlq_depth: 'dlq',
   audit_event_spike: 'auditLogs',
