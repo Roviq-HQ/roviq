@@ -5,6 +5,8 @@
  * rendering, CASL gate, and table structure without wiring real Apollo or
  * subscriptions. Real GraphQL behaviour is covered by integration + e2e.
  */
+
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -204,6 +206,32 @@ describe('EnquiriesPage (component)', () => {
       await screen.findByText(messagesEn.enquiries.newForm.errors.tooLong.replace('{max}', '20')),
     ).toBeInTheDocument();
     expect(createEnquiry).not.toHaveBeenCalled();
+  });
+
+  it('shows a refused save in the form, above the button, and keeps the sheet open', async () => {
+    createEnquiry.mockRejectedValueOnce(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'raw server text', extensions: { code: 'VALIDATION_FAILED' } }],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByTestId('enquiries-new-btn'));
+    await user.type(await screen.findByTestId('enquiry-student-name-input'), 'Diya Patel');
+    await user.type(screen.getByTestId('enquiry-class-input'), 'Class 1');
+    await user.type(screen.getByTestId('enquiry-parent-name-input'), 'Meera Patel');
+    await user.type(screen.getByTestId('enquiry-parent-phone-input'), '9876543210');
+    await user.click(screen.getByTestId('enquiry-relation-select'));
+    await user.click(await screen.findByRole('option', { name: messagesEn.relationships.MOTHER }));
+    await user.click(screen.getByTestId('enquiry-form-submit-btn'));
+
+    const alert = await screen.findByRole('alert', {
+      name: (_, el) => el.textContent?.includes(messagesEn.errors.validation) ?? false,
+    });
+    expect(alert).toHaveTextContent(messagesEn.enquiries.newForm.errors.generic);
+    expect(alert).not.toHaveTextContent('raw server text');
+    expect(createEnquiry).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('enquiry-form-title')).toBeInTheDocument();
   });
 
   it('marks the relationship as required and says so once it is left empty', async () => {

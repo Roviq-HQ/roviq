@@ -13,9 +13,11 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  setFormSubmitError,
   useAppForm,
 } from '@roviq/ui';
 import { enquiryHelp } from '@web/help/admission/enquiry.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -131,13 +133,14 @@ export interface EnquiryFormSheetProps {
 export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormSheetProps) {
   const t = useTranslations('admission');
   const [createEnquiry] = useCreateEnquiry();
+  const errorCopy = useErrorCopy();
 
   const schema = React.useMemo(() => buildSchema(t), [t]);
 
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value, formApi }) => {
       const parsed = schema.parse(value);
       try {
         const result = await createEnquiry({
@@ -164,8 +167,11 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
         onOpenChange(false);
         if (id) onCreated?.(id);
       } catch (err) {
-        toast.error(t('enquiries.newForm.errors.generic'), {
-          description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+        const key = admissionErrorKey(extractGraphQLErrorCode(err));
+        setFormSubmitError(formApi, {
+          title: t('enquiries.newForm.errors.generic'),
+          // Unlisted codes and a lost connection still get their own translated copy.
+          description: key === 'generic' ? errorCopy(err, t('errors.generic')) : t(`errors.${key}`),
         });
       }
     },
@@ -357,6 +363,9 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
             </FieldGroup>
           </FieldSet>
 
+          <form.AppForm>
+            <form.SubmitError />
+          </form.AppForm>
           <SheetFooter className="sticky bottom-0 border-t bg-background pt-4">
             <Button
               type="button"
