@@ -181,7 +181,7 @@
   },
   "empty": {
     "title": "कोई संस्थान नहीं मिला",
-    "description": "आपके फ़िल्टर से कोई संस्थान मेल नहीं अकाउंट।",
+    "description": "आपके फ़िल्टर से कोई संस्थान मेल नहीं खाता।",
     "noData": "अभी कोई संस्थान नहीं",
     "noDataDescription": "शुरू करने के लिए अपना पहला संस्थान बनाएं।",
     "noPending": "कोई लंबित अप्रूवल नहीं",
@@ -327,7 +327,7 @@
     "boardDescription": "मुख्य संबद्धता बोर्ड। अतिरिक्त संबद्धताएँ बाद में जोड़ी जा सकती हैं।",
     "boardPlaceholder": "बोर्ड खोजें या चुनें…",
     "boardSearchPlaceholder": "बोर्ड खोजें…",
-    "boardNoResults": "कोई मेल अकाउंट बोर्ड नहीं।",
+    "boardNoResults": "कोई मेल खाता बोर्ड नहीं।",
     "departments": "प्रदान किए जाने वाले विभाग",
     "departmentsDescription": "इस संस्थान में चलने वाले एकेडमिक विभाग।",
     "departmentOptions": {
@@ -387,7 +387,7 @@
     "state": "राज्य / केंद्र शासित प्रदेश",
     "statePlaceholder": "राज्य खोजें या चुनें…",
     "stateSearchPlaceholder": "राज्य खोजें…",
-    "stateNoResults": "कोई मेल अकाउंट राज्य नहीं।",
+    "stateNoResults": "कोई मेल खाता राज्य नहीं।",
     "stateRequired": "राज्य ज़रूरी है।",
     "postalCode": "पिन कोड",
     "postalCodePlaceholder": "जैसे 122001",

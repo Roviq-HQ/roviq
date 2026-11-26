@@ -11,7 +11,7 @@
       "interval": "अंतराल",
       "status": "स्टेटस",
       "subscriberCount": "मेंबर",
-      "createdAt": "निर्मित"
+      "createdAt": "बनाया गया"
     },
     "intervals": {
       "MONTHLY": "मासिक",
@@ -57,7 +57,7 @@
       "maxStudentsHint": "प्रति संस्थान अधिकतम एनरोल्ड स्टूडेंट। {max} तक।",
       "maxStaffHint": "प्रति संस्थान अधिकतम टीचर एवं स्टाफ। {max} तक।",
       "maxStorageMbHint": "कुल फ़ाइल भंडारण मेगाबाइट में। असीमित के लिए खाली छोड़ें।",
-      "metaCreatedAt": "निर्मित",
+      "metaCreatedAt": "बनाया गया",
       "metaUpdatedAt": "अंतिम बार अपडेट",
       "metaVersion": "संस्करण",
       "metaStatus": "स्टेटस",
@@ -119,7 +119,7 @@
       "plan": "प्लान",
       "status": "स्टेटस",
       "currentPeriodEnd": "अवधि समाप्ति",
-      "createdAt": "निर्मित"
+      "createdAt": "बनाया गया"
     },
     "statuses": {
       "TRIALING": "टेस्ट",
@@ -208,7 +208,7 @@
       "currentPeriodEnd": "अवधि समाप्ति",
       "cancelledAt": "कैंसल किया गया",
       "trialEndsAt": "टेस्ट समाप्ति",
-      "createdAt": "निर्मित"
+      "createdAt": "बनाया गया"
     },
     "filters": {
       "status": "स्टेटस",
@@ -257,7 +257,7 @@
       "billingPeriodEnd": "अवधि समाप्ति",
       "dueDate": "देय तारीख",
       "paidAt": "पेमेंट तारीख",
-      "createdAt": "निर्मित",
+      "createdAt": "बनाया गया",
       "lineItems": "मद डिटेल्स",
       "lineItemDescription": "डिटेल्स",
       "lineItemQty": "मात्रा",
@@ -288,7 +288,7 @@
     "emptyTitle": "अभी तक कोई इनवॉइस नहीं",
     "emptyDescription": "सब्सक्रिप्शन बिलिंग होने पर इनवॉइस स्वचालित रूप से बनाए जाएँगे।",
     "emptyFilteredTitle": "कोई मेल खाने वाला इनवॉइस नहीं",
-    "emptyFilteredDescription": "आपके वर्तमान फ़िल्टर से कोई इनवॉइस मेल नहीं अकाउंट। फ़िल्टर बदलें या हटाएँ।",
+    "emptyFilteredDescription": "आपके वर्तमान फ़िल्टर से कोई इनवॉइस मेल नहीं खाता। फ़िल्टर बदलें या हटाएँ।",
     "accessDenied": "आपको इनवॉइस देखने की अनुमति नहीं है।",
     "recordPayment": {
       "title": "मैनुअल पेमेंट दर्ज करें",
