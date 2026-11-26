@@ -3,8 +3,11 @@ import type { AdmissionNumberConfig } from '../../schema/tenant/institute-config
 import {
   admissionSeriesName,
   formatSequenceValue,
+  MAX_SEQUENCE_VALUE,
+  parseSequenceValue,
   resolveAdmissionPrefix,
   resolveAdmissionYear,
+  sequenceLiteralPrefix,
 } from '../admission-number';
 
 const DEFAULT_CONFIG: AdmissionNumberConfig = {
@@ -112,5 +115,106 @@ describe('formatSequenceValue', () => {
     expect(formatSequenceValue('{value:04d}', { prefix: '', year: '', value: 123456n })).toBe(
       '123456',
     );
+  });
+});
+
+describe('parseSequenceValue', () => {
+  const FORMAT = '{prefix}{year}/{value:04d}';
+  const N_2026 = { prefix: 'N-', year: '2026' };
+  const PLAIN_2026 = { prefix: '', year: '2026' };
+
+  it('should read serial 42 from N-2026/0042 in the N- series of 2026', () => {
+    expect(parseSequenceValue(FORMAT, N_2026, 'N-2026/0042')).toBe(42n);
+  });
+
+  it('should read a serial wider than the padding, as formatSequenceValue prints it', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/123456')).toBe(123456n);
+  });
+
+  it('should refuse a number of another prefix', () => {
+    expect(parseSequenceValue(FORMAT, N_2026, 'L-2026/0042')).toBeNull();
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, 'N-2026/0042')).toBeNull();
+  });
+
+  it('should refuse a number of another year', () => {
+    expect(parseSequenceValue(FORMAT, N_2026, 'N-2025/0042')).toBeNull();
+  });
+
+  it('should refuse a number of another shape', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, 'OLD-17')).toBeNull();
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026-0042')).toBeNull();
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/0042 ')).toBeNull();
+  });
+
+  it('should refuse a number the series would print differently (missing padding)', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/42')).toBeNull();
+  });
+
+  it('should refuse serial zero, which the series never issues', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/0000')).toBeNull();
+  });
+
+  it('should treat regex characters in the prefix and the template as plain text', () => {
+    expect(parseSequenceValue('{prefix}{value:03d}', { prefix: 'A.', year: '' }, 'A.007')).toBe(7n);
+    expect(
+      parseSequenceValue('{prefix}{value:03d}', { prefix: 'A.', year: '' }, 'AX007'),
+    ).toBeNull();
+    expect(parseSequenceValue('ADM({year})-{value}', PLAIN_2026, 'ADM(2026)-9')).toBe(9n);
+  });
+
+  it('should read an unpadded {value} and a YY-YY year', () => {
+    expect(parseSequenceValue('{year}/{value}', { prefix: '', year: '25-26' }, '25-26/17')).toBe(
+      17n,
+    );
+  });
+
+  it('should refuse a serial more than two digits longer than the padding', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/999999')).toBe(999_999n);
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, '2026/1000000')).toBeNull();
+    expect(parseSequenceValue('{value:06d}', N_2026, '12345678')).toBe(12_345_678n);
+    expect(parseSequenceValue('{value:06d}', N_2026, '123456789')).toBeNull();
+  });
+
+  it('should treat an unpadded {value} as four digits wide', () => {
+    expect(parseSequenceValue('S-{value}', N_2026, 'S-999999')).toBe(999_999n);
+    expect(parseSequenceValue('S-{value}', N_2026, 'S-1000000')).toBeNull();
+  });
+
+  it('should refuse a serial past the bigint limit a counter can hold', () => {
+    expect(parseSequenceValue(FORMAT, PLAIN_2026, `2026/${MAX_SEQUENCE_VALUE}`)).toBeNull();
+    const wide = '{value:019d}';
+    expect(parseSequenceValue(wide, N_2026, String(MAX_SEQUENCE_VALUE))).toBe(MAX_SEQUENCE_VALUE);
+    expect(parseSequenceValue(wide, N_2026, String(MAX_SEQUENCE_VALUE + 1n))).toBeNull();
+  });
+
+  it('should require every {value} token to carry the same serial', () => {
+    const twice = 'R{value:03d}-{value:03d}';
+    expect(parseSequenceValue(twice, N_2026, 'R007-007')).toBe(7n);
+    expect(parseSequenceValue(twice, N_2026, 'R007-008')).toBeNull();
+  });
+
+  it('should return null for a template with no value placeholder', () => {
+    expect(parseSequenceValue('{prefix}{year}', N_2026, 'N-2026')).toBeNull();
+  });
+
+  it('should read back every number formatSequenceValue prints', () => {
+    for (const format of [FORMAT, '{prefix}{value:04d}', '{year}{value:06d}', 'S-{value}']) {
+      for (const value of [1n, 9n, 10n, 999n, 1000n, 10_000n, 999_999n]) {
+        const printed = formatSequenceValue(format, { ...N_2026, value });
+        expect(parseSequenceValue(format, N_2026, printed)).toBe(value);
+      }
+    }
+  });
+});
+
+describe('sequenceLiteralPrefix', () => {
+  it('should fill the text before the value', () => {
+    expect(
+      sequenceLiteralPrefix('{prefix}{year}/{value:04d}', { prefix: 'N-', year: '2026' }),
+    ).toBe('N-2026/');
+  });
+
+  it('should be empty when the value comes first', () => {
+    expect(sequenceLiteralPrefix('{value:04d}/{year}', { prefix: '', year: '2026' })).toBe('');
   });
 });

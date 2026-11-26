@@ -1,3 +1,4 @@
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   type DrizzleDB,
   memberships,
@@ -5,13 +6,14 @@ import {
   studentAcademics,
   studentProfiles,
   tenantSequences,
+  uniqueViolationConstraint,
 } from '@roviq/database';
 import { and, eq, sql } from 'drizzle-orm';
 import {
   ensureTenantUserProfile,
   type TenantUserProfileFields,
 } from '../../../auth/tenant-user-profile';
-import { nextAdmissionNumber } from '../admission-number.sequence';
+import { nextAdmissionNumber, recordSuppliedAdmissionNumber } from '../admission-number.sequence';
 import { findYearAndClass, findYearAndStandard } from './class-lookup';
 import { lockSectionForPlacement, strengthChange } from './section-strength';
 import type {
@@ -82,20 +84,26 @@ export async function admitStudent(
     .returning({ id: memberships.id });
   await ensureTenantUserProfile(tx, { tenantId, userId, actorId, ...data.tenantProfile });
 
-  const admissionNumber =
-    data.admissionNumber ?? (await nextAdmissionNumber(tx, tenantId, data.standardId));
-  const [profile] = await tx
-    .insert(studentProfiles)
-    .values({
-      ...data.profile,
-      userId,
-      membershipId: membership.id,
-      tenantId,
-      admissionNumber,
-      createdBy: actorId,
-      updatedBy: actorId,
-    })
-    .returning({ id: studentProfiles.id });
+  const insertProfile = async (db: DrizzleDB, admissionNumber: string) => {
+    const [row] = await db
+      .insert(studentProfiles)
+      .values({
+        ...data.profile,
+        userId,
+        membershipId: membership.id,
+        tenantId,
+        admissionNumber,
+        createdBy: actorId,
+        updatedBy: actorId,
+      })
+      .returning({ id: studentProfiles.id });
+    return { id: row.id, admissionNumber };
+  };
+
+  const profile = data.admissionNumber
+    ? await insertWithSuppliedNumber(tx, data, data.admissionNumber, insertProfile)
+    : await insertWithGeneratedNumber(tx, data, insertProfile);
+  const { admissionNumber } = profile;
 
   let strength: SectionStrengthChange | null = null;
   if (data.sectionId) {
@@ -123,6 +131,60 @@ export async function admitStudent(
     admissionNumber,
     strength,
   };
+}
+
+const ADMISSION_NUMBER_INDEX = 'idx_student_admission_no_active';
+
+/**
+ * A generated number can clash only with a number another admission is saving at this moment,
+ * which the free-number check cannot see until it commits. The insert waits for that commit,
+ * so a second generation, after the savepoint is rolled back, sees the number and skips it.
+ */
+const GENERATED_NUMBER_ATTEMPTS = 3;
+
+type InsertProfile = (
+  db: DrizzleDB,
+  admissionNumber: string,
+) => Promise<{ id: string; admissionNumber: string }>;
+
+/** A number the institute supplied: kept as given, so a clash is the institute's to resolve. */
+async function insertWithSuppliedNumber(
+  tx: DrizzleDB,
+  data: AdmitStudentData,
+  admissionNumber: string,
+  insertProfile: InsertProfile,
+) {
+  await recordSuppliedAdmissionNumber(tx, data.tenantId, data.standardId, admissionNumber);
+  try {
+    return await insertProfile(tx, admissionNumber);
+  } catch (error) {
+    if (uniqueViolationConstraint(error) !== ADMISSION_NUMBER_INDEX) throw error;
+    throw new BusinessException(
+      ErrorCode.ADMISSION_NUMBER_TAKEN,
+      `Admission number ${admissionNumber} is already held by another student`,
+    );
+  }
+}
+
+/** A number Roviq chose: a clash is never the institute's fault, so another number is taken. */
+async function insertWithGeneratedNumber(
+  tx: DrizzleDB,
+  data: AdmitStudentData,
+  insertProfile: InsertProfile,
+) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await tx.transaction(async (savepoint) =>
+        insertProfile(
+          savepoint,
+          await nextAdmissionNumber(savepoint, data.tenantId, data.standardId),
+        ),
+      );
+    } catch (error) {
+      const clash = uniqueViolationConstraint(error) === ADMISSION_NUMBER_INDEX;
+      if (!clash || attempt === GENERATED_NUMBER_ATTEMPTS) throw error;
+    }
+  }
 }
 
 /** The institute's student role, or null when the institute has none. */

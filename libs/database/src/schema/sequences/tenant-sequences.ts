@@ -26,7 +26,10 @@ export const tenantSequences = pgTable(
     tenantId: uuid('tenant_id').notNull(),
     /** Identifies the counter, e.g. `adm_no:N-`, `roll_no:{section_id}:{academic_year_id}` */
     sequenceName: varchar('sequence_name', { length: 120 }).notNull(),
-    /** Last issued value — incremented atomically by `next_sequence_value()` */
+    /**
+     * Last issued value, incremented atomically by `next_sequence_value()`. An admission series is
+     * also raised to a supplied number that fits it (`recordSuppliedAdmissionNumber`).
+     */
     currentValue: bigint('current_value', { mode: 'bigint' }).default(0n).notNull(),
     /** Optional prefix prepended in the formatted output, e.g. `N-` */
     prefix: varchar({ length: 20 }),

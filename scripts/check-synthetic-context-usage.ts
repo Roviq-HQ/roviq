@@ -93,6 +93,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-275: fixtures and row snapshots for the one-transaction student create and its cleanup.
   'apps/api-gateway/src/institute/student/__tests__/student-create-atomic.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-bulk-import-atomic.integration.spec.ts',
+  // ROV-367: config, class and counter fixtures for supplied and generated admission numbers.
+  'apps/api-gateway/src/institute/student/__tests__/supplied-admission-number.integration.spec.ts',
   'apps/api-gateway/src/auth/__tests__/discard-new-user.integration.spec.ts',
   // ROV-362: reads the stored account and phone after IdentityService.createUser.
   'apps/api-gateway/src/auth/__tests__/create-user.integration.spec.ts',

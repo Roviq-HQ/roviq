@@ -8,6 +8,8 @@ import { Logger } from '@nestjs/common';
 import {
   AcademicStatus,
   AdmissionType,
+  BusinessException,
+  ErrorCode,
   Gender,
   isStudentImportField,
   SocialCategory,
@@ -31,6 +33,9 @@ const logger = new Logger('BulkStudentImportActivities');
 
 export const ROW_INSERT_FAILED =
   'This student could not be created because of a system error. Import the row again or add the student by hand.';
+
+export const ROW_ADMISSION_NUMBERS_EXHAUSTED =
+  "This student was not created: no free admission number is left in this class's series. Give the row an admission number, or ask Roviq support to change the admission number format.";
 
 // ── Validation helpers ────────────────────────────────────
 
@@ -460,6 +465,17 @@ async function discardAccount(ctx: InsertRowContext, userId: string, rowNumber: 
   }
 }
 
+/** The report goes to the institute: a driver error would show SQL and other rows' values. */
+function rowFailure(rowNumber: number, error: unknown): RowError {
+  if (
+    error instanceof BusinessException &&
+    error.code === ErrorCode.ADMISSION_NUMBER_SERIES_EXHAUSTED
+  ) {
+    return { rowNumber, field: 'admission_number', reason: ROW_ADMISSION_NUMBERS_EXHAUSTED };
+  }
+  return { rowNumber, field: '_system', reason: ROW_INSERT_FAILED };
+}
+
 /**
  * Process a single row for insertion. Returns 'created', 'skipped', or throws on failure.
  */
@@ -486,6 +502,11 @@ async function insertSingleRow(
     admitted = await admitRow(ctx, row, userId);
   } catch (error) {
     await discardAccount(ctx, userId, row.rowNumber);
+    // Saved by another admission between the check above and this insert: still a duplicate.
+    if (error instanceof BusinessException && error.code === ErrorCode.ADMISSION_NUMBER_TAKEN) {
+      logger.log(`Row ${row.rowNumber}: Skipping — admission number ${row.admissionNumber} taken`);
+      return 'skipped';
+    }
     throw error;
   }
   if (admitted.kind !== 'ok') {
@@ -633,12 +654,7 @@ export function createBulkStudentImportActivities(
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.error(`Row ${row.rowNumber}: Insert failed — ${message}`);
-          // The report goes to the institute: a driver error would show SQL and other rows' values.
-          errors.push({
-            rowNumber: row.rowNumber,
-            field: '_system',
-            reason: ROW_INSERT_FAILED,
-          });
+          errors.push(rowFailure(row.rowNumber, error));
         }
       }
 

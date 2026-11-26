@@ -84,3 +84,68 @@ export function formatSequenceValue(
       parts.value.toString().padStart(width ? Number(width) : 0, '0'),
     );
 }
+
+const TEMPLATE_TOKEN = /\{prefix\}|\{year\}|\{value(?::0(\d+)d)?\}/g;
+
+/** The largest value a `tenant_sequences` counter (PostgreSQL bigint) can hold. */
+export const MAX_SEQUENCE_VALUE = 9_223_372_036_854_775_807n;
+
+/**
+ * A serial may be this many digits longer than the template's padding (an unpadded `{value}`
+ * counts as 4). `{value:04d}` accepts up to 999,999: a hundred times the register the padding was
+ * chosen for. A longer number is a typo or a different register, and raising a counter to it
+ * would push every later number out of that range, or past the bigint limit, for good.
+ */
+const EXTRA_SERIAL_DIGITS = 2;
+const UNPADDED_WIDTH = 4;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The serial inside `value` when it is exactly what the series would print for that serial, else
+ * null. A number of another prefix, year or shape never matches, so it can never raise a counter;
+ * neither can a serial longer than the padding allows (see `EXTRA_SERIAL_DIGITS`).
+ */
+export function parseSequenceValue(
+  template: string,
+  parts: { prefix: string; year: string },
+  value: string,
+): bigint | null {
+  let pattern = '';
+  let width: number | null = null;
+  let last = 0;
+  for (const match of template.matchAll(TEMPLATE_TOKEN)) {
+    pattern += escapeRegExp(template.slice(last, match.index));
+    if (match[0] === '{prefix}') pattern += escapeRegExp(parts.prefix);
+    else if (match[0] === '{year}') pattern += escapeRegExp(parts.year);
+    else {
+      pattern += width === null ? '(\\d+)' : '\\1';
+      width ??= match[1] ? Number(match[1]) : 0;
+    }
+    last = match.index + match[0].length;
+  }
+  pattern += escapeRegExp(template.slice(last));
+  if (width === null) return null;
+
+  const digits = new RegExp(`^${pattern}$`).exec(value)?.[1];
+  if (digits === undefined) return null;
+  if (digits.length > Math.max(width, UNPADDED_WIDTH) + EXTRA_SERIAL_DIGITS) return null;
+  const serial = BigInt(digits);
+  if (serial === 0n || serial > MAX_SEQUENCE_VALUE) return null;
+  return formatSequenceValue(template, { ...parts, value: serial }) === value ? serial : null;
+}
+
+/**
+ * The fixed text every number of the series starts with: the template up to its value, filled.
+ * `{prefix}{year}/{value:04d}` with `N-` and 2026 gives `N-2026/`.
+ */
+export function sequenceLiteralPrefix(
+  template: string,
+  parts: { prefix: string; year: string },
+): string {
+  const valueAt = template.search(/\{value(?::0\d+d)?\}/);
+  const head = valueAt === -1 ? template : template.slice(0, valueAt);
+  return head.replaceAll('{prefix}', parts.prefix).replaceAll('{year}', parts.year);
+}
