@@ -3,6 +3,18 @@ import type { CORSRule, LifecycleRule } from '@aws-sdk/client-s3';
 export { S3_CHECKSUM_OPTIONS } from '../../libs/backend/storage/src/s3-checksum-options';
 
 /** Prefix that `storage:check` writes under; the lifecycle rule cleans up after an aborted run. */
+/** Temporary sign-ins (`aws login`, STS) carry a session token; a static key does not. */
+export function storageCredentials(input: {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string | undefined;
+}): { accessKeyId: string; secretAccessKey: string; sessionToken?: string } {
+  const { accessKeyId, secretAccessKey, sessionToken } = input;
+  return sessionToken
+    ? { accessKeyId, secretAccessKey, sessionToken }
+    : { accessKeyId, secretAccessKey };
+}
+
 export const STORAGE_CHECK_PREFIX = '__storage-check__/';
 
 export function parseOrigins(raw: string): string[] {

@@ -20,7 +20,12 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { parseOrigins, S3_CHECKSUM_OPTIONS, STORAGE_CHECK_PREFIX } from './lib/storage-rules';
+import {
+  parseOrigins,
+  S3_CHECKSUM_OPTIONS,
+  STORAGE_CHECK_PREFIX,
+  storageCredentials,
+} from './lib/storage-rules';
 
 function required(name: string, value: string | undefined): string {
   if (!value) {
@@ -34,10 +39,11 @@ const shared = {
   region: required('S3_REGION', process.env.S3_REGION),
   forcePathStyle: true,
   ...S3_CHECKSUM_OPTIONS,
-  credentials: {
+  credentials: storageCredentials({
     accessKeyId: required('S3_ACCESS_KEY', process.env.S3_ACCESS_KEY),
     secretAccessKey: required('S3_SECRET_KEY', process.env.S3_SECRET_KEY),
-  },
+    sessionToken: process.env.S3_SESSION_TOKEN,
+  }),
 };
 const server = new S3Client({
   ...shared,

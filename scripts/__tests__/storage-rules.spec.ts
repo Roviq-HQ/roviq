@@ -9,6 +9,7 @@ import {
   publicBucketLifecycle,
   ruleDifferences,
   STORAGE_CHECK_PREFIX,
+  storageCredentials,
   storagePlan,
 } from '../lib/storage-rules';
 
@@ -197,5 +198,25 @@ describe('ruleDifferences', () => {
         appliedLifecycle,
       }),
     ).toEqual([`CORS rule ${PORTAL_CORS_RULE_ID}`, 'lifecycle rule expire-abandoned-uploads']);
+  });
+});
+
+describe('storageCredentials', () => {
+  it('passes a session token from a temporary sign-in to the client', () => {
+    expect(
+      storageCredentials({ accessKeyId: 'AKIA1', secretAccessKey: 's', sessionToken: 'tok' }),
+    ).toEqual({ accessKeyId: 'AKIA1', secretAccessKey: 's', sessionToken: 'tok' });
+  });
+
+  it('leaves the session token out for a static key', () => {
+    for (const sessionToken of [undefined, '']) {
+      const credentials = storageCredentials({
+        accessKeyId: 'AKIA1',
+        secretAccessKey: 's',
+        sessionToken,
+      });
+      expect(credentials).toEqual({ accessKeyId: 'AKIA1', secretAccessKey: 's' });
+      expect('sessionToken' in credentials).toBe(false);
+    }
   });
 });

@@ -20,6 +20,7 @@ declare global {
       S3_REGION?: string;
       S3_ACCESS_KEY?: string;
       S3_SECRET_KEY?: string;
+      S3_SESSION_TOKEN?: string;
       S3_BUCKET_PRIVATE?: string;
       S3_BUCKET_PUBLIC?: string;
       S3_PUBLIC_BASE_URL?: string;
