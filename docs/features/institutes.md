@@ -18,6 +18,7 @@ The Institute Service manages the tenant root entity and its academic structure.
 | `institute_identifiers` | Tenant | tenantPolicies | One-to-many: UDISE+, CBSE, BSEH codes |
 | `institute_affiliations` | Tenant | tenantPolicies | One-to-many: board affiliations |
 | `institute_groups` | Platform | Custom (admin/reseller/app) | Informational grouping (trust/society) |
+| `institute_group_branding` | Platform | Custom (admin writes; an institute reads its own group's row) | One-to-one with a group: logo, favicon, colors, theme |
 
 ### Academic Structure Tables
 

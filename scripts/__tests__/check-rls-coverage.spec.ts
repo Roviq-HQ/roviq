@@ -33,10 +33,6 @@ describe('hasRls', () => {
     expect(hasRls("...entityPolicies('foo'),")).toBe(true);
   });
 
-  it('detects immutableEntityPolicies', () => {
-    expect(hasRls("...immutableEntityPolicies('foo'),")).toBe(true);
-  });
-
   it('detects pgPolicy', () => {
     expect(hasRls("pgPolicy('foo', { ... })")).toBe(true);
   });

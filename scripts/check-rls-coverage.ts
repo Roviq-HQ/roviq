@@ -2,7 +2,7 @@
  * CI guard — every pgTable definition must opt into RLS.
  *
  * Detects RLS via any of: `tenantPolicies(`, `entityPolicies(`,
- * `immutableEntityPolicies(`, `filePolicies(`, `userScopedPolicies(`, `pgPolicy(`.
+ * `filePolicies(`, `userScopedPolicies(`, `pgPolicy(`.
  * drizzle-kit enables row security on any table with a policy, so the deprecated
  * `.enableRLS()` is refused rather than counted.
  *
@@ -34,7 +34,6 @@ export const RLS_EXEMPT_BASENAMES = new Set<string>();
 const RLS_INDICATORS = [
   'tenantPolicies(',
   'entityPolicies(',
-  'immutableEntityPolicies(',
   'filePolicies(',
   'userScopedPolicies(',
   'pgPolicy(',

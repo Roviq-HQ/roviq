@@ -98,7 +98,7 @@ export const auditLogs = pgTable(
 
     // === RLS Policies (5-role model) ===
 
-    // roviq_app: can INSERT any row, can SELECT its own institute-scoped rows and the
+    // roviq_app: can INSERT institute rows of its own institute, can SELECT its own institute-scoped rows and the
     // platform/reseller rows that name it as their subject
     pgPolicy('audit_app_read', {
       for: 'select',
@@ -108,10 +108,10 @@ export const auditLogs = pgTable(
     pgPolicy('audit_app_insert', {
       for: 'insert',
       to: roviqApp,
-      withCheck: sql`true`,
+      withCheck: sql`scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
 
-    // roviq_reseller: can INSERT any row, can SELECT their institutes + own reseller entries
+    // roviq_reseller: can INSERT its own reseller rows, can SELECT their institutes + own reseller entries
     pgPolicy('audit_reseller_read', {
       for: 'select',
       to: roviqReseller,
@@ -120,7 +120,7 @@ export const auditLogs = pgTable(
     pgPolicy('audit_reseller_insert', {
       for: 'insert',
       to: roviqReseller,
-      withCheck: sql`true`,
+      withCheck: sql`scope = 'reseller' AND reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
     }),
 
     // roviq_admin: full access (SELECT, INSERT, UPDATE, DELETE)
