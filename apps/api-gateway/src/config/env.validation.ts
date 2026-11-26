@@ -156,6 +156,14 @@ function urlOrNull(value: string | undefined): URL | null {
   }
 }
 
+/** A subdomain shares cookies set for the portal's domain, so it is no separate origin either. */
+function isPortalHostOrSubdomain(host: string, portalHosts: Set<string>): boolean {
+  for (const portal of portalHosts) {
+    if (host === portal || host.endsWith(`.${portal}`)) return true;
+  }
+  return false;
+}
+
 /** A Docker service name or loopback: the server reaches the store on a private network. */
 function isPrivateHost(host: string): boolean {
   return !host.includes('.') || host === '127.0.0.1';
@@ -197,10 +205,10 @@ function storageIssues(env: {
         message: `${name} — must be https outside development and test`,
       });
     }
-    if (portalHosts.has(url.hostname)) {
+    if (isPortalHostOrSubdomain(url.hostname, portalHosts)) {
       issues.push({
         path: [name],
-        message: `${name} — must not be a portal host from ALLOWED_ORIGINS; serve storage from its own domain`,
+        message: `${name} — must not be a portal host from ALLOWED_ORIGINS or its subdomain; serve storage from its own domain`,
       });
     }
   }

@@ -166,6 +166,35 @@ describe('api-gateway env validation: object storage outside development and tes
     ).toThrow(`${name} — must not be a portal host from ALLOWED_ORIGINS`);
   });
 
+  it.each([
+    'S3_PUBLIC_ENDPOINT',
+    'S3_PUBLIC_BASE_URL',
+  ] as const)('should refuse %s on a subdomain of a portal host', (name) => {
+    expect(() => validate({ ...PRODUCTION, [name]: 'https://files.app.example.test' })).toThrow(
+      `${name} — must not be a portal host from ALLOWED_ORIGINS or its subdomain`,
+    );
+  });
+
+  it('should refuse a portal host even when the portal origin names a port', () => {
+    expect(() =>
+      validate({
+        ...PRODUCTION,
+        ALLOWED_ORIGINS: 'https://app.example.test:8443',
+        S3_PUBLIC_BASE_URL: 'https://app.example.test/files',
+      }),
+    ).toThrow('S3_PUBLIC_BASE_URL — must not be a portal host from ALLOWED_ORIGINS');
+  });
+
+  it('should accept a plain http server endpoint on 127.0.0.1', () => {
+    expect(() => validate({ ...PRODUCTION, S3_ENDPOINT: 'http://127.0.0.1:9000' })).not.toThrow();
+  });
+
+  it('should accept a storage domain that only ends like a portal host', () => {
+    expect(() =>
+      validate({ ...PRODUCTION, S3_PUBLIC_BASE_URL: 'https://files-app.example.test' }),
+    ).not.toThrow();
+  });
+
   it('should refuse one bucket for both private and public files', () => {
     expect(() =>
       validate({ ...PRODUCTION, S3_BUCKET_PUBLIC: PRODUCTION.S3_BUCKET_PRIVATE }),
