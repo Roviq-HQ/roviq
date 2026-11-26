@@ -12,10 +12,14 @@ export class PlanFieldResolver {
   private readonly countLoader: DataLoader<string, number>;
 
   constructor(private readonly subscriptionRepo: SubscriptionRepository) {
-    this.countLoader = new DataLoader(async (planIds: readonly string[]) => {
-      const counts = await this.subscriptionRepo.countByPlanIds([...planIds]);
-      return planIds.map((id) => counts.get(id) ?? 0);
-    });
+    this.countLoader = new DataLoader(
+      async (planIds: readonly string[]) => {
+        const counts = await this.subscriptionRepo.countByPlanIds([...planIds]);
+        return planIds.map((id) => counts.get(id) ?? 0);
+      },
+      // The resolver is a singleton: a cached count would outlive every later subscription.
+      { cache: false },
+    );
   }
 
   @ResolveField('subscriberCount', () => Int)
