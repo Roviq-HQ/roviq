@@ -1014,7 +1014,7 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 
 ## 2026-11-26 — untagged skips and todos fail the push
 
-- **Symptom:** `scripts/ci-check-skips.sh` existed but ran nowhere, so eleven untagged `it.todo` and `describe.skip` lines piled up; eight described behaviour that other specs already asserted.
+- **Symptom:** `scripts/ci-check-skips.sh` existed but ran nowhere, so eleven untagged `it.todo` and `describe.skip` lines piled up.
 - **Cause:** the script waited for the backlog to be cleaned before it was wired.
-- **Fix:** the dead placeholders are deleted, the webhook replay gap has an e2e test, and `pnpm test:check-skips` runs in the `gates` group of `scripts/ci-check.sh` and in the CI `lint` job.
+- **Fix:** of the eleven, eight described behaviour that other specs already assert and are deleted; the webhook replay gap now has two e2e tests (the identical delivery twice, and the same payment under a second order id); the two blocked by product defects are tagged ROV-369 (billing suspend and restore) and ROV-370 (certificate templates). `pnpm test:check-skips` runs in the `gates` group of `scripts/ci-check.sh` and in the CI `lint` job.
 - **Lesson:** a placeholder test with no issue number is forgotten; tag it `ROV-xxx` or write the test.
