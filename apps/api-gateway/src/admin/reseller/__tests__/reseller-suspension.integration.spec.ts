@@ -22,7 +22,12 @@ import {
   users,
   withAdmin,
 } from '@roviq/database';
+import { ResellerDeletionConsumer } from '@roviq/ee-gateway';
+import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { REDIS_CLIENT } from '@roviq/redis';
+import type { TemporalClientService } from '@roviq/temporal';
+import { createMock } from '@roviq/testing';
 import {
   cleanupTestInstitute,
   cleanupTestReseller,
@@ -40,7 +45,7 @@ import {
   type TestReseller,
 } from '@roviq/testing/integration';
 import { eq, inArray } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../../app/app.module';
 
@@ -362,9 +367,35 @@ describe('Reseller suspension and deletion (integration)', () => {
 
     it('moves institutes to Roviq Direct and removes staff memberships after 30 days', async () => {
       await backdateSuspension(31);
+      const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
 
       const response = await gql(DELETE, { id: reseller.resellerId }, platformAdminToken);
       expect(response.errors).toBeUndefined();
+
+      // The event the deletion emits is the one that starts the billing cleanup.
+      const statusEvents = emit.mock.calls.filter(
+        ([pattern]) => pattern === EVENT_PATTERNS.RESELLER.status_changed,
+      );
+      expect(statusEvents).toHaveLength(1);
+      const startWorkflowOnce = vi
+        .fn<TemporalClientService['startWorkflowOnce']>()
+        .mockResolvedValue(true);
+      await new ResellerDeletionConsumer(
+        createMock<TemporalClientService>({ startWorkflowOnce }),
+      ).onStatusChanged(statusEvents[0][1]);
+      expect(startWorkflowOnce).toHaveBeenCalledTimes(1);
+      const [stored] = await admin((tx) =>
+        tx
+          .select({ deletedAt: resellers.deletedAt })
+          .from(resellers)
+          .where(eq(resellers.id, reseller.resellerId)),
+      );
+      assert(stored.deletedAt);
+      expect(startWorkflowOnce).toHaveBeenCalledWith('resellerDeletionCleanupWorkflow', {
+        taskQueue: 'billing-automation',
+        workflowId: `reseller-deletion-cleanup-${reseller.resellerId}-${stored.deletedAt.getTime()}`,
+        args: [reseller.resellerId],
+      });
       expect(response.data?.adminDeleteReseller).toEqual({
         id: reseller.resellerId,
         status: 'DELETED',

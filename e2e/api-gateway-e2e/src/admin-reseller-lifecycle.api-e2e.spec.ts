@@ -68,8 +68,44 @@ async function insertTestReseller(
   );
 }
 
+// A plan and a gateway config of the reseller to delete: the billing cleanup deactivates both.
+const TEST_PLAN_ID = 'ffffffff-f000-4000-a000-000000000201';
+const TEST_GATEWAY_CONFIG_ID = 'ffffffff-f000-4000-a000-000000000202';
+
+async function insertBillingRows(pool: pg.Pool, resellerId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO plans (id, reseller_id, name, code, interval, amount, status, created_by, updated_by)
+     VALUES ($1, $2, '{"en":"Cleanup plan"}', 'e2e-cleanup', 'MONTHLY', 99900, 'ACTIVE',
+             '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')
+     ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE', deleted_at = NULL`,
+    [TEST_PLAN_ID, resellerId],
+  );
+  await pool.query(
+    `INSERT INTO payment_gateway_configs (id, reseller_id, provider, display_name, status, created_by, updated_by)
+     VALUES ($1, $2, 'RAZORPAY', 'Razorpay', 'ACTIVE',
+             '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')
+     ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE', deleted_at = NULL`,
+    [TEST_GATEWAY_CONFIG_ID, resellerId],
+  );
+}
+
+async function billingStatuses(
+  pool: pg.Pool,
+): Promise<{ plan: string | undefined; config: string | undefined }> {
+  const plan = await pool.query<{ status: string }>('SELECT status FROM plans WHERE id = $1', [
+    TEST_PLAN_ID,
+  ]);
+  const config = await pool.query<{ status: string }>(
+    'SELECT status FROM payment_gateway_configs WHERE id = $1',
+    [TEST_GATEWAY_CONFIG_ID],
+  );
+  return { plan: plan.rows[0]?.status, config: config.rows[0]?.status };
+}
+
 async function deleteTestReseller(pool: pg.Pool, id: string): Promise<void> {
   // Remove any dependent rows first — test reseller should have none, but defensive.
+  await pool.query('DELETE FROM plans WHERE reseller_id = $1', [id]);
+  await pool.query('DELETE FROM payment_gateway_configs WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM reseller_memberships WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM roles WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM resellers WHERE id = $1', [id]);
@@ -129,6 +165,7 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
       `test-reseller-${TEST_RESELLER_ID_FOR_DELETE.slice(-4)}`,
       { suspendedDaysAgo: 40 },
     );
+    await insertBillingRows(pool, TEST_RESELLER_ID_FOR_DELETE);
   });
 
   afterAll(async () => {
@@ -263,6 +300,13 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
     const after = await getResellerStatus(pool, TEST_RESELLER_ID_FOR_DELETE);
     expect(after.status).toBe('DELETED');
     expect(after.deletedAt).not.toBeNull();
+  });
+
+  it('runs the billing cleanup of the deleted reseller: its plan and gateway config go INACTIVE', async () => {
+    // RESELLER.status_changed → ResellerDeletionConsumer → the billing worker's workflow.
+    await expect
+      .poll(() => billingStatuses(pool), { timeout: 30_000, interval: 500 })
+      .toEqual({ plan: 'INACTIVE', config: 'INACTIVE' });
   });
 
   // ── ROV-234: adminListResellers ─────────────────────────────

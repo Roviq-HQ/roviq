@@ -8,6 +8,7 @@ import {
   ResellerTier,
   resellerRoleAfterTierChange,
 } from '@roviq/common-types';
+import { ROVIQ_DIRECT_RESELLER_ID } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { REDIS_CLIENT } from '@roviq/redis';
@@ -31,9 +32,6 @@ import type {
   ResellerPatch,
   ResellerRecord,
 } from './repositories/types';
-
-/** Default "Roviq Direct" system reseller UUID — hardcoded seed ID */
-const DEFAULT_RESELLER_ID = '00000000-0000-7000-a000-000000000011';
 
 /** Minimum days a reseller must be suspended before deletion */
 const GRACE_PERIOD_DAYS = 30;
@@ -423,33 +421,38 @@ export class AdminResellerService {
   }
 
   async deleteReseller(resellerId: string, actorId: string) {
-    const result = await this.repo.delete(resellerId, actorId, DEFAULT_RESELLER_ID, (reseller) => {
-      if (reseller.isSystem)
-        throw new BusinessException(
-          ErrorCode.SYSTEM_RESELLER_PROTECTED,
-          'Cannot delete system reseller',
-        );
-      if (reseller.status !== ResellerStatus.SUSPENDED) {
-        throw new BusinessException(
-          ErrorCode.RESELLER_NOT_SUSPENDED,
-          'Reseller must be suspended before deletion',
-        );
-      }
+    const result = await this.repo.delete(
+      resellerId,
+      actorId,
+      ROVIQ_DIRECT_RESELLER_ID,
+      (reseller) => {
+        if (reseller.isSystem)
+          throw new BusinessException(
+            ErrorCode.SYSTEM_RESELLER_PROTECTED,
+            'Cannot delete system reseller',
+          );
+        if (reseller.status !== ResellerStatus.SUSPENDED) {
+          throw new BusinessException(
+            ErrorCode.RESELLER_NOT_SUSPENDED,
+            'Reseller must be suspended before deletion',
+          );
+        }
 
-      // Enforce 30-day grace period
-      if (!reseller.suspendedAt) {
-        throw new BusinessException(ErrorCode.RESELLER_INVALID, 'Suspension date not set');
-      }
-      const daysSinceSuspension = Math.floor(
-        (Date.now() - reseller.suspendedAt.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      if (daysSinceSuspension < GRACE_PERIOD_DAYS) {
-        throw new BusinessException(
-          ErrorCode.GRACE_PERIOD_NOT_ELAPSED,
-          `Grace period not elapsed (${GRACE_PERIOD_DAYS} days required, ${daysSinceSuspension} elapsed)`,
+        // Enforce 30-day grace period
+        if (!reseller.suspendedAt) {
+          throw new BusinessException(ErrorCode.RESELLER_INVALID, 'Suspension date not set');
+        }
+        const daysSinceSuspension = Math.floor(
+          (Date.now() - reseller.suspendedAt.getTime()) / (1000 * 60 * 60 * 24),
         );
-      }
-    });
+        if (daysSinceSuspension < GRACE_PERIOD_DAYS) {
+          throw new BusinessException(
+            ErrorCode.GRACE_PERIOD_NOT_ELAPSED,
+            `Grace period not elapsed (${GRACE_PERIOD_DAYS} days required, ${daysSinceSuspension} elapsed)`,
+          );
+        }
+      },
+    );
     if (result.kind === 'not_found')
       throw new BusinessException(ErrorCode.RESELLER_NOT_FOUND, 'Reseller not found');
     const { record, affectedInstituteIds } = result;

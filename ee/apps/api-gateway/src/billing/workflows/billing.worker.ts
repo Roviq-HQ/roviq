@@ -5,7 +5,8 @@ import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq
 import { createBillingActivities } from './billing.activities';
 import { billingWorkflowsPath } from './billing.workflows-path';
 
-const TASK_QUEUE = 'billing-automation';
+/** The task queue the billing worker polls; every billing workflow is started on it. */
+export const BILLING_TASK_QUEUE = 'billing-automation';
 
 /** Runs the billing automation workflows (ROV-124) in this gateway when BILLING_WORKER_ENABLED is 'true'. */
 @Injectable()
@@ -14,7 +15,7 @@ export class BillingWorkerService extends EmbeddedTemporalWorker {
     super(config, {
       flag: 'BILLING_WORKER_ENABLED',
       label: 'Billing worker',
-      taskQueue: TASK_QUEUE,
+      taskQueue: BILLING_TASK_QUEUE,
       loggerName: BillingWorkerService.name,
       restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });

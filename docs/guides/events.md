@@ -187,16 +187,18 @@ interceptor do not run for event deliveries (they read a request an event does n
 | `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` |
 | `STUDENT.removed_from_year` | `GroupInvalidationHandler` | Every dynamic and hybrid group of the institute gets `resolved_at = NULL` (emitted by `removeStudentFromYear`) |
 | `GROUP.rules_updated` | `GroupInvalidationHandler` | That group gets `resolved_at = NULL` |
+| `RESELLER.status_changed` (EE) | `ResellerDeletionConsumer` | On `newStatus: DELETED`, starts `resellerDeletionCleanupWorkflow` (workflow id `reseller-deletion-cleanup-<resellerId>-<deletedAt in ms>`, one per deletion): the reseller's billing moves to Roviq Direct (`ee/docs/billing.md` → "Reseller deletion") |
 
 - **Durable naming**: `gateway-<subject in kebab case>` (e.g. `gateway-academic-year-activated`),
-  with an explicit `stream`, both from `gatewayConsumer(pattern)` in
-  `apps/api-gateway/src/common/events/gateway-consumer.ts`. Every gateway handler of a subject
-  uses it, so they cannot disagree.
+  with an explicit `stream`, both from `gatewayConsumer(pattern)` in `@roviq/nats-jetstream`
+  (`libs/backend/nats-jetstream/src/streams/gateway-consumer.ts`). Every gateway handler of a
+  subject, EE ones included, uses it, so they cannot disagree.
 - **Payloads** are validated first with `eventPayloadSchemas[pattern].parse(data)`; a payload
   that fails goes to the DLQ after the retries.
 - **Tenant isolation**: each handler runs in `withTenant(db, mkInstituteCtx(tenantId, origin), …)`
   with the event's `tenantId`, reads `*Live` views and writes base tables. An id of another
-  institute in the payload matches nothing under RLS.
+  institute in the payload matches nothing under RLS. `ResellerDeletionConsumer` is
+  platform-level: it reads nothing and only starts a workflow keyed by the reseller id.
 - **Idempotency**: each handler is safe to run twice and harmless for an institute, year, section
   or group that no longer exists. `SECTION.deleted` acts only while the section is still deleted.
 

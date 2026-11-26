@@ -1,4 +1,5 @@
-import { type EventPattern, STREAMS } from '@roviq/nats-jetstream';
+import type { EventPattern } from './event-patterns';
+import { STREAMS } from './stream.config';
 
 /** The `@EventPattern` extras of a gateway consumer: its stream and durable name. */
 export interface GatewayConsumer {

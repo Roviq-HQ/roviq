@@ -9,9 +9,8 @@ import {
   mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
-import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
+import { EVENT_PATTERNS, eventPayloadSchemas, gatewayConsumer } from '@roviq/nats-jetstream';
 import { and, arrayOverlaps, eq, inArray, isNull, type SQL } from 'drizzle-orm';
-import { gatewayConsumer } from '../../common/events/gateway-consumer';
 
 const ORIGIN = 'consumer:group-invalidation';
 

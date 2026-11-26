@@ -228,6 +228,11 @@ start or stops (Temporal restarted, connection lost) tries to start again every 
   gateway already creates partitions at boot and daily; only this worker enforces retention.
   It connects with `DATABASE_URL` and runs as `roviq_admin`, reaching partition DDL through the
   `SECURITY DEFINER` functions `ensure_monthly_partition` and `detach_monthly_partition`.
+- **`BILLING_WORKER_ENABLED`** (EE, ROV-295): runs the billing workflows on task queue
+  `billing-automation`, among them the cleanup a reseller deletion starts (`ee/docs/billing.md` →
+  "Reseller deletion"). Without any instance running it, a deleted reseller's subscriptions stay
+  on that reseller and its plans and gateway configs stay `ACTIVE`. More than one instance is
+  safe. It connects with `DATABASE_URL` and runs its queries as `roviq_admin`.
 
 ## Notification delivery
 

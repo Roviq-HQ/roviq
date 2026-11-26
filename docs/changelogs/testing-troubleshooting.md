@@ -1004,3 +1004,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the console guardian runs an axe scan after each test. The branding preview is an `<iframe sandbox="">` with scripts off, so axe cannot run inside it, and the scan waited about 23 s on that frame before giving up.
 - **Fix:** the scan in `e2e/shared/console-guardian.ts` excludes `iframe[sandbox]`. The branding tests now take 2 to 4 s each.
 - **Lesson:** a test that is slow for no reason it can see is waiting on a fixture; time the fixture before raising a timeout.
+
+## 2026-11-26 — the e2e stack runs the billing worker
+
+- **Symptom:** nothing in the e2e stack ran the EE billing workflows, so a test of the reseller deletion cleanup would have waited for a workflow that no worker picks up.
+- **Cause:** `docker/compose.e2e.yaml` listed every embedded worker flag except `BILLING_WORKER_ENABLED`.
+- **Fix:** the e2e gateway sets `BILLING_WORKER_ENABLED: "true"`. No billing cron is scheduled anywhere, so the worker runs only the workflows a test starts.
+- **Lesson:** a new embedded worker needs its flag in `compose.e2e.yaml` in the same change as its first e2e test.

@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { SUBSCRIPTION_READER } from '@roviq/common-types';
 import { PaymentsModule } from '@roviq/ee-payments';
+import { TemporalClientModule } from '@roviq/temporal';
 import './billing.enums';
 import { AdminBillingResolver } from './admin/admin-billing.resolver';
 import { BillingRepository } from './billing.repository';
@@ -28,6 +29,7 @@ import { PaymentService } from './reseller/payment.service';
 import { PlanService } from './reseller/plan.service';
 import { ResellerBillingResolver } from './reseller/reseller-billing.resolver';
 import { SubscriptionService } from './reseller/subscription.service';
+import { ResellerDeletionConsumer } from './reseller-deletion.consumer';
 import { SubscriptionReaderImpl } from './subscription-reader.impl';
 import { CashfreeWebhookController } from './webhook/cashfree-webhook.controller';
 import { RazorpayWebhookController } from './webhook/razorpay-webhook.controller';
@@ -37,8 +39,8 @@ import { BillingWorkerService } from './workflows/billing.worker';
 // Global so the OSS EntitlementService can inject SUBSCRIPTION_READER without importing EE.
 @Global()
 @Module({
-  imports: [PaymentsModule],
-  controllers: [RazorpayWebhookController, CashfreeWebhookController],
+  imports: [PaymentsModule, TemporalClientModule],
+  controllers: [RazorpayWebhookController, CashfreeWebhookController, ResellerDeletionConsumer],
   providers: [
     BillingRepository,
     PlanRepository,

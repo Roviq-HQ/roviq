@@ -4,6 +4,7 @@ import {
   COMPLIANCE_REPORT_TYPE_VALUES,
   FILE_PURPOSE_VALUES,
   NOTIFICATION_CHANNEL_VALUES,
+  RESELLER_STATUS_VALUES,
 } from '@roviq/common-types';
 import { z } from 'zod';
 import type { EventPattern } from './event-patterns';
@@ -618,7 +619,16 @@ const ENQUIRY_SCHEMAS = {
 
 const RESELLER_SCHEMAS = {
   'RESELLER.created': z.object({ scope: str }).catchall(z.unknown()),
-  'RESELLER.status_changed': z.object({ scope: str.optional() }).catchall(z.unknown()),
+  'RESELLER.status_changed': z
+    .object({
+      id: uuid,
+      previousStatus: z.enum(RESELLER_STATUS_VALUES),
+      newStatus: z.enum(RESELLER_STATUS_VALUES),
+      // A Date in process, an ISO string once serialised for JetStream.
+      deletedAt: z.coerce.date().nullable().optional(),
+      scope: str.optional(),
+    })
+    .catchall(z.unknown()),
   'RESELLER.tier_changed': z.object({}).catchall(z.unknown()),
   'RESELLER.updated': z.object({ scope: str }).catchall(z.unknown()),
 } as const;
