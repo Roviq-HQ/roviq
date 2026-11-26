@@ -19,7 +19,12 @@ export { SelectField, type SelectFieldProps, type SelectOption } from './fields/
 export { SwitchField, type SwitchFieldProps } from './fields/switch-field';
 export { TextField, type TextFieldProps } from './fields/text-field';
 export { TextareaField, type TextareaFieldProps } from './fields/textarea-field';
-export { SubmitButton, type SubmitButtonProps } from './form-components';
+export {
+  SubmitButton,
+  type SubmitButtonProps,
+  SubmitError,
+  type SubmitErrorProps,
+} from './form-components';
 export {
   DEFAULT_FORM_HELP_MODE,
   defineFieldHelp,
@@ -42,6 +47,12 @@ export { HelpArticleBody, HelpArticleSheet } from './help/help-article';
 export { useFieldHelpIds } from './help/use-field-help-ids';
 export { useHelpText } from './help/use-help-text';
 export { setServerFieldError } from './server-field-error';
+export {
+  clearFormSubmitError,
+  type FormSubmitError,
+  setFormSubmitError,
+  useFormSubmitError,
+} from './submit-error';
 export {
   fieldContext,
   formContext,

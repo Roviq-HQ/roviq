@@ -32,7 +32,16 @@ Never show `error.message` from the API and never match on its text. Branch on t
 - **Crashes** — `PageErrorBoundary` shows the translated fallback (`AdminLayout` passes `error.*` labels), never the crash's own text.
 - **Auth flows** (`@roviq/auth` uses its own fetch client) — errors are `AuthRequestError` with a `code`. `isAppError(error, 'SESSION_EXPIRED')` to branch, `resolveAuthErrorMessage(error, labels)` for copy. It also classifies browser failures: `network`, `passkeyCancelled`, `passkeyAlreadyRegistered`, `passkeyNotSupported`.
 - **Labels** — `useAuthErrorLabels()` (`@web/hooks/use-auth-error-labels`) returns every `auth.errors.*` message; pass it as `labels.errors` to `LoginForm`, `PasskeyManager`, `PasswordChangeForm` and the session-expired dialog. A new auth code needs an entry in `AUTH_ERROR_CODES` (`libs/frontend/auth/src/lib/error-utils.ts`) and in both `auth.json` files.
-- **Where it shows** — errors the user must act on render inline (`role="alert"`). Transient ones are toasts: a dropped connection gets a Retry action, a dismissed passkey prompt is an info toast, not an error.
+- **Where it shows** — an error the user must act on stays on the screen, beside what it is about (`role="alert"`). A toast is gone before a slow reader finishes it and leaves nothing on the form to act on.
+
+  | Failure | Where it shows |
+  |---------|----------------|
+  | A form submit failed because of one field (the server says a value is taken or invalid) | Under that field: `setServerFieldError`, and the form moves to the step or tab that holds the field. No toast as well |
+  | A form submit failed as a whole (connection, permission, conflict, unknown) | An alert directly above the submit button that stays until the next attempt: `setFormSubmitError` + `<form.SubmitError />` |
+  | An action inside a form that is not the submit (a preview, a lookup) failed | Beside the control that started it |
+  | Success, undo, and an action with no form (delete a row, download a file, a toggle) | Toast. A dropped connection gets a Retry action; a dismissed passkey prompt is an info toast, not an error |
+
+  **`pnpm check:form-errors`** (`scripts/check-form-errors.ts`, in the pre-push gate) fails on a `toast.error` inside the `onSubmit` or `onSubmitInvalid` of a `useAppForm` call. Forms written before the rule are listed with their counts in `scripts/form-errors-baseline.json`; a count may only go down, and a form is converted when it is next changed.
 
 ## Messages that report a problem
 
@@ -106,7 +115,8 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 
 - `hooks/useLocaleChange()` — topbar language switch handler wired into all three `(dashboard)/layout.tsx` (`LayoutConfig.onLocaleChange`): saves the account language, then navigates; navigates only when impersonating.
 - `FieldHelpButton` + `FieldLabelWithInfo` (`@roviq/ui`) — the ⓘ button and popover for a help topic, and a label with that button beside it plus the topic's hint; use `FieldLabelWithInfo help={…}` for a raw `FieldLabel` (see "Field help").
-- `setServerFieldError(form, field, message)` (`@roviq/ui`) — shows a server rejection under a form field; cleared when that field's value changes. Never hand-set `errorMap` with `setFieldMeta`: an `onChange` error sticks and refuses every submit.
+- `setServerFieldError(form, field, message)` (`@roviq/ui`) — shows a server rejection under a form field; cleared when that field's value changes, and kept when the field is unmounted and mounted again (a wizard step, a tab). Pass the form or the `formApi` that `onSubmit` receives. Never hand-set `errorMap` with `setFieldMeta`: an `onChange` error sticks and refuses every submit.
+- `setFormSubmitError(form, { title, description })` + `<form.SubmitError />` (`@roviq/ui`) — a failed submit that is not about one field: the alert sits directly above the submit button, scrolls into view, stays while the person edits, and clears when the next submit starts. It never disables the submit button. `clearFormSubmitError(form)` removes it early. Which error goes where: "Error messages" → "Where it shows".
 - `pickers/SectionPicker` — multi-select of class sections grouped by department → standard, with per-class / per-department / global "select all" and a live count.
 - `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
 - `pickers/AcademicYearSelector` + `useSelectedAcademicYear()` — persistent academic-year dropdown stored in the URL via nuqs (`?year=`); seeds the active year on load and exposes `loading`. Shared across academic-years, academics, and examinations pages. `ControlledAcademicYearSelector` + `useLocalAcademicYear()` is the same dropdown with caller-held state (no URL) — used only inside the timetable creation wizard; every other timetable read resolves the active year server-side.
@@ -160,7 +170,7 @@ Client-side auth state management:
 Apollo Client setup:
 - HTTP + WebSocket split link
 - Auth link (injects Bearer token)
-- Error link (handles 401 → auth refresh, network errors)
+- Error link: a 401 refreshes the session and retries. A query or subscription (any operation but a mutation) that cannot reach the server shows one translated toast (`error.networkTitle`, `error.network`, passed to `GraphQLProvider` as `networkErrorLabels`). A mutation that cannot reach the server shows nothing here: its caller reports the failure, in the form or in its own toast (`isNetworkError(error)` tells a lost connection from another failure)
 - Cache normalization for core entities
 - Load-more pagination: every paginated query field needs a merge policy in `client.ts`, or `fetchMore` replaces page 1 instead of appending. Top-level `first`/`after` args use `relayStylePagination([...])`; connections that take the cursor inside `filter` (`adminListUsers`, `adminListResellers`, `adminListInstitutes`) use `filterCursorPagination()`
 

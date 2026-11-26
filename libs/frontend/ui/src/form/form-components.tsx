@@ -1,9 +1,12 @@
 'use client';
 
 import type { VariantProps } from 'class-variance-authority';
-import { Loader2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Button, type buttonVariants } from '../components/ui/button';
+import { testIds } from '../testing/testid-registry';
+import { useFormSubmitError } from './submit-error';
 import { useFormContext } from './use-app-form';
 
 /** Ties a submit button to its TanStack form, so a refused submit can find the form's fields. */
@@ -55,5 +58,41 @@ export function SubmitButton({
         </Button>
       )}
     </form.Subscribe>
+  );
+}
+
+export interface SubmitErrorProps {
+  className?: string;
+}
+
+/**
+ * The failure set with `setFormSubmitError`, shown where the person is about to press submit
+ * again. Render it directly above the submit button, inside `<form.AppForm>`.
+ */
+export function SubmitError({ className }: SubmitErrorProps) {
+  const form = useFormContext();
+  const error = useFormSubmitError(form);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    // Test DOMs (jsdom, some happy-dom versions) lack scrollIntoView.
+    if (error && element && typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [error]);
+
+  if (!error) return null;
+  return (
+    <Alert
+      ref={ref}
+      variant="destructive"
+      data-testid={testIds.form.submitError}
+      className={className}
+    >
+      <AlertCircle aria-hidden="true" />
+      <AlertTitle className="line-clamp-none">{error.title}</AlertTitle>
+      {error.description && <AlertDescription>{error.description}</AlertDescription>}
+    </Alert>
   );
 }

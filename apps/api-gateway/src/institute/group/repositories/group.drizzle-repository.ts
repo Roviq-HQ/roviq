@@ -70,6 +70,22 @@ export class GroupDrizzleRepository extends GroupRepository {
         if (found.length !== linkedIds.length) return [];
       }
 
+      // Same for memberships: another institute's id must not reach group_members. RLS hides
+      // it from the view, so it answers like an id that does not exist.
+      const memberIds = data.memberMembershipIds;
+      if (memberIds.length > 0) {
+        const found = await tx
+          .select({ id: membershipsLive.id })
+          .from(membershipsLive)
+          .where(inArray(membershipsLive.id, memberIds));
+        if (found.length !== memberIds.length) {
+          throw new BusinessException(
+            ErrorCode.MEMBERSHIP_NOT_FOUND,
+            'A chosen member is not a membership of this institute',
+          );
+        }
+      }
+
       const newGroups = await tx
         .insert(groups)
         .values({
@@ -82,6 +98,8 @@ export class GroupDrizzleRepository extends GroupRepository {
           isSystem: data.isSystem,
           status: DynamicGroupStatus.ACTIVE,
           parentGroupId: data.parentGroupId,
+          // Every member below is new and not excluded.
+          memberCount: memberIds.length,
           createdBy: actorId,
           updatedBy: actorId,
         })
@@ -109,6 +127,20 @@ export class GroupDrizzleRepository extends GroupRepository {
           childGroupId: childId,
           tenantId,
         });
+      }
+
+      if (memberIds.length > 0) {
+        await tx.insert(groupMembers).values(
+          memberIds.map((membershipId) => ({
+            tenantId,
+            groupId,
+            membershipId,
+            source: GroupMemberSource.MANUAL,
+            isExcluded: false,
+            createdBy: actorId,
+            updatedBy: actorId,
+          })),
+        );
       }
 
       return newGroups;

@@ -56,6 +56,13 @@ const CREATE = /* GraphQL */ `
     }
   }
 `;
+const LIST = /* GraphQL */ `
+  query ListGroups($filter: GroupFilterInput) {
+    listGroups(filter: $filter) {
+      id
+    }
+  }
+`;
 const UPDATE = /* GraphQL */ `
   mutation UpdateGroup($id: ID!, $rule: JSON) {
     updateGroup(id: $id, input: { name: "Renamed", rule: $rule }) {
@@ -290,6 +297,50 @@ describe('group: another institute id (ROV-293)', () => {
     ['input.childGroupIds', () => createInput({ childGroupIds: [a.groupId, b.groupId] })],
   ] as const)('createGroup should refuse %s of another institute and write nothing', async (_field, variables) => {
     await refusesAndWritesNothing(CREATE, variables(), ErrorCode.GROUP_NOT_FOUND);
+  });
+
+  describe('createGroup input.memberMembershipIds', () => {
+    const staticInput = (name: string, memberMembershipIds: string[]) => ({
+      input: {
+        name,
+        groupType: DomainGroupType.CLUB,
+        membershipType: GroupMembershipType.STATIC,
+        memberMembershipIds,
+      },
+    });
+
+    it('should refuse a membership of another institute among its own and create nothing', async () => {
+      const name = `Quiz Club ${randomUUID().slice(0, 8)}`;
+
+      await refusesAndWritesNothing(
+        CREATE,
+        staticInput(name, [instA.membershipId, instB.membershipId]),
+        ErrorCode.MEMBERSHIP_NOT_FOUND,
+      );
+
+      const listed = await gqlRequest<{ listGroups: { id: string }[] }>(result.httpServer, {
+        query: LIST,
+        variables: { filter: { search: name } },
+        token: tokenA,
+      });
+      expect(listed.errors).toBeUndefined();
+      expect(listed.data?.listGroups).toEqual([]);
+      const rowsOfB = await asAdmin((tx) =>
+        tx
+          .select({ groupId: groupMembers.groupId })
+          .from(groupMembers)
+          .where(eq(groupMembers.membershipId, instB.membershipId)),
+      );
+      expect(rowsOfB).toEqual([{ groupId: b.hybridGroupId }]);
+    });
+
+    it('should answer a membership id that does not exist the same way', async () => {
+      await refusesAndWritesNothing(
+        CREATE,
+        staticInput(`Quiz Club ${randomUUID().slice(0, 8)}`, [instA.membershipId, randomUUID()]),
+        ErrorCode.MEMBERSHIP_NOT_FOUND,
+      );
+    });
   });
 
   describe('setGroupMemberExcluded', () => {

@@ -610,9 +610,10 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 **Problem:** "Save" clicked, nothing visible happens. Silent success or silent failure.
 **Rules:**
 
-- Every mutation has 3 visible states: idle → loading (button spinner + "Saving...") → success (Sonner toast) | error (Sonner toast with detail + retry)
-- Network errors: "Connection lost. Changes not saved. Retrying..." with auto-retry
-- Validation errors: map to specific fields via `<FieldError>`, not just a generic toast
+- Every mutation has 3 visible states: idle → loading (button spinner + "Saving...") → success (Sonner toast) | error
+- An error from a form's submit is shown in the form and stays there, never in a toast: under the field it is about, or in the alert above the submit button. The table and the helpers are in `docs/frontend.md` → "Error messages" → "Where it shows"; `pnpm check:form-errors` enforces it
+- An error from an action with no form (delete a row, a toggle, a download) is a Sonner toast that says what was not done, with Retry where retrying can help
+- Network errors say the change was not saved and what to do next
 - GraphQL errors: parse `extensions`, show human messages — never raw error codes or stack traces
 
 ---
@@ -673,6 +674,7 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 **Problem:** Toasts disappear before user reads them, or error details are lost.
 **Rules:**
 
+- A toast is for success, undo and an action with no form. A form's error is never a toast (see NGIAC)
 - Success: 3–4 seconds, auto-dismiss
 - Error: persist until manually dismissed, or 8 seconds minimum with progress bar
 - Action toasts: include Undo button, persist 5 seconds. "Student deactivated. Undo"

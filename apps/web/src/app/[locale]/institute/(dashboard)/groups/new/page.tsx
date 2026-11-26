@@ -1,14 +1,19 @@
 'use client';
 
 import { DOMAIN_GROUP_TYPE_VALUES, GROUP_MEMBERSHIP_TYPE_VALUES } from '@roviq/common-types';
-import { extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode, isNetworkError } from '@roviq/graphql';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Badge,
   Button,
+  Can,
   Card,
   CardContent,
   Checkbox,
+  clearFormSubmitError,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,6 +28,7 @@ import {
   FieldLabelWithInfo,
   FieldLegend,
   FieldSet,
+  type FormSubmitError,
   fieldErrorMessages,
   Input,
   Select,
@@ -31,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
+  setFormSubmitError,
   setServerFieldError,
   useAppForm,
   useDebounce,
@@ -38,7 +45,17 @@ import {
 import { useStore } from '@tanstack/react-form';
 import { groupNewHelp } from '@web/help/groups/group-new.help';
 import { useErrorCopy } from '@web/hooks/use-error-copy';
-import { ArrowLeft, ArrowRight, Check, Plus, Search, Trash2, UserPlus, Zap } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+  Zap,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -94,7 +111,7 @@ interface RuleNode {
 }
 
 interface SelectedMember {
-  id: string;
+  membershipId: string;
   memberType: MemberType;
   displayName: string;
 }
@@ -166,6 +183,27 @@ function nodeToJsonLogic(node: RuleNode): GroupRule {
   return { [node.combinator]: parts };
 }
 
+type FailureCopyGroup = 'submitErrors' | 'previewErrors';
+
+function failureCopy(
+  t: ReturnType<typeof useTranslations>,
+  errorCopy: ReturnType<typeof useErrorCopy>,
+  group: FailureCopyGroup,
+  err: unknown,
+): FormSubmitError {
+  const kind = isNetworkError(err)
+    ? 'network'
+    : extractGraphQLErrorCode(err) === 'FORBIDDEN'
+      ? 'forbidden'
+      : 'unknown';
+  const description = t(`new.${group}.${kind}.description`);
+  return {
+    title: t(`new.${group}.${kind}.title`),
+    // An unforeseen code still gets its own translated copy when there is one.
+    description: kind === 'unknown' ? errorCopy(err, description) : description,
+  };
+}
+
 /** Try to coerce a literal to boolean/number before falling back to string. */
 function coerceValue(raw: string): string | number | boolean {
   const trimmed = raw.trim();
@@ -180,6 +218,30 @@ function coerceValue(raw: string): string | number | boolean {
 type Step = 'basics' | 'rule' | 'members';
 
 export default function NewGroupPage() {
+  return (
+    <Can I="create" a="Group" passThrough>
+      {(allowed: boolean) => (allowed ? <NewGroupForm /> : <NoCreateAccess />)}
+    </Can>
+  );
+}
+
+function NoCreateAccess() {
+  const t = useTranslations('groups');
+  const router = useRouter();
+  return (
+    <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 text-center">
+      <p className="text-muted-foreground" data-testid={instituteGroups.newAccessDenied}>
+        {t('new.accessDenied')}
+      </p>
+      <Button variant="outline" onClick={() => router.push('/institute/groups')}>
+        <ArrowLeft className="size-4" />
+        {t('actions.back')}
+      </Button>
+    </div>
+  );
+}
+
+function NewGroupForm() {
   const t = useTranslations('groups');
   const errorCopy = useErrorCopy();
   const router = useRouter();
@@ -190,20 +252,27 @@ export default function NewGroupPage() {
   const [step, setStep] = React.useState<Step>('basics');
   const [rootNode, setRootNode] = React.useState<RuleNode>(() => emptyNode('and'));
   const [selectedMembers, setSelectedMembers] = React.useState<SelectedMember[]>([]);
+  const [focusNamePending, setFocusNamePending] = React.useState(false);
 
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value, formApi }) => {
       const parsed = schema.parse(value);
       const needsRuleAtSubmit =
         parsed.membershipType === 'DYNAMIC' || parsed.membershipType === 'HYBRID';
+      const takesMembers = parsed.membershipType === 'STATIC' || parsed.membershipType === 'HYBRID';
+      const rule = needsRuleAtSubmit ? nodeToJsonLogic(rootNode) : undefined;
+      if (needsRuleAtSubmit && Object.keys(rule ?? {}).length === 0) {
+        setFormSubmitError(formApi, {
+          title: t('new.ruleEmpty.title'),
+          description: t('new.ruleEmpty.submitDescription'),
+        });
+        setStep('rule');
+        return;
+      }
+      let created: { id: string } | undefined;
       try {
-        const rule = needsRuleAtSubmit ? nodeToJsonLogic(rootNode) : undefined;
-        if (needsRuleAtSubmit && Object.keys(rule ?? {}).length === 0) {
-          toast.error(t('new.rule.previewError'));
-          return;
-        }
         const result = await createGroup({
           variables: {
             input: {
@@ -212,21 +281,37 @@ export default function NewGroupPage() {
               membershipType: parsed.membershipType,
               memberTypes: parsed.memberTypes,
               rule,
+              memberMembershipIds: takesMembers
+                ? selectedMembers.map((m) => m.membershipId)
+                : undefined,
             },
           },
         });
-        const created = result.data?.createGroup;
-        if (!created) throw new Error(t('new.createError'));
-        toast.success(t('new.createSuccess'));
-        router.push(`/institute/groups/${created.id}`);
+        created = result.data?.createGroup;
       } catch (err) {
         if (extractGraphQLErrorCode(err) === 'GROUP_NAME_DUPLICATE') {
           setStep('basics');
-          setServerFieldError(form, 'name', errorCopy(err));
-        } else {
-          toast.error(errorCopy(err, t('new.createError')));
+          setServerFieldError(formApi, 'name', errorCopy(err));
+          setFocusNamePending(true);
+          return;
         }
+        if (extractGraphQLErrorCode(err) === 'MEMBERSHIP_NOT_FOUND') {
+          setFormSubmitError(formApi, {
+            title: t('new.submitErrors.memberNotFound.title'),
+            description: t('new.submitErrors.memberNotFound.description'),
+          });
+          setStep('members');
+          return;
+        }
+        setFormSubmitError(formApi, failureCopy(t, errorCopy, 'submitErrors', err));
+        return;
       }
+      if (!created) {
+        setFormSubmitError(formApi, failureCopy(t, errorCopy, 'submitErrors', undefined));
+        return;
+      }
+      toast.success(t('new.createSuccess'));
+      router.push(`/institute/groups/${created.id}`);
     },
   });
 
@@ -253,6 +338,13 @@ export default function NewGroupPage() {
 
   const stepIndex = steps.indexOf(step);
 
+  // The name input exists only once the Basics step has rendered.
+  React.useEffect(() => {
+    if (!focusNamePending || step !== 'basics') return;
+    setFocusNamePending(false);
+    window.requestAnimationFrame(() => document.getElementById('name')?.focus());
+  }, [focusNamePending, step]);
+
   React.useEffect(() => {
     // If the user changes membershipType such that the current step no
     // longer exists, snap back to the first step.
@@ -275,12 +367,27 @@ export default function NewGroupPage() {
       if (hasErrors) return;
     }
     const next = steps[stepIndex + 1];
-    if (next) setStep(next);
+    if (!next) return;
+    // The alert answers the last submit; on another step it would read as being about that step.
+    clearFormSubmitError(form);
+    setStep(next);
   };
 
   const goPrev = () => {
     const prev = steps[stepIndex - 1];
-    if (prev) setStep(prev);
+    if (!prev) return;
+    clearFormSubmitError(form);
+    setStep(prev);
+  };
+
+  // A changed rule or member list starts a new attempt: the old failure no longer holds.
+  const changeRule = (next: RuleNode) => {
+    clearFormSubmitError(form);
+    setRootNode(next);
+  };
+  const changeMembers = (next: SelectedMember[]) => {
+    clearFormSubmitError(form);
+    setSelectedMembers(next);
   };
 
   const isLastStep = stepIndex === steps.length - 1;
@@ -411,49 +518,54 @@ export default function NewGroupPage() {
                 </FieldSet>
               </FieldGroup>
             )}
-            {step === 'rule' && <RuleStep rootNode={rootNode} onChange={setRootNode} />}
+            {step === 'rule' && <RuleStep rootNode={rootNode} onChange={changeRule} />}
             {step === 'members' && (
               <MembersStep
                 memberTypes={memberTypes}
                 selected={selectedMembers}
-                onSelectedChange={setSelectedMembers}
+                onSelectedChange={changeMembers}
               />
             )}
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex items-center justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={goPrev}
-            disabled={stepIndex === 0 || creating}
-            data-testid={instituteGroups.newPrevBtn}
-          >
-            <ArrowLeft className="size-4" />
-            {t('actions.previous')}
-          </Button>
-          {isLastStep ? (
-            <form.AppForm>
-              <form.SubmitButton
-                testId="groups-new-submit-btn"
-                submittingLabel={t('actions.saving')}
-              >
-                <Check className="size-4" />
-                {t('actions.finish')}
-              </form.SubmitButton>
-            </form.AppForm>
-          ) : (
+        <div className="mt-6 space-y-4">
+          <form.AppForm>
+            <form.SubmitError />
+          </form.AppForm>
+          <div className="flex items-center justify-between">
             <Button
               type="button"
-              onClick={goNext}
-              disabled={creating}
-              data-testid={instituteGroups.newNextBtn}
+              variant="outline"
+              onClick={goPrev}
+              disabled={stepIndex === 0 || creating}
+              data-testid={instituteGroups.newPrevBtn}
             >
-              {t('actions.next')}
-              <ArrowRight className="size-4" />
+              <ArrowLeft className="size-4" />
+              {t('actions.previous')}
             </Button>
-          )}
+            {isLastStep ? (
+              <form.AppForm>
+                <form.SubmitButton
+                  testId={instituteGroups.newSubmitBtn}
+                  submittingLabel={t('actions.saving')}
+                >
+                  <Check className="size-4" />
+                  {t('actions.finish')}
+                </form.SubmitButton>
+              </form.AppForm>
+            ) : (
+              <Button
+                type="button"
+                onClick={goNext}
+                disabled={creating}
+                data-testid={instituteGroups.newNextBtn}
+              >
+                {t('actions.next')}
+                <ArrowRight className="size-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </form>
     </div>
@@ -511,11 +623,21 @@ function RuleStep({
     RulePreviewResult,
     'count' | 'sampleMembers'
   > | null>(null);
+  const [previewProblem, setPreviewProblem] = React.useState<FormSubmitError | null>(null);
+
+  const changeRule = (next: RuleNode) => {
+    setPreviewProblem(null);
+    onChange(next);
+  };
 
   const handlePreview = async () => {
+    setPreviewProblem(null);
     const logic = nodeToJsonLogic(rootNode);
     if (Object.keys(logic).length === 0) {
-      toast.error(t('new.rule.previewError'));
+      setPreviewProblem({
+        title: t('new.ruleEmpty.title'),
+        description: t('new.ruleEmpty.previewDescription'),
+      });
       return;
     }
     try {
@@ -525,7 +647,7 @@ function RuleStep({
         setPreviewOpen(true);
       }
     } catch (err) {
-      toast.error(errorCopy(err, t('new.rule.previewError')));
+      setPreviewProblem(failureCopy(t, errorCopy, 'previewErrors', err));
     }
   };
 
@@ -535,9 +657,9 @@ function RuleStep({
         <FieldLegend>{t('new.rule.sectionTitle')}</FieldLegend>
         <FieldDescription>{t('new.rule.sectionDescription')}</FieldDescription>
 
-        <RuleNodeEditor node={rootNode} onChange={onChange} depth={0} />
+        <RuleNodeEditor node={rootNode} onChange={changeRule} depth={0} />
 
-        <div className="flex justify-end pt-2">
+        <div className="flex flex-col items-end gap-2 pt-2">
           <Button
             type="button"
             variant="outline"
@@ -548,6 +670,17 @@ function RuleStep({
             <Zap className="size-4" />
             {previewing ? t('new.rule.previewing') : t('new.rule.preview')}
           </Button>
+          {previewProblem && (
+            <Alert
+              variant="destructive"
+              className="py-2"
+              data-testid={instituteGroups.newRulePreviewError}
+            >
+              <AlertCircle aria-hidden="true" />
+              <AlertTitle className="line-clamp-none">{previewProblem.title}</AlertTitle>
+              <AlertDescription>{previewProblem.description}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FieldSet>
 
@@ -733,6 +866,9 @@ function RuleNodeEditor({
 
 // ─── Step 3: Members ────────────────────────────────────────────────────────
 
+/** `createGroup` takes at most this many hand-picked members (`CreateGroupInput`). */
+const MAX_PICKED_MEMBERS = 500;
+
 function MembersStep({
   memberTypes,
   selected,
@@ -746,13 +882,14 @@ function MembersStep({
   const [searchInput, setSearchInput] = React.useState('');
   const debouncedSearch = useDebounce(searchInput, 250);
 
+  const full = selected.length >= MAX_PICKED_MEMBERS;
   const addMember = (m: SelectedMember) => {
-    if (selected.some((s) => s.id === m.id && s.memberType === m.memberType)) return;
+    if (full || selected.some((s) => s.membershipId === m.membershipId)) return;
     onSelectedChange([...selected, m]);
   };
 
-  const removeMember = (id: string, memberType: MemberType) => {
-    onSelectedChange(selected.filter((s) => !(s.id === id && s.memberType === memberType)));
+  const removeMember = (membershipId: string) => {
+    onSelectedChange(selected.filter((s) => s.membershipId !== membershipId));
   };
 
   return (
@@ -779,18 +916,29 @@ function MembersStep({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">
             {memberTypes.includes('student') && (
-              <StudentCandidates search={debouncedSearch} onAdd={addMember} />
+              <StudentCandidates search={debouncedSearch} onAdd={addMember} full={full} />
             )}
             {memberTypes.includes('staff') && (
-              <StaffCandidates search={debouncedSearch} onAdd={addMember} />
+              <StaffCandidates search={debouncedSearch} onAdd={addMember} full={full} />
             )}
             {memberTypes.includes('guardian') && (
-              <GuardianCandidates search={debouncedSearch} onAdd={addMember} />
+              <GuardianCandidates search={debouncedSearch} onAdd={addMember} full={full} />
             )}
           </div>
 
           <div className="space-y-2 rounded-md border p-3">
-            <p className="text-sm font-medium">{t('new.members.selectedMembers')}</p>
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-medium">{t('new.members.selectedMembers')}</p>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid={instituteGroups.newPickedCount}
+              >
+                {t('new.members.pickedCount', {
+                  count: selected.length,
+                  max: MAX_PICKED_MEMBERS,
+                })}
+              </p>
+            </div>
             {selected.length === 0 ? (
               <p
                 className="text-sm text-muted-foreground"
@@ -802,7 +950,7 @@ function MembersStep({
               <ul className="space-y-1">
                 {selected.map((m) => (
                   <li
-                    key={`${m.memberType}-${m.id}`}
+                    key={m.membershipId}
                     className="flex items-center justify-between gap-2 rounded border bg-background px-2 py-1.5 text-sm"
                   >
                     <div className="flex items-center gap-2">
@@ -815,7 +963,7 @@ function MembersStep({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeMember(m.id, m.memberType)}
+                      onClick={() => removeMember(m.membershipId)}
                       aria-label={t('new.members.removeMember')}
                       title={t('new.members.removeMember')}
                     >
@@ -835,17 +983,25 @@ function MembersStep({
 function StudentCandidates({
   search,
   onAdd,
+  full,
 }: {
   search: string;
   onAdd: (m: SelectedMember) => void;
+  /** The picker is at its limit: Add is off. */
+  full: boolean;
 }) {
   const t = useTranslations('groups');
   const ti = useI18nField();
   const { students, loading } = useStudents({ search: search || undefined, first: 20 });
+  // A student without an institute membership cannot be a group member.
+  const pickable = students.flatMap((s) =>
+    s.membershipId ? [{ ...s, membershipId: s.membershipId }] : [],
+  );
 
   return (
-    <CandidateList title={t('memberTypes.student')} loading={loading} empty={students.length === 0}>
-      {students.map((s) => {
+    <CandidateList title={t('memberTypes.student')} loading={loading} empty={pickable.length === 0}>
+      {pickable.map((s) => {
+        const { membershipId } = s;
         const first = ti(s.firstName) ?? '';
         const last = ti(s.lastName ?? undefined) ?? '';
         const displayName = `${first} ${last}`.trim() || s.admissionNumber || s.id;
@@ -853,7 +1009,8 @@ function StudentCandidates({
           <CandidateRow
             key={s.id}
             label={`${displayName} · ${s.admissionNumber}`}
-            onAdd={() => onAdd({ id: s.id, memberType: 'student', displayName })}
+            disabled={full}
+            onAdd={() => onAdd({ membershipId, memberType: 'student', displayName })}
           />
         );
       })}
@@ -864,9 +1021,12 @@ function StudentCandidates({
 function StaffCandidates({
   search,
   onAdd,
+  full,
 }: {
   search: string;
   onAdd: (m: SelectedMember) => void;
+  /** The picker is at its limit: Add is off. */
+  full: boolean;
 }) {
   const t = useTranslations('groups');
   const ti = useI18nField();
@@ -882,7 +1042,8 @@ function StaffCandidates({
           <CandidateRow
             key={s.id}
             label={displayName}
-            onAdd={() => onAdd({ id: s.id, memberType: 'staff', displayName })}
+            disabled={full}
+            onAdd={() => onAdd({ membershipId: s.membershipId, memberType: 'staff', displayName })}
           />
         );
       })}
@@ -893,9 +1054,12 @@ function StaffCandidates({
 function GuardianCandidates({
   search,
   onAdd,
+  full,
 }: {
   search: string;
   onAdd: (m: SelectedMember) => void;
+  /** The picker is at its limit: Add is off. */
+  full: boolean;
 }) {
   const t = useTranslations('groups');
   const ti = useI18nField();
@@ -916,7 +1080,10 @@ function GuardianCandidates({
           <CandidateRow
             key={g.id}
             label={displayName}
-            onAdd={() => onAdd({ id: g.id, memberType: 'guardian', displayName })}
+            disabled={full}
+            onAdd={() =>
+              onAdd({ membershipId: g.membershipId, memberType: 'guardian', displayName })
+            }
           />
         );
       })}
@@ -957,7 +1124,15 @@ function CandidateList({
   );
 }
 
-function CandidateRow({ label, onAdd }: { label: string; onAdd: () => void }) {
+function CandidateRow({
+  label,
+  onAdd,
+  disabled,
+}: {
+  label: string;
+  onAdd: () => void;
+  disabled: boolean;
+}) {
   const t = useTranslations('groups');
   return (
     <li className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
@@ -967,8 +1142,13 @@ function CandidateRow({ label, onAdd }: { label: string; onAdd: () => void }) {
         variant="ghost"
         size="sm"
         onClick={onAdd}
+        disabled={disabled}
         aria-label={t('new.members.addMember')}
-        title={t('new.members.addMember')}
+        title={
+          disabled
+            ? t('new.members.pickerFull', { max: MAX_PICKED_MEMBERS })
+            : t('new.members.addMember')
+        }
       >
         <UserPlus className="size-4" />
         {t('new.members.addMember')}

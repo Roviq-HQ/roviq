@@ -93,6 +93,10 @@ export const testIds = {
     userAgent: 'session-user-agent',
     ipAddress: 'session-ip-address',
   },
+  // ── Form kit (consumed by libs/frontend/ui/src/form) ──────────────────
+  form: {
+    submitError: 'form-submit-error',
+  },
   // ── Cross-cutting layout (consumed by libs/frontend/ui components) ─────
   layout: {
     topbar: 'topbar',
@@ -1293,10 +1297,14 @@ export const testIds = {
     newBackBtn: 'groups-new-back-btn',
     newMembersSearchInput: 'groups-new-members-search-input',
     newNoCandidates: 'groups-new-no-candidates',
+    newPickedCount: 'groups-new-picked-count',
     newNoSelection: 'groups-new-no-selection',
     newPrevBtn: 'groups-new-prev-btn',
     newNextBtn: 'groups-new-next-btn',
     newRulePreviewBtn: 'groups-new-rule-preview-btn',
+    newRulePreviewError: 'groups-new-rule-preview-error',
+    newSubmitBtn: 'groups-new-submit-btn',
+    newAccessDenied: 'groups-new-access-denied',
     // Rule preview
     previewMember: (membershipId: string) => `groups-preview-member-${membershipId}`,
   },

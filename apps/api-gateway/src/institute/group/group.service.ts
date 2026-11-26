@@ -56,6 +56,14 @@ export class GroupService {
   async create(input: CreateGroupInput): Promise<GroupRecord> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
+    const membershipType = input.membershipType ?? GroupMembershipType.DYNAMIC;
+    const memberMembershipIds = input.memberMembershipIds ?? [];
+    if (memberMembershipIds.length > 0 && membershipType === GroupMembershipType.DYNAMIC) {
+      throw new BusinessException(
+        ErrorCode.VALIDATION_FAILED,
+        'memberMembershipIds applies only to STATIC and HYBRID groups',
+      );
+    }
 
     const rule =
       input.rule && Object.keys(input.rule).length > 0
@@ -72,12 +80,13 @@ export class GroupService {
       name: input.name,
       description: input.description ?? null,
       groupType: input.groupType,
-      membershipType: input.membershipType ?? GroupMembershipType.DYNAMIC,
+      membershipType,
       memberTypes: input.memberTypes ?? ['student'],
       isSystem: input.isSystem ?? false,
       parentGroupId: input.parentGroupId ?? null,
       rule,
       childGroupIds: input.childGroupIds ?? [],
+      memberMembershipIds,
     });
     if (!group) {
       throw new BusinessException(ErrorCode.GROUP_NOT_FOUND, 'Parent or child group not found');

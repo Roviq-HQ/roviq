@@ -1934,6 +1934,11 @@ input CreateGroupInput {
   isSystem: Boolean
 
   """
+  Memberships added by hand when the group is created (at most 500, no repeats). Each must be a membership of this institute. Not allowed when membershipType is DYNAMIC.
+  """
+  memberMembershipIds: [ID!]
+
+  """
   Member entity types this group can contain, e.g. ["student"] or ["staff"].
   """
   memberTypes: [String!] = ["student"]

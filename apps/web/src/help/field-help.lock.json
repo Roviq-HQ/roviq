@@ -113,10 +113,10 @@
     }
   },
   "groups.new.memberTypes": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "GroupService.create now also stores hand-picked members and refuses them on a dynamic group; member types are still saved with the group and fixed after creation, so the copy holds",
     "targets": {
       "apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput": "31a986e62a3a5a46",
-      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "43636c6bebadf043"
+      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "9e3d14e5d9f6a4bb"
     }
   },
   "groups.new.membershipType": {
