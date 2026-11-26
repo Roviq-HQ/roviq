@@ -3,20 +3,10 @@
  *
  * Tests that rules produce parameterized SQL with correct table-qualified column names.
  */
-import { GROUP_RULE_DIMENSION_VALUES } from '@roviq/common-types';
 import { describe, expect, it } from 'vitest';
 import { groupRuleToSql } from '../group-rule-interpreter';
 
 describe('groupRuleToSql', () => {
-  it.each(
-    GROUP_RULE_DIMENSION_VALUES,
-  )('maps the shared dimension %s to a table column', (dimension) => {
-    const result = groupRuleToSql({ '==': [{ var: dimension }, 'x'] });
-    expect(result?.sqlString).toMatch(
-      /^"(tenant_user_profiles|student_profiles|student_academics|sections)"\."[a-z_]+" = \$1$/,
-    );
-  });
-
   it('simple equality → parameterized SQL with table-qualified column', () => {
     const result = groupRuleToSql({ '==': [{ var: 'gender' }, 'female'] });
     expect(result).toBeDefined();

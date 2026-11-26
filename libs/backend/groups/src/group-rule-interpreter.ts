@@ -6,6 +6,7 @@
  *
  * Pipeline: JsonLogic → jsonLogicToUcast() → @ucast/sql interpret() → SQL string + params
  */
+import type { GroupRuleDimension } from '@roviq/common-types';
 import { allInterpreters, createSqlInterpreter, pg } from '@ucast/sql';
 import { type SQL, sql } from 'drizzle-orm';
 import { jsonLogicToUcast } from './json-logic-to-ucast';
@@ -23,7 +24,7 @@ const interpret = createSqlInterpreter(allInterpreters);
  * - student_academics: standard_id, section_id, house_id, route_id
  * - sections (via join): shift, medium
  */
-const DIMENSION_TO_COLUMN: Record<string, string> = {
+const DIMENSION_TO_COLUMN: Record<GroupRuleDimension, string> = {
   // tenant_user_profiles: the institute's own copy of the demographics
   gender: '"tenant_user_profiles"."gender"',
   date_of_birth: '"tenant_user_profiles"."date_of_birth"',
@@ -48,6 +49,8 @@ const DIMENSION_TO_COLUMN: Record<string, string> = {
   shift: '"sections"."shift"',
   medium: '"sections"."medium_of_instruction"',
 };
+
+const COLUMN_OF: ReadonlyMap<string, string> = new Map(Object.entries(DIMENSION_TO_COLUMN));
 
 /** Type for a JsonLogic rule — the input format stored in group_rules.rule */
 export type JsonLogicRule = Record<string, unknown>;
@@ -74,7 +77,7 @@ export function groupRuleToSql(
     // Override escapeField to use our dimension→column mapping.
     // The mapping values are already pre-escaped (e.g., '"tenant_user_profiles"."gender"')
     // so we return them directly instead of applying pg's default escaping.
-    escapeField: (field: string) => DIMENSION_TO_COLUMN[field] ?? pg.escapeField(field),
+    escapeField: (field: string) => COLUMN_OF.get(field) ?? pg.escapeField(field),
     joinRelation: () => false,
   });
 
