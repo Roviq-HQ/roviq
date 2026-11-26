@@ -40,6 +40,9 @@ const RESOLVE_GROUP_MEMBERS = /* GraphQL */ `
     resolveGroupMembers(groupId: $groupId) { groupId memberCount resolvedAt }
   }
 `;
+const LIST_GROUPS = /* GraphQL */ `
+  query ListGroups($filter: GroupFilterInput) { listGroups(filter: $filter) { id name } }
+`;
 const LIST_GROUP_MEMBERS = /* GraphQL */ `
   query ListGroupMembers($groupId: ID!) { listGroupMembers(groupId: $groupId) { id } }
 `;

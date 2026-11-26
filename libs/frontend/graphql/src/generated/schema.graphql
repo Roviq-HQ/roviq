@@ -1934,7 +1934,7 @@ input CreateGroupInput {
   isSystem: Boolean
 
   """
-  Memberships added by hand when the group is created (at most 500; duplicates are stored once). Each must be a membership of this institute. Not allowed when membershipType is DYNAMIC.
+  Memberships added by hand when the group is created (at most 500, no repeats). Each must be a membership of this institute. Not allowed when membershipType is DYNAMIC.
   """
   memberMembershipIds: [ID!]
 

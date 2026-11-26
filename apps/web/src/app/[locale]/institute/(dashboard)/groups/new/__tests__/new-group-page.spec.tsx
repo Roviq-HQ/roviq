@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { NetworkFetchError } from '@roviq/graphql';
 import type { Locale } from '@roviq/i18n';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -203,7 +204,7 @@ describe('NewGroupPage submit errors', () => {
   });
 
   it('should show the connection copy when the server cannot be reached', async () => {
-    createGroupMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    createGroupMock.mockRejectedValue(new NetworkFetchError(new TypeError('Failed to fetch')));
     const m = renderPage();
     await toRuleStep(m, 'DYNAMIC');
     await fillCondition(m);
@@ -216,7 +217,7 @@ describe('NewGroupPage submit errors', () => {
   });
 
   it('should show the connection copy in Hindi', async () => {
-    createGroupMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    createGroupMock.mockRejectedValue(new NetworkFetchError(new TypeError('Failed to fetch')));
     const m = renderPage('hi');
     await toRuleStep(m, 'DYNAMIC');
     await fillCondition(m);

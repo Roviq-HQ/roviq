@@ -113,10 +113,10 @@
     }
   },
   "groups.new.memberTypes": {
-    "reviewedReason": "createGroup now also stores hand-picked members; member types are still saved with the group and cannot be changed later",
+    "reviewedReason": "GroupService.create now also stores hand-picked members and refuses them on a dynamic group; member types are still saved with the group and fixed after creation, so the copy holds",
     "targets": {
       "apps/api-gateway/src/institute/group/dto/create-group.input.ts#UpdateGroupInput": "31a986e62a3a5a46",
-      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "b01679e15a3191fd"
+      "apps/api-gateway/src/institute/group/group.service.ts#GroupService.create": "9e3d14e5d9f6a4bb"
     }
   },
   "groups.new.membershipType": {
