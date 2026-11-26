@@ -5,7 +5,8 @@
  *   pnpm storage:check
  *
  * It needs both buckets to exist already, writes only under `__storage-check__/` and removes
- * what it wrote. Exit code 1 when any check fails.
+ * what it wrote. Exit code 1 when any check fails. A check that cannot apply to this store (the
+ * https checks against a plain-http dev store) prints SKIP and does not fail the run.
  */
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
@@ -19,6 +20,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { parseOrigins, S3_CHECKSUM_OPTIONS, STORAGE_CHECK_PREFIX } from './lib/storage-rules';
 
 function required(name: string, value: string | undefined): string {
   if (!value) {
@@ -31,6 +33,7 @@ function required(name: string, value: string | undefined): string {
 const shared = {
   region: required('S3_REGION', process.env.S3_REGION),
   forcePathStyle: true,
+  ...S3_CHECKSUM_OPTIONS,
   credentials: {
     accessKeyId: required('S3_ACCESS_KEY', process.env.S3_ACCESS_KEY),
     secretAccessKey: required('S3_SECRET_KEY', process.env.S3_SECRET_KEY),
@@ -51,12 +54,24 @@ const publicBaseUrl = required('S3_PUBLIC_BASE_URL', process.env.S3_PUBLIC_BASE_
   '',
 );
 
-const prefix = `__storage-check__/${randomUUID()}`;
+const publicEndpoint = required('S3_PUBLIC_ENDPOINT', process.env.S3_PUBLIC_ENDPOINT).replace(
+  /\/+$/,
+  '',
+);
+const portalOrigins = parseOrigins(required('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS));
+
+const prefix = `${STORAGE_CHECK_PREFIX}${randomUUID()}`;
 const pendingKey = `${prefix}/pending/प्रमाण पत्र.pdf`;
 const finalKey = `${prefix}/final.pdf`;
 const publicKey = `${prefix}/logo.pdf`;
 const PDF = Buffer.from('%PDF-1.7\nstorage check');
 const failures: string[] = [];
+let skipped = 0;
+
+function skip(name: string, reason: string): void {
+  console.info(`SKIP  ${name} (${reason})`);
+  skipped += 1;
+}
 
 async function check(name: string, run: () => Promise<boolean>): Promise<void> {
   let ok = false;
@@ -109,21 +124,25 @@ async function main(): Promise<void> {
   });
 
   const uploadUrl = await presignPut(pendingKey, PDF.length);
+  await check('presigned PUT URL carries no checksum parameter', async () => {
+    return ![...new URL(uploadUrl).searchParams.keys()].some((name) => /checksum/i.test(name));
+  });
   await check('presigned PUT accepts the declared size and type', async () => {
     return (await put(uploadUrl, PDF, 'application/pdf')) === 200;
   });
-  const portalOrigin = required('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS).split(',')[0];
-  await check('browser preflight from a portal origin is allowed to upload', async () => {
-    const res = await fetch(uploadUrl, {
-      method: 'OPTIONS',
-      headers: {
-        Origin: portalOrigin ?? '',
-        'Access-Control-Request-Method': 'PUT',
-        'Access-Control-Request-Headers': 'content-type',
-      },
+  for (const portalOrigin of portalOrigins) {
+    await check(`browser preflight from ${portalOrigin} is allowed to upload`, async () => {
+      const res = await fetch(uploadUrl, {
+        method: 'OPTIONS',
+        headers: {
+          Origin: portalOrigin,
+          'Access-Control-Request-Method': 'PUT',
+          'Access-Control-Request-Headers': 'content-type',
+        },
+      });
+      return res.ok && res.headers.get('access-control-allow-origin') === portalOrigin;
     });
-    return res.ok && res.headers.get('access-control-allow-origin') === portalOrigin;
-  });
+  }
   await check('browser preflight from an unknown origin is not allowed', async () => {
     const res = await fetch(uploadUrl, {
       method: 'OPTIONS',
@@ -179,6 +198,21 @@ async function main(): Promise<void> {
     return Buffer.from((await res.Body?.transformToByteArray()) ?? []).equals(PDF);
   });
 
+  await check('server write keeps its Cache-Control header', async () => {
+    const key = `${prefix}/cached.pdf`;
+    await server.send(
+      new PutObjectCommand({
+        Bucket: privateBucket,
+        Key: key,
+        Body: PDF,
+        ContentType: 'application/pdf',
+        CacheControl: 'private, max-age=86400',
+      }),
+    );
+    const head = await server.send(new HeadObjectCommand({ Bucket: privateBucket, Key: key }));
+    return head.CacheControl === 'private, max-age=86400';
+  });
+
   await check('ranged read returns the first bytes', async () => {
     const res = await server.send(
       new GetObjectCommand({ Bucket: privateBucket, Key: finalKey, Range: 'bytes=0-4' }),
@@ -220,16 +254,49 @@ async function main(): Promise<void> {
     },
   );
   await check('private bucket object is NOT readable without sign-in', async () => {
-    const base = required('S3_PUBLIC_ENDPOINT', process.env.S3_PUBLIC_ENDPOINT).replace(/\/+$/, '');
-    return (await fetch(`${base}/${privateBucket}/${finalKey}`)).status >= 400;
+    return (await fetch(`${publicEndpoint}/${privateBucket}/${finalKey}`)).status >= 400;
   });
+  await check('public bucket cannot be listed without sign-in', async () => {
+    const urls = [`${publicBaseUrl}/`, `${publicEndpoint}/${publicBucket}?list-type=2`];
+    for (const url of urls) {
+      const res = await fetch(url);
+      if (res.ok && (await res.text()).includes('ListBucketResult')) return false;
+    }
+    return true;
+  });
+  await check('public bucket refuses a write without sign-in', async () => {
+    const key = `${prefix}/anonymous.txt`;
+    const res = await fetch(`${publicEndpoint}/${publicBucket}/${key}`, {
+      method: 'PUT',
+      body: 'anonymous',
+      headers: { 'Content-Type': 'text/plain' },
+    });
+    return res.status >= 400 && !(await exists(publicBucket, key));
+  });
+  if (publicEndpoint.startsWith('https://')) {
+    await check('a download link over plain http is refused', async () => {
+      const plain = (await presignGet()).replace(/^https:/, 'http:');
+      try {
+        return (await fetch(plain, { redirect: 'manual' })).status !== 200;
+      } catch {
+        return true;
+      }
+    });
+  } else {
+    skip('a download link over plain http is refused', 'S3_PUBLIC_ENDPOINT is not https');
+  }
 
   await check('batch delete removes objects and tolerates a missing key', async () => {
     const res = await server.send(
       new DeleteObjectsCommand({
         Bucket: privateBucket,
         Delete: {
-          Objects: [{ Key: pendingKey }, { Key: finalKey }, { Key: `${prefix}/never-existed` }],
+          Objects: [
+            { Key: pendingKey },
+            { Key: finalKey },
+            { Key: `${prefix}/cached.pdf` },
+            { Key: `${prefix}/never-existed` },
+          ],
           Quiet: true,
         },
       }),
@@ -250,7 +317,9 @@ main()
       console.error(`\n${failures.length} check(s) failed. This store is not safe to use as is.`);
       process.exit(1);
     }
-    console.info('\nAll checks passed.');
+    console.info(
+      skipped > 0 ? `\nAll checks passed (${skipped} skipped).` : '\nAll checks passed.',
+    );
   })
   .catch((err) => {
     console.error('storage:check could not run:', err);
