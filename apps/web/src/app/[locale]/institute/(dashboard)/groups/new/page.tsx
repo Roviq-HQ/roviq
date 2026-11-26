@@ -13,6 +13,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  clearFormSubmitError,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -251,6 +252,7 @@ function NewGroupForm() {
   const [step, setStep] = React.useState<Step>('basics');
   const [rootNode, setRootNode] = React.useState<RuleNode>(() => emptyNode('and'));
   const [selectedMembers, setSelectedMembers] = React.useState<SelectedMember[]>([]);
+  const [focusNamePending, setFocusNamePending] = React.useState(false);
 
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,
@@ -290,6 +292,7 @@ function NewGroupForm() {
         if (extractGraphQLErrorCode(err) === 'GROUP_NAME_DUPLICATE') {
           setStep('basics');
           setServerFieldError(formApi, 'name', errorCopy(err));
+          setFocusNamePending(true);
           return;
         }
         if (extractGraphQLErrorCode(err) === 'MEMBERSHIP_NOT_FOUND') {
@@ -335,6 +338,13 @@ function NewGroupForm() {
 
   const stepIndex = steps.indexOf(step);
 
+  // The name input exists only once the Basics step has rendered.
+  React.useEffect(() => {
+    if (!focusNamePending || step !== 'basics') return;
+    setFocusNamePending(false);
+    window.requestAnimationFrame(() => document.getElementById('name')?.focus());
+  }, [focusNamePending, step]);
+
   React.useEffect(() => {
     // If the user changes membershipType such that the current step no
     // longer exists, snap back to the first step.
@@ -357,12 +367,27 @@ function NewGroupForm() {
       if (hasErrors) return;
     }
     const next = steps[stepIndex + 1];
-    if (next) setStep(next);
+    if (!next) return;
+    // The alert answers the last submit; on another step it would read as being about that step.
+    clearFormSubmitError(form);
+    setStep(next);
   };
 
   const goPrev = () => {
     const prev = steps[stepIndex - 1];
-    if (prev) setStep(prev);
+    if (!prev) return;
+    clearFormSubmitError(form);
+    setStep(prev);
+  };
+
+  // A changed rule or member list starts a new attempt: the old failure no longer holds.
+  const changeRule = (next: RuleNode) => {
+    clearFormSubmitError(form);
+    setRootNode(next);
+  };
+  const changeMembers = (next: SelectedMember[]) => {
+    clearFormSubmitError(form);
+    setSelectedMembers(next);
   };
 
   const isLastStep = stepIndex === steps.length - 1;
@@ -493,12 +518,12 @@ function NewGroupForm() {
                 </FieldSet>
               </FieldGroup>
             )}
-            {step === 'rule' && <RuleStep rootNode={rootNode} onChange={setRootNode} />}
+            {step === 'rule' && <RuleStep rootNode={rootNode} onChange={changeRule} />}
             {step === 'members' && (
               <MembersStep
                 memberTypes={memberTypes}
                 selected={selectedMembers}
-                onSelectedChange={setSelectedMembers}
+                onSelectedChange={changeMembers}
               />
             )}
           </CardContent>

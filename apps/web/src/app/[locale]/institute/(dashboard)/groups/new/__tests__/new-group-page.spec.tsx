@@ -201,6 +201,9 @@ describe('NewGroupPage submit errors', () => {
     expect(screen.queryByText(m.new.rule.sectionTitle)).not.toBeInTheDocument();
     expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: new RegExp(m.new.basics.name) })).toHaveFocus(),
+    );
   });
 
   it('should show the connection copy when the server cannot be reached', async () => {
@@ -315,6 +318,48 @@ describe('NewGroupPage members', () => {
     expectAlert(m.new.submitErrors.memberNotFound);
     expect(screen.getByText(m.new.members.sectionTitle)).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  /** HYBRID wizard, Create pressed with an empty rule: the alert shows on the Rule step. */
+  async function emptyRuleAlertOnRuleStep(m: Messages) {
+    await toRuleStep(m, 'HYBRID');
+    await userEvent.click(screen.getByTestId(ids.newNextBtn));
+    await screen.findByText(m.new.members.sectionTitle);
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+    await screen.findByTestId(formIds.submitError);
+    expect(screen.getByText(m.new.rule.sectionTitle)).toBeInTheDocument();
+  }
+
+  it('should clear the submit alert when the person moves to another step', async () => {
+    const m = renderPage();
+    await emptyRuleAlertOnRuleStep(m);
+
+    await userEvent.click(screen.getByTestId(ids.newNextBtn));
+
+    await screen.findByText(m.new.members.sectionTitle);
+    expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
+  });
+
+  it('should clear the submit alert when the rule changes', async () => {
+    const m = renderPage();
+    await emptyRuleAlertOnRuleStep(m);
+
+    await fillCondition(m);
+
+    expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
+  });
+
+  it('should clear the member alert when the picked members change', async () => {
+    createGroupMock.mockRejectedValue(graphQLError('MEMBERSHIP_NOT_FOUND'));
+    const m = renderPage();
+    await toMembersStep(m);
+    await addCandidate(m, 'Asha Verma · ADM-1');
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+    await screen.findByTestId(formIds.submitError);
+
+    await addCandidate(m, 'Ravi Nair');
+
+    expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
   });
 });
 
