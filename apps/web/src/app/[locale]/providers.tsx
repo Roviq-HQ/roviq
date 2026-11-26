@@ -128,6 +128,7 @@ export function Providers({ scope = 'institute', children }: ProvidersProps) {
         loginFailed: t('loginFailed'),
         errors: errorLabels,
         switchAccount: t('switchAccount'),
+        chooseInstitute: t('reAuthChooseInstitute'),
       },
     }),
     [t, errorLabels],

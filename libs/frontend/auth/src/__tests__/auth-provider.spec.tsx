@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../lib/auth-context';
+import { AuthRequestError } from '../lib/error-utils';
 import type { AuthUser, LoginResult, MembershipInfo } from '../lib/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -674,5 +675,60 @@ describe('AuthProvider — one refresh request per refresh token', () => {
     await act(() => result.current.refreshSession());
 
     expect(props.refreshMutation).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('AuthProvider — re-login from the session-expired dialog, several institutes', () => {
+  const SELECTION = {
+    requiresInstituteSelection: true,
+    selectionToken: 'sel-token',
+    memberships: MOCK_MEMBERSHIPS,
+  } as LoginResult;
+
+  async function expireSessionIn(tenantId: string) {
+    sessionStorage.clear();
+    localStorage.clear();
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt-old');
+    localStorage.setItem('roviq-institute-user', JSON.stringify({ ...MOCK_USER, tenantId }));
+    const props = makeDefaultProps();
+    props.refreshMutation.mockRejectedValue(new AuthRequestError('revoked', 'SESSION_EXPIRED'));
+    props.loginMutation.mockResolvedValue(SELECTION);
+    const view = renderUseAuth(props);
+    await waitFor(() => expect(view.result.current.isAuthenticated).toBe(true));
+    await act(async () => {
+      await view.result.current.refreshSession().catch(() => {});
+    });
+    expect(view.result.current.sessionExpired).toBe(true);
+    return { ...view, props };
+  }
+
+  it('signs back into the institute the person was in, without the institute picker page', async () => {
+    const { result, props } = await expireSessionIn('t2');
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.reAuthenticate({ username: 'priya.admin', password: 'pw' });
+    });
+
+    expect(outcome).toEqual({ kind: 'signed-in' });
+    expect(props.selectInstituteMutation).toHaveBeenCalledWith('sel-token', 'm2');
+    expect(result.current.needsInstituteSelection).toBe(false);
+    expect(result.current.isAuthenticated).toBe(true);
+  });
+
+  it('lists the institutes when the one the person was in is not among theirs any more', async () => {
+    const { result, props } = await expireSessionIn('t-gone');
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.reAuthenticate({ username: 'priya.admin', password: 'pw' });
+    });
+    expect(outcome).toEqual({ kind: 'chooseInstitute', memberships: MOCK_MEMBERSHIPS });
+    expect(props.selectInstituteMutation).not.toHaveBeenCalled();
+    expect(result.current.needsInstituteSelection).toBe(false);
+
+    await act(() => result.current.completeReAuthentication('m1'));
+    expect(props.selectInstituteMutation).toHaveBeenCalledWith('sel-token', 'm1');
   });
 });
