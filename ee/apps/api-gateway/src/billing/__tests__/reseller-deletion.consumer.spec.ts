@@ -91,8 +91,36 @@ describe('ResellerDeletionConsumer', () => {
 
     await expect(
       consumer.onStatusChanged({ ...event(ResellerStatus.DELETED), deletedAt: null }),
-    ).rejects.toThrow('carries no deletedAt');
+    ).rejects.toBeInstanceOf(ZodError);
     expect(startWorkflowOnce).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a number', Date.parse(DELETED_AT)],
+    ['a boolean', true],
+    ['a non-ISO string', '26/11/2026'],
+  ])('should refuse deletedAt given as %s and start nothing', async (_label, deletedAt) => {
+    const { consumer, startWorkflowOnce } = setUp();
+
+    await expect(
+      consumer.onStatusChanged({ ...event(ResellerStatus.DELETED), deletedAt }),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(startWorkflowOnce).not.toHaveBeenCalled();
+  });
+
+  it('should accept deletedAt as a Date, as the in-process emit passes it', async () => {
+    const { consumer, startWorkflowOnce } = setUp();
+    startWorkflowOnce.mockResolvedValue(true);
+    const id = randomUUID();
+
+    await consumer.onStatusChanged({
+      ...event(ResellerStatus.DELETED, id),
+      deletedAt: new Date(DELETED_AT),
+    });
+
+    expect(startWorkflowOnce.mock.calls[0][1].workflowId).toBe(
+      `reseller-deletion-cleanup-${id}-${Date.parse(DELETED_AT)}`,
+    );
   });
 
   it('should refuse a payload without a reseller id and start nothing', async () => {

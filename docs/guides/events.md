@@ -198,7 +198,9 @@ interceptor do not run for event deliveries (they read a request an event does n
 - **Tenant isolation**: each handler runs in `withTenant(db, mkInstituteCtx(tenantId, origin), …)`
   with the event's `tenantId`, reads `*Live` views and writes base tables. An id of another
   institute in the payload matches nothing under RLS. `ResellerDeletionConsumer` is
-  platform-level: it reads nothing and only starts a workflow keyed by the reseller id.
+  platform-level: it starts a workflow keyed by the reseller id and deletion time, and the
+  workflow's activity runs as `roviq_admin` and acts only when the reseller's stored status is
+  `DELETED`, so an event naming a live reseller moves nothing.
 - **Idempotency**: each handler is safe to run twice and harmless for an institute, year, section
   or group that no longer exists. `SECTION.deleted` acts only while the section is still deleted.
 

@@ -3,10 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
 import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
 import { createBillingActivities } from './billing.activities';
+import { BILLING_TASK_QUEUE } from './billing.constants';
 import { billingWorkflowsPath } from './billing.workflows-path';
-
-/** The task queue the billing worker polls; every billing workflow is started on it. */
-export const BILLING_TASK_QUEUE = 'billing-automation';
 
 /** Runs the billing automation workflows (ROV-124) in this gateway when BILLING_WORKER_ENABLED is 'true'. */
 @Injectable()

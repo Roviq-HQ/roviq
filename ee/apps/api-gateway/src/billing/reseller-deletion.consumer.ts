@@ -3,7 +3,7 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { ResellerStatus } from '@roviq/common-types';
 import { EVENT_PATTERNS, eventPayloadSchemas, gatewayConsumer } from '@roviq/nats-jetstream';
 import { TemporalClientService } from '@roviq/temporal';
-import { BILLING_TASK_QUEUE } from './workflows/billing.worker';
+import { BILLING_TASK_QUEUE } from './workflows/billing.constants';
 
 const SUBJECT = EVENT_PATTERNS.RESELLER.status_changed;
 
@@ -23,10 +23,9 @@ export class ResellerDeletionConsumer {
 
   @EventPattern(SUBJECT, gatewayConsumer(SUBJECT))
   async onStatusChanged(@Payload() data: unknown): Promise<void> {
-    const { id, newStatus, deletedAt } = eventPayloadSchemas[SUBJECT].parse(data);
-    if (newStatus !== ResellerStatus.DELETED) return;
-    if (!deletedAt)
-      throw new Error(`RESELLER.status_changed DELETED for ${id} carries no deletedAt`);
+    const event = eventPayloadSchemas[SUBJECT].parse(data);
+    if (event.newStatus !== ResellerStatus.DELETED) return;
+    const { id, deletedAt } = event;
 
     const started = await this.temporal.startWorkflowOnce('resellerDeletionCleanupWorkflow', {
       taskQueue: BILLING_TASK_QUEUE,

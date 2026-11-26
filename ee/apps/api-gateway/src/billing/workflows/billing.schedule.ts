@@ -17,7 +17,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client, Connection } from '@temporalio/client';
-import { BILLING_TASK_QUEUE } from './billing.worker';
+import { BILLING_TASK_QUEUE } from './billing.constants';
 
 @Injectable()
 export class BillingScheduleService {

@@ -5,6 +5,7 @@ import {
   institutes,
   memberships,
   mkAdminCtx,
+  ROVIQ_DIRECT_RESELLER_ID,
   resellerMemberships,
   resellers,
   roles,
@@ -21,7 +22,7 @@ import { and, eq, sql } from 'drizzle-orm';
  *
  * Source of truth: `e2e/shared/seed-fixtures.ts → SEED_IDS.RESELLER_DIRECT`.
  */
-export const RESELLER_DIRECT_ID = '00000000-0000-7000-a000-000000000011';
+export const RESELLER_DIRECT_ID = ROVIQ_DIRECT_RESELLER_ID;
 
 /** Full-access abilities used as a default for test memberships. */
 const TEST_ABILITIES = [{ action: 'manage', subject: 'all' }] as const;

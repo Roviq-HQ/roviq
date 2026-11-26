@@ -617,18 +617,34 @@ const ENQUIRY_SCHEMAS = {
   'ENQUIRY.created': tenantBase.catchall(z.unknown()),
 } as const;
 
+/** A Date in process, an ISO string once the payload is serialised for JetStream. */
+const dateOrIsoString = z.union([z.date(), z.iso.datetime().transform((value) => new Date(value))]);
+
+const resellerStatusBase = {
+  id: uuid,
+  previousStatus: z.enum(RESELLER_STATUS_VALUES),
+  scope: str.optional(),
+};
+
 const RESELLER_SCHEMAS = {
   'RESELLER.created': z.object({ scope: str }).catchall(z.unknown()),
-  'RESELLER.status_changed': z
-    .object({
-      id: uuid,
-      previousStatus: z.enum(RESELLER_STATUS_VALUES),
-      newStatus: z.enum(RESELLER_STATUS_VALUES),
-      // A Date in process, an ISO string once serialised for JetStream.
-      deletedAt: z.coerce.date().nullable().optional(),
-      scope: str.optional(),
-    })
-    .catchall(z.unknown()),
+  // DELETED carries the deletion time: the billing cleanup keys its workflow on it.
+  'RESELLER.status_changed': z.discriminatedUnion('newStatus', [
+    z
+      .object({
+        ...resellerStatusBase,
+        newStatus: z.literal('DELETED'),
+        deletedAt: dateOrIsoString,
+      })
+      .catchall(z.unknown()),
+    z
+      .object({
+        ...resellerStatusBase,
+        newStatus: z.enum(RESELLER_STATUS_VALUES).exclude(['DELETED']),
+        deletedAt: dateOrIsoString.nullish(),
+      })
+      .catchall(z.unknown()),
+  ]),
   'RESELLER.tier_changed': z.object({}).catchall(z.unknown()),
   'RESELLER.updated': z.object({ scope: str }).catchall(z.unknown()),
 } as const;

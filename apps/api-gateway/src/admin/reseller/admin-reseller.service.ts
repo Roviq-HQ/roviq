@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   BusinessException,
@@ -456,12 +457,15 @@ export class AdminResellerService {
     if (result.kind === 'not_found')
       throw new BusinessException(ErrorCode.RESELLER_NOT_FOUND, 'Reseller not found');
     const { record, affectedInstituteIds } = result;
+    // The repository sets it in the same update that marks the reseller DELETED.
+    assert(record.deletedAt, `Deleted reseller ${resellerId} has no deletedAt`);
 
     const model = await this.withCounts(record);
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.status_changed, {
       ...model,
       previousStatus: ResellerStatus.SUSPENDED,
       newStatus: ResellerStatus.DELETED,
+      deletedAt: record.deletedAt,
       affectedInstituteIds,
       scope: 'platform',
     });

@@ -10,6 +10,7 @@
 import assert from 'node:assert';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SEED } from '../../shared/seed-fixtures';
 import {
   E2eAdminChangeResellerTierDocument,
   E2eAdminCreateResellerDocument,
@@ -71,6 +72,9 @@ async function insertTestReseller(
 // A plan and a gateway config of the reseller to delete: the billing cleanup deactivates both.
 const TEST_PLAN_ID = 'ffffffff-f000-4000-a000-000000000201';
 const TEST_GATEWAY_CONFIG_ID = 'ffffffff-f000-4000-a000-000000000202';
+// CANCELLED, so it never clashes with the seeded institute's own active subscription.
+const TEST_SUBSCRIPTION_ID = 'ffffffff-f000-4000-a000-000000000203';
+const ROVIQ_DIRECT_ID = '00000000-0000-7000-a000-000000000011';
 
 async function insertBillingRows(pool: pg.Pool, resellerId: string): Promise<void> {
   await pool.query(
@@ -87,11 +91,20 @@ async function insertBillingRows(pool: pg.Pool, resellerId: string): Promise<voi
      ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE', deleted_at = NULL`,
     [TEST_GATEWAY_CONFIG_ID, resellerId],
   );
+  await pool.query(
+    `INSERT INTO subscriptions (id, tenant_id, plan_id, reseller_id, status, cancelled_at, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, 'CANCELLED', now(),
+             '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')
+     ON CONFLICT (id) DO UPDATE SET reseller_id = EXCLUDED.reseller_id`,
+    [TEST_SUBSCRIPTION_ID, SEED.INSTITUTE_2.id, TEST_PLAN_ID, resellerId],
+  );
 }
 
-async function billingStatuses(
-  pool: pg.Pool,
-): Promise<{ plan: string | undefined; config: string | undefined }> {
+async function billingStatuses(pool: pg.Pool): Promise<{
+  plan: string | undefined;
+  config: string | undefined;
+  subscriptionReseller: string | undefined;
+}> {
   const plan = await pool.query<{ status: string }>('SELECT status FROM plans WHERE id = $1', [
     TEST_PLAN_ID,
   ]);
@@ -99,11 +112,23 @@ async function billingStatuses(
     'SELECT status FROM payment_gateway_configs WHERE id = $1',
     [TEST_GATEWAY_CONFIG_ID],
   );
-  return { plan: plan.rows[0]?.status, config: config.rows[0]?.status };
+  const subscription = await pool.query<{ reseller_id: string }>(
+    'SELECT reseller_id FROM subscriptions WHERE id = $1',
+    [TEST_SUBSCRIPTION_ID],
+  );
+  return {
+    plan: plan.rows[0]?.status,
+    config: config.rows[0]?.status,
+    subscriptionReseller: subscription.rows[0]?.reseller_id,
+  };
 }
 
 async function deleteTestReseller(pool: pg.Pool, id: string): Promise<void> {
   // Remove any dependent rows first — test reseller should have none, but defensive.
+  await pool.query(
+    'DELETE FROM subscriptions WHERE plan_id IN (SELECT id FROM plans WHERE reseller_id = $1)',
+    [id],
+  );
   await pool.query('DELETE FROM plans WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM payment_gateway_configs WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM reseller_memberships WHERE reseller_id = $1', [id]);
@@ -302,11 +327,11 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
     expect(after.deletedAt).not.toBeNull();
   });
 
-  it('runs the billing cleanup of the deleted reseller: its plan and gateway config go INACTIVE', async () => {
+  it('runs the billing cleanup of the deleted reseller: billing moves to Roviq Direct', async () => {
     // RESELLER.status_changed → ResellerDeletionConsumer → the billing worker's workflow.
     await expect
       .poll(() => billingStatuses(pool), { timeout: 30_000, interval: 500 })
-      .toEqual({ plan: 'INACTIVE', config: 'INACTIVE' });
+      .toEqual({ plan: 'INACTIVE', config: 'INACTIVE', subscriptionReseller: ROVIQ_DIRECT_ID });
   });
 
   // ── ROV-234: adminListResellers ─────────────────────────────

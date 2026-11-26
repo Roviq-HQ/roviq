@@ -6,11 +6,13 @@
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
+import { ResellerStatus } from '@roviq/common-types';
 import {
   createDrizzleDb,
   type DrizzleDB,
   mkAdminCtx,
   ROVIQ_DIRECT_RESELLER_ID,
+  resellers,
   SYSTEM_USER_ID,
   withAdmin,
 } from '@roviq/database';
@@ -54,6 +56,14 @@ describe.skipIf(!hasTestDb)('Billing workflow activities (integration)', () => {
       if (!(err instanceof RolledBack)) throw err;
     });
     expect(finished).toBe(true);
+  }
+
+  /** What `adminDeleteReseller` leaves behind; the cleanup acts only on a deleted reseller. */
+  async function markDeleted(tx: DrizzleDB, resellerId: string) {
+    await tx
+      .update(resellers)
+      .set({ status: ResellerStatus.DELETED, deletedAt: new Date(), deletedBy: SYSTEM_USER_ID })
+      .where(eq(resellers.id, resellerId));
   }
 
   async function addPlan(tx: DrizzleDB, resellerId: string, deletedAt: Date | null = null) {
@@ -146,6 +156,7 @@ describe.skipIf(!hasTestDb)('Billing workflow activities (integration)', () => {
   describe('cleanupResellerDeletion', () => {
     it('should move every subscription to Roviq Direct and deactivate plans and gateway configs', async () => {
       await rolledBack(async (tx) => {
+        await markDeleted(tx, reseller.resellerId);
         const plan = await addPlan(tx, reseller.resellerId);
         const deletedPlan = await addPlan(tx, reseller.resellerId, new Date());
         const config = await addGatewayConfig(tx, reseller.resellerId);
@@ -255,6 +266,7 @@ describe.skipIf(!hasTestDb)('Billing workflow activities (integration)', () => {
 
     it('should leave another reseller’s subscription, plan and gateway config untouched', async () => {
       await rolledBack(async (tx) => {
+        await markDeleted(tx, reseller.resellerId);
         await addPlan(tx, reseller.resellerId);
         const otherPlan = await addPlan(tx, otherReseller.resellerId);
         const otherConfig = await addGatewayConfig(tx, otherReseller.resellerId);
@@ -286,6 +298,7 @@ describe.skipIf(!hasTestDb)('Billing workflow activities (integration)', () => {
 
     it('should complete with zero counts for a reseller with no billing rows, and on a second run', async () => {
       await rolledBack(async (tx) => {
+        await markDeleted(tx, reseller.resellerId);
         const activities = createBillingActivities(tx);
         const zero = { subscriptionsTransferred: 0, plansDeactivated: 0, configsDeactivated: 0 };
 
@@ -305,6 +318,38 @@ describe.skipIf(!hasTestDb)('Billing workflow activities (integration)', () => {
         });
         expect(await activities.cleanupResellerDeletion(reseller.resellerId)).toEqual(zero);
       });
+    });
+  });
+
+  it('should move nothing for a reseller that is not deleted', async () => {
+    await rolledBack(async (tx) => {
+      const plan = await addPlan(tx, reseller.resellerId);
+      const config = await addGatewayConfig(tx, reseller.resellerId);
+      const sub = await addSubscription(tx, {
+        tenantId: first.tenantId,
+        resellerId: reseller.resellerId,
+        planId: plan.id,
+      });
+
+      expect(
+        await createBillingActivities(tx).cleanupResellerDeletion(reseller.resellerId),
+      ).toEqual({ subscriptionsTransferred: 0, plansDeactivated: 0, configsDeactivated: 0 });
+
+      const [subRow] = await tx
+        .select({ resellerId: subscriptions.resellerId })
+        .from(subscriptions)
+        .where(eq(subscriptions.id, sub.id));
+      expect(subRow.resellerId).toBe(reseller.resellerId);
+      const [planRow] = await tx
+        .select({ status: plans.status })
+        .from(plans)
+        .where(eq(plans.id, plan.id));
+      expect(planRow.status).toBe('ACTIVE');
+      const [configRow] = await tx
+        .select({ status: gatewayConfigs.status })
+        .from(gatewayConfigs)
+        .where(eq(gatewayConfigs.id, config.id));
+      expect(configRow.status).toBe('ACTIVE');
     });
   });
 

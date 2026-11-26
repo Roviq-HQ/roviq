@@ -184,7 +184,7 @@ function createRepo(stages: Stages, writes: Writes): AdminResellerRepository {
           writes.deleted = true;
           return {
             kind: 'ok',
-            record: { ...row, status: ResellerStatus.DELETED },
+            record: { ...row, status: ResellerStatus.DELETED, deletedAt: new Date() },
             affectedInstituteIds: stages.affectedInstituteIds ?? [],
           };
         },

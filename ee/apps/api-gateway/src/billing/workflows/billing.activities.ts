@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common';
+import { ResellerStatus } from '@roviq/common-types';
 import {
   type DrizzleDB,
   mkAdminCtx,
   ROVIQ_DIRECT_RESELLER_ID,
+  resellers,
   SYSTEM_USER_ID,
   withAdmin,
 } from '@roviq/database';
@@ -190,6 +192,15 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
 
     async cleanupResellerDeletion(resellerId: string) {
       return withAdmin(db, mkAdminCtx('workflow:billing'), async (tx) => {
+        const [reseller] = await tx
+          .select({ status: resellers.status })
+          .from(resellers) // allow-base-read: the Live view hides the deleted reseller this needs
+          .where(eq(resellers.id, resellerId));
+        if (reseller?.status !== ResellerStatus.DELETED) {
+          logger.warn(`Reseller ${resellerId} is not deleted; billing cleanup skipped`);
+          return { subscriptionsTransferred: 0, plansDeactivated: 0, configsDeactivated: 0 };
+        }
+
         // Transfer subscriptions to Roviq Direct
         const transferred = await tx
           .update(subscriptions)
