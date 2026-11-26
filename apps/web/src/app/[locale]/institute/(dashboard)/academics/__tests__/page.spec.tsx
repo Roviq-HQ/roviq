@@ -80,7 +80,7 @@ describe('AcademicsPage new standard (ROV-358)', () => {
 
   it('shows a taken name in Hindi', async () => {
     rejectWith('STANDARD_NAME_DUPLICATE');
-    const dialog = await submitNewStandard('hi', 'नई कक्षा');
+    const dialog = await submitNewStandard('hi', 'नई क्लास');
 
     expect(await within(dialog).findByText(errorHi.STANDARD_NAME_DUPLICATE)).toBeInTheDocument();
   });

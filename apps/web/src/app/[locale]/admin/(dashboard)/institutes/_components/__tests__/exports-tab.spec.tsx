@@ -390,6 +390,6 @@ describe('InstituteExportsTab', () => {
       { locale: 'hi' },
     );
 
-    expect(screen.getByText('अनुपालन निर्यात')).toBeInTheDocument();
+    expect(screen.getByText('अनुपालन एक्सपोर्ट')).toBeInTheDocument();
   });
 });

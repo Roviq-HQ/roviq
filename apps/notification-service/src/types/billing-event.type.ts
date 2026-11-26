@@ -34,7 +34,7 @@ function copy(p: BillingEventParams, locale: Locale): Copy {
   switch (p.kind) {
     case 'subscription-activated':
       return hi
-        ? { subject: 'सदस्यता सक्रिय', body: `${planName} की आपकी सदस्यता अब सक्रिय है।` }
+        ? { subject: 'सब्सक्रिप्शन ऐक्टिव', body: `${planName} की आपकी सब्सक्रिप्शन अब ऐक्टिव है।` }
         : {
             subject: 'Subscription activated',
             body: `Your subscription to ${planName} is now active.`,
@@ -42,8 +42,8 @@ function copy(p: BillingEventParams, locale: Locale): Copy {
     case 'subscription-pending':
       return hi
         ? {
-            subject: 'सदस्यता भुगतान के लिए लंबित',
-            body: `${planName} की सदस्यता बनाई गई है — इसे सक्रिय करने के लिए भुगतान पूरा करें।`,
+            subject: 'सब्सक्रिप्शन पेमेंट के लिए लंबित',
+            body: `${planName} की सब्सक्रिप्शन बनाई गई है — इसे ऐक्टिव करने के लिए पेमेंट पूरा करें।`,
           }
         : {
             subject: 'Subscription pending payment',
@@ -51,28 +51,28 @@ function copy(p: BillingEventParams, locale: Locale): Copy {
           };
     case 'subscription-canceled':
       return hi
-        ? { subject: 'सदस्यता रद्द', body: `आपकी ${planName} सदस्यता रद्द कर दी गई है।` }
+        ? { subject: 'सब्सक्रिप्शन रद्द', body: `आपकी ${planName} सब्सक्रिप्शन रद्द कर दी गई है।` }
         : {
             subject: 'Subscription canceled',
             body: `Your ${planName} subscription has been canceled.`,
           };
     case 'subscription-paused':
       return hi
-        ? { subject: 'सदस्यता रोकी गई', body: `आपकी ${planName} सदस्यता रोक दी गई है।` }
+        ? { subject: 'सब्सक्रिप्शन रोकी गई', body: `आपकी ${planName} सब्सक्रिप्शन रोक दी गई है।` }
         : {
             subject: 'Subscription paused',
             body: `Your ${planName} subscription has been paused.`,
           };
     case 'subscription-resumed':
       return hi
-        ? { subject: 'सदस्यता फिर से शुरू', body: `आपकी ${planName} सदस्यता फिर से शुरू हो गई है।` }
+        ? { subject: 'सब्सक्रिप्शन फिर से शुरू', body: `आपकी ${planName} सब्सक्रिप्शन फिर से शुरू हो गई है।` }
         : {
             subject: 'Subscription resumed',
             body: `Your ${planName} subscription has been resumed.`,
           };
     case 'subscription-ended':
       return hi
-        ? { subject: 'सदस्यता समाप्त', body: `आपकी ${planName} सदस्यता की अवधि समाप्त हो गई है।` }
+        ? { subject: 'सब्सक्रिप्शन समाप्त', body: `आपकी ${planName} सब्सक्रिप्शन की अवधि समाप्त हो गई है।` }
         : {
             subject: 'Subscription ended',
             body: `Your ${planName} subscription period has ended.`,
@@ -80,8 +80,8 @@ function copy(p: BillingEventParams, locale: Locale): Copy {
     case 'payment-received':
       return hi
         ? {
-            subject: 'भुगतान प्राप्त हुआ',
-            body: `${planName} के लिए ${planAmount} ${planCurrency} का भुगतान प्राप्त हुआ।`,
+            subject: 'पेमेंट प्राप्त हुआ',
+            body: `${planName} के लिए ${planAmount} ${planCurrency} का पेमेंट प्राप्त हुआ।`,
           }
         : {
             subject: 'Payment received',
@@ -90,8 +90,8 @@ function copy(p: BillingEventParams, locale: Locale): Copy {
     case 'payment-failed':
       return hi
         ? {
-            subject: 'भुगतान विफल',
-            body: `${planName} का भुगतान विफल रहा — कृपया अपना भुगतान तरीका अपडेट करें।`,
+            subject: 'पेमेंट फ़ेल',
+            body: `${planName} का पेमेंट फ़ेल हुआ — कृपया अपना पेमेंट तरीका अपडेट करें।`,
           }
         : {
             subject: 'Payment failed',

@@ -40,8 +40,8 @@ function notification(id: string, overrides: { readAt?: string | null; path?: un
     __typename: 'NotificationModel' as const,
     id,
     type: 'ATTENDANCE_ABSENT',
-    title: { en: `Ishaan Kapoor was absent (${id})`, hi: `ईशान कपूर अनुपस्थित रहे (${id})` },
-    body: { en: 'Marked absent in Nursery-A today.', hi: 'आज नर्सरी-A में अनुपस्थित दर्ज किया गया।' },
+    title: { en: `Ishaan Kapoor was absent (${id})`, hi: `ईशान कपूर ऐब्सेंट रहे (${id})` },
+    body: { en: 'Marked absent in Nursery-A today.', hi: 'आज नर्सरी-A में ऐब्सेंट दर्ज किया गया।' },
     data: { path: 'path' in overrides ? overrides.path : '/institute/attendance' },
     readAt: overrides.readAt ?? null,
     createdAt: FIVE_MINUTES_AGO,
@@ -221,12 +221,12 @@ describe('NotificationBell panel', () => {
 
   it('shows the notification text and labels in Hindi', async () => {
     renderBell([countMock(1), listMock([notification('n1')])], { locale: 'hi' });
-    await waitFor(() => expect(bell()).toHaveAccessibleName('सूचनाएँ, 1 अपठित'));
+    await waitFor(() => expect(bell()).toHaveAccessibleName('नोटिफ़िकेशन, 1 अपठित'));
     await openPanel();
 
     const item = await screen.findByTestId('notification-item-n1');
-    expect(item).toHaveTextContent('ईशान कपूर अनुपस्थित रहे (n1)');
-    expect(item).toHaveTextContent('आज नर्सरी-A में अनुपस्थित दर्ज किया गया।');
+    expect(item).toHaveTextContent('ईशान कपूर ऐब्सेंट रहे (n1)');
+    expect(item).toHaveTextContent('आज नर्सरी-A में ऐब्सेंट दर्ज किया गया।');
     expect(item).toHaveTextContent('५ मिनट पहले');
     expect(within(item).getByText('नई')).toBeInTheDocument();
     expect(screen.getByTestId('notification-mark-all-btn')).toHaveTextContent(

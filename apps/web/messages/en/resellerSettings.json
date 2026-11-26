@@ -84,13 +84,6 @@
     "customCssDescription": "Extra style rules, up to {max} characters. They cannot load anything from another site.",
     "customCssTooLong": "Keep the stylesheet under {max} characters.",
     "customCssForbidden": "Remove \"{token}\". Styles cannot load files from other sites or contain HTML.",
-    "fieldHelp": {
-      "primaryColorTitle": "Primary colour",
-      "primaryColorBody": "Pick a colour dark enough for white text to stay readable on it.",
-      "customCssTitle": "Custom CSS",
-      "customCssBody": "Plain style rules only. @import, url(), image(), backslashes and angle brackets are refused so a stylesheet can never pull content from another server.",
-      "customCssExample": "Preview classes: .brand-header, .brand-sidebar, .brand-nav-item, .brand-button, .brand-card"
-    },
     "preview": "Live preview",
     "previewFrameTitle": "Preview of your portal with this branding",
     "previewSample": {

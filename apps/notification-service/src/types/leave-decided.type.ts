@@ -15,7 +15,7 @@ export interface LeaveDecidedParams {
 }
 
 function decided(status: LeaveDecidedParams['status'], locale: Locale): string {
-  if (locale === 'hi') return status === 'APPROVED' ? 'स्वीकृत' : 'अस्वीकृत';
+  if (locale === 'hi') return status === 'APPROVED' ? 'अप्रूव' : 'रिजेक्ट';
   return status === 'APPROVED' ? 'approved' : 'rejected';
 }
 
@@ -51,7 +51,7 @@ function body(p: LeaveDecidedParams, locale: Locale): string {
           ? `${p.applicantName} का`
           : 'आपके बच्चे का'
         : 'आपका';
-    return `${[whose, when, 'छुट्टी आवेदन'].filter(Boolean).join(' ')} ${word} कर दिया गया है।`;
+    return `${[whose, when, 'छुट्टी ऐप्लिकेशन'].filter(Boolean).join(' ')} ${word} कर दिया गया है।`;
   }
   const whose =
     p.audience === 'guardian' ? (p.applicantName ? `${p.applicantName}'s` : "Your ward's") : 'Your';

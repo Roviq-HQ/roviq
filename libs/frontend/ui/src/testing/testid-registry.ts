@@ -215,22 +215,15 @@ export const testIds = {
     formSectionAddress: 'institute-form-section-address',
     formSectionAdvanced: 'institute-form-section-advanced',
     formSectionFirstAdmin: 'institute-form-section-first-admin',
-    newFirstAdminInfo: 'admin-institute-new-first-admin-info',
     newFirstAdminFirstName: 'admin-institute-new-first-admin-first-name',
     newFirstAdminLastName: 'admin-institute-new-first-admin-last-name',
     newFirstAdminEmail: 'admin-institute-new-first-admin-email',
     newFirstAdminPhone: 'admin-institute-new-first-admin-phone',
-    newCodeInfo: 'admin-institute-new-code-info',
     newCodeInput: 'admin-institute-new-code-input',
-    newTypeInfo: 'admin-institute-new-type-info',
-    newFrameworkInfo: 'admin-institute-new-framework-info',
     newFrameworkSelect: 'admin-institute-new-framework-select',
-    newBoardInfo: 'admin-institute-new-board-info',
     newBoardCombobox: 'admin-institute-new-board-combobox',
     newDepartment: (dept: string) => `admin-institute-new-department-${dept}`,
-    newResellerInfo: 'admin-institute-new-reseller-info',
     newResellerCombobox: 'admin-institute-new-reseller-combobox',
-    newGroupInfo: 'admin-institute-new-group-info',
     newGroupCombobox: 'admin-institute-new-group-combobox',
     newPhone: (index: number) => `admin-institute-new-phone-${index}-input`,
     newRemovePhone: (index: number) => `admin-institute-new-remove-phone-${index}-btn`,
@@ -328,10 +321,6 @@ export const testIds = {
     formSectionRegistration: 'institute-group-form-section-registration',
     formSectionContact: 'institute-group-form-section-contact',
     formSectionAddress: 'institute-group-form-section-address',
-    codeInfo: 'institute-group-code-info',
-    typeInfo: 'institute-group-type-info',
-    registrationNumberInfo: 'institute-group-registration-number-info',
-    registrationStateInfo: 'institute-group-registration-state-info',
   },
 
   // ── Admin: audit logs (referenced by navigation e2e) ───────────────────
@@ -604,8 +593,6 @@ export const testIds = {
     brandingNoImage: (name: string) => `reseller-settings-branding-no-${name}`,
     brandingPrimaryColorPicker: 'reseller-settings-branding-primary-picker',
     brandingSecondaryColorPicker: 'reseller-settings-branding-secondary-picker',
-    brandingPrimaryColorInfo: 'reseller-settings-branding-primary-info',
-    brandingCustomCssInfo: 'reseller-settings-branding-css-info',
     brandingAdvanced: 'reseller-settings-branding-advanced',
     brandingPreview: 'reseller-settings-branding-preview',
     customDomainNotice: 'reseller-settings-domain-notice',
@@ -1843,12 +1830,6 @@ export const testIds = {
   resellerInstitutes: {
     title: 'reseller-institutes-title',
     // Create form info popovers
-    newCodeInfo: 'reseller-institute-new-code-info',
-    newTypeInfo: 'reseller-institute-new-type-info',
-    newFrameworkInfo: 'reseller-institute-new-framework-info',
-    newBoardInfo: 'reseller-institute-new-board-info',
-    newGroupInfo: 'reseller-institute-new-group-info',
-    newFirstAdminInfo: 'reseller-institute-new-first-admin-info',
     newFirstAdminFirstName: 'reseller-institute-new-first-admin-first-name',
     newFirstAdminLastName: 'reseller-institute-new-first-admin-last-name',
     newFirstAdminEmail: 'reseller-institute-new-first-admin-email',
@@ -1865,25 +1846,13 @@ export const testIds = {
     sectionBasic: 'billing-plan-section-basic',
     sectionBilling: 'billing-plan-section-billing',
     sectionLimits: 'billing-plan-section-limits',
-    codeInfoEdit: 'billing-plan-code-info-edit',
-    codeInfoCreate: 'billing-plan-code-info-create',
-    amountInfo: 'billing-plan-amount-info',
-    intervalInfo: 'billing-plan-interval-info',
     priceDisplay: 'billing-plan-price-display',
-    trialDaysInfo: 'billing-plan-trial-days-info',
-    limitsInfo: 'billing-plan-limits-info',
     cancelBtn: 'billing-plan-cancel-btn',
   },
 
   // ── Reseller: billing → gateway configs ───────────────────────────────
   resellerBillingGateway: {
-    vpaInfo: 'billing-gateway-vpa-info',
     defaultSwitch: 'billing-gateway-default-switch',
-    keyIdInfo: 'billing-gateway-key-id-info',
-    keySecretInfo: 'billing-gateway-key-secret-info',
-    webhookSecretInfo: 'billing-gateway-webhook-secret-info',
-    testModeInfo: 'billing-gateway-test-mode-info',
-    defaultInfo: 'billing-gateway-default-info',
   },
 
   // ── Reseller: billing → dashboard ─────────────────────────────────────
@@ -1904,13 +1873,8 @@ export const testIds = {
     table: 'reseller-billing-invoices-table',
     statusFilter: 'reseller-billing-invoices-status-filter',
     // Record payment dialog
-    recordPaymentMethodInfo: 'billing-record-payment-method-info',
-    recordPaymentReceiptInfo: 'billing-record-payment-receipt-info',
     recordPaymentCollectedBySelf: 'billing-record-payment-collected-by-self',
-    recordPaymentCollectionDateInfo: 'billing-record-payment-collection-date-info',
     // Refund dialog
-    refundAmountInfo: 'billing-refund-amount-info',
-    refundReasonInfo: 'billing-refund-reason-info',
     refundPaymentSelect: 'billing-refund-payment-select',
     refundPaymentOption: (id: string) => `billing-refund-payment-option-${id}`,
     refundNoPayment: 'billing-refund-no-payment',
@@ -1927,9 +1891,7 @@ export const testIds = {
     // Assign plan dialog
     assignPlanDialog: 'billing-assign-plan-dialog',
     // Change plan dialog
-    changePlanProrationInfo: 'billing-change-plan-proration-info',
     // Action dialog
-    subscriptionReasonInfo: 'billing-subscription-reason-info',
   },
 
   // ── Institute: billing → overview and payments ──────────────────────

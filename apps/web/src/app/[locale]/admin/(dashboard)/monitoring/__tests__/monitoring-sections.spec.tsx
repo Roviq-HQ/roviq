@@ -159,9 +159,9 @@ describe('AlertsPanel', () => {
     );
 
     const item = screen.getByTestId(ids.alertItem('notification_canary_missing'));
-    expect(item).toHaveTextContent('परीक्षण संदेश नहीं पहुँचा');
+    expect(item).toHaveTextContent('टेस्ट मैसेज नहीं पहुँचा');
     expect(item).toHaveTextContent('रनबुक');
-    expect(item).toHaveTextContent('सूचना वितरण खोलें');
+    expect(item).toHaveTextContent('नोटिफ़िकेशन वितरण खोलें');
   });
 
   it('should render in Hindi', () => {
@@ -169,7 +169,7 @@ describe('AlertsPanel', () => {
       locale: 'hi',
     });
 
-    expect(screen.getByTestId(ids.alertsEmpty)).toHaveTextContent('कोई अलर्ट सक्रिय नहीं है।');
+    expect(screen.getByTestId(ids.alertsEmpty)).toHaveTextContent('कोई अलर्ट ऐक्टिव नहीं है।');
   });
 });
 

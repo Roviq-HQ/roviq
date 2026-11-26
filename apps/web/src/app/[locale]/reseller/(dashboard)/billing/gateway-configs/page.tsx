@@ -17,8 +17,8 @@ import {
   DialogTitle,
   Field,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   Input,
   Select,
   SelectContent,
@@ -30,6 +30,7 @@ import {
   useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { gatewayConfigHelp } from '@web/help/reseller-billing/gateway-config.help';
 import { CreditCard, Plus, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -132,7 +133,9 @@ function GatewayConfigsContent() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="size-5" />
-                    {config.provider}
+                    {isKnownProvider(config.provider)
+                      ? t(`gateway.providerNames.${config.provider}`)
+                      : config.provider}
                   </CardTitle>
                   <div className="flex gap-1">
                     {config.isDefault && <Badge>{t('gateway.default')}</Badge>}
@@ -307,7 +310,7 @@ function GatewayConfigDialog({
                   <SelectContent>
                     {PROVIDERS.map((p) => (
                       <SelectItem key={p} value={p}>
-                        {p}
+                        {t(`gateway.providerNames.${p}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -327,15 +330,9 @@ function GatewayConfigDialog({
 
             {provider === 'UPI_DIRECT' ? (
               <Field>
-                <FieldLabel htmlFor="vpa">
+                <FieldLabelWithInfo htmlFor="vpa" help={gatewayConfigHelp.vpa}>
                   {t('gateway.vpa')}
-                  <FieldInfoPopover
-                    title={t('gateway.fieldHelp.vpaTitle')}
-                    data-testid={resellerBillingGateway.vpaInfo}
-                  >
-                    <p>{t('gateway.fieldHelp.vpaBody')}</p>
-                  </FieldInfoPopover>
-                </FieldLabel>
+                </FieldLabelWithInfo>
                 <Input
                   id="vpa"
                   value={vpa}
@@ -346,15 +343,9 @@ function GatewayConfigDialog({
             ) : (
               <>
                 <Field>
-                  <FieldLabel htmlFor="keyId">
+                  <FieldLabelWithInfo htmlFor="keyId" help={gatewayConfigHelp.keyId}>
                     {provider === 'RAZORPAY' ? t('gateway.keyId') : t('gateway.clientId')}
-                    <FieldInfoPopover
-                      title={t('gateway.fieldHelp.keyIdTitle')}
-                      data-testid={resellerBillingGateway.keyIdInfo}
-                    >
-                      <p>{t('gateway.fieldHelp.keyIdBody')}</p>
-                    </FieldInfoPopover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Input
                     id="keyId"
                     type="password"
@@ -365,15 +356,9 @@ function GatewayConfigDialog({
                 </Field>
 
                 <Field>
-                  <FieldLabel htmlFor="keySecret">
+                  <FieldLabelWithInfo htmlFor="keySecret" help={gatewayConfigHelp.keySecret}>
                     {provider === 'RAZORPAY' ? t('gateway.keySecret') : t('gateway.clientSecret')}
-                    <FieldInfoPopover
-                      title={t('gateway.fieldHelp.keySecretTitle')}
-                      data-testid={resellerBillingGateway.keySecretInfo}
-                    >
-                      <p>{t('gateway.fieldHelp.keySecretBody')}</p>
-                    </FieldInfoPopover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Input
                     id="keySecret"
                     type="password"
@@ -385,15 +370,12 @@ function GatewayConfigDialog({
 
                 {provider === 'RAZORPAY' && (
                   <Field>
-                    <FieldLabel htmlFor="webhookSecret">
+                    <FieldLabelWithInfo
+                      htmlFor="webhookSecret"
+                      help={gatewayConfigHelp.webhookSecret}
+                    >
                       {t('gateway.webhookSecret')}
-                      <FieldInfoPopover
-                        title={t('gateway.fieldHelp.webhookSecretTitle')}
-                        data-testid={resellerBillingGateway.webhookSecretInfo}
-                      >
-                        <p>{t('gateway.fieldHelp.webhookSecretBody')}</p>
-                      </FieldInfoPopover>
-                    </FieldLabel>
+                    </FieldLabelWithInfo>
                     <Input
                       id="webhookSecret"
                       type="password"
@@ -405,15 +387,9 @@ function GatewayConfigDialog({
                 )}
 
                 <Field className="flex items-center justify-between">
-                  <FieldLabel htmlFor="testMode">
+                  <FieldLabelWithInfo htmlFor="testMode" help={gatewayConfigHelp.testMode}>
                     {t('gateway.testMode')}
-                    <FieldInfoPopover
-                      title={t('gateway.fieldHelp.testModeTitle')}
-                      data-testid={resellerBillingGateway.testModeInfo}
-                    >
-                      <p>{t('gateway.fieldHelp.testModeBody')}</p>
-                    </FieldInfoPopover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Switch id="testMode" checked={testMode} onCheckedChange={setTestMode} />
                 </Field>
               </>
@@ -421,15 +397,9 @@ function GatewayConfigDialog({
 
             {provider !== 'UPI_DIRECT' && (
               <Field className="flex items-center justify-between">
-                <FieldLabel htmlFor="isDefault">
+                <FieldLabelWithInfo htmlFor="isDefault" help={gatewayConfigHelp.defaultGateway}>
                   {t('gateway.defaultGateway')}
-                  <FieldInfoPopover
-                    title={t('gateway.fieldHelp.defaultGatewayTitle')}
-                    data-testid={resellerBillingGateway.defaultInfo}
-                  >
-                    <p>{t('gateway.fieldHelp.defaultGatewayBody')}</p>
-                  </FieldInfoPopover>
-                </FieldLabel>
+                </FieldLabelWithInfo>
                 <Switch
                   id="isDefault"
                   data-testid={resellerBillingGateway.defaultSwitch}
@@ -460,4 +430,8 @@ function GatewayConfigDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function isKnownProvider(provider: string): provider is (typeof PROVIDERS)[number] {
+  return (PROVIDERS as readonly string[]).includes(provider);
 }

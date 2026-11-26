@@ -184,7 +184,7 @@ describe('AuditLogTable', () => {
     const log = makeLog({ scope: 'platform', actorName: null, actorId: OUTSIDER_ID });
     renderTable({ scope: 'admin', logs: [log] }, 'hi');
 
-    expect(screen.getByText('अज्ञात उपयोगकर्ता')).toBeInTheDocument();
+    expect(screen.getByText('अज्ञात यूज़र')).toBeInTheDocument();
     expect(screen.getByTestId(testIds.copyId.button(log.id, OUTSIDER_ID))).toBeInTheDocument();
     expect(screen.queryByText(OUTSIDER_ID.slice(0, 8))).not.toBeInTheDocument();
     expect(screen.queryByText('Roviq platform')).not.toBeInTheDocument();
@@ -214,7 +214,7 @@ describe('AuditLogTable', () => {
   it('translates the impersonation badge', () => {
     renderTable({ logs: [makeLog({ impersonatorId: 'imp-1' })] }, 'hi');
 
-    expect(screen.getByText('Asha Verma द्वारा प्रतिरूपित')).toBeInTheDocument();
+    expect(screen.getByText('Asha Verma ने इम्पर्सोनेट किया')).toBeInTheDocument();
     expect(screen.queryByText(/Impersonated by/)).not.toBeInTheDocument();
   });
 

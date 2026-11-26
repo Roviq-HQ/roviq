@@ -17,14 +17,15 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldInfoPopover,
-  FieldLabel,
+  type FieldHelpTopic,
+  FieldLabelWithInfo,
   useAbility,
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload';
+import { resellerBrandingHelp } from '@web/help/reseller-settings/branding.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -156,15 +157,14 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
     name: 'primaryColor' | 'secondaryColor',
     fallback: string,
     pickerTestId: string,
-    info?: React.ReactNode,
+    help?: FieldHelpTopic,
   ) => {
     const current = values[name];
     return (
       <Field>
-        <FieldLabel htmlFor={name}>
+        <FieldLabelWithInfo htmlFor={name} help={help}>
           {tb(name)}
-          {info}
-        </FieldLabel>
+        </FieldLabelWithInfo>
         <div className="flex items-start gap-2">
           <input
             type="color"
@@ -268,12 +268,7 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
                     'primaryColor',
                     DEFAULT_PRIMARY_COLOR,
                     resellerSettings.brandingPrimaryColorPicker,
-                    <FieldInfoPopover
-                      title={tb('fieldHelp.primaryColorTitle')}
-                      data-testid={resellerSettings.brandingPrimaryColorInfo}
-                    >
-                      <p>{tb('fieldHelp.primaryColorBody')}</p>
-                    </FieldInfoPopover>,
+                    resellerBrandingHelp.primaryColor,
                   )}
                   {colorField(
                     'secondaryColor',
@@ -312,17 +307,7 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
                           rows={8}
                           testId="reseller-settings-custom-css-input"
                           errorTestId="reseller-settings-custom-css-error"
-                          info={
-                            <FieldInfoPopover
-                              title={tb('fieldHelp.customCssTitle')}
-                              data-testid={resellerSettings.brandingCustomCssInfo}
-                            >
-                              <p>{tb('fieldHelp.customCssBody')}</p>
-                              <p>
-                                <em>{tb('fieldHelp.customCssExample')}</em>
-                              </p>
-                            </FieldInfoPopover>
-                          }
+                          help={resellerBrandingHelp.customCss}
                         />
                       )}
                     </form.AppField>

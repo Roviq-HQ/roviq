@@ -63,7 +63,7 @@ describe('GatewayConfigsPage dialog', () => {
     const { user, dialog } = await openAddDialog();
 
     await user.click(within(dialog).getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: 'UPI_DIRECT' }));
+    await user.click(await screen.findByRole('option', { name: 'Direct UPI' }));
     await user.type(
       within(dialog).getByRole('textbox', { name: /UPI VPA Address/ }),
       'roviq@okhdfcbank',

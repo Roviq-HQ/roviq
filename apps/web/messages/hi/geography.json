@@ -28,7 +28,7 @@
     "UTTAR_PRADESH": "उत्तर प्रदेश",
     "UTTARAKHAND": "उत्तराखंड",
     "WEST_BENGAL": "पश्चिम बंगाल",
-    "ANDAMAN_AND_NICOBAR_ISLANDS": "अंडमान और निकोबार द्वीपसमूह",
+    "ANDAMAN_AND_NICOBAR_ISLANDS": "अंडमान और निकोबार द्वीपग्रुप",
     "CHANDIGARH": "चंडीगढ़",
     "DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU": "दादरा और नगर हवेली और दमन और दीव",
     "DELHI": "दिल्ली",
@@ -36,5 +36,6 @@
     "LADAKH": "लद्दाख",
     "LAKSHADWEEP": "लक्षद्वीप",
     "PUDUCHERRY": "पुदुचेरी"
-  }
+  },
+  "india": "भारत"
 }

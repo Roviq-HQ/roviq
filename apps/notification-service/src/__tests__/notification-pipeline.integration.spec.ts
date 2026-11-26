@@ -391,10 +391,10 @@ describe('notification pipeline (integration)', () => {
         resellerId: null,
         recipientMembershipId: guardian.membershipId,
         type: 'ATTENDANCE_ABSENT',
-        title: { en: 'Absence recorded', hi: 'अनुपस्थिति दर्ज' },
+        title: { en: 'Absence recorded', hi: 'ऐब्सेंट दर्ज' },
         body: {
           en: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 10 April 2026. Please contact the institute if this is incorrect.',
-          hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
+          hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को ऐब्सेंट दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
         },
         dedupeKey: `attendance:session-1:${student.membershipId}:ABSENT:${guardian.userId}`,
       });
@@ -585,10 +585,10 @@ describe('notification pipeline (integration)', () => {
         {
           type: 'LEAVE_DECIDED',
           recipientMembershipId: staff.membershipId,
-          title: { en: 'Your leave was approved', hi: 'आपकी छुट्टी स्वीकृत हुई' },
+          title: { en: 'Your leave was approved', hi: 'आपकी छुट्टी अप्रूव हुई' },
           body: {
             en: 'Your leave application from 20 April 2026 to 21 April 2026 has been approved.',
-            hi: 'आपका 20 अप्रैल 2026 से 21 अप्रैल 2026 तक का छुट्टी आवेदन स्वीकृत कर दिया गया है।',
+            hi: 'आपका 20 अप्रैल 2026 से 21 अप्रैल 2026 तक का छुट्टी ऐप्लिकेशन अप्रूव कर दिया गया है।',
           },
           data: { leaveId: 'leave-1', path: '/institute/leave' },
         },
@@ -1006,14 +1006,14 @@ describe('notification pipeline (integration)', () => {
         scope: 'institute',
         tenantId: institute.tenantId,
         type: 'AUTH_LOGIN',
-        title: { en: 'New sign-in to your account', hi: 'आपके खाते में नया साइन-इन' },
+        title: { en: 'New sign-in to your account', hi: 'आपके अकाउंट में नया साइन-इन' },
       });
       // The time is the moment of the call; its format is pinned in notification-types.spec.ts.
       expect(row.body.en).toMatch(
         /^A new sign-in was detected from IP 127\.0\.0\.1 at \d{1,2} \w{3} \d{4}, \d{1,2}:\d{2} [ap]m\. If this wasn't you, secure your account immediately\.$/,
       );
       expect(row.body.hi).toMatch(
-        /^\d{1,2} \S+ \d{4}, \d{2}:\d{2} पर IP 127\.0\.0\.1 से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना खाता सुरक्षित करें।$/,
+        /^\d{1,2} \S+ \d{4}, \d{2}:\d{2} पर IP 127\.0\.0\.1 से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना अकाउंट सुरक्षित करें।$/,
       );
       expect(await deliveriesFor(member.userId)).toEqual([]);
       expect(email.sent).toEqual([]);

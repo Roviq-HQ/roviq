@@ -12,13 +12,13 @@ import {
   CardTitle,
   FieldDescription,
   FieldGroup,
-  FieldInfoPopover,
   FieldLegend,
   FieldSet,
   setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { instituteGroupNewHelp } from '@web/help/admin-institute-groups/institute-group-new.help';
 import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -274,14 +274,7 @@ export default function NewInstituteGroupPage() {
                   {(field) => (
                     <field.TextField
                       label={t('code')}
-                      info={
-                        <FieldInfoPopover
-                          title={t('codeHelpTitle')}
-                          data-testid={adminInstituteGroups.codeInfo}
-                        >
-                          <p>{t('codeHelpBody')}</p>
-                        </FieldInfoPopover>
-                      }
+                      help={instituteGroupNewHelp.code}
                       description={t('codeDescription')}
                       placeholder={t('codePlaceholder')}
                       maxLength={50}
@@ -299,31 +292,11 @@ export default function NewInstituteGroupPage() {
                       description={t('typeDescription')}
                       options={GROUP_TYPE_VALUES.map((type) => ({
                         value: type,
-                        label: (
-                          <div className="flex flex-col">
-                            <span>{t(`types.${type}`)}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {t(`typeDescriptions.${type}`)}
-                            </span>
-                          </div>
-                        ),
+                        label: t(`types.${type}`),
                       }))}
                       optional={false}
                       testId="institute-group-type-select"
-                      info={
-                        <FieldInfoPopover
-                          title={t('fieldHelp.typeTitle')}
-                          data-testid={adminInstituteGroups.typeInfo}
-                        >
-                          <p>{t('fieldHelp.typeBody')}</p>
-                          <ul className="mt-1 list-disc space-y-0.5 ps-4">
-                            <li>{t('fieldHelp.typeTrust')}</li>
-                            <li>{t('fieldHelp.typeSociety')}</li>
-                            <li>{t('fieldHelp.typeChain')}</li>
-                            <li>{t('fieldHelp.typeFranchise')}</li>
-                          </ul>
-                        </FieldInfoPopover>
-                      }
+                      help={instituteGroupNewHelp.type}
                     />
                   )}
                 </form.AppField>
@@ -342,14 +315,7 @@ export default function NewInstituteGroupPage() {
                       maxLength={100}
                       testId="institute-group-registration-number-input"
                       errorTestId="institute-group-registration-number-error"
-                      info={
-                        <FieldInfoPopover
-                          title={t('fieldHelp.registrationNumberTitle')}
-                          data-testid={adminInstituteGroups.registrationNumberInfo}
-                        >
-                          <p>{t('fieldHelp.registrationNumberBody')}</p>
-                        </FieldInfoPopover>
-                      }
+                      help={instituteGroupNewHelp.registrationNumber}
                     />
                   )}
                 </form.AppField>
@@ -365,14 +331,7 @@ export default function NewInstituteGroupPage() {
                         label: tGeo(`states.${state}`),
                       }))}
                       testId="institute-group-registration-state-select"
-                      info={
-                        <FieldInfoPopover
-                          title={t('fieldHelp.registrationStateTitle')}
-                          data-testid={adminInstituteGroups.registrationStateInfo}
-                        >
-                          <p>{t('fieldHelp.registrationStateBody')}</p>
-                        </FieldInfoPopover>
-                      }
+                      help={instituteGroupNewHelp.registrationState}
                     />
                   )}
                 </form.AppField>

@@ -166,7 +166,7 @@ describe('NotificationsPanel', () => {
       locale: 'hi',
     });
 
-    expect(await screen.findByText('सूचना वितरण')).toBeInTheDocument();
+    expect(await screen.findByText('नोटिफ़िकेशन वितरण')).toBeInTheDocument();
     expect(await screen.findAllByText('नहीं भेजा गया')).toHaveLength(4);
   });
 

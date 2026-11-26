@@ -29,7 +29,7 @@ function subject(p: SectionCapacityWarningParams, locale: Locale): string {
 function body(p: SectionCapacityWarningParams, locale: Locale): string {
   const section = `${nameIn(p.standardName, locale)} ${nameIn(p.sectionName, locale)}`;
   if (locale === 'hi') {
-    return `${section} में अब ${p.currentStrength} विद्यार्थी हैं, जो इसकी सामान्य क्षमता ${p.optimal} के बराबर या उससे अधिक है। नए विद्यार्थी आने से पहले एक नया सेक्शन जोड़ें या कुछ विद्यार्थियों को दूसरे सेक्शन में भेजें। यह संदेश एक बार भेजा जाता है; सेक्शन ${p.optimal} से कम होकर फिर भरने पर ही दोबारा आएगा।`;
+    return `${section} में अब ${p.currentStrength} स्टूडेंट हैं, जो इसकी सामान्य क्षमता ${p.optimal} के बराबर या उससे अधिक है। नए स्टूडेंट आने से पहले एक नया सेक्शन जोड़ें या कुछ स्टूडेंट्स को दूसरे सेक्शन में भेजें। यह मैसेज एक बार भेजा जाता है; सेक्शन ${p.optimal} से कम होकर फिर भरने पर ही दोबारा आएगा।`;
   }
   const students = p.currentStrength === 1 ? 'student' : 'students';
   return `${section} now has ${p.currentStrength} ${students}, at or above its optimal strength of ${p.optimal}. Before more students join, add a section or move some students to another section. This is sent once; it comes again only after the section drops below ${p.optimal} and fills up again.`;

@@ -32,7 +32,7 @@ export interface AttendanceAbsentParams {
 const ATTENDANCE_PATH = '/institute/attendance';
 
 function statusWord(status: AttendanceAbsentParams['status'], locale: Locale): string {
-  if (locale === 'hi') return status === 'LATE' ? 'विलंब से उपस्थित' : 'अनुपस्थित';
+  if (locale === 'hi') return status === 'LATE' ? 'लेट' : 'ऐब्सेंट';
   return status === 'LATE' ? 'late' : 'absent';
 }
 
@@ -69,7 +69,7 @@ function single(p: AttendanceAbsentParams, locale: Locale): string {
 function singleSubject(p: AttendanceAbsentParams, locale: Locale): string {
   if (locale === 'hi') {
     const who = p.studentName ?? 'आपका बच्चा';
-    return `उपस्थिति सूचना: ${who} ${p.status === 'LATE' ? 'विलंब से उपस्थित' : 'अनुपस्थित'}`;
+    return `अटेंडेंस नोटिफ़िकेशन: ${who} ${p.status === 'LATE' ? 'लेट' : 'ऐब्सेंट'}`;
   }
   const who = p.studentName ?? 'your ward';
   return `Attendance alert: ${who} was ${p.status === 'LATE' ? 'late' : 'absent'}`;
@@ -79,8 +79,8 @@ function digestSubject(items: readonly AttendanceAbsentParams[], locale: Locale)
   const late = items.filter((p) => p.status === 'LATE').length;
   const absent = items.length - late;
   if (locale === 'hi') {
-    const parts = [absent > 0 ? `${absent} अनुपस्थिति` : null, late > 0 ? `${late} विलंब` : null];
-    return `उपस्थिति सूचनाएँ: ${parts.filter(Boolean).join(', ')}`;
+    const parts = [absent > 0 ? `${absent} ऐब्सेंट` : null, late > 0 ? `${late} देर` : null];
+    return `अटेंडेंस नोटिफ़िकेशन: ${parts.filter(Boolean).join(', ')}`;
   }
   const parts = [
     absent > 0 ? `${absent} ${absent === 1 ? 'absence' : 'absences'}` : null,
@@ -111,7 +111,7 @@ const whatsappSingle: WhatsAppTemplate<AttendanceAbsentParams> = {
   },
   variables: (p, locale) => [
     cleanVariable(p.studentName ?? '', WARD[locale]),
-    cleanVariable(sectionLabel(p, locale) ?? '', locale === 'hi' ? 'अपनी कक्षा' : 'their class'),
+    cleanVariable(sectionLabel(p, locale) ?? '', locale === 'hi' ? 'अपनी क्लास' : 'their class'),
     statusWord(p.status, locale),
     cleanVariable(
       formatCalendarDate(p.sessionDate, locale) ?? '',
@@ -164,7 +164,7 @@ function summary(
   const one = items.length === 1 && first ? first : null;
   if (channel === 'WHATSAPP') {
     return {
-      subject: locale === 'hi' ? 'उपस्थिति सूचना' : 'Attendance Alert',
+      subject: locale === 'hi' ? 'अटेंडेंस नोटिफ़िकेशन' : 'Attendance Alert',
       body: one
         ? renderTemplate(whatsappSingle.body[locale], whatsappSingle.variables(one, locale))
         : renderTemplate(whatsappDigest.body[locale], whatsappDigest.variables(items, locale)),
@@ -173,12 +173,12 @@ function summary(
   const body = one
     ? single(one, locale)
     : locale === 'hi'
-      ? `आज उपस्थिति की ${items.length} सूचनाएँ दर्ज हुईं।`
+      ? `आज अटेंडेंस के ${items.length} नोटिफ़िकेशन दर्ज हुए।`
       : `${items.length} attendance alerts were recorded today.`;
   if (channel === 'EMAIL') {
     return { subject: one ? singleSubject(one, locale) : digestSubject(items, locale), body };
   }
-  return { subject: locale === 'hi' ? 'उपस्थिति सूचना' : 'Attendance Alert', body };
+  return { subject: locale === 'hi' ? 'अटेंडेंस नोटिफ़िकेशन' : 'Attendance Alert', body };
 }
 
 /**
@@ -202,10 +202,10 @@ export const attendanceAbsentType: RegularNotificationType<AttendanceAbsentParam
     title: localized((l) =>
       p.status === 'LATE'
         ? l === 'hi'
-          ? 'देर से आने की सूचना'
+          ? 'लेट आने का नोटिफ़िकेशन'
           : 'Late arrival recorded'
         : l === 'hi'
-          ? 'अनुपस्थिति दर्ज'
+          ? 'ऐब्सेंट दर्ज'
           : 'Absence recorded',
     ),
     body: localized((l) =>

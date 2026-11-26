@@ -24,12 +24,12 @@ export const EDUCATION_LEVEL_LABELS_EN: Record<GuardianEducationLevel, string> =
 };
 
 export const EDUCATION_LEVEL_LABELS_HI: Record<GuardianEducationLevel, string> = {
-  ILLITERATE: 'कोई औपचारिक शिक्षा नहीं',
-  PRIMARY: 'प्राथमिक (कक्षा 5 तक)',
-  SECONDARY: 'माध्यमिक (कक्षा 10 / 12)',
-  GRADUATE: 'स्नातक',
-  POST_GRADUATE: 'स्नातकोत्तर',
-  PROFESSIONAL: 'व्यावसायिक (MBBS, LLB, CA आदि)',
+  ILLITERATE: 'पढ़ाई नहीं की',
+  PRIMARY: 'प्राइमरी (क्लास 5 तक)',
+  SECONDARY: 'सेकेंडरी (क्लास 10 / 12)',
+  GRADUATE: 'ग्रेजुएट',
+  POST_GRADUATE: 'पोस्ट ग्रेजुएट',
+  PROFESSIONAL: 'प्रोफ़ेशनल (MBBS, LLB, CA वगैरह)',
 };
 
 export class GuardianCreatePage {

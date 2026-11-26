@@ -113,16 +113,6 @@
     "removeExtra": "Remove extra period",
     "extraEmpty": "No extra periods added."
   },
-  "fieldHelp": {
-    "dayStartTitle": "Day start time",
-    "dayStartBody": "The clock time the first teaching period begins. Periods and breaks are computed forward from here.",
-    "workingDaysTitle": "Working days",
-    "workingDaysBody": "Which days of the week classes run. Leave Sunday unchecked unless your institute teaches on Sundays.",
-    "lunchTitle": "Lunch breaks",
-    "lunchBody": "A break is inserted after the given period number and shifts later periods accordingly.",
-    "extraTitle": "Extra / zero periods",
-    "extraBody": "Morning extras (zero periods) are added before period 1; evening extras after the last period."
-  },
   "editor": {
     "back": "Back to timetables",
     "noSectionsCovered": "This timetable covers no sections yet.",

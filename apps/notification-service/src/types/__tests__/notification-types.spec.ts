@@ -193,10 +193,10 @@ describe('regular type copy', () => {
     const sample = SAMPLES.ATTENDANCE_ABSENT;
 
     expect(composeInApp(sample)).toEqual({
-      title: { en: 'Absence recorded', hi: 'अनुपस्थिति दर्ज' },
+      title: { en: 'Absence recorded', hi: 'ऐब्सेंट दर्ज' },
       body: {
         en: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 22 November 2026. Please contact the institute if this is incorrect.',
-        hi: '22 नवंबर 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
+        hi: '22 नवंबर 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को ऐब्सेंट दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
       },
       data: {
         sessionId: 'session-1',
@@ -209,12 +209,12 @@ describe('regular type copy', () => {
       body: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 22 November 2026.',
     });
     expect(composeOutside(sample, 'EMAIL', 'hi')).toEqual({
-      subject: 'उपस्थिति सूचना: Aarav Sharma अनुपस्थित',
-      body: '22 नवंबर 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया।',
+      subject: 'अटेंडेंस नोटिफ़िकेशन: Aarav Sharma ऐब्सेंट',
+      body: '22 नवंबर 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को ऐब्सेंट दर्ज किया गया।',
     });
     expect(composeOutside(sample, 'WHATSAPP', 'hi')).toEqual({
-      subject: 'उपस्थिति सूचना',
-      body: 'उपस्थिति सूचना: Aarav Sharma को, जो Class 5-A में हैं, अनुपस्थित दर्ज किया गया, तिथि 22 नवंबर 2026। विवरण के लिए Roviq खोलें।',
+      subject: 'अटेंडेंस नोटिफ़िकेशन',
+      body: 'उपस्थिति सूचना: Aarav Sharma को, जो Class 5-A में हैं, ऐब्सेंट दर्ज किया गया, तिथि 22 नवंबर 2026। विवरण के लिए Roviq खोलें।',
     });
   });
 
@@ -234,8 +234,8 @@ describe('regular type copy', () => {
       body: 'Your ward (Section A) was marked late on 22 November 2026.',
     });
     expect(composeOutside(late, 'EMAIL', 'hi')).toEqual({
-      subject: 'उपस्थिति सूचना: आपका बच्चा विलंब से उपस्थित',
-      body: '22 नवंबर 2026 को आपके बच्चे (सेक्शन A) को विलंब से उपस्थित दर्ज किया गया।',
+      subject: 'अटेंडेंस नोटिफ़िकेशन: आपका बच्चा लेट',
+      body: '22 नवंबर 2026 को आपके बच्चे (सेक्शन A) को लेट दर्ज किया गया।',
     });
   });
 
@@ -248,7 +248,7 @@ describe('regular type copy', () => {
 
       expect(composeInApp(message).body).toEqual({
         en: 'Your ward Aarav Sharma was marked absent. Please contact the institute if this is incorrect.',
-        hi: 'आपके बच्चे Aarav Sharma को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
+        hi: 'आपके बच्चे Aarav Sharma को ऐब्सेंट दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
       });
     }
   });
@@ -280,12 +280,12 @@ describe('regular type copy', () => {
       body: '2 attendance alerts were recorded today.',
     });
     expect(composeDigest({ type: 'ATTENDANCE_ABSENT', items }, 'EMAIL', 'hi')).toEqual({
-      subject: 'उपस्थिति सूचनाएँ: 1 अनुपस्थिति, 1 विलंब',
-      body: 'आज उपस्थिति की 2 सूचनाएँ दर्ज हुईं।',
+      subject: 'अटेंडेंस नोटिफ़िकेशन: 1 ऐब्सेंट, 1 देर',
+      body: 'आज अटेंडेंस के 2 नोटिफ़िकेशन दर्ज हुए।',
     });
     expect(composeDigest({ type: 'ATTENDANCE_ABSENT', items }, 'PUSH', 'hi')).toEqual({
-      subject: 'उपस्थिति सूचना',
-      body: 'आज उपस्थिति की 2 सूचनाएँ दर्ज हुईं।',
+      subject: 'अटेंडेंस नोटिफ़िकेशन',
+      body: 'आज अटेंडेंस के 2 नोटिफ़िकेशन दर्ज हुए।',
     });
   });
 
@@ -301,10 +301,10 @@ describe('regular type copy', () => {
     const sample = SAMPLES.LEAVE_DECIDED;
 
     expect(composeInApp(sample)).toEqual({
-      title: { en: "Ishaan Kapoor's leave was approved", hi: 'Ishaan Kapoor की छुट्टी स्वीकृत हुई' },
+      title: { en: "Ishaan Kapoor's leave was approved", hi: 'Ishaan Kapoor की छुट्टी अप्रूव हुई' },
       body: {
         en: "Ishaan Kapoor's leave application from 24 November 2026 to 26 November 2026 has been approved.",
-        hi: 'Ishaan Kapoor का 24 नवंबर 2026 से 26 नवंबर 2026 तक का छुट्टी आवेदन स्वीकृत कर दिया गया है।',
+        hi: 'Ishaan Kapoor का 24 नवंबर 2026 से 26 नवंबर 2026 तक का छुट्टी ऐप्लिकेशन अप्रूव कर दिया गया है।',
       },
       data: { leaveId: 'leave-1', path: '/institute/leave' },
     });
@@ -326,8 +326,8 @@ describe('regular type copy', () => {
       body: 'Your leave application for 24 November 2026 has been rejected.',
     });
     expect(composeOutside(message, 'EMAIL', 'hi')).toEqual({
-      subject: 'आपकी छुट्टी अस्वीकृत हुई',
-      body: 'आपका 24 नवंबर 2026 का छुट्टी आवेदन अस्वीकृत कर दिया गया है।',
+      subject: 'आपकी छुट्टी रिजेक्ट हुई',
+      body: 'आपका 24 नवंबर 2026 का छुट्टी ऐप्लिकेशन रिजेक्ट कर दिया गया है।',
     });
   });
 
@@ -345,10 +345,10 @@ describe('regular type copy', () => {
     };
 
     expect(composeInApp(message)).toEqual({
-      title: { en: "Your ward's leave was rejected", hi: 'आपके बच्चे की छुट्टी अस्वीकृत हुई' },
+      title: { en: "Your ward's leave was rejected", hi: 'आपके बच्चे की छुट्टी रिजेक्ट हुई' },
       body: {
         en: "Your ward's leave application has been rejected.",
-        hi: 'आपके बच्चे का छुट्टी आवेदन अस्वीकृत कर दिया गया है।',
+        hi: 'आपके बच्चे का छुट्टी ऐप्लिकेशन रिजेक्ट कर दिया गया है।',
       },
       data: { leaveId: '01a202dc-0000-7000-8000-000000000001', path: '/institute/leave' },
     });
@@ -362,10 +362,10 @@ describe('regular type copy', () => {
 
   it('should word a sign-in with a 12-hour clock in English and a 24-hour clock in Hindi', () => {
     expect(composeInApp(SAMPLES.AUTH_LOGIN)).toEqual({
-      title: { en: 'New sign-in to your account', hi: 'आपके खाते में नया साइन-इन' },
+      title: { en: 'New sign-in to your account', hi: 'आपके अकाउंट में नया साइन-इन' },
       body: {
         en: "A new sign-in was detected from IP 203.0.113.7 at 22 Nov 2026, 6:17 pm. If this wasn't you, secure your account immediately.",
-        hi: '22 नव॰ 2026, 18:17 पर IP 203.0.113.7 से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना खाता सुरक्षित करें।',
+        hi: '22 नव॰ 2026, 18:17 पर IP 203.0.113.7 से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना अकाउंट सुरक्षित करें।',
       },
       data: { path: '/institute/account' },
     });
@@ -380,7 +380,7 @@ describe('regular type copy', () => {
     });
     expect(composeOutside(sample, 'EMAIL', 'hi')).toEqual({
       subject: 'नए उपकरण से साइन-इन',
-      body: '10 अप्रैल 2026, 10:00 पर एक नए उपकरण से आपके खाते में प्रवेश हुआ (IP: 203.0.113.7)। यदि यह आप नहीं थे, तो अपना खाता सुरक्षित करें।',
+      body: '10 अप्रैल 2026, 10:00 पर एक नए उपकरण से आपके अकाउंट में साइन-इन हुआ (IP: 203.0.113.7)। यदि यह आप नहीं थे, तो अपना अकाउंट सुरक्षित करें।',
     });
   });
 
@@ -473,7 +473,7 @@ describe('secret types', () => {
     expect(composeSecret('IMPERSONATION_OTP', params, 'EMAIL', 'hi')).toEqual({
       subject: 'Roviq सपोर्ट आपके संस्थान को देखने की अनुमति माँग रहा है',
       body: [
-        'Roviq सपोर्ट से किसी ने आपके संस्थान को उसके एक उपयोगकर्ता के रूप में देखने की अनुमति माँगी है।',
+        'Roviq सपोर्ट से किसी ने आपके संस्थान को उसके एक यूज़र के रूप में देखने की अनुमति माँगी है।',
         '',
         'यदि आप अनुमति देते हैं, तो उन्हें यह कोड दें: 771204',
         'यह 5 मिनट में समाप्त हो जाएगा।',
@@ -537,7 +537,7 @@ describe('secret types', () => {
       body: [
         'नमस्ते Kiran,',
         '',
-        'सनराइज़ पब्लिक ने Roviq पर आपके लिए एक खाता बनाया है।',
+        'सनराइज़ पब्लिक ने Roviq पर आपके लिए एक अकाउंट बनाया है।',
         'यूज़रनेम: staff-0191-ab12',
         'अस्थायी पासवर्ड: Tmp-7kP4',
         '',

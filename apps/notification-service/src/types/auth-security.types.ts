@@ -47,38 +47,38 @@ const UNKNOWN_IP: Record<Locale, string> = { en: 'unknown', hi: 'अज्ञा
 
 const COPY: Record<AuthAlertKey, AuthCopy> = {
   AUTH_LOGIN: {
-    subject: { en: 'New sign-in to your account', hi: 'आपके खाते में नया साइन-इन' },
+    subject: { en: 'New sign-in to your account', hi: 'आपके अकाउंट में नया साइन-इन' },
     body: (time, ip, l) =>
       l === 'hi'
-        ? `${time} पर IP ${ip} से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना खाता सुरक्षित करें।`
+        ? `${time} पर IP ${ip} से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना अकाउंट सुरक्षित करें।`
         : `A new sign-in was detected from IP ${ip} at ${time}. If this wasn't you, secure your account immediately.`,
   },
   AUTH_PASSWORD_RESET: {
-    subject: { en: 'Password reset requested', hi: 'पासवर्ड रीसेट का अनुरोध' },
+    subject: { en: 'Password reset requested', hi: 'पासवर्ड रीसेट की रिक्वेस्ट' },
     body: (time, _ip, l) =>
       l === 'hi'
-        ? `${time} पर आपके खाते का पासवर्ड रीसेट करने का अनुरोध किया गया। यदि यह आप नहीं थे, तो सहायता टीम से संपर्क करें।`
+        ? `${time} पर आपके अकाउंट का पासवर्ड रीसेट करने की रिक्वेस्ट की गई। यदि यह आप नहीं थे, तो सहायता टीम से संपर्क करें।`
         : `A password reset was requested for your account at ${time}. If this wasn't you, contact support.`,
   },
   AUTH_NEW_DEVICE: {
     subject: { en: 'New device sign-in', hi: 'नए उपकरण से साइन-इन' },
     body: (time, ip, l) =>
       l === 'hi'
-        ? `${time} पर एक नए उपकरण से आपके खाते में प्रवेश हुआ (IP: ${ip})। यदि यह आप नहीं थे, तो अपना खाता सुरक्षित करें।`
+        ? `${time} पर एक नए उपकरण से आपके अकाउंट में साइन-इन हुआ (IP: ${ip})। यदि यह आप नहीं थे, तो अपना अकाउंट सुरक्षित करें।`
         : `Your account was accessed from a new device at ${time} (IP: ${ip}). If this wasn't you, secure your account.`,
   },
   AUTH_ACCOUNT_LOCKED: {
-    subject: { en: 'Account locked', hi: 'खाता लॉक किया गया' },
+    subject: { en: 'Account locked', hi: 'अकाउंट लॉक किया गया' },
     body: (time, _ip, l) =>
       l === 'hi'
-        ? `${time} पर कई बार गलत प्रयासों के कारण आपका खाता लॉक कर दिया गया है। इसे खुलवाने के लिए सहायता टीम से संपर्क करें।`
+        ? `${time} पर कई बार गलत कोशिशों के कारण आपका अकाउंट लॉक कर दिया गया है। इसे खुलवाने के लिए सहायता टीम से संपर्क करें।`
         : `Your account has been locked due to too many failed attempts at ${time}. Contact support to unlock.`,
   },
   AUTH_SESSION_REVOKED: {
-    subject: { en: 'Session revoked', hi: 'सत्र रद्द किया गया' },
+    subject: { en: 'Session revoked', hi: 'सेशन रद्द किया गया' },
     body: (time, _ip, l) =>
       l === 'hi'
-        ? `${time} पर आपके खाते का एक सत्र रद्द किया गया। यदि यह आप नहीं थे, तो तुरंत अपना पासवर्ड बदलें।`
+        ? `${time} पर आपके अकाउंट का एक सेशन रद्द किया गया। यदि यह आप नहीं थे, तो तुरंत अपना पासवर्ड बदलें।`
         : `A session was revoked for your account at ${time}. If this wasn't you, change your password immediately.`,
   },
 };

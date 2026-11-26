@@ -24,7 +24,7 @@ describe('RulePreviewSample (ROV-360)', () => {
 
     const row = screen.getByTestId(testIds.instituteGroups.previewMember(MEMBER));
     expect(row).toHaveTextContent('नेहा गुप्ता');
-    expect(row).toHaveTextContent('प्रवेश सं. ADM-0007');
+    expect(row).toHaveTextContent('एडमिशन नं. ADM-0007');
     expect(row).not.toHaveTextContent(MEMBER);
   });
 });

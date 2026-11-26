@@ -330,13 +330,13 @@ function PinToggleButton({
   title: string;
   pinned: boolean;
   onToggle: () => void;
-  pinLabel: string;
-  unpinLabel: string;
+  pinLabel: (title: string) => string;
+  unpinLabel: (title: string) => string;
 }) {
   return (
     <button
       type="button"
-      aria-label={pinned ? `${unpinLabel} ${title}` : `${pinLabel} ${title}`}
+      aria-label={pinned ? unpinLabel(title) : pinLabel(title)}
       data-testid={layout.navPinToggle(href)}
       onClick={(e) => {
         e.preventDefault();
@@ -377,7 +377,7 @@ function ShortcutRow({
   isActive: boolean;
   onClick: () => void;
   onUnpin?: () => void;
-  unpinLabel?: string;
+  unpinLabel?: (title: string) => string;
 }) {
   const Icon = item.icon;
   const localizedHref = `/${locale}${item.href}`;
@@ -412,7 +412,7 @@ function ShortcutRow({
       {onUnpin && (
         <button
           type="button"
-          aria-label={`${unpinLabel ?? 'Unpin'} ${item.title}`}
+          aria-label={unpinLabel ? unpinLabel(item.title) : `Unpin ${item.title}`}
           data-testid={layout.navPinToggle(item.href)}
           onClick={(e) => {
             e.preventDefault();
@@ -452,7 +452,7 @@ function ShortcutSection({
   activeHref: string | null;
   onItemClick: () => void;
   onUnpin?: (href: string) => void;
-  unpinLabel?: string;
+  unpinLabel?: (title: string) => string;
 }) {
   return (
     <div data-testid={testId} className="flex flex-col gap-0.5">
@@ -506,8 +506,8 @@ function FullNavContent({ config }: { config: LayoutConfig }) {
     [pins, itemByHref],
   );
   const recentItems = useRecents(allItems);
-  const pinLabel = tNav('pinItem');
-  const unpinLabel = tNav('unpinItem');
+  const pinLabel = (title: string) => tNav('pinItem', { title });
+  const unpinLabel = (title: string) => tNav('unpinItem', { title });
   // Dedupe: when an item is pinned, hide it from its original group so the
   // sidebar doesn't show the same row twice.
   const pinnedHrefSet = React.useMemo(() => new Set(pins), [pins]);

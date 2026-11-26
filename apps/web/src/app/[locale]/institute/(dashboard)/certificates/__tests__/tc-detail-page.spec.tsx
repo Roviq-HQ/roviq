@@ -314,7 +314,7 @@ describe('TCDetailPage (component)', () => {
     renderWithProviders(<TCDetailPage />, { locale: 'hi' });
 
     expect(screen.getByText('लेखा')).toBeInTheDocument();
-    expect(screen.getByText('पुस्तकालय')).toBeInTheDocument();
+    expect(screen.getByText('लाइब्रेरी')).toBeInTheDocument();
   });
 
   it.each(

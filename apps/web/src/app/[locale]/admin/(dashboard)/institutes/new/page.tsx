@@ -30,8 +30,9 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldInfoPopover,
+  FieldHelpButton,
   FieldLabel,
+  FieldLabelWithInfo,
   FieldLegend,
   FieldSeparator,
   FieldSet,
@@ -51,6 +52,8 @@ import {
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { adminInstituteNewHelp } from '@web/help/admin-institutes/admin-institute-new.help';
+import { instituteNewHelp } from '@web/help/institutes/institute-new.help';
 import { Check, ChevronsUpDown, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -452,15 +455,9 @@ export default function CreateInstitutePage() {
                     const value = typeof field.state.value === 'string' ? field.state.value : '';
                     return (
                       <Field data-invalid={invalid || undefined}>
-                        <FieldLabel htmlFor={field.name}>
+                        <FieldLabelWithInfo htmlFor={field.name} help={instituteNewHelp.code}>
                           {t('code')}
-                          <FieldInfoPopover
-                            title={t('codeHelpTitle')}
-                            data-testid={adminInstitutes.newCodeInfo}
-                          >
-                            <p>{t('codeHelpBody')}</p>
-                          </FieldInfoPopover>
-                        </FieldLabel>
+                        </FieldLabelWithInfo>
                         <Input
                           id={field.name}
                           name={field.name}
@@ -488,19 +485,7 @@ export default function CreateInstitutePage() {
                       options={INSTITUTE_TYPES.map((tp) => ({ value: tp, label: tTypes(tp) }))}
                       optional={false}
                       testId="admin-institute-new-type-select"
-                      info={
-                        <FieldInfoPopover
-                          title={t('fieldHelp.typeTitle')}
-                          data-testid={adminInstitutes.newTypeInfo}
-                        >
-                          <p>{t('fieldHelp.typeBody')}</p>
-                          <ul className="mt-1 list-disc space-y-0.5 ps-4">
-                            <li>{t('fieldHelp.typeSchool')}</li>
-                            <li>{t('fieldHelp.typeCoaching')}</li>
-                            <li>{t('fieldHelp.typeLibrary')}</li>
-                          </ul>
-                        </FieldInfoPopover>
-                      }
+                      help={instituteNewHelp.type}
                     />
                   )}
                 </form.AppField>
@@ -521,15 +506,12 @@ export default function CreateInstitutePage() {
                           : 'TRADITIONAL';
                       return (
                         <Field>
-                          <FieldLabel htmlFor={field.name}>
+                          <FieldLabelWithInfo
+                            htmlFor={field.name}
+                            help={instituteNewHelp.structureFramework}
+                          >
                             {t('structureFramework')}
-                            <FieldInfoPopover
-                              title={t('structureFrameworkHelpTitle')}
-                              data-testid={adminInstitutes.newFrameworkInfo}
-                            >
-                              <p>{t('structureFrameworkHelpBody')}</p>
-                            </FieldInfoPopover>
-                          </FieldLabel>
+                          </FieldLabelWithInfo>
                           <Select
                             value={value}
                             onValueChange={(v) =>
@@ -562,16 +544,9 @@ export default function CreateInstitutePage() {
                       const selected = BOARD_TYPE_VALUES.find((b) => b === value);
                       return (
                         <Field>
-                          <FieldLabel>
+                          <FieldLabelWithInfo help={instituteNewHelp.board}>
                             {t('board')}
-                            <FieldInfoPopover
-                              title={t('fieldHelp.boardTitle')}
-                              data-testid={adminInstitutes.newBoardInfo}
-                            >
-                              <p>{t('fieldHelp.boardBody')}</p>
-                              <p>{t('fieldHelp.boardOptions')}</p>
-                            </FieldInfoPopover>
-                          </FieldLabel>
+                          </FieldLabelWithInfo>
                           <BoardCombobox
                             value={value}
                             onChange={(next) => field.handleChange(next)}
@@ -621,18 +596,9 @@ export default function CreateInstitutePage() {
                     const value = typeof field.state.value === 'string' ? field.state.value : null;
                     return (
                       <Field data-invalid={invalid || undefined}>
-                        <FieldLabel>
+                        <FieldLabelWithInfo help={adminInstituteNewHelp.reseller}>
                           {t('reseller')}
-                          <FieldInfoPopover
-                            title={t('fieldHelp.resellerTitle')}
-                            data-testid={adminInstitutes.newResellerInfo}
-                          >
-                            <p>{t('fieldHelp.resellerBody')}</p>
-                            <p>
-                              <em>{t('fieldHelp.resellerExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        </FieldLabel>
+                        </FieldLabelWithInfo>
                         <ResellerCombobox
                           value={value}
                           onChange={(next) => field.handleChange(next)}
@@ -661,18 +627,9 @@ export default function CreateInstitutePage() {
                     const value = typeof field.state.value === 'string' ? field.state.value : null;
                     return (
                       <Field>
-                        <FieldLabel>
+                        <FieldLabelWithInfo help={adminInstituteNewHelp.group}>
                           {t('group')}
-                          <FieldInfoPopover
-                            title={t('fieldHelp.groupTitle')}
-                            data-testid={adminInstitutes.newGroupInfo}
-                          >
-                            <p>{t('fieldHelp.groupBody')}</p>
-                            <p>
-                              <em>{t('fieldHelp.groupExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        </FieldLabel>
+                        </FieldLabelWithInfo>
                         <InstituteGroupCombobox
                           value={value}
                           onChange={(next) => field.handleChange(next)}
@@ -690,12 +647,10 @@ export default function CreateInstitutePage() {
               <FieldSet data-testid={adminInstitutes.formSectionFirstAdmin}>
                 <div className="flex items-center gap-1">
                   <FieldLegend>{t('firstAdmin.title')}</FieldLegend>
-                  <FieldInfoPopover
-                    title={t('firstAdmin.infoTitle')}
-                    data-testid={adminInstitutes.newFirstAdminInfo}
-                  >
-                    <p>{t('firstAdmin.infoBody')}</p>
-                  </FieldInfoPopover>
+                  <FieldHelpButton
+                    topic={instituteNewHelp.firstAdmin}
+                    fieldLabel={t('firstAdmin.title')}
+                  />
                 </div>
                 <FieldDescription>{t('firstAdmin.description')}</FieldDescription>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

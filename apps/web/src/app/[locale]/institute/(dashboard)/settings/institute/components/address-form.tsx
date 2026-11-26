@@ -25,7 +25,7 @@ import {
 } from '@roviq/ui';
 import { type AnyFieldApi, useStore } from '@tanstack/react-form';
 import { addressHelp } from '@web/help/institute-settings/address.help';
-import { Check, ChevronsUpDown, Info, MapPin } from 'lucide-react';
+import { Check, ChevronsUpDown, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 
@@ -86,6 +86,10 @@ async function lookupPincode(
   } catch {
     return null;
   }
+}
+
+function isIndianState(value: string): value is IndianState {
+  return (INDIAN_STATE_VALUES as readonly string[]).includes(value);
 }
 
 /** Normalise a human-readable API state name to an `IndianState` UPPER_SNAKE value. */
@@ -214,8 +218,10 @@ export function AddressForm({ form, allowedStates }: AddressFormProps) {
     line2,
     line3,
     [currentCity, currentDistrict].filter(Boolean).join(', '),
-    [currentState, postalCode].filter(Boolean).join(' - '),
-    'India',
+    [isIndianState(currentState) ? tGeo(`states.${currentState}`) : currentState, postalCode]
+      .filter(Boolean)
+      .join(' - '),
+    tGeo('india'),
   ].filter((l) => l && l.trim().length > 0);
 
   return (
@@ -301,25 +307,9 @@ export function AddressForm({ form, allowedStates }: AddressFormProps) {
               const value = typeof field.state.value === 'string' ? field.state.value : '';
               return (
                 <Field data-invalid={invalid || undefined}>
-                  <FieldLabel htmlFor="address-postal-code">
+                  <FieldLabelWithInfo htmlFor="address-postal-code" help={addressHelp.postalCode}>
                     {t('postalCode')}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="ms-1 size-5"
-                          aria-label={t('postalCodeHelpAria')}
-                        >
-                          <Info className="size-3.5" aria-hidden="true" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent side="top" className="max-w-xs text-sm">
-                        {t('postalCodeHelp')}
-                      </PopoverContent>
-                    </Popover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Input
                     id="address-postal-code"
                     data-testid={instituteSettings.addressPostalCodeInput}
@@ -510,25 +500,9 @@ export function AddressForm({ form, allowedStates }: AddressFormProps) {
               const value = typeof raw === 'number' && !Number.isNaN(raw) ? String(raw) : '';
               return (
                 <Field data-invalid={invalid || undefined}>
-                  <FieldLabel htmlFor="address-lat">
+                  <FieldLabelWithInfo htmlFor="address-lat" help={addressHelp.coordinates}>
                     {t('latitude')}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="ms-1 size-5"
-                          aria-label={t('coordinatesHelpAria')}
-                        >
-                          <Info className="size-3.5" aria-hidden="true" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent side="top" className="max-w-xs text-sm">
-                        {t('coordinatesHelp')}
-                      </PopoverContent>
-                    </Popover>
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Input
                     id="address-lat"
                     data-testid={instituteSettings.addressLatInput}
