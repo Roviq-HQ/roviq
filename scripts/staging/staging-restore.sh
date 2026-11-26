@@ -9,8 +9,8 @@
 # it. The API answers on 127.0.0.1:$STAGING_RESTORE_API_PORT (default 13999). Remove the drill,
 # volumes included, with: staging-restore.sh --remove <backup folder> [project]
 #
-# With STAGING_OBJECT_STORE=external the backup holds no objects and the drill restores and starts
-# the databases only: apps started here would share the live buckets, and the restored file
+# A backup taken with an external store holds no objects, and the drill restores and starts the
+# databases only: apps started here would share the live buckets, and the restored file
 # sweeper could delete objects the live stack still uses.
 set -euo pipefail
 
@@ -28,6 +28,10 @@ TARGET="${2:-${STAGING_PROJECT}-restore}"
 [[ "$TARGET" != "$STAGING_PROJECT" ]] || { echo "Refusing to use the live project" >&2; exit 1; }
 [[ -f "$BACKUP/manifest" ]] || { echo "$BACKUP has no manifest" >&2; exit 1; }
 SHA="$(sed -n 's/^release=//p' "$BACKUP/manifest")"
+# The store the backup was taken with decides what is restored, not today's env file. A backup
+# from before the manifest recorded it was taken with the in-stack store.
+backup_store="$(sed -n 's/^object_store=//p' "$BACKUP/manifest")"
+set_object_store "${backup_store:-in-stack}"
 REL="$RELEASES_DIR/$SHA"
 [[ -d "$REL" ]] || { echo "Release $SHA of the backup is not in $RELEASES_DIR" >&2; exit 1; }
 

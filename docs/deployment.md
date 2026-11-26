@@ -503,9 +503,9 @@ shares with other sites (ROV-337). The repository holds what does not depend on 
 |---|---|
 | `docker/compose.staging.yaml` | Override of `docker/compose.app.yaml`: no published port (the metrics store and the workflow console are bound to `127.0.0.1`), pinned infrastructure images, bounded logs, persistent volumes for the object store and NATS, a mail catcher with its own sign-in, and the web app, the API, object storage and the mail catcher on the proxy's external network as `roviq-lab-web`, `roviq-lab-api`, `roviq-lab-storage` and `roviq-lab-mail` |
 | `docker/compose.staging-external-store.yaml` | Added after `compose.staging.yaml` when `STAGING_OBJECT_STORE=external`: the in-stack object store is not started and the gateway and the migrator take every `S3_*` value from the env file |
-| `scripts/staging/staging-deploy.sh <ref>` | Exports the commit with `git archive`, builds its four images (tagged with the commit), backs up, starts the infrastructure, sets the runtime role's password, runs `drizzle-kit migrate`, the essential seed, `pnpm storage:init` (with an external store, `pnpm storage:check` instead) and `pnpm admin:create`, starts the apps and checks the API health and the three portals through their public names. A failure after the migration starts the previous release's apps again |
+| `scripts/staging/staging-deploy.sh <ref>` | Exports the commit with `git archive`, builds its four images (tagged with the commit), backs up, starts the infrastructure, sets the runtime role's password, runs `pnpm storage:check` against an external store (before the migration, so a failing store changes nothing), `drizzle-kit migrate`, the essential seed, `pnpm storage:init` (in-stack store only) and `pnpm admin:create`, starts the apps and checks the API health and the three portals through their public names. A failure after the migration starts the previous release's apps again |
 | `scripts/staging/staging-backup.sh` | Stops the apps, dumps the `roviq`, `temporal` and `temporal_visibility` databases and the roles, archives the in-stack object store (an external store keeps its own versions and is not copied), writes a manifest of the release, the object store mode and its image ids, starts the apps again, and removes backups older than `STAGING_BACKUP_KEEP_DAYS` |
-| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill). With an external store it restores and starts the databases only: apps started there would share the live buckets, and the restored file sweeper could delete objects the live stack still uses |
+| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill). The store mode comes from the backup's manifest, not the env file; a backup taken with an external store is restored as databases only: apps started there would share the live buckets, and the restored file sweeper could delete objects the live stack still uses |
 | `scripts/create-platform-admin.ts` (`pnpm admin:create`) | Creates the first platform admin on a database that has only the essential seed, with a random password that must be changed at first sign-in; does nothing once a platform admin exists |
 
 Every script reads the env file named by `STAGING_ENV_FILE`. Besides the app secrets, it sets
@@ -516,8 +516,17 @@ first admin's password file), `STAGING_IMAGE_PREFIX`, `STAGING_PROXY_NETWORK`, `
 `STAGING_MAIL_UI_AUTH`, `STAGING_METRICS_PORT` and `STAGING_WORKFLOWS_PORT`.
 `STAGING_OBJECT_STORE` is `in-stack` (the default: RustFS in the stack) or `external`; with
 `external` the env file also holds all eight `S3_*` values of the store, whose buckets are set up as
-in "Object storage" above. A release without `docker/compose.staging-external-store.yaml` cannot
-be deployed with an external store.
+in "Object storage" above. To switch a running staging stack to an external store:
+
+1. Deploy a release that has `docker/compose.staging-external-store.yaml` with the store still
+   `in-stack`. The deploy script refuses a switch whose previous release lacks that file, because
+   its backup and rollback would not understand the external mode.
+2. Copy any objects that must survive into the external buckets yourself: nothing copies them, and
+   backups taken after the switch hold no objects.
+3. Set `STAGING_OBJECT_STORE=external` and the eight `S3_*` values, then deploy again.
+
+The in-stack store's container and its volume are left running after the switch; remove them
+when nothing needs them any more.
 
 What staging shows about any environment:
 
