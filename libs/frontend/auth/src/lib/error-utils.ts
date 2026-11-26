@@ -56,6 +56,25 @@ export function classifyClientError(error: unknown): ClientErrorKind | null {
   }
 }
 
+/** Server answers to a token refresh that mean the session is over, not that the try failed. */
+const REFRESH_REFUSED_CODES: readonly string[] = [
+  'SESSION_EXPIRED',
+  'UNAUTHENTICATED',
+  'ACCOUNT_INACTIVE',
+  'PASSWORD_CHANGED',
+  'NO_ACTIVE_MEMBERSHIP',
+  'INSTITUTE_NOT_ACTIVE',
+];
+
+/**
+ * True when a refresh failed because the server refused the session. A network failure or a
+ * server error is false: the session may be fine, so the caller should try again later.
+ */
+export function isRefreshRefused(error: unknown): boolean {
+  const code = extractErrorCode(error);
+  return code !== null && REFRESH_REFUSED_CODES.includes(code);
+}
+
 export function isPasskeySupported(): boolean {
   return typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
 }

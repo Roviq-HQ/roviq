@@ -1,7 +1,13 @@
 'use client';
 
 import type { AuthScope, LoginInput, LoginResult } from '@roviq/auth';
-import { AuthProvider, createAuthMutations, createScopedTokenStorage, useAuth } from '@roviq/auth';
+import {
+  AuthProvider,
+  createAuthMutations,
+  createScopedTokenStorage,
+  isRefreshRefused,
+  useAuth,
+} from '@roviq/auth';
 import { GraphQLProvider } from '@roviq/graphql';
 import { ThemeProvider } from '@roviq/ui/components/theme-provider';
 import { Toaster } from '@roviq/ui/components/ui/sonner';
@@ -57,12 +63,15 @@ function GraphQLBridge({
     notifyImpersonationEnded();
   }, [notifyImpersonationEnded]);
 
+  // null means the server refused the session; a refresh that could not be made rejects, so the
+  // caller tries again instead of treating a network blip as a sign-out.
   const handleTokenRefresh = React.useCallback(async () => {
     try {
       await refreshSession();
       return scopedStorage.getAccessToken();
-    } catch {
-      return null;
+    } catch (err) {
+      if (isRefreshRefused(err)) return null;
+      throw err;
     }
   }, [refreshSession, scopedStorage]);
 

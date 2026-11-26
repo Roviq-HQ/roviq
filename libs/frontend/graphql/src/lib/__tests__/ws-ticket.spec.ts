@@ -80,12 +80,14 @@ describe('resolveWsConnectionParams', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('ends the session when the refresh itself rejects', async () => {
+  it('keeps retrying, without ending the session, when the refresh could not be made', async () => {
     fetchMock.mockResolvedValue(refused());
-    const deps = makeDeps({ refreshToken: vi.fn().mockRejectedValue(new Error('revoked')) });
+    const deps = makeDeps({
+      refreshToken: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    });
 
-    await expect(resolveWsConnectionParams(deps)).rejects.toBeInstanceOf(LiveSessionEndedError);
-    expect(deps.onSessionEnded).toHaveBeenCalledTimes(1);
+    await expect(resolveWsConnectionParams(deps)).resolves.toEqual({});
+    expect(deps.onSessionEnded).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -126,10 +128,11 @@ describe('resolveWsConnectionParams', () => {
     expect(deps.onSessionEnded).not.toHaveBeenCalled();
   });
 
-  it('stops without asking for a ticket when there is no access token', async () => {
+  it('ends the session without asking for a ticket when there is no access token', async () => {
     const deps = makeDeps({ getAccessToken: () => null });
 
     await expect(resolveWsConnectionParams(deps)).rejects.toBeInstanceOf(LiveSessionEndedError);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(deps.onSessionEnded).toHaveBeenCalledTimes(1);
   });
 });

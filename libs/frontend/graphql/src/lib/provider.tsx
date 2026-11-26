@@ -3,7 +3,7 @@
 import { ApolloProvider as BaseApolloProvider } from '@apollo/client/react';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { createApolloClient } from './client';
+import { bindBrowserConnectivity, createApolloClient } from './client';
 import {
   createLiveConnection,
   type LiveConnection,
@@ -73,6 +73,12 @@ export function GraphQLProvider({
     });
   }
 
+  React.useEffect(() => {
+    const live = liveRef.current;
+    if (!live) return;
+    return bindBrowserConnectivity(window, live);
+  }, []);
+
   return (
     <LiveConnectionContext.Provider value={liveRef.current}>
       <BaseApolloProvider client={clientRef.current}>{children}</BaseApolloProvider>
@@ -85,6 +91,8 @@ export interface LiveConnectionHandle extends LiveConnectionState {
   reconnectNow: () => void;
   /** Restarts live updates that stopped when the session ended. */
   resume: () => void;
+  /** Tells the connection the screen was just reloaded, so the next reconnect does not again. */
+  noteRefetched: () => void;
 }
 
 const IDLE: LiveConnectionState = { status: 'idle', failedAttempts: 0 };
@@ -102,6 +110,7 @@ export function useLiveConnection(): LiveConnectionHandle {
     ...state,
     reconnectNow: live?.reconnectNow ?? noop,
     resume: live?.resume ?? noop,
+    noteRefetched: live ? () => void live.claimRefetch() : noop,
   };
 }
 

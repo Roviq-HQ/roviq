@@ -123,9 +123,9 @@ graphql-ws connections never carry the JWT. The client exchanges its access toke
 
 A missing, malformed, unknown, expired or reused ticket closes the socket with code 4403. The stored user is validated on the way in and out (`ws-ticket.store.ts`) and keeps `isImpersonated`, `impersonationSessionId` and `mustChangePassword`, which `ImpersonationSessionGuard` and `MustChangePasswordGuard` read on the subscription path. On every connect and reconnect the frontend fetches a new ticket (`libs/frontend/graphql/src/lib/ws-ticket.ts`):
 
-- A 401 refreshes the access token once and asks again. If the refresh fails or the new token is refused too, the session has ended: the client stops retrying (`connectionParams` throws `LiveSessionEndedError`, which the client's `shouldRetry` refuses), live subscriptions are held rather than failed, and the next sign-in restarts them (`RefetchAfterReLogin` calls `resume()`).
+- A 401 refreshes the access token once and asks again. If the server refuses the refresh (`isRefreshRefused`: `SESSION_EXPIRED`, `UNAUTHENTICATED` and the like) or refuses the new token too, the session has ended: the client stops retrying (`connectionParams` throws `LiveSessionEndedError`, which the client's `shouldRetry` refuses), live subscriptions are held rather than failed, and the next sign-in restarts them (`RefetchAfterReLogin` calls `resume()`).
 - In an impersonation tab a 401 ends the impersonation; there is no refresh token to try.
-- A network error or another status keeps the socket retrying with backoff.
+- A network error, another status, or a refresh that could not be made (network, server error) keeps the socket retrying with backoff.
 
 The web app refreshes the access token through one shared request per refresh token (`AuthProvider`), whatever asked for it: the timer, an HTTP request refused as `UNAUTHENTICATED`, or the ticket. Two requests with the same refresh token would replay a rotated token, which the server answers by revoking every session of the user.
 

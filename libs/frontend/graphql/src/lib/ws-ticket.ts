@@ -10,7 +10,10 @@ export interface WsTicketDeps {
   apiUrl: string;
   getAccessToken: () => string | null;
   isImpersonating: () => boolean;
-  /** Resolves to the new access token, or null when the session cannot be refreshed. */
+  /**
+   * Resolves to the new access token, or null when the server refused the refresh (the
+   * session is over). Rejects when the refresh could not be made (network, server error).
+   */
   refreshToken?: () => Promise<string | null>;
   onSessionEnded: () => void;
   onImpersonationEnded: () => void;
@@ -18,12 +21,12 @@ export interface WsTicketDeps {
 
 /**
  * The `connectionParams` of the WebSocket client. Returns `{ ticket }`, or `{}` when the ticket
- * service could not be reached so graphql-ws retries with backoff. Throws
+ * could not be had this time so graphql-ws retries with backoff. Throws
  * `LiveSessionEndedError` when the session is over.
  */
 export async function resolveWsConnectionParams(deps: WsTicketDeps): Promise<{ ticket?: string }> {
   const token = deps.getAccessToken();
-  if (!token) throw new LiveSessionEndedError();
+  if (!token) return endSession(deps);
 
   const first = await requestTicket(deps.apiUrl, token);
   if (first.kind !== 'refused') return first.kind === 'ticket' ? { ticket: first.ticket } : {};
@@ -32,17 +35,23 @@ export async function resolveWsConnectionParams(deps: WsTicketDeps): Promise<{ t
     deps.onImpersonationEnded();
     throw new LiveSessionEndedError();
   }
-  const fresh = deps.refreshToken ? await deps.refreshToken().catch(() => null) : null;
-  if (!fresh) {
-    deps.onSessionEnded();
-    throw new LiveSessionEndedError();
+  if (!deps.refreshToken) return endSession(deps);
+  let fresh: string | null;
+  try {
+    fresh = await deps.refreshToken();
+  } catch {
+    // The refresh did not reach a verdict; the session may well be fine.
+    return {};
   }
+  if (!fresh) return endSession(deps);
   const second = await requestTicket(deps.apiUrl, fresh);
-  if (second.kind === 'refused') {
-    deps.onSessionEnded();
-    throw new LiveSessionEndedError();
-  }
+  if (second.kind === 'refused') return endSession(deps);
   return second.kind === 'ticket' ? { ticket: second.ticket } : {};
+}
+
+function endSession(deps: WsTicketDeps): never {
+  deps.onSessionEnded();
+  throw new LiveSessionEndedError();
 }
 
 type TicketResult =

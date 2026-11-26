@@ -12,15 +12,16 @@ import * as React from 'react';
 export function RefetchAfterReLogin() {
   const { sessionRestores } = useAuth();
   const client = useApolloClient();
-  const { resume } = useLiveConnection();
+  const { resume, noteRefetched } = useLiveConnection();
   const seen = React.useRef(sessionRestores);
 
   React.useEffect(() => {
     if (sessionRestores === seen.current) return;
     seen.current = sessionRestores;
     void client.refetchQueries({ include: 'active' });
+    noteRefetched();
     resume();
-  }, [client, resume, sessionRestores]);
+  }, [client, noteRefetched, resume, sessionRestores]);
 
   return null;
 }

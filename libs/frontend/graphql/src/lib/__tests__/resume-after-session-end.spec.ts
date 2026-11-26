@@ -4,7 +4,7 @@ import { ApolloLink } from '@apollo/client/link';
 import { Observable } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { resumeAfterSessionEnd } from '../client';
-import { createLiveConnection, MANUAL_RECONNECT_AFTER } from '../live-connection';
+import { createLiveConnection } from '../live-connection';
 
 const SUBSCRIPTION = gql`
   subscription StudentChanged {
@@ -102,10 +102,7 @@ describe('resumeAfterSessionEnd', () => {
       error,
     });
     expect(error).not.toHaveBeenCalled();
-    expect(live.getSnapshot()).toEqual({
-      status: 'reconnecting',
-      failedAttempts: MANUAL_RECONNECT_AFTER,
-    });
+    expect(live.getSnapshot().status).toBe('stopped');
 
     live.reconnectNow();
 

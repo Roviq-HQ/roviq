@@ -174,7 +174,7 @@ export function createApolloClient(config: ApolloClientConfig) {
           config.onAuthError();
         },
         onImpersonationEnded: () => {
-          live?.onSessionEnded();
+          live?.onSessionEnded('impersonation');
           handleImpersonationEnded(config);
         },
       });
@@ -187,29 +187,12 @@ export function createApolloClient(config: ApolloClientConfig) {
       await new Promise((resolve) => setTimeout(resolve, delay));
     },
     on: live
-      ? {
-          connecting: () => live.onConnecting(),
-          connected: (_socket, _payload, wasRetry) => {
-            const before = live.getSnapshot().status;
-            live.onConnected();
-            // Events sent while the socket was down are lost; the queries on screen catch up.
-            if (wasRetry || before === 'reconnecting' || before === 'offline') {
-              void apolloClient?.refetchQueries({ include: 'active' });
-            }
-          },
-          closed: (event) => live.onClosed(closeCode(event)),
-        }
+      ? liveSocketHandlers(live, () => {
+          if (apolloClient) void refetchQueriesOnScreen(apolloClient);
+        })
       : undefined,
   });
-
-  if (live && typeof window !== 'undefined') {
-    window.addEventListener('offline', () => {
-      live.setOnline(false);
-      // A dead socket can look open for minutes; dropping it starts the retries at once.
-      wsClient.terminate();
-    });
-    window.addEventListener('online', () => live.setOnline(true));
-  }
+  live?.setTerminate(() => wsClient.terminate());
 
   const wsLink = live
     ? resumeAfterSessionEnd(live).concat(new GraphQLWsLink(wsClient))
@@ -266,6 +249,85 @@ export function createApolloClient(config: ApolloClientConfig) {
     },
   });
   return apolloClient;
+}
+
+/**
+ * The socket events that keep `live` current. After a reconnect the queries on screen are
+ * refetched once (events sent while the socket was down are lost); a re-login that refetched a
+ * moment ago counts as that refetch.
+ */
+export function liveSocketHandlers(
+  live: LiveConnection,
+  refetchOnScreen: () => void,
+): {
+  connecting: () => void;
+  connected: (socket: unknown, payload: unknown, wasRetry: boolean) => void;
+  closed: (event: unknown) => void;
+} {
+  return {
+    connecting: () => live.onConnecting(),
+    connected: (_socket, _payload, wasRetry) => {
+      const before = live.getSnapshot().status;
+      live.onConnected();
+      const missedEvents =
+        wasRetry || before === 'reconnecting' || before === 'offline' || before === 'stopped';
+      if (missedEvents && live.claimRefetch()) refetchOnScreen();
+    },
+    closed: (event) => live.onClosed(closeCode(event)),
+  };
+}
+
+/** Keeps `live` in step with the browser's connectivity; returns a function that stops it. */
+export function bindBrowserConnectivity(
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'>,
+  live: LiveConnection,
+): () => void {
+  const goOffline = () => {
+    live.setOnline(false);
+    // A dead socket can look open for minutes; dropping it starts the retries at once.
+    live.terminate();
+  };
+  const goOnline = () => live.setOnline(true);
+  target.addEventListener('offline', goOffline);
+  target.addEventListener('online', goOnline);
+  return () => {
+    target.removeEventListener('offline', goOffline);
+    target.removeEventListener('online', goOnline);
+  };
+}
+
+/**
+ * Refetches the active queries, except a list the person has already paged past its first page:
+ * refetching its first page would drop the pages below and lose their place.
+ */
+export function refetchQueriesOnScreen(client: ApolloClient) {
+  return client.refetchQueries({
+    include: 'active',
+    onQueryUpdated: (query) => !loadedPastFirstPage(query.variables, query.getCurrentResult().data),
+  });
+}
+
+export function loadedPastFirstPage(variables: unknown, data: unknown): boolean {
+  const first = pageSize(variables);
+  if (first === undefined) return false;
+  return longestEdges(data) > first;
+}
+
+function pageSize(variables: unknown): number | undefined {
+  if (!isRecord(variables)) return undefined;
+  if (typeof variables.first === 'number') return variables.first;
+  if (isRecord(variables.filter) && typeof variables.filter.first === 'number') {
+    return variables.filter.first;
+  }
+  return undefined;
+}
+
+function longestEdges(value: unknown, depth = 0): number {
+  if (!isRecord(value) || depth > 4) return 0;
+  let longest = Array.isArray(value.edges) ? value.edges.length : 0;
+  for (const child of Object.values(value))
+    longest = Math.max(longest, longestEdges(child, depth + 1));
+  return longest;
 }
 
 /** A socket is retried unless the session is over: asking again would only be refused. */
