@@ -4,7 +4,8 @@
 #   STAGING_ENV_FILE=<env file> scripts/staging/staging-deploy.sh <commit, branch or tag>
 #
 # Order: export the commit, build its images, back up, start the infrastructure, set the runtime
-# role's password, migrate, essential seed, buckets, first admin, start the apps, smoke-check
+# role's password, migrate, essential seed, buckets (an external store is checked instead), first
+# admin, start the apps, smoke-check
 # through the public names. A failure after the migration puts the previous release's apps back;
 # when that release cannot run on the migrated schema, restore the backup printed above.
 set -euo pipefail
@@ -98,8 +99,14 @@ migrated=true
 printf '%s\n' '\getenv pw POSTGRES_AUDIT_WRITER_PASSWORD' "ALTER ROLE roviq_audit_writer PASSWORD :'pw';" |
     stg_compose "$REL" exec -T -e POSTGRES_AUDIT_WRITER_PASSWORD postgres \
         psql -q -v ON_ERROR_STOP=1 -U roviq -d roviq >/dev/null
-log "Essential seed and buckets"
-stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:init'
+if external_store; then
+    # An external store's buckets and rules are set up outside the stack; prove they behave.
+    log "Essential seed and the external object store check"
+    stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:check'
+else
+    log "Essential seed and buckets"
+    stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:init'
+fi
 log "First platform admin"
 ADMIN_FILE="$STAGING_STATE_DIR/first-admin-password"
 ADMIN_OUT="$(stg_compose "$REL" run --rm -T -w /app migrator \

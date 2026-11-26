@@ -1,0 +1,37 @@
+# Staging with an external S3-compatible store instead of the in-stack RustFS. Added after
+# compose.staging.yaml by scripts/staging/staging-lib.sh when the env file sets
+# STAGING_OBJECT_STORE=external; never used on its own.
+#
+# The store, its buckets, CORS and lifecycle rules, encryption and backup are set up outside the
+# stack (docs/deployment.md → "Object storage"). The env file then holds all eight S3_* values.
+
+services:
+  # Not started: nothing in the stack names its profile.
+  object-storage:
+    profiles: ["in-stack-store"]
+
+  migrator:
+    environment:
+      S3_ENDPOINT: ${S3_ENDPOINT:?}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?}
+      S3_REGION: ${S3_REGION:?}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE:?}
+      S3_BUCKET_PUBLIC: ${S3_BUCKET_PUBLIC:?}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:?}
+
+  api-gateway:
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      S3_ENDPOINT: ${S3_ENDPOINT:?}
+      S3_REGION: ${S3_REGION:?}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE:?}
+      S3_BUCKET_PUBLIC: ${S3_BUCKET_PUBLIC:?}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:?}

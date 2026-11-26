@@ -8,6 +8,10 @@
 # volumes and a private network instead of the proxy's, so nothing outside the host can reach
 # it. The API answers on 127.0.0.1:$STAGING_RESTORE_API_PORT (default 13999). Remove the drill,
 # volumes included, with: staging-restore.sh --remove <backup folder> [project]
+#
+# With STAGING_OBJECT_STORE=external the backup holds no objects and the drill restores and starts
+# the databases only: apps started here would share the live buckets, and the restored file
+# sweeper could delete objects the live stack still uses.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,11 +54,17 @@ docker network inspect "$STAGING_PROXY_NETWORK" >/dev/null 2>&1 ||
 export STAGING_METRICS_PORT="${STAGING_RESTORE_METRICS_PORT:-13998}"
 export STAGING_WORKFLOWS_PORT="${STAGING_RESTORE_WORKFLOWS_PORT:-13997}"
 
-log "Restoring the object store into $TARGET"
-docker volume create --label "com.docker.compose.project=$TARGET" \
-    --label com.docker.compose.volume=roviq-objects "${TARGET}_roviq-objects" >/dev/null
-docker run --rm -v "${TARGET}_roviq-objects:/data" -v "$BACKUP:/in:ro" \
-    postgres:18-alpine tar -C /data -xzf /in/objects.tar.gz
+if ! external_store; then
+    [[ -f "$BACKUP/objects.tar.gz" ]] || {
+        echo "$BACKUP holds no object archive (taken with an external store)" >&2
+        exit 1
+    }
+    log "Restoring the object store into $TARGET"
+    docker volume create --label "com.docker.compose.project=$TARGET" \
+        --label com.docker.compose.volume=roviq-objects "${TARGET}_roviq-objects" >/dev/null
+    docker run --rm -v "${TARGET}_roviq-objects:/data" -v "$BACKUP:/in:ro" \
+        postgres:18-alpine tar -C /data -xzf /in/objects.tar.gz
+fi
 
 log "Starting a fresh database"
 stg_compose "$REL" up -d --wait postgres
@@ -77,6 +87,11 @@ printf '%s\n' '\getenv pw POSTGRES_POOLER_PASSWORD' "ALTER ROLE roviq_pooler PAS
 
 log "Starting the restored stack (no migration, no seed)"
 stg_compose "$REL" up -d --wait "${INFRA_SERVICES[@]}"
+if external_store; then
+    log "Restored the databases of $BACKUP into $TARGET in $(($(date +%s) - START)) s."
+    log "The apps were not started: they would share the live external buckets."
+    exit 0
+fi
 stg_compose "$REL" up -d "${APP_SERVICES[@]}"
 
 API_PORT="${STAGING_RESTORE_API_PORT:-13999}"

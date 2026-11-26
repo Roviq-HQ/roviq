@@ -50,14 +50,20 @@ done
 log "Dumping database roles"
 stg_compose "$REL" exec -T postgres pg_dumpall -U roviq --roles-only >"$OUT/roles.sql"
 
-log "Copying the object store"
-# Written by this shell, not the container, so the archive belongs to the user running the backup.
-docker run --rm -v "${STAGING_PROJECT}_roviq-objects:/data:ro" \
-    postgres:18-alpine tar -C /data -czf - . >"$OUT/objects.tar.gz"
+if external_store; then
+    # The external store keeps its own object versions and replica (docs/deployment.md).
+    log "Object store is external: not copied"
+else
+    log "Copying the object store"
+    # Written by this shell, not the container, so the archive belongs to the user running the backup.
+    docker run --rm -v "${STAGING_PROJECT}_roviq-objects:/data:ro" \
+        postgres:18-alpine tar -C /data -czf - . >"$OUT/objects.tar.gz"
+fi
 
 {
     echo "release=$SHA"
     echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "object_store=$STAGING_OBJECT_STORE"
     for image in migrator api-gateway notification-service web; do
         echo "image.$image=$(docker image inspect --format '{{.Id}}' "$STAGING_IMAGE_PREFIX/$image:$SHA")"
     done
