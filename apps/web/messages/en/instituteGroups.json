@@ -32,12 +32,6 @@
     "CHAIN": "Chain",
     "FRANCHISE": "Franchise"
   },
-  "typeDescriptions": {
-    "TRUST": "Registered under the Indian Trusts Act.",
-    "SOCIETY": "Registered under the Societies Registration Act.",
-    "CHAIN": "A branded chain operating multiple institutes.",
-    "FRANCHISE": "A franchise model with franchisor and franchisees."
-  },
   "statuses": {
     "ACTIVE": "Active",
     "INACTIVE": "Inactive",

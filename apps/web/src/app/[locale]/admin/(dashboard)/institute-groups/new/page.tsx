@@ -292,14 +292,7 @@ export default function NewInstituteGroupPage() {
                       description={t('typeDescription')}
                       options={GROUP_TYPE_VALUES.map((type) => ({
                         value: type,
-                        label: (
-                          <div className="flex flex-col">
-                            <span>{t(`types.${type}`)}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {t(`typeDescriptions.${type}`)}
-                            </span>
-                          </div>
-                        ),
+                        label: t(`types.${type}`),
                       }))}
                       optional={false}
                       testId="institute-group-type-select"
