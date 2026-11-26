@@ -403,7 +403,8 @@ launch gates bash -c 'set -e
   pnpm -s check:event-handlers
   pnpm -s check:docs
   pnpm -s test:check-integration
-  pnpm -s test:check-dates'
+  pnpm -s test:check-dates
+  pnpm -s test:check-skips'
 
 # ── Collect results ────────────────────────────────────────────────────────
 overall=0

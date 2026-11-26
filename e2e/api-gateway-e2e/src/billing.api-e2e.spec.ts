@@ -15,7 +15,7 @@ import { SEED_IDS } from '../../shared/seed-fixtures';
 import { E2ePingDocument } from './__generated__/graphql';
 import { loginAsPlatformAdmin, loginAsReseller } from './helpers/auth';
 import { gql } from './helpers/gql-client';
-import { simulatePaymentWebhook } from './helpers/webhook';
+import { buildPaymentWebhook, sendWebhook, simulatePaymentWebhook } from './helpers/webhook';
 
 /**
  * Billing E2E — migrated from e2e/api-gateway-e2e/hurl/billing/*.hurl (14 files).
@@ -202,6 +202,27 @@ const GET_INVOICE = `
       status
       totalAmount
       tenantId
+    }
+  }
+`;
+
+const GET_INVOICE_PAID = `
+  query InvoicePaid($instituteId: ID, $first: Int) {
+    invoices(instituteId: $instituteId, first: $first) {
+      id
+      status
+      totalAmount
+      paidAmount
+    }
+  }
+`;
+
+const INVOICE_PAYMENTS = `
+  query InvoicePayments($invoiceId: ID!) {
+    invoicePayments(invoiceId: $invoiceId) {
+      gatewayPaymentId
+      amountPaise
+      status
     }
   }
 `;
@@ -848,6 +869,98 @@ describe('Billing E2E', () => {
       const updated = after.find((i) => i.id === invoice.id);
       expect(updated, `invoice ${invoice.id} disappeared after webhook`).toBeDefined();
       expect(updated?.status).toBe('PAID');
+    });
+
+    /** A fresh unpaid invoice on tenant1, from a new paid plan. */
+    async function unpaidInvoice(planName: string): Promise<InvoiceModel> {
+      await cancelExistingSubscription(resellerToken, tenant1);
+      const plan = await createPlan(resellerToken, {
+        name: planName,
+        amount: '49900',
+        maxStudents: 100,
+      });
+      await assignPlan(resellerToken, tenant1, plan.id);
+      const invoicesRes = await gql<{ invoices: InvoiceModel[] }>(
+        GET_INVOICE,
+        { instituteId: tenant1, first: 5 },
+        resellerToken,
+      );
+      expect(invoicesRes.errors).toBeUndefined();
+      const invoice = invoicesRes.data?.invoices[0];
+      assert(invoice);
+      expect(invoice.status).not.toBe('PAID');
+      return invoice;
+    }
+
+    /** One payment row for the gateway payment, and the invoice paid exactly once. */
+    async function expectPaidOnce(invoice: InvoiceModel, gatewayPaymentId: string) {
+      const paymentsRes = await gql<{
+        invoicePayments: Pick<PaymentModel, 'gatewayPaymentId' | 'amountPaise' | 'status'>[];
+      }>(INVOICE_PAYMENTS, { invoiceId: invoice.id }, resellerToken);
+      expect(paymentsRes.errors).toBeUndefined();
+      const recorded = (paymentsRes.data?.invoicePayments ?? []).filter(
+        (p) => p.gatewayPaymentId === gatewayPaymentId,
+      );
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]?.amountPaise).toBe(invoice.totalAmount);
+
+      const afterRes = await gql<{
+        invoices: Pick<InvoiceModel, 'id' | 'status' | 'totalAmount' | 'paidAmount'>[];
+      }>(GET_INVOICE_PAID, { instituteId: tenant1, first: 5 }, resellerToken);
+      expect(afterRes.errors).toBeUndefined();
+      const updated = afterRes.data?.invoices.find((i) => i.id === invoice.id);
+      expect(updated?.status).toBe('PAID');
+      expect(updated?.paidAmount).toBe(invoice.totalAmount);
+    }
+
+    it('should record one payment when the gateway delivers the same webhook twice', async () => {
+      await ensureGatewayConfig();
+      const invoice = await unpaidInvoice('Vitest Webhook Replay Plan');
+      const gatewayPaymentId = `pay_vitest_replay_${Date.now()}`;
+
+      const delivery = buildPaymentWebhook({
+        resellerId: SEED_IDS.RESELLER_DIRECT,
+        invoiceId: invoice.id,
+        tenantId: tenant1,
+        amountPaise: Number(invoice.totalAmount),
+        status: 'captured',
+        gatewayPaymentId,
+        webhookSecret: WEBHOOK_SECRET,
+      });
+      expect((await sendWebhook(delivery)).status).toBe(200);
+      expect((await sendWebhook(delivery)).status).toBe(200);
+
+      await expectPaidOnce(invoice, gatewayPaymentId);
+    });
+
+    // The second delivery names another order, so it misses the order lookup and reaches the
+    // insert, where only the unique gateway payment id stops a second row.
+    it('should record one payment when a captured payment arrives under a second order id', async () => {
+      await ensureGatewayConfig();
+      const invoice = await unpaidInvoice('Vitest Webhook Second Order Plan');
+      const gatewayPaymentId = `pay_vitest_reorder_${Date.now()}`;
+      const base = {
+        resellerId: SEED_IDS.RESELLER_DIRECT,
+        invoiceId: invoice.id,
+        tenantId: tenant1,
+        amountPaise: Number(invoice.totalAmount),
+        status: 'captured' as const,
+        gatewayPaymentId,
+        webhookSecret: WEBHOOK_SECRET,
+      };
+
+      const first = await simulatePaymentWebhook({
+        ...base,
+        gatewayOrderId: `order_a_${gatewayPaymentId}`,
+      });
+      const second = await simulatePaymentWebhook({
+        ...base,
+        gatewayOrderId: `order_b_${gatewayPaymentId}`,
+      });
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+
+      await expectPaidOnce(invoice, gatewayPaymentId);
     });
 
     it('should reject a webhook with an invalid signature', async () => {

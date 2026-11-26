@@ -129,14 +129,14 @@ function signCashfree(rawBody: string, secret: string, timestamp: string): strin
     .digest('base64');
 }
 
-/**
- * POST a signed webhook payload to the running api-gateway. Returns the raw
- * HTTP status and parsed JSON body so callers can assert success and inspect
- * any error response.
- */
-export async function simulatePaymentWebhook(
-  options: SimulatePaymentWebhookOptions,
-): Promise<SimulatedWebhookResult> {
+export interface SignedWebhook {
+  url: string;
+  headers: Record<string, string>;
+  body: string;
+}
+
+/** Build and sign a webhook once, so a test can deliver the identical request more than once. */
+export function buildPaymentWebhook(options: SimulatePaymentWebhookOptions): SignedWebhook {
   const gateway = options.gateway ?? 'razorpay';
   const url = `${API_BASE}/webhooks/${gateway}/${options.resellerId}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -153,7 +153,25 @@ export async function simulatePaymentWebhook(
     headers['x-webhook-timestamp'] = timestamp;
     headers['x-webhook-signature'] = signCashfree(body, secret, timestamp);
   }
+  return { url, headers, body };
+}
 
+/**
+ * POST a signed webhook payload to the running api-gateway. Returns the raw
+ * HTTP status and parsed JSON body so callers can assert success and inspect
+ * any error response.
+ */
+export async function simulatePaymentWebhook(
+  options: SimulatePaymentWebhookOptions,
+): Promise<SimulatedWebhookResult> {
+  return sendWebhook(buildPaymentWebhook(options));
+}
+
+export async function sendWebhook({
+  url,
+  headers,
+  body,
+}: SignedWebhook): Promise<SimulatedWebhookResult> {
   const res = await fetch(url, { method: 'POST', headers, body });
   let parsed: unknown;
   const text = await res.text();

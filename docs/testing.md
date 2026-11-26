@@ -375,9 +375,9 @@ Lightweight grep-based checks that catch degradation in test hygiene:
 | Script | Enforces | Wired into CI |
 |---|---|---|
 | `scripts/ci-check-integration-mocks.sh` | `*.integration.spec.ts` files cannot mock the database (Drizzle/Database/Pool). If a file needs a DB mock, it should be renamed to `*.spec.ts` (unit). | Yes — via `pnpm test:check-integration` |
-| `scripts/ci-check-skips.sh` | Every static `.skip()`/`.todo()` must include a `ROV-xxx` Linear reference. Runtime conditional skips (`test.skip(condition, 'reason')`) are allowed. | **Deferred** — script exists but not wired pending orphaned-skip cleanup (tracked in ROV-233) |
+| `scripts/ci-check-skips.sh` | Every static `.skip()`/`.todo()` must include a `ROV-xxx` Linear reference. Runtime conditional skips (`test.skip(condition, 'reason')`) are allowed. | Yes — via `pnpm test:check-skips` |
 
-Both scripts are pure grep — fast enough to run in the `lint` job without extra install steps.
+The scripts are pure grep — fast enough to run in the `lint` job without extra install steps.
 
 ## Adding Tests
 

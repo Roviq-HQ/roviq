@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --project unit-node --project unit-dom --coverage",
     "test:check-integration": "bash scripts/ci-check-integration-mocks.sh",
     "test:check-dates": "bash scripts/ci-check-date-format.sh",
+    "test:check-skips": "bash scripts/ci-check-skips.sh",
     "check:no-double-cast": "pnpx tsx scripts/check-no-double-cast.ts",
     "check:live-views": "pnpx tsx scripts/check-live-views.ts",
     "check:live-views-coverage": "pnpx tsx scripts/check-live-views-coverage.ts",

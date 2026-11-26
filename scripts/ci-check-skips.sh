@@ -15,21 +15,6 @@
 #   - Any line containing ROV-xxx
 #   - Comment lines (JSDoc `*`, single-line `//`)
 #
-# ─────────────────────────────────────────────────────────────────────────────
-# DEFERRED: not yet wired into CI.
-#
-# When this script first ran against develop it flagged ~22 pre-existing
-# orphaned skips (impersonation UI/API placeholders, billing workflow todos,
-# bonafide certificate, <ImpersonationBanner> component). These are tracked
-# under ROV-233 — tag each flagged skip with its issue ID first, then wire
-# this script into CI (see ROV-233 for the checklist).
-#
-# To wire into CI after cleanup:
-#   1. Add `"test:check-skips": "bash scripts/ci-check-skips.sh"` to package.json.
-#   2. Add a step to `.github/workflows/ci.yml` that runs `pnpm test:check-skips`
-#      (cheap — pure grep, no install needed beyond checkout).
-#   3. Remove this DEFERRED block.
-# ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 

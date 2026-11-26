@@ -1845,13 +1845,6 @@ describe('AuthService', () => {
       );
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
     });
-
-    // The remaining drift items (scope-specific behaviour, must_change_password
-    // clearing, JWT mustChangePassword claim) are covered by integration / e2e
-    // tests and don't belong on the unit boundary anymore. Marking explicitly
-    // for review during the next AuthService spec sweep.
-    it.todo('asserts JWT claim mustChangePassword=false on subsequent login after change');
-    it.todo('verifies must_change_password column is cleared on success (integration scope)');
   });
 
   describe('verifyCredentials (lockout integration)', () => {

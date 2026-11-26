@@ -28,6 +28,8 @@ jobs:
         run: pnpm run test:check-integration
       - name: Check for ambiguous slash-separated date literals
         run: pnpm run test:check-dates
+      - name: Check every static skip or todo names a ROV issue
+        run: pnpm run test:check-skips
       - name: Check live-views (no base-table reads in app code)
         run: pnpm run check:live-views
       - name: Check live-views coverage (every soft-deletable table has a *Live view)
