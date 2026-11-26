@@ -531,8 +531,10 @@ in "Object storage" above. To switch a running staging stack to an external stor
    backups taken after the switch hold no objects.
 3. Set `STAGING_OBJECT_STORE=external` and the eight `S3_*` values, then deploy again.
 
-The in-stack store's container and its volume are left running after the switch; remove them
-when nothing needs them any more.
+The in-stack store's container and its volume are left running after the switch. Once the stack
+works on the external store, remove them: `docker rm -f <project>-object-storage-1`, then
+`docker volume rm <project>_roviq-objects`. The last backup taken before the switch keeps the
+store's files (`objects.tar.gz`) for as long as that backup is kept.
 
 What staging shows about any environment:
 
