@@ -34,6 +34,8 @@ import { readFieldMiddleware } from '../casl/read-field.middleware';
 import { createGraphqlErrorFormatter } from '../common/filters/graphql-error.mapper';
 import { GraphqlExceptionFilter } from '../common/filters/graphql-exception.filter';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
+import { ResponseScopePlugin } from '../common/response-scope/response-scope.plugin';
+import { ResponseScopeGauge } from '../common/response-scope/response-scope-gauge';
 import { validate } from '../config/env.validation';
 import { DlqModule } from '../dlq/dlq.module';
 import { ProfileImageResolversModule } from '../files/profile-image-resolvers.module';
@@ -172,6 +174,8 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
     },
+    ResponseScopeGauge,
+    ResponseScopePlugin,
   ],
 })
 export class AppModule implements NestModule {

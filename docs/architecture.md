@@ -184,6 +184,17 @@ reads the same value. Tenant context and audit consumers use this request value.
 - Condition placeholders (`${user.id}`, `${user.tenantId}`) resolved at request time
 - Same `AppAction`/`AppSubject` types shared between backend and frontend via `@roviq/common-types`
 
+### Response scope check
+
+A last check after the guards, RLS and the ability rules, in case one of them is wrong. `ResponseScopePlugin` (`apps/api-gateway/src/common/response-scope/`) is an Apollo plugin on every query and mutation. When the caller is institute scope it walks each value a resolver returned, to any depth, and compares every `tenantId` / `tenant_id` in it with the caller's institute; for a reseller caller it compares every `resellerId` / `reseller_id` with the caller's reseller. It reads resolved values, not the GraphQL response, so a column the client did not select is checked too.
+
+- It checks the value of every root field and of every field below it whose value did not come straight off its parent object, which is every `@ResolveField` that loads rows of its own. It is a plugin and not a Nest interceptor because `fieldResolverEnhancers` would run every global guard and interceptor once per field.
+- A failed check is logged at error level with the operation, the field, the caller's scope and the two ids (no row data), counted in the gauge `api_foreign_scope_responses_recent` (labels `scope` and `reason`; the last 15 minutes of this process, 0 included), and the whole response is replaced with one `INTERNAL_ERROR`, so the caller gets no part of it. The alert `api_foreign_scope_response` reads the gauge; its runbook is [A response was refused by the scope check](runbooks/response-scope-check.md).
+- It fails closed on size: a value holding more than 1,000,000 objects (`MAX_SCAN_NODES`: 100 objects per row of the largest page, 10,000 students) is not read to the end and fails the check with reason `too_large`. Reason `foreign_id` is an id that is not the caller's.
+- `RESPONSE_SCOPE_CHECK` sets the mode: `refuse` (default, in every environment), `report` (log and count, still send) or `off`.
+- Not checked: platform callers, an institute caller's `resellerId`, a reseller caller's `tenantId` (it reads many institutes), and subscriptions (graphql-ws does not pass through Apollo's request pipeline). A refused mutation has already committed its write, and its audit entry says it succeeded.
+- `FOREIGN_SCOPE_ALLOWED` (`response-scope.allowlist.ts`) names root operations that may carry a foreign id, each with its reason; the fields under such an operation are not checked either. Its one entry is `switchInstitute`, which answers with the caller's own session in the institute being switched to. An entry needs a security review.
+
 ### NestJS Build: @nx/js:tsc (not webpack)
 
 - NestJS apps use `@nx/js:tsc` executor for builds

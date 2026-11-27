@@ -1,0 +1,32 @@
+{
+  "name": "api_foreign_scope_response",
+  "description": "In the last 15 minutes the API prepared a response for an institute or reseller caller that carried another institute's or reseller's id, or was too large to check, and refused to send it. Find the operation in the api-gateway logs; a foreign id is a security finding.",
+  "stream_type": "metrics",
+  "stream_name": "api_foreign_scope_responses_recent",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "max(api_foreign_scope_responses_recent)",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 60
+  },
+  "pending_period_sec": 0,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "page",
+    "component": "api-gateway",
+    "runbook": "docs/runbooks/response-scope-check.md"
+  }
+}
