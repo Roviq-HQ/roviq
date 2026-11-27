@@ -15,7 +15,10 @@ function createMockRedis() {
 }
 
 function createMockRoleRepo() {
-  return createMock<RoleRepository>({ findAbilities: vi.fn() });
+  return createMock<RoleRepository>({
+    findAbilities: vi.fn(),
+    findInstituteAbilities: vi.fn(),
+  });
 }
 
 function createMockMembershipAbilityRepo() {
@@ -71,6 +74,43 @@ describe('AbilityFactory', () => {
       const result = await factory.getRoleAbilities('nonexistent');
 
       expect(result).toEqual([]);
+    });
+
+    it('should not cache a role that is not found', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRoleRepo.findAbilities.mockResolvedValue(null);
+
+      await factory.getRoleAbilities('nonexistent');
+
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
+    it('should read the role of an institute caller as that institute', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRoleRepo.findInstituteAbilities.mockResolvedValue({
+        abilities: [{ action: 'read', subject: 'Student' }],
+      });
+
+      const result = await factory.getRoleAbilities('role-1', 'tenant-1');
+
+      expect(result).toEqual([{ action: 'read', subject: 'Student' }]);
+      expect(mockRoleRepo.findInstituteAbilities).toHaveBeenCalledWith('role-1', 'tenant-1');
+      expect(mockRoleRepo.findAbilities).not.toHaveBeenCalled();
+      expect(mockRedis.get).toHaveBeenCalledWith('casl:role:tenant-1:role-1');
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'casl:role:tenant-1:role-1',
+        expect.any(String),
+        'EX',
+        300,
+      );
+    });
+
+    it('should give nothing for a role the institute cannot read', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRoleRepo.findInstituteAbilities.mockResolvedValue(null);
+
+      expect(await factory.getRoleAbilities('other-institute-role', 'tenant-1')).toEqual([]);
+      expect(mockRoleRepo.findAbilities).not.toHaveBeenCalled();
     });
   });
 
@@ -347,6 +387,13 @@ describe('AbilityFactory', () => {
       await factory.invalidateRoleCache('role-1');
 
       expect(mockRedis.del).toHaveBeenCalledWith('casl:role:role-1');
+    });
+
+    it("should also drop the entry of the role's institute", async () => {
+      await factory.invalidateRoleCache('role-1', 'tenant-1');
+
+      expect(mockRedis.del).toHaveBeenCalledWith('casl:role:role-1');
+      expect(mockRedis.del).toHaveBeenCalledWith('casl:role:tenant-1:role-1');
     });
   });
 });

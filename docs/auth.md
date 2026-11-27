@@ -147,6 +147,14 @@ The call sites that let an impersonation session read are listed with their reas
 
 In the institute portal the account and sessions pages show a notice in place of the owner-only sections during an impersonation session (`OwnAccountNotice`), and the email card shows it when the server answers with the code.
 
+### An institute's own row runs as the institute (ROV-383)
+
+The institute portal reads and edits its own institute through `OwnInstituteRepository` (`institute/management/repositories/`), under `withTenant`. No method takes an institute id: the institute is the one in the request context.
+
+- PostgreSQL holds the rule. The policy `institutes_app_update` limits the institute role to its own row, and a column grant limits it to the profile and locale columns. `institute-own-row-update-rls.integration.spec.ts` attempts every other column as the role.
+- `InstituteRepository` keeps the platform's and the reseller's queries. Platform operations are reached from `admin/` only.
+- The branding, configuration, identifiers and affiliations of an institute are read by `InstituteDetailsRepository` as the caller's own role (`withTenant`, `withReseller`, or `withAdmin` for a platform caller), so row security decides whether the institute is the caller's.
+
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes
 - Frontend: `<ProtectedRoute>` component redirects to `/login` with return URL
@@ -500,7 +508,8 @@ Until a person can claim an account by OTP, a person in two institutes has two l
 - `@CurrentAbility()` param decorator for imperative checks in resolver body
 - **Row conditions fail closed.** A rule may carry a condition (own leaves, own children, assigned sections). `AbilityGuard` checks the subject type, so an operation must apply the condition to the rows itself, and says so with `@CheckAbility({ action, subject, rows: 'scoped' })`. Without the declaration the guard refuses (`FORBIDDEN`) a caller who holds the pair only through rules with a condition, or whose unconditional rule is narrowed by a conditional `cannot` rule; a caller with an unconditional rule passes. Declare `rows: 'scoped'` only when the operation does one of these with the caller's ability: adds a `caslToSqlWhere` predicate to the query, checks `ability.can(action, subject(type, row))` on the row before using it, filters each subscription event the same way, or finds its rows from the caller's token alone
 - `apps/api-gateway/src/__tests__/row-scope-coverage.spec.ts` keeps the declarations honest. An institute operation on a pair that a default role holds only with a condition must declare `rows: 'scoped'` or be listed with a reason in `ROW_SCOPE_UNDECLARED`. Every declared operation is in `ROW_SCOPE_COVERAGE` (`row-scope-coverage.ts`) with how it applies the condition and the spec in which a conditional role is allowed a row inside its condition and refused one outside. A declared handler must receive the ability (`@CurrentAbility()`, `@CurrentReadAccess()`, `AbilityRequestContext`) or the token (`@CurrentUser()`). Every field of a conditional default rule must have a column in its module's predicate, and every `$user.…` variable must be one `substitute-user-vars.ts` supplies
-- Role abilities cached in Redis with key `casl:role:{roleId}`, 5-minute TTL
+- Role abilities cached in Redis for 5 minutes: `casl:role:{tenantId}:{roleId}` for an institute caller, `casl:role:{roleId}` for a reseller or platform caller. A role that is not found is not cached
+- An institute caller's role and membership are loaded as the institute role (`RoleRepository.findInstituteAbilities`, `MembershipAbilityRepository`), so a role or membership of another institute gives no abilities. Reseller and platform roles, and sign-in, are read as the platform role
 - Platform scope uses the role's abilities like the other scopes: `platform_admin` is `manage all`, `platform_support` is read-only plus impersonation
 - `AbilityGuard` must come after `GqlAuthGuard` in the class-level chain: `@UseGuards(GqlAuthGuard, <Scope>ScopeGuard, AbilityGuard)`. A separate `@UseGuards(AbilityGuard)` under a scope decorator runs before authentication. `ability-guard-wiring.spec.ts` fails on a `@CheckAbility` without the guard and on a mis-ordered chain
 - Starting impersonation and verifying its OTP need `impersonate User` in every scope; listing sessions needs `read AuditLog`. Changing tenant notification channels needs `update_config Institute`

@@ -23,7 +23,7 @@ export class InstituteRoleService {
     // Bust the role-abilities cache so any subsequent /me call picks up the
     // change in the same Redis tick (defensive — primary_nav_slugs lives in
     // the same row as abilities).
-    await this.abilityFactory.invalidateRoleCache(roleId);
+    await this.abilityFactory.invalidateRoleCache(roleId, updated.tenantId ?? undefined);
     return updated;
   }
 }

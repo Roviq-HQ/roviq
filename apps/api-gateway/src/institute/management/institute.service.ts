@@ -20,6 +20,8 @@ import type { UpdateInstituteConfigInput } from './dto/update-institute-config.i
 import type { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
 import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.input';
 import { InstituteRepository } from './repositories/institute.repository';
+import { InstituteDetailsRepository } from './repositories/institute-details.repository';
+import { OwnInstituteRepository } from './repositories/own-institute.repository';
 import type {
   CreateInstituteData,
   DeletedInstituteRecord,
@@ -38,6 +40,8 @@ export class InstituteService {
 
   constructor(
     private readonly instituteRepo: InstituteRepository,
+    private readonly ownRepo: OwnInstituteRepository,
+    private readonly detailsRepo: InstituteDetailsRepository,
     private readonly setupService: InstituteSetupService,
     private readonly eventBus: EventBusService,
     private readonly files: FileService,
@@ -150,7 +154,16 @@ export class InstituteService {
     return record;
   }
 
-  async updateInfo(id: string, input: UpdateInstituteInfoInput): Promise<InstituteRecord> {
+  /** The caller's own institute, read as the institute role. */
+  async findOwn(): Promise<InstituteRecord> {
+    const record = await this.ownRepo.find();
+    if (!record) {
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
+    }
+    return record;
+  }
+
+  async updateOwnInfo(input: UpdateInstituteInfoInput): Promise<InstituteRecord> {
     if (input.contact) {
       const result = instituteContactSchema.safeParse(input.contact);
       if (!result.success) {
@@ -158,7 +171,13 @@ export class InstituteService {
       }
     }
 
-    const record = await this.instituteRepo.updateInfo(id, input);
+    const record = await this.ownRepo.updateInfo(input);
+    if (!record) {
+      throw new BusinessException(
+        ErrorCode.CONCURRENT_MODIFICATION,
+        'Record was modified by another user. Please refresh and try again.',
+      );
+    }
 
     // The GraphQL subscription `instituteUpdated` filters on payload.id ===
     // context.user.tenantId, so the payload must carry the institute id.
@@ -172,57 +191,59 @@ export class InstituteService {
     return record;
   }
 
-  async updateBranding(
-    instituteId: string,
-    input: UpdateInstituteBrandingInput,
-  ): Promise<InstituteRecord> {
+  async updateOwnBranding(input: UpdateInstituteBrandingInput): Promise<InstituteRecord> {
     for (const { column, purpose } of BRANDING_IMAGES) {
       const fileId = input[column];
       if (fileId) await this.files.verifyUploads([fileId], purpose);
     }
-    const record = await this.instituteRepo.updateBranding(instituteId, input);
+    const record = await this.ownRepo.updateBranding(input);
+    if (!record) {
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
+    }
     this.emitEvent(EVENT_PATTERNS.INSTITUTE.branding_updated, {
-      instituteId,
-      tenantId: instituteId,
+      instituteId: record.id,
+      tenantId: record.id,
       branding: input,
     });
     return record;
   }
 
-  async updateLocales(id: string, input: UpdateInstituteLocalesInput): Promise<InstituteRecord> {
+  async updateOwnLocales(input: UpdateInstituteLocalesInput): Promise<InstituteRecord> {
     if (!validInstituteLocales(input)) {
       throw new BusinessException(
         ErrorCode.INVALID_LOCALE_SETTINGS,
         'Choose supported languages including English and the default language.',
       );
     }
-    const record = await this.instituteRepo.updateLocales(
-      id,
+    const record = await this.ownRepo.updateLocales(
       {
         supportedLocales: input.supportedLocales,
         defaultLocale: input.defaultLocale,
       },
       input.version,
     );
+    if (!record) {
+      throw new BusinessException(
+        ErrorCode.CONCURRENT_MODIFICATION,
+        'Refresh the institute and try again.',
+      );
+    }
     this.emitEvent(EVENT_PATTERNS.INSTITUTE.config_updated, {
-      instituteId: id,
-      tenantId: id,
+      instituteId: record.id,
+      tenantId: record.id,
       changedFields: ['supportedLocales', 'defaultLocale'],
     });
     return record;
   }
 
-  async updateConfig(
-    instituteId: string,
-    input: UpdateInstituteConfigInput,
-  ): Promise<InstituteRecord> {
-    const record = await this.instituteRepo.updateConfig(
-      instituteId,
-      input as UpdateInstituteConfigData,
-    );
+  async updateOwnConfig(input: UpdateInstituteConfigInput): Promise<InstituteRecord> {
+    const record = await this.ownRepo.updateConfig(input as UpdateInstituteConfigData);
+    if (!record) {
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
+    }
     this.emitEvent(EVENT_PATTERNS.INSTITUTE.config_updated, {
-      instituteId,
-      tenantId: instituteId,
+      instituteId: record.id,
+      tenantId: record.id,
       changedFields: Object.keys(input),
     });
     return record;
@@ -305,19 +326,19 @@ export class InstituteService {
   }
 
   async findBranding(instituteId: string) {
-    return this.instituteRepo.findBranding(instituteId);
+    return this.detailsRepo.findBranding(instituteId);
   }
 
   async findConfig(instituteId: string) {
-    return this.instituteRepo.findConfig(instituteId);
+    return this.detailsRepo.findConfig(instituteId);
   }
 
   async findIdentifiers(instituteId: string) {
-    return this.instituteRepo.findIdentifiers(instituteId);
+    return this.detailsRepo.findIdentifiers(instituteId);
   }
 
   async findAffiliations(instituteId: string) {
-    return this.instituteRepo.findAffiliations(instituteId);
+    return this.detailsRepo.findAffiliations(instituteId);
   }
 
   private async requireInstitute(id: string): Promise<InstituteRecord> {

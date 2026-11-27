@@ -135,26 +135,10 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts). Foreign-id test: compliance-export.integration.spec.ts.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.create':
     'Reseller scope passes its own reseller id from the token as owner; no existing group is read or changed.',
+  'apps/api-gateway/src/institute/management/repositories/institute-details.drizzle-repository.ts#InstituteDetailsDrizzleRepository.asCaller':
+    'Runs the query as the caller’s own role: withTenant for an institute, withReseller for a reseller. The admin branch is taken only when the request scope is platform. Foreign-id test: institute-details-scope.integration.spec.ts.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.create':
     'Reseller scope only: reseller id comes from the token and a named group must be owned by that reseller (assertOwnedByReseller).',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findAffiliations':
-    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findBranding':
-    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findById':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument. Foreign-id test: institute-branding-foreign-id.integration.spec.ts.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findConfig':
-    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findIdentifiers':
-    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateBranding':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument. Foreign-id test: institute-branding-foreign-id.integration.spec.ts.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateConfig':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateInfo':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateLocales':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateStatus':
     'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership. Foreign-id test: reseller-institute-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findByActiveUsername':
@@ -171,10 +155,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Team (ROV-185): takes a membership id the service first found under withReseller for the caller token reseller. Foreign-id test: reseller-team.integration.spec.ts.',
   'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts#PaymentGatewayConfigDrizzleRepository.findActiveByResellerId':
     'Keyed by the reseller id in the verified token. Foreign-id test: billing.integration.spec.ts.',
-  'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findAbilities':
-    'Loads abilities for the membership id and tenant id in the verified token. Foreign-id test: files-foreign-id.integration.spec.ts.',
-  'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findReadAssignments':
-    'Loads abilities for the membership id and tenant id in the verified token. Foreign-id test: files-foreign-id.integration.spec.ts.',
   'libs/backend/casl/src/repositories/role.drizzle-repository.ts#RoleDrizzleRepository.findAbilities':
     'Loads abilities for the role id in the verified token. Foreign-id test: files-foreign-id.integration.spec.ts.',
   'libs/backend/casl/src/repositories/role.drizzle-repository.ts#RoleDrizzleRepository.findPrimaryNavSlugs':

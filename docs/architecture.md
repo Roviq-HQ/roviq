@@ -151,7 +151,7 @@ reads the same value. Tenant context and audit consumers use this request value.
 - `app.current_tenant_id` session variable set via `withTenant()` helper
 - Policy-based admin bypass: `roviq_admin` does NOT have `BYPASSRLS`. Instead, policies explicitly grant `roviq_admin` access via `FOR ALL USING (true) WITH CHECK (true)`.
 - `FORCE ROW LEVEL SECURITY` on every table — without it, the table owner bypasses policies silently.
-- `institutes` table has custom RLS: `roviq_app` gets SELECT only (read own institute), `roviq_reseller` gets FOR ALL (GRANTs limit to SELECT + INSERT + UPDATE), `roviq_admin` gets full access.
+- `institutes` table has custom RLS: `roviq_app` reads its own row and updates that row's profile and locale columns (a column grant; `institute-own-row-update-rls.integration.spec.ts` lists them), `roviq_reseller` gets FOR ALL (GRANTs limit to SELECT + INSERT + UPDATE), `roviq_admin` gets full access.
 
 ### Platform vs Tenant Tables
 

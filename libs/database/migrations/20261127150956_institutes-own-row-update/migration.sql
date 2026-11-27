@@ -1,0 +1,1 @@
+CREATE POLICY "institutes_app_update" ON "institutes" AS PERMISSIVE FOR UPDATE TO "roviq_app" USING (id = current_setting('app.current_tenant_id', true)::uuid) WITH CHECK (id = current_setting('app.current_tenant_id', true)::uuid);
