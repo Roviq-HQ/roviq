@@ -243,7 +243,7 @@ grant  | roviq_reseller | group_children | SELECT | *
 grant  | roviq_reseller | group_members | SELECT | *
 grant  | roviq_reseller | group_rules | SELECT | *
 grant  | roviq_reseller | groups | SELECT | *
-grant  | roviq_reseller | guardian_profiles | SELECT | *
+grant  | roviq_reseller | guardian_profiles | SELECT | created_at, created_by, deleted_at, deleted_by, designation, education_level, id, membership_id, occupation, organization, tenant_id, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | holidays | SELECT | *
 grant  | roviq_reseller | impersonation_sessions | SELECT | *
 grant  | roviq_reseller | institute_affiliations | SELECT | *
@@ -293,7 +293,7 @@ grant  | roviq_reseller | resellers | UPDATE | address, branding, contact, favic
 grant  | roviq_reseller | roles | SELECT | *
 grant  | roviq_reseller | section_subjects | SELECT | *
 grant  | roviq_reseller | sections | SELECT | *
-grant  | roviq_reseller | staff_profiles | SELECT | *
+grant  | roviq_reseller | staff_profiles | SELECT | created_at, created_by, date_of_joining, date_of_leaving, deleted_at, deleted_by, department, designation, employee_id, employment_type, id, is_class_teacher, leaving_reason, membership_id, nature_of_appointment, specialization, tenant_id, trained_for_cwsn, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | staff_qualifications | SELECT | *
 grant  | roviq_reseller | standard_subjects | SELECT | *
 grant  | roviq_reseller | standards | SELECT | *

@@ -37,6 +37,12 @@ const WITHHELD: ReadonlyArray<{ table: string; columns: string[]; readable: stri
   },
   { table: 'enquiries', columns: ['special_needs'], readable: 'student_name' },
   { table: 'admission_applications', columns: ['form_data'], readable: 'status' },
+  {
+    table: 'staff_profiles',
+    columns: ['social_category', 'is_disabled', 'disability_type'],
+    readable: 'employee_id',
+  },
+  { table: 'guardian_profiles', columns: ['annual_income'], readable: 'occupation' },
 ];
 
 const CASES = WITHHELD.flatMap(({ table, columns }) => columns.map((column) => [table, column]));
