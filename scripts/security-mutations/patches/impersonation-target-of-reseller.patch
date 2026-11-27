@@ -1,0 +1,14 @@
+diff --git a/apps/api-gateway/src/auth/impersonation.service.ts b/apps/api-gateway/src/auth/impersonation.service.ts
+index 9ee6c41b..d0fec1fb 100644
+--- a/apps/api-gateway/src/auth/impersonation.service.ts
++++ b/apps/api-gateway/src/auth/impersonation.service.ts
+@@ -172,9 +172,6 @@ export class ImpersonationService {
+     // institutes: the institute is settled first, and every refusal reads the same.
+     if (actor.scope === 'reseller') {
+       await this.assertActiveResellerMembership(actor);
+-      if (!(await this.repo.isInstituteOfReseller(actor, targetTenantId))) {
+-        throw targetOutOfReach();
+-      }
+     }
+     if (actor.scope === 'institute' && actor.tenantId !== targetTenantId) {
+       throw targetOutOfReach();

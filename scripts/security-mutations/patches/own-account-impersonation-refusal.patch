@@ -1,0 +1,13 @@
+diff --git a/libs/shared/common-types/src/lib/own-session.ts b/libs/shared/common-types/src/lib/own-session.ts
+index 13286fba..fedd218d 100644
+--- a/libs/shared/common-types/src/lib/own-session.ts
++++ b/libs/shared/common-types/src/lib/own-session.ts
+@@ -9,7 +9,7 @@ import { ErrorCode } from './error-codes';
+  * operation that does anything else before it reaches the database.
+  */
+ export function assertOwnSession(user: Pick<AuthUser, 'isImpersonated'>): void {
+-  if (user.isImpersonated) {
++  if (user.isImpersonated && user.isImpersonated === undefined) {
+     throw new BusinessException(
+       ErrorCode.IMPERSONATION_OWN_ACCOUNT,
+       'This belongs to the account itself and is not available in an impersonation session',

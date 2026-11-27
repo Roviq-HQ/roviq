@@ -13,6 +13,8 @@
  * FORBIDDEN response is returned before the service ever sees the input.
  */
 
+import type { AbilityRule } from '@roviq/common-types';
+import { memberships, mkAdminCtx, roles, withAdmin } from '@roviq/database';
 import {
   cleanupTestInstitute,
   cleanupTestTeacher,
@@ -27,6 +29,7 @@ import {
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../app/app.module';
@@ -78,6 +81,65 @@ describe('CASL @CheckAbility enforcement', () => {
       if (response.errors) {
         expect(response.errors[0]?.extensions?.code).not.toBe('FORBIDDEN');
       }
+    });
+  });
+
+  describe('A role with a row condition, on an operation that applies no row condition', () => {
+    // `setStudentPhoto` is guarded by update:Student and does not declare `rows: 'scoped'`.
+    const SET_PHOTO = `
+      mutation SetStudentPhoto($id: ID!) {
+        setStudentPhoto(studentProfileId: $id, fileId: null)
+      }
+    `;
+    const extra: TestTeacher[] = [];
+
+    async function tokenWithAbilities(abilities: AbilityRule[]): Promise<string> {
+      const member = await createTestTeacher(result.db, tenant.tenantId);
+      extra.push(member);
+      await withAdmin(result.db, mkAdminCtx('test:casl-enforcement'), async (tx) => {
+        await tx.update(roles).set({ abilities }).where(eq(roles.id, member.roleId));
+        await tx
+          .update(memberships)
+          .set({ abilities })
+          .where(eq(memberships.id, member.membershipId));
+      });
+      return createInstituteToken({
+        sub: member.userId,
+        tenantId: tenant.tenantId,
+        membershipId: member.membershipId,
+        roleId: member.roleId,
+      });
+    }
+
+    afterAll(async () => {
+      for (const member of extra) await cleanupTestTeacher(result.db, member);
+    });
+
+    it('should refuse a role that may update only the students of its own sections', async () => {
+      const token = await tokenWithAbilities([
+        {
+          action: 'update',
+          subject: 'Student',
+          conditions: { sectionId: { $in: '$user.assignedSections' } },
+        },
+      ]);
+      const response = await gqlRequest(result.httpServer, {
+        query: SET_PHOTO,
+        variables: { id: FAKE_ID },
+        token,
+      });
+      expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    });
+
+    it('should let a role that may update every student reach the operation', async () => {
+      const token = await tokenWithAbilities([{ action: 'update', subject: 'Student' }]);
+      const response = await gqlRequest(result.httpServer, {
+        query: SET_PHOTO,
+        variables: { id: FAKE_ID },
+        token,
+      });
+      // The guard passed: the refusal is the operation's own, for a student that does not exist.
+      expect(response.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
     });
   });
 

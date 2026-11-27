@@ -1,0 +1,12 @@
+diff --git a/apps/api-gateway/src/reseller/institute/reseller-institute.service.ts b/apps/api-gateway/src/reseller/institute/reseller-institute.service.ts
+index 3aca0af3..1b4bc5ef 100644
+--- a/apps/api-gateway/src/reseller/institute/reseller-institute.service.ts
++++ b/apps/api-gateway/src/reseller/institute/reseller-institute.service.ts
+@@ -29,7 +29,6 @@ export class ResellerInstituteService {
+     const { userId } = getRequestContext();
+     const resellerId = this.getResellerId();
+     // SECURITY: create() runs as admin; an unchecked groupId would join another reseller's group.
+-    if (input.groupId) await this.groupService.assertOwnedByReseller(resellerId, input.groupId);
+ 
+     const record = await this.instituteService.insertWithFirstAdmin({
+       ...input,

@@ -1,0 +1,13 @@
+diff --git a/libs/database/src/tenant-db.ts b/libs/database/src/tenant-db.ts
+index c8e52282..a8387cb8 100644
+--- a/libs/database/src/tenant-db.ts
++++ b/libs/database/src/tenant-db.ts
+@@ -97,7 +97,7 @@ export async function withUser<T>(
+   }
+   if (access !== 'IMPERSONATOR_MAY_READ') assertOwnSession(ctx);
+   return db.transaction(async (tx) => {
+-    await tx.execute(sql`SET LOCAL ROLE roviq_user`);
++    await tx.execute(sql`SET LOCAL ROLE roviq_admin`);
+     await tx.execute(sql`SELECT set_config('app.current_user_id', ${ctx.userId}, true)`);
+     if (ctx.isImpersonated) await tx.execute(sql`SET LOCAL transaction_read_only = on`);
+     return callback(tx as DrizzleDB);

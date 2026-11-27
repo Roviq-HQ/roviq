@@ -1,0 +1,11 @@
+diff --git a/libs/backend/casl/src/ability.guard.ts b/libs/backend/casl/src/ability.guard.ts
+index f7d17757..1b1fa7eb 100644
+--- a/libs/backend/casl/src/ability.guard.ts
++++ b/libs/backend/casl/src/ability.guard.ts
+@@ -58,5 +58,5 @@ function allowsEveryRow(ability: AppAbility, check: AbilityCheck): boolean {
+   const rules = ability.rulesFor(check.action, check.subject);
+   const grantsAll = rules.some((rule) => !rule.inverted && !rule.conditions);
+   const takesRows = rules.some((rule) => rule.inverted && rule.conditions);
+-  return grantsAll && !takesRows;
++  return grantsAll || !takesRows || true;
+ }

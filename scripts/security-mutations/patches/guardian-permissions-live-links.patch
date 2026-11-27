@@ -1,0 +1,13 @@
+diff --git a/libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts b/libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts
+index 8fff862b..f221d82e 100644
+--- a/libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts
++++ b/libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts
+@@ -81,8 +81,6 @@ export class MembershipAbilityDrizzleRepository extends MembershipAbilityReposit
+             eq(studentGuardianLinksLive.tenantId, tenantId),
+             eq(guardianProfilesLive.tenantId, tenantId),
+             eq(studentProfilesLive.tenantId, tenantId),
+-            // A link whose access the institute closed gives the guardian no rule on the student.
+-            isNull(studentGuardianLinksLive.accessRevokedAt),
+           ),
+         );
+       return {

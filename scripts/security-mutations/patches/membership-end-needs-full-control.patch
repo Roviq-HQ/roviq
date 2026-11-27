@@ -1,0 +1,12 @@
+diff --git a/apps/api-gateway/src/auth/membership-lifecycle.ts b/apps/api-gateway/src/auth/membership-lifecycle.ts
+index 1a55ee3f..6d214c67 100644
+--- a/apps/api-gateway/src/auth/membership-lifecycle.ts
++++ b/apps/api-gateway/src/auth/membership-lifecycle.ts
+@@ -100,7 +100,6 @@ export async function decideMembershipEnd(
+ 
+   if (await roleHasFullControl(tx, member.roleId)) {
+     // Deleting a record is not a way to decide who runs the institute.
+-    if (!(await actorHasFullControl(tx, actorId))) return 'needs_full_control';
+     const others = await tx
+       .select({ id: memberships.id })
+       .from(memberships) // allow-base-read: FOR UPDATE needs the table, not the view

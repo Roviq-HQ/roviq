@@ -60,6 +60,8 @@ export function pdfWithoutStamp(data: unknown): unknown {
         ? Buffer.from(value, 'base64')
             .toString('latin1')
             .replace(/\/CreationDate \([^)]*\)/g, '')
+            // PDFKit writes the time as an object of its own: `16 0 obj (D:20261127182338Z)`.
+            .replace(/\(D:\d{14}[^)]*\)/g, '')
             .replace(/\/ID \[[^\]]*\]/g, '')
         : value,
     ]),
