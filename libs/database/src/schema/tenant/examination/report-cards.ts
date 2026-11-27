@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { boolean, foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { i18nText, tenantColumns } from '../../common/columns';
+import { i18nText, sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { reportCardStatus } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { academicYears } from '../academic-years';
@@ -16,9 +16,7 @@ export const reportCards = pgTable(
   'report_cards',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
     /** The term this card covers; null = annual aggregate across terms. */
     examTermId: uuid('exam_term_id').references(() => examTerms.id, {
       onDelete: 'set null',
@@ -37,6 +35,13 @@ export const reportCards = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'report_cards_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

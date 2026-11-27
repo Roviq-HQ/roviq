@@ -8,7 +8,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { i18nText, tenantColumns } from '../../common/columns';
+import { i18nText, sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { tenantPolicies } from '../../common/rls-policies';
 import { academicYears } from '../academic-years';
 import { institutes } from '../institutes';
@@ -23,9 +23,7 @@ export const examTerms = pgTable(
   'exam_terms',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
     name: i18nText('name').notNull(),
     sequence: integer().default(0).notNull(),
     /** Weight of this term in an annual roll-up (percent). */
@@ -35,6 +33,13 @@ export const examTerms = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'exam_terms_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

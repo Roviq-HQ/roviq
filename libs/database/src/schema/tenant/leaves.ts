@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { date, foreignKey, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { leaveStatus, leaveType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from './institutes';
@@ -18,9 +18,7 @@ export const leaves = pgTable(
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     /** Membership the leave is for — student or staff. */
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => memberships.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    userId: uuid('user_id').notNull(),
     /** Inclusive start date (YYYY-MM-DD). */
     startDate: date('start_date').notNull(),
     /** Inclusive end date (YYYY-MM-DD). Single-day leaves set startDate = endDate. */
@@ -36,6 +34,13 @@ export const leaves = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'leaves_user_id_tenant_fkey',
+      [table.userId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

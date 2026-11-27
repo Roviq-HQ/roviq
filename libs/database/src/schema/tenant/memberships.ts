@@ -23,6 +23,8 @@ export const memberships = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('memberships_id_tenant_key').on(table.id, table.tenantId),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

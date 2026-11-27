@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
 import { sections } from '../sections';
@@ -14,12 +14,17 @@ export const timetableSections = pgTable(
     timetableId: uuid('timetable_id')
       .notNull()
       .references(() => timetables.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    sectionId: uuid('section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    sectionId: uuid('section_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'timetable_sections_section_id_tenant_fkey',
+      [table.sectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

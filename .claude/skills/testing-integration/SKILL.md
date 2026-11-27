@@ -32,7 +32,7 @@ const res = await gqlRequest<{ enrollStudent: string }>(result.httpServer, {
 expect(res.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
 ```
 
-- The database is prepared for you: the project's global setup creates `roviq_test` if missing and applies pending migrations. No reset command is needed, and none may be run from a test.
+- The database is prepared for you: the project's global setup creates `roviq_test` if missing and applies pending migrations; when rows left by earlier runs refuse a new migration, it rebuilds the database once. No reset command is needed, and none may be run from a test.
 - Redis is an in-memory stand-in, NATS and Temporal are mocked. `createIntegrationAppWithNats` boots against real NATS; use it only for a test that needs a consumer to run (the audit pipeline).
 - Other scopes: `createPlatformToken`, `createResellerToken`, `createTestReseller`. A role with fewer abilities: `createTestTeacher(result.db, tenantId)`, cleaned with `cleanupTestTeacher`.
 - An emitted event is asserted by spying on the bus: `vi.spyOn(result.app.get(EventBusService), 'emit')`. A consumer is tested by getting the handler from the app and calling it with the payload.

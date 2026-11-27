@@ -673,8 +673,11 @@ describe('notification pipeline (integration)', () => {
         (await deliveriesFor(guardian.userId)).filter((d) => d.channel === 'WHATSAPP');
       const before = (await whatsappRows()).length;
 
-      // Another institute's row for the same pair must not count: RLS hides it.
-      await recordConsent(true, foreignInstitute.tenantId);
+      // Another institute cannot hold a row for this pair: the foreign key carries the institute.
+      await expect(recordConsent(true, foreignInstitute.tenantId)).rejects.toMatchObject({
+        code: '23503',
+        constraint: 'consent_records_student_profile_id_tenant_fkey',
+      });
       expect(await send('WHATSAPP', aboutStudent())).toEqual(blocked);
       // Other channels are not gated by this consent.
       expect((await send('EMAIL', aboutStudent())).status).toBe('SENT');

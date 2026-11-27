@@ -11,7 +11,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { certificateStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -37,7 +37,7 @@ export const issuedCertificates = pgTable(
       .notNull()
       .references(() => certificateTemplates.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
     /** Student receiving the certificate — NULL if issued to staff */
-    studentProfileId: uuid('student_profile_id').references(() => studentProfiles.id),
+    studentProfileId: uuid('student_profile_id'),
     /** Staff member receiving the certificate — NULL if issued to student */
     staffProfileId: uuid('staff_profile_id').references(() => staffProfiles.id),
     /** Certificate serial number — unique per tenant (e.g., 'CERT/2025-26/BON/001') */
@@ -68,6 +68,11 @@ export const issuedCertificates = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'issued_certificates_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    ),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

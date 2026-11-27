@@ -12,7 +12,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { botRateLimitTier, botStatus, botType as botTypeEnum } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
@@ -34,10 +34,7 @@ export const botProfiles = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    membershipId: uuid('membership_id')
-      .notNull()
-      .unique()
-      .references(() => memberships.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    membershipId: uuid('membership_id').notNull().unique(),
 
     /**
      * Bot purpose category:
@@ -88,6 +85,13 @@ export const botProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'bot_profiles_membership_id_tenant_fkey',
+      [table.membershipId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

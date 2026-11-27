@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from './academic-years';
 import { institutes } from './institutes';
@@ -16,18 +16,33 @@ export const yearRolloverSectionMap = pgTable(
   'year_rollover_section_map',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    fromSectionId: uuid('from_section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    toSectionId: uuid('to_section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
+    fromSectionId: uuid('from_section_id').notNull(),
+    toSectionId: uuid('to_section_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'year_rollover_section_map_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'year_rollover_section_map_from_section_id_tenant_fkey',
+      [table.fromSectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'year_rollover_section_map_to_section_id_tenant_fkey',
+      [table.toSectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

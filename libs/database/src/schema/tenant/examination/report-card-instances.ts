@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { reportCardStatus, resultStatus } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { studentProfiles } from '../../user-profiles/student-profiles';
@@ -33,16 +33,12 @@ export const reportCardInstances = pgTable(
     reportCardId: uuid('report_card_id')
       .notNull()
       .references(() => reportCards.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    studentProfileId: uuid('student_profile_id')
-      .notNull()
-      .references(() => studentProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    studentProfileId: uuid('student_profile_id').notNull(),
     sectionId: uuid('section_id').references(() => sections.id, {
       onDelete: 'set null',
       onUpdate: 'cascade',
     }),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
     status: reportCardStatus().default('DRAFT').notNull(),
     maxMarks: numeric('max_marks', { precision: 8, scale: 2, mode: 'number' }),
     obtainedMarks: numeric('obtained_marks', { precision: 8, scale: 2, mode: 'number' }),
@@ -61,6 +57,20 @@ export const reportCardInstances = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'report_card_instances_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'report_card_instances_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

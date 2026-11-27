@@ -1,4 +1,4 @@
-import { integer, jsonb, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { type AnyPgColumn, foreignKey, integer, jsonb, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** Multi-language text stored as `{ "en": "Science", "hi": "विज्ञान" }` */
 export type I18nContent = Record<string, string>;
@@ -38,3 +38,15 @@ export const tenantColumns = {
  * Stored as `{ "en": "Science", "hi": "विज्ञान" }`
  */
 export const i18nText = (columnName: string) => jsonb(columnName).$type<Record<string, string>>();
+
+/**
+ * A reference to a row of the same institute. The key carries `tenant_id` on both sides, so
+ * PostgreSQL refuses a row that names another institute's row, whichever role writes it. The
+ * referenced table needs a unique index on `(id, tenant_id)`. While the referencing column is
+ * NULL the key is not checked.
+ */
+export const sameTenantForeignKey = (
+  name: string,
+  columns: [reference: AnyPgColumn, tenantId: AnyPgColumn],
+  foreignColumns: [id: AnyPgColumn, tenantId: AnyPgColumn],
+) => foreignKey({ name, columns, foreignColumns });

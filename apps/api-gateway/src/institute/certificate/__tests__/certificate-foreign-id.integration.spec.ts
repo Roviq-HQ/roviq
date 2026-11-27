@@ -682,12 +682,11 @@ describe('certificates and TCs: another institute id (ROV-293)', () => {
       expect(one?.getCertificate).toEqual(expected);
     });
 
-    it("listCertificates should never join in another institute's student (ROV-360)", async () => {
-      // The foreign key accepts any student id; RLS on the joined views must hide B's name.
-      const [pointing] = await asAdmin((tx) =>
-        tx
-          .insert(issuedCertificates)
-          .values({
+    it("a certificate cannot name another institute's student, and listCertificates finds none (ROV-360)", async () => {
+      // The foreign key carries the institute, so the platform role cannot store such a row either.
+      await expect(
+        asAdmin((tx) =>
+          tx.insert(issuedCertificates).values({
             tenantId: instA.tenantId,
             templateId: a.templateId,
             studentProfileId: b.studentIds[3],
@@ -696,22 +695,16 @@ describe('certificates and TCs: another institute id (ROV-293)', () => {
             certificateData: {},
             purpose: 'Fixture pointing at another institute',
             ...BY,
-          })
-          .returning({ id: issuedCertificates.id }),
-      );
+          }),
+        ),
+      ).rejects.toMatchObject({
+        cause: { code: '23503', constraint: 'issued_certificates_student_profile_id_tenant_fkey' },
+      });
 
-      const listed = await query<{ listCertificates: { id: string; studentFirstName: unknown }[] }>(
-        LIST_NAMED_CERTIFICATES,
-        { filter: { studentProfileId: b.studentIds[3] } },
-      );
-      expect(listed?.listCertificates).toEqual([
-        {
-          id: pointing.id,
-          studentFirstName: null,
-          studentLastName: null,
-          studentAdmissionNumber: null,
-        },
-      ]);
+      const listed = await query<{ listCertificates: { id: string }[] }>(LIST_NAMED_CERTIFICATES, {
+        filter: { studentProfileId: b.studentIds[3] },
+      });
+      expect(listed?.listCertificates).toEqual([]);
     });
 
     it('listCertificateTemplates should list its own active templates and none of another institute', async () => {

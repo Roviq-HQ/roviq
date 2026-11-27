@@ -13,7 +13,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { enquirySource, enquiryStatus, guardianRelationship } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from '../tenant/academic-years';
@@ -47,7 +47,7 @@ export const enquiries = pgTable(
     gender: varchar('gender', { length: 10 }),
     /** Requested class for admission — e.g., 'Nursery', 'LKG', 'Class 5' */
     classRequested: varchar('class_requested', { length: 20 }).notNull(),
-    academicYearId: uuid('academic_year_id').references(() => academicYears.id),
+    academicYearId: uuid('academic_year_id'),
 
     // ── Parent info ─────────────────────────────────────
     parentName: varchar('parent_name', { length: 200 }).notNull(),
@@ -116,6 +116,11 @@ export const enquiries = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'enquiries_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    ),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

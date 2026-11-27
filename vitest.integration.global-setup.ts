@@ -34,8 +34,21 @@ export async function setup(): Promise<void> {
 
   if (result.status !== 0) {
     const target = new URL(url);
-    throw new Error(
-      `drizzle-kit migrate failed (exit ${result.status}) against ${target.host}${target.pathname} — its output is above`,
+    // A pending migration can be refused by rows earlier runs left behind (a new foreign key or
+    // CHECK that an old fixture breaks). The test database holds nothing but seed data, so it
+    // is rebuilt once; a migration that fails on an empty database fails here again.
+    console.warn(
+      `drizzle-kit migrate failed (exit ${result.status}) against ${target.host}${target.pathname}; rebuilding the test database`,
     );
+    const rebuild = spawnSync('pnpm', ['run', 'db:reset', '--test'], {
+      stdio: 'inherit',
+      cwd: __dirname,
+      shell: false,
+    });
+    if (rebuild.status !== 0) {
+      throw new Error(
+        `drizzle-kit migrate failed against ${target.host}${target.pathname}, and so did the rebuild (exit ${rebuild.status}) — the output is above`,
+      );
+    }
   }
 }

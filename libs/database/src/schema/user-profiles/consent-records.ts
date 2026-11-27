@@ -18,6 +18,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sameTenantForeignKey } from '../common/columns';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { guardianProfiles } from './guardian-profiles';
@@ -49,9 +50,7 @@ export const consentRecords = pgTable(
     guardianProfileId: uuid('guardian_profile_id')
       .notNull()
       .references(() => guardianProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    studentProfileId: uuid('student_profile_id')
-      .notNull()
-      .references(() => studentProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    studentProfileId: uuid('student_profile_id').notNull(),
 
     /** What the consent covers: one of `CONSENT_PURPOSE_VALUES` (DPDP Section 6). */
     purpose: varchar('purpose', { length: 50 }).$type<ConsentPurpose>().notNull(),
@@ -79,6 +78,13 @@ export const consentRecords = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    sameTenantForeignKey(
+      'consent_records_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

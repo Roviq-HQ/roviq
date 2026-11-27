@@ -104,7 +104,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - `withTenant/withReseller/withAdmin(db, ctx, fn)` with the branded ctx — no `$transaction`, no `tenantTransaction()` · the caller's own account rows: `withUser(db, user, access, fn)`, never `withAdmin` with the user id in the `WHERE`; `'PERSON_ONLY'` unless an impersonator must read it (`own-account-access.spec.ts`)
 - `assertTenantContext()` / `assertResellerContext()` / `assertPlatformContext()` / `assertInstituteWithReseller()` instead of inline `ForbiddenException`
 - A scope guard is not tenant isolation: institute/reseller code never passes a caller-supplied id to `withAdmin` code without an ownership check · platform operations live in `admin/` resolvers (`pnpm check:admin-context-reach`)
-- Foreign keys do not apply RLS: read every caller-supplied id under the caller's own context before storing a reference to it
+- Foreign keys do not apply RLS: read every caller-supplied id under the caller's own context before storing a reference to it · a new reference between two tenant tables is a `sameTenantForeignKey()` on `(column, tenant_id)` (`pnpm check:tenant-foreign-keys`)
 - Every institute- or reseller-scope operation that takes an id is listed in `foreign-id-coverage.ts` with the spec that sends it another institute's id (`foreign-id-coverage.spec.ts`)
 - A `*.service.ts` never queries the database: every query is a repository method, one per unit of work (`pnpm check:service-db-access`)
 - `mk*Ctx()` only in workflow activities, seeders, event-consumer repos, integration fixtures (`pnpm check:synthetic-context-usage`)

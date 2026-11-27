@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { timetableOverrideType } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
@@ -36,9 +36,7 @@ export const timetableDayOverrides = pgTable(
       .notNull()
       .references(() => timetables.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     date: date('date').notNull(),
-    sectionId: uuid('section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    sectionId: uuid('section_id').notNull(),
     periodId: uuid('period_id')
       .notNull()
       .references(() => timetablePeriods.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -59,6 +57,13 @@ export const timetableDayOverrides = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'timetable_day_overrides_section_id_tenant_fkey',
+      [table.sectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

@@ -1018,3 +1018,11 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the script waited for the backlog to be cleaned before it was wired.
 - **Fix:** of the eleven, eight described behaviour that other specs already assert and are deleted; the webhook replay gap now has two e2e tests (the identical delivery twice, and the same payment under a second order id); the two blocked by product defects are tagged ROV-369 (billing suspend and restore) and ROV-370 (certificate templates). `pnpm test:check-skips` runs in the `gates` group of `scripts/ci-check.sh` and in the CI `lint` job.
 - **Lesson:** a placeholder test with no issue number is forgotten; tag it `ROV-xxx` or write the test.
+
+## 2026-11-27 — a new foreign key was refused by rows old test runs left behind
+
+- **Symptom:** the integration run stopped in its global setup with "drizzle-kit migrate failed (exit 1)" and no reason, on a test database that had been used before. An empty database took the same migration without error.
+- **Cause:** the migration adds foreign keys that carry `tenant_id`. Four specs used to store a row of one institute that named another institute's row, as a fixture, and never removed it; those rows broke the new keys. `drizzle-kit migrate` prints no PostgreSQL error.
+- **Fix:** the four fixtures now assert that PostgreSQL refuses the row. The global setup (`vitest.integration.global-setup.ts`) rebuilds the test database once when a pending migration fails, and says so; a migration that fails on an empty database still stops the run.
+- **Lesson:** to see why a migration fails, apply its SQL with `psql` inside `BEGIN; … ROLLBACK;`. A fixture that proves "the database accepts this bad row" turns into a refusal test the day the database stops accepting it.
+
