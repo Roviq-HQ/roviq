@@ -102,7 +102,10 @@ describe('InstituteRoleService (unit)', () => {
 
       expect(result).toBe(updated);
       expect(repo.updatePrimaryNavSlugs).toHaveBeenCalledWith(ROLE_ID, slugs);
-      expect(abilityFactory.invalidateRoleCache).toHaveBeenCalledWith(ROLE_ID);
+      expect(abilityFactory.invalidateRoleCache).toHaveBeenCalledWith(
+        ROLE_ID,
+        updated.tenantId ?? undefined,
+      );
     });
 
     it('calls repo.updatePrimaryNavSlugs BEFORE abilityFactory.invalidateRoleCache', async () => {

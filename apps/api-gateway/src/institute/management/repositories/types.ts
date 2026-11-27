@@ -4,6 +4,10 @@ import type {
   InstituteAddress,
   InstituteContact,
   InstituteStatus,
+  instituteAffiliations,
+  instituteBranding,
+  instituteConfigs,
+  instituteIdentifiers,
   SectionStrengthNorms,
   ShiftConfig,
   TermConfig,
@@ -142,3 +146,49 @@ export interface DeletedInstituteRecord {
   status: InstituteStatus;
   deletedAt: Date;
 }
+
+/** The branding columns the API exposes. */
+export type InstituteBrandingRecord = Pick<
+  typeof instituteBranding.$inferSelect,
+  | 'id'
+  | 'logoFileId'
+  | 'faviconFileId'
+  | 'coverImageFileId'
+  | 'primaryColor'
+  | 'secondaryColor'
+  | 'themeIdentifier'
+>;
+
+/** The configuration columns the API exposes. */
+export type InstituteConfigRecord = Pick<
+  typeof instituteConfigs.$inferSelect,
+  | 'id'
+  | 'attendanceType'
+  | 'openingTime'
+  | 'closingTime'
+  | 'shifts'
+  | 'notificationPreferences'
+  | 'payrollConfig'
+  | 'gradingSystem'
+  | 'termStructure'
+  | 'sectionStrengthNorms'
+  | 'admissionNumberConfig'
+>;
+
+export type InstituteIdentifierRecord = Pick<
+  typeof instituteIdentifiers.$inferSelect,
+  'id' | 'type' | 'value' | 'issuingAuthority' | 'validFrom' | 'validTo'
+>;
+
+export type InstituteAffiliationRecord = Pick<
+  typeof instituteAffiliations.$inferSelect,
+  | 'id'
+  | 'board'
+  | 'affiliationStatus'
+  | 'affiliationNumber'
+  | 'grantedLevel'
+  | 'validFrom'
+  | 'validTo'
+  | 'nocNumber'
+  | 'nocDate'
+>;

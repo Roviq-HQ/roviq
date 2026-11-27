@@ -16,9 +16,8 @@ import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.inpu
 import { InstituteService } from './institute.service';
 import { InstituteModel } from './models/institute.model';
 
-// SECURITY: no handler here may take an institute id — the repository runs as admin, so an id
-// argument lets one institute act on another (ROV-290). Use the token tenant; platform-level
-// operations belong in admin/.
+// No handler here takes an institute id: the institute is the caller's own, read and written as
+// the institute database role. Platform-level operations belong in admin/.
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
 export class InstituteResolver {
@@ -34,7 +33,7 @@ export class InstituteResolver {
         'Institute scope required to access myInstitute',
       );
     }
-    return this.instituteService.findById(user.tenantId);
+    return this.instituteService.findOwn();
   }
 
   @Mutation(() => InstituteModel)
@@ -44,7 +43,7 @@ export class InstituteResolver {
     @Args('input') input: UpdateInstituteInfoInput,
   ) {
     assertTenantContext(user);
-    return this.instituteService.updateInfo(user.tenantId, input);
+    return this.instituteService.updateOwnInfo(input);
   }
 
   @Mutation(() => InstituteModel)
@@ -54,7 +53,7 @@ export class InstituteResolver {
     @Args('input') input: UpdateInstituteBrandingInput,
   ) {
     assertTenantContext(user);
-    return this.instituteService.updateBranding(user.tenantId, input);
+    return this.instituteService.updateOwnBranding(input);
   }
 
   @Mutation(() => InstituteModel)
@@ -64,7 +63,7 @@ export class InstituteResolver {
     @Args('input') input: UpdateInstituteLocalesInput,
   ) {
     assertTenantContext(user);
-    return this.instituteService.updateLocales(user.tenantId, input);
+    return this.instituteService.updateOwnLocales(input);
   }
 
   @Mutation(() => InstituteModel)
@@ -74,6 +73,6 @@ export class InstituteResolver {
     @Args('input') input: UpdateInstituteConfigInput,
   ) {
     assertTenantContext(user);
-    return this.instituteService.updateConfig(user.tenantId, input);
+    return this.instituteService.updateOwnConfig(input);
   }
 }

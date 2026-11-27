@@ -4,13 +4,13 @@ import {
   type DrizzleDB,
   guardianProfilesLive,
   membershipsLive,
-  mkAdminCtx,
+  mkInstituteCtx,
   sectionsLive,
   studentGuardianLinksLive,
   studentProfilesLive,
   timetableEntriesLive,
   timetablesLive,
-  withAdmin,
+  withTenant,
 } from '@roviq/database';
 import { and, eq, isNull } from 'drizzle-orm';
 import { MembershipAbilityRepository } from './membership-ability.repository';
@@ -22,8 +22,13 @@ export class MembershipAbilityDrizzleRepository extends MembershipAbilityReposit
     super();
   }
 
+  /** The institute named by the verified token: its role reads only its own rows. */
+  private ctx(tenantId: string) {
+    return mkInstituteCtx(tenantId, 'repository:membership-ability');
+  }
+
   async findAbilities(membershipId: string, tenantId: string): Promise<AbilitiesRecord | null> {
-    return withAdmin(this.db, mkAdminCtx('repository:membership-ability'), async (tx) => {
+    return withTenant(this.db, this.ctx(tenantId), async (tx) => {
       const result = await tx
         .select({ abilities: membershipsLive.abilities })
         .from(membershipsLive)
@@ -41,7 +46,7 @@ export class MembershipAbilityDrizzleRepository extends MembershipAbilityReposit
   }
 
   async findReadAssignments(membershipId: string, tenantId: string) {
-    return withAdmin(this.db, mkAdminCtx('repository:membership-ability'), async (tx) => {
+    return withTenant(this.db, this.ctx(tenantId), async (tx) => {
       const sections = await tx
         .select({ id: sectionsLive.id })
         .from(sectionsLive)

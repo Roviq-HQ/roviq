@@ -128,11 +128,19 @@ export const institutes = pgTable(
     // Soft-delete visibility is handled in the application layer (see
     // libs/database/src/schema/common/rls-policies.ts header).
 
-    // roviq_app: SELECT only — institute users can read their own institute
+    // roviq_app: reads its own institute and edits its profile columns
     pgPolicy('institutes_app_select', {
       for: 'select',
       to: roviqApp,
       using: sql`id = current_setting('app.current_tenant_id', true)::uuid`,
+    }),
+    // Its own row only. Which columns it may write is a column grant: the profile fields and
+    // the locale settings, never ownership, status or billing (`institutes-own-row-update-grant`).
+    pgPolicy('institutes_app_update', {
+      for: 'update',
+      to: roviqApp,
+      using: sql`id = current_setting('app.current_tenant_id', true)::uuid`,
+      withCheck: sql`id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
 
     // roviq_reseller: its own institutes.

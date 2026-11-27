@@ -150,7 +150,7 @@ Granular actions defined in `AppAction`:
 
 ### Institute Tables
 
-- `roviq_app`: SELECT only on `institutes` (tenant root)
+- `roviq_app`: SELECT on its own `institutes` row, and UPDATE of that row's profile and locale columns only (`name`, `code`, `contact`, `address`, `timezone`, `currency`, `supported_locales`, `default_locale`, with `version`, `updated_at`, `updated_by`). Status, setup status, reseller, group, slug, type, departments, settings, the demo flag and the first admin are never writable by an institute; it cannot insert or delete an institute
 - `roviq_app`: Full CRUD on child tables (branding, configs, identifiers, affiliations)
 - `roviq_reseller`: SELECT + INSERT + UPDATE on `institutes` (create with approval, suspend)
 - `roviq_reseller`: SELECT only on child tables

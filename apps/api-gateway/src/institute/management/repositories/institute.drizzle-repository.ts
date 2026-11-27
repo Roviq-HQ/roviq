@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode, type InstituteLocaleSettings } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -8,11 +8,6 @@ import {
   i18nNameSearch,
   instituteAffiliations,
   instituteAffiliationsLive,
-  instituteBranding,
-  instituteBrandingLive,
-  instituteConfigs,
-  instituteConfigsLive,
-  instituteIdentifiersLive,
   institutes,
   institutesLive,
   mkAdminCtx,
@@ -41,18 +36,14 @@ import {
 import type Redis from 'ioredis';
 import { recordInstituteAccess } from '../../../auth/institute-access-cache';
 import { decodeCursor } from '../../../common/pagination/relay-pagination.model';
-import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
-import { BRANDING_IMAGES, type BrandingImageColumn } from '../branding-images';
 import { InstituteRepository } from './institute.repository';
+import { instituteColumns, instituteLiveColumns } from './institute-columns';
 import type {
   CreateInstituteData,
   DeletedInstituteRecord,
   InstituteRecord,
   InstituteSearchParams,
   InstituteStatistics,
-  UpdateInstituteBrandingData,
-  UpdateInstituteConfigData,
-  UpdateInstituteInfoData,
   UpdateInstituteOwnershipData,
 } from './types';
 
@@ -94,62 +85,9 @@ function buildCursorCondition(after: string | undefined): SQL | null {
   return sql`${institutesLive.id} > ${cursor.id as string}`;
 }
 
-// Read projection — `institutes_live` view excludes soft-deleted rows.
-const instituteLiveColumns = {
-  id: institutesLive.id,
-  name: institutesLive.name,
-  slug: institutesLive.slug,
-  code: institutesLive.code,
-  type: institutesLive.type,
-  structureFramework: institutesLive.structureFramework,
-  setupStatus: institutesLive.setupStatus,
-  contact: institutesLive.contact,
-  address: institutesLive.address,
-  timezone: institutesLive.timezone,
-  currency: institutesLive.currency,
-  settings: institutesLive.settings,
-  supportedLocales: institutesLive.supportedLocales,
-  defaultLocale: institutesLive.defaultLocale,
-  status: institutesLive.status,
-  resellerId: institutesLive.resellerId,
-  groupId: institutesLive.groupId,
-  departments: institutesLive.departments,
-  isDemo: institutesLive.isDemo,
-  firstAdminUserId: institutesLive.firstAdminUserId,
-  version: institutesLive.version,
-  createdAt: institutesLive.createdAt,
-  updatedAt: institutesLive.updatedAt,
-} as const;
-
-// Same projection on the base table — used by INSERT/UPDATE … RETURNING.
-const instituteColumns = {
-  id: institutes.id,
-  name: institutes.name,
-  slug: institutes.slug,
-  code: institutes.code,
-  type: institutes.type,
-  structureFramework: institutes.structureFramework,
-  setupStatus: institutes.setupStatus,
-  contact: institutes.contact,
-  address: institutes.address,
-  timezone: institutes.timezone,
-  currency: institutes.currency,
-  settings: institutes.settings,
-  supportedLocales: institutes.supportedLocales,
-  defaultLocale: institutes.defaultLocale,
-  status: institutes.status,
-  resellerId: institutes.resellerId,
-  groupId: institutes.groupId,
-  departments: institutes.departments,
-  isDemo: institutes.isDemo,
-  firstAdminUserId: institutes.firstAdminUserId,
-  version: institutes.version,
-  createdAt: institutes.createdAt,
-  updatedAt: institutes.updatedAt,
-} as const;
-
-// SECURITY: most methods run as admin (no RLS). Institute scope may pass only the token tenant id;
-// reseller scope must use the *ByReseller methods or prove ownership first (ROV-290).
+// SECURITY: the platform's and the reseller's institute queries. Most run as admin (no RLS):
+// reseller scope must use the *ByReseller methods or prove ownership first (ROV-290). An
+// institute's own row is read and written by OwnInstituteRepository, under its own role.
 @Injectable()
 export class InstituteDrizzleRepository extends InstituteRepository {
   constructor(
@@ -230,32 +168,6 @@ export class InstituteDrizzleRepository extends InstituteRepository {
         records: records as InstituteRecord[],
         total: totalResult[0]?.value ?? 0,
       };
-    });
-  }
-
-  async updateLocales(
-    id: string,
-    settings: InstituteLocaleSettings,
-    version: number,
-  ): Promise<InstituteRecord> {
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      const [record] = await tx
-        .update(institutes)
-        .set({
-          ...settings,
-          version: sql`${institutes.version} + 1`,
-          updatedBy: getRequestContext().userId,
-        })
-        .where(
-          and(eq(institutes.id, id), eq(institutes.version, version), isNull(institutes.deletedAt)),
-        )
-        .returning(instituteColumns);
-      if (!record)
-        throw new BusinessException(
-          ErrorCode.CONCURRENT_MODIFICATION,
-          'Refresh the institute and try again.',
-        );
-      return record;
     });
   }
 
@@ -348,35 +260,6 @@ export class InstituteDrizzleRepository extends InstituteRepository {
     }
   }
 
-  async updateInfo(id: string, data: UpdateInstituteInfoData): Promise<InstituteRecord> {
-    const { userId } = getRequestContext();
-
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      const rows = await tx
-        .update(institutes)
-        .set({
-          ...(data.name !== undefined && { name: data.name }),
-          ...(data.code !== undefined && { code: data.code }),
-          ...(data.contact !== undefined && { contact: data.contact }),
-          ...(data.address !== undefined && { address: data.address }),
-          ...(data.timezone !== undefined && { timezone: data.timezone }),
-          ...(data.currency !== undefined && { currency: data.currency }),
-          version: sql`${institutes.version} + 1`,
-          updatedBy: userId,
-        })
-        .where(and(eq(institutes.id, id), eq(institutes.version, data.version)))
-        .returning(instituteColumns);
-
-      if (rows.length === 0) {
-        throw new BusinessException(
-          ErrorCode.CONCURRENT_MODIFICATION,
-          'Record was modified by another user. Please refresh and try again.',
-        );
-      }
-      return rows[0] as InstituteRecord;
-    });
-  }
-
   async updateStatus(id: string, status: InstituteStatus): Promise<InstituteRecord> {
     const { userId } = getRequestContext();
 
@@ -426,122 +309,6 @@ export class InstituteDrizzleRepository extends InstituteRepository {
       }
       return rows[0] as InstituteRecord;
     });
-  }
-
-  async updateBranding(id: string, data: UpdateInstituteBrandingData): Promise<InstituteRecord> {
-    const { userId } = getRequestContext();
-
-    await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      const [current] = await tx
-        .select({
-          logoFileId: instituteBrandingLive.logoFileId,
-          faviconFileId: instituteBrandingLive.faviconFileId,
-          coverImageFileId: instituteBrandingLive.coverImageFileId,
-        })
-        .from(instituteBrandingLive)
-        .where(eq(instituteBrandingLive.tenantId, id));
-
-      const images: Partial<Record<BrandingImageColumn, string | null>> = {};
-      const replaced: string[] = [];
-      for (const { column, purpose } of BRANDING_IMAGES) {
-        const next = data[column];
-        const previous = current?.[column] ?? null;
-        if (next === undefined || next === previous) continue;
-        images[column] = next;
-        if (next) {
-          // Admin transaction: the tenant filter is what keeps another institute's upload out.
-          await markFilesReady(tx, { fileIds: [next], purpose, userId, tenantId: id });
-        }
-        if (previous) replaced.push(previous);
-      }
-
-      const fields = {
-        ...images,
-        ...(data.primaryColor !== undefined && { primaryColor: data.primaryColor }),
-        ...(data.secondaryColor !== undefined && { secondaryColor: data.secondaryColor }),
-        ...(data.themeIdentifier !== undefined && { themeIdentifier: data.themeIdentifier }),
-        updatedBy: userId,
-      };
-      await tx
-        .insert(instituteBranding)
-        .values({ tenantId: id, ...fields, createdBy: userId })
-        .onConflictDoUpdate({
-          target: instituteBranding.tenantId,
-          // `institute_branding.tenant_id` uses a PARTIAL unique index
-          // (WHERE deleted_at IS NULL). Postgres only matches ON CONFLICT to
-          // partial unique indexes when the predicate matches exactly, so we
-          // must repeat it here.
-          targetWhere: sql`${instituteBranding.deletedAt} IS NULL`,
-          set: fields,
-        });
-      await markFilesDeleted(tx, { fileIds: replaced, userId });
-    });
-
-    const record = await this.findById(id);
-    if (!record) {
-      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
-    }
-    return record;
-  }
-
-  async updateConfig(id: string, data: UpdateInstituteConfigData): Promise<InstituteRecord> {
-    const { userId } = getRequestContext();
-
-    await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      await tx
-        .insert(instituteConfigs)
-        .values({
-          tenantId: id,
-          ...(data.attendanceType !== undefined && {
-            attendanceType: data.attendanceType as 'LECTURE_WISE' | 'DAILY',
-          }),
-          ...(data.openingTime !== undefined && { openingTime: data.openingTime }),
-          ...(data.closingTime !== undefined && { closingTime: data.closingTime }),
-          ...(data.shifts !== undefined && { shifts: data.shifts }),
-          ...(data.notificationPreferences !== undefined && {
-            notificationPreferences: data.notificationPreferences,
-          }),
-          ...(data.payrollConfig !== undefined && { payrollConfig: data.payrollConfig }),
-          ...(data.gradingSystem !== undefined && { gradingSystem: data.gradingSystem }),
-          ...(data.termStructure !== undefined && { termStructure: data.termStructure }),
-          ...(data.sectionStrengthNorms !== undefined && {
-            sectionStrengthNorms: data.sectionStrengthNorms,
-          }),
-          createdBy: userId,
-          updatedBy: userId,
-        })
-        .onConflictDoUpdate({
-          target: instituteConfigs.tenantId,
-          // `institute_configs.tenant_id` uses a PARTIAL unique index
-          // (WHERE deleted_at IS NULL). Postgres only matches ON CONFLICT to
-          // partial unique indexes when the predicate matches exactly.
-          targetWhere: sql`${instituteConfigs.deletedAt} IS NULL`,
-          set: {
-            ...(data.attendanceType !== undefined && {
-              attendanceType: data.attendanceType as 'LECTURE_WISE' | 'DAILY',
-            }),
-            ...(data.openingTime !== undefined && { openingTime: data.openingTime }),
-            ...(data.closingTime !== undefined && { closingTime: data.closingTime }),
-            ...(data.shifts !== undefined && { shifts: data.shifts }),
-            ...(data.notificationPreferences !== undefined && {
-              notificationPreferences: data.notificationPreferences,
-            }),
-            ...(data.payrollConfig !== undefined && { payrollConfig: data.payrollConfig }),
-            ...(data.gradingSystem !== undefined && { gradingSystem: data.gradingSystem }),
-            ...(data.termStructure !== undefined && { termStructure: data.termStructure }),
-            ...(data.sectionStrengthNorms !== undefined && {
-              sectionStrengthNorms: data.sectionStrengthNorms,
-            }),
-            updatedBy: userId,
-          },
-        });
-    });
-
-    const record = await this.findById(id);
-    if (!record) {
-      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
-    }
-    return record;
   }
 
   async findByIdIncludeDeleted(id: string): Promise<InstituteRecord | null> {
@@ -602,48 +369,6 @@ export class InstituteDrizzleRepository extends InstituteRepository {
     ).then((rows) =>
       rows.flatMap((row) => (row.deletedAt ? [{ ...row, deletedAt: row.deletedAt }] : [])),
     );
-  }
-
-  async findBranding(instituteId: string): Promise<Record<string, unknown> | null> {
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      const rows = await tx
-        .select()
-        .from(instituteBrandingLive)
-        .where(eq(instituteBrandingLive.tenantId, instituteId));
-      return (rows[0] as Record<string, unknown> | undefined) ?? null;
-    });
-  }
-
-  async findConfig(instituteId: string): Promise<Record<string, unknown> | null> {
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      const rows = await tx
-        .select()
-        .from(instituteConfigsLive)
-        .where(eq(instituteConfigsLive.tenantId, instituteId));
-      return (rows[0] as Record<string, unknown> | undefined) ?? null;
-    });
-  }
-
-  async findIdentifiers(instituteId: string): Promise<Record<string, unknown>[]> {
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      return tx
-        .select()
-        .from(instituteIdentifiersLive)
-        .where(eq(instituteIdentifiersLive.tenantId, instituteId)) as Promise<
-        Record<string, unknown>[]
-      >;
-    });
-  }
-
-  async findAffiliations(instituteId: string): Promise<Record<string, unknown>[]> {
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      return tx
-        .select()
-        .from(instituteAffiliationsLive)
-        .where(eq(instituteAffiliationsLive.tenantId, instituteId)) as Promise<
-        Record<string, unknown>[]
-      >;
-    });
   }
 
   // ── Reseller-scoped methods ──────────────────────────
