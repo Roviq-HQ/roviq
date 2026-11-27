@@ -146,6 +146,7 @@ export class TimetableViewService {
 
   async daySchedule(date: string, sectionId: string, timetableId?: string): Promise<DaySchedule> {
     const dayOfWeek = weekdayOf(date);
+    await assertTimetableRefs(this.repo, { sectionIds: [sectionId] });
     const timetable = await this.resolveForSection(sectionId, timetableId);
     if (!timetable || !this.isActiveDay(timetable, date, dayOfWeek)) {
       return { date, dayOfWeek, sectionId, timetableId: timetable?.id ?? null, slots: [] };

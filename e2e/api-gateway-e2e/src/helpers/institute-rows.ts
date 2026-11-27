@@ -1,7 +1,7 @@
 /**
- * Reads, with the superuser connection, which ids belong to an institute. Read-only: the
- * two-institute spec needs the full list of another institute's ids to look for them in
- * responses, and no API may return that list.
+ * Reads, with the superuser connection, which ids belong to an institute, and counts its rows.
+ * Read-only: the two-institute spec needs the full list of another institute's ids to look
+ * for them in responses, and no API may return that list.
  */
 import type pg from 'pg';
 
@@ -89,7 +89,27 @@ const SPECIAL_KINDS = {
     JOIN institutes i ON i.reseller_id = rm.reseller_id WHERE i.id = $1 ORDER BY rm.id LIMIT 1`,
   plans: `SELECT p.id FROM plans p
     JOIN institutes i ON i.reseller_id = p.reseller_id WHERE i.id = $1 ORDER BY p.id LIMIT 1`,
+  payment_gateway_configs: `SELECT g.id FROM payment_gateway_configs g
+    JOIN institutes i ON i.reseller_id = g.reseller_id WHERE i.id = $1 ORDER BY g.id LIMIT 1`,
+  institute_groups: `SELECT group_id AS id FROM institutes WHERE id = $1`,
+  // A person of this institute only: one who is also elsewhere is not foreign to everyone.
+  users: `SELECT m.user_id AS id FROM memberships m
+    WHERE m.tenant_id = $1
+      AND NOT EXISTS (SELECT 1 FROM memberships o
+                       WHERE o.user_id = m.user_id AND o.tenant_id <> m.tenant_id)
+      AND NOT EXISTS (SELECT 1 FROM platform_memberships p WHERE p.user_id = m.user_id)
+      AND NOT EXISTS (SELECT 1 FROM reseller_memberships r WHERE r.user_id = m.user_id)
+    ORDER BY m.user_id LIMIT 1`,
+  student_memberships: `SELECT membership_id AS id FROM student_profiles
+    WHERE tenant_id = $1 ORDER BY id LIMIT 1`,
+  staff_memberships: `SELECT membership_id AS id FROM staff_profiles
+    WHERE tenant_id = $1 ORDER BY id LIMIT 1`,
 } as const;
+
+/** Every kind `pickInstituteIds` can return a row for; a kind outside it is a typing error. */
+export async function knownKinds(pool: pg.Pool): Promise<Set<string>> {
+  return new Set([...(await tenantTables(pool)), ...Object.keys(SPECIAL_KINDS)]);
+}
 
 /** One id of each kind for the institute: a table name, or a key of `SPECIAL_KINDS`. */
 export async function pickInstituteIds(
@@ -140,4 +160,110 @@ export function findForeignIds(
   scan(response.data, new Set());
   scan(response.errors, new Set(sentIds.map((id) => id.toLowerCase())));
   return [...hits].map(([id, source]) => ({ id, source }));
+}
+
+/** What is watched for change: institutes, resellers, and everyone who belongs to them. */
+export interface WatchedOwners {
+  tenantIds: readonly string[];
+  resellerIds: readonly string[];
+}
+
+interface WatchedTable {
+  name: string;
+  owner: 'tenant_id' | 'reseller_id' | 'user_id' | 'id';
+  hasUpdatedAt: boolean;
+  hasDeletedAt: boolean;
+}
+
+/** Base tables that belong to an institute, a reseller or a person, and what each records. */
+async function watchedTables(pool: pg.Pool): Promise<WatchedTable[]> {
+  const res = await pool.query<{ table_name: string; columns: string[] }>(
+    `SELECT t.table_name, array_agg(c.column_name::text) AS columns
+       FROM information_schema.tables t
+       JOIN information_schema.columns c
+         ON c.table_schema = 'public' AND c.table_name = t.table_name
+      WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+        AND NOT EXISTS (SELECT 1 FROM pg_inherits i
+                         WHERE i.inhrelid = format('public.%I', t.table_name)::regclass)
+      GROUP BY t.table_name
+      ORDER BY t.table_name`,
+  );
+  const tables: WatchedTable[] = [];
+  for (const { table_name: name, columns } of res.rows) {
+    const has = (column: string) => columns.includes(column);
+    const facts = { hasUpdatedAt: has('updated_at'), hasDeletedAt: has('deleted_at') };
+    if (name === 'institutes' || name === 'resellers' || name === 'users') {
+      tables.push({ name, owner: 'id', ...facts });
+    }
+    if (has('tenant_id')) tables.push({ name, owner: 'tenant_id', ...facts });
+    if (has('reseller_id') && name !== 'institutes') {
+      tables.push({ name, owner: 'reseller_id', ...facts });
+    }
+    if (has('user_id') && !has('tenant_id') && !has('reseller_id')) {
+      tables.push({ name, owner: 'user_id', ...facts });
+    }
+  }
+  return tables;
+}
+
+/**
+ * One line per table and owner: how many rows, the latest `updated_at`, and how many are
+ * deleted. Read-only. Two snapshots that are equal mean no row of the watched institutes,
+ * resellers and their people was added, changed or removed in between.
+ */
+export async function snapshotRows(
+  pool: pg.Pool,
+  watched: WatchedOwners,
+  ignoredTables: ReadonlySet<string>,
+): Promise<Map<string, string>> {
+  const people = `(SELECT user_id FROM memberships WHERE tenant_id = ANY($1::uuid[])
+    UNION SELECT user_id FROM reseller_memberships WHERE reseller_id = ANY($2::uuid[]))`;
+  const parts: string[] = [];
+  for (const table of await watchedTables(pool)) {
+    if (ignoredTables.has(table.name)) continue;
+    const updated = table.hasUpdatedAt ? 'max(updated_at)::text' : 'NULL::text';
+    const deleted = table.hasDeletedAt ? 'count(deleted_at)' : '0::bigint';
+    const select = (owner: string, where: string) =>
+      `SELECT '${table.name}'::text AS tbl, ${owner} AS owner, count(*) AS n,
+              ${updated} AS u, ${deleted} AS d
+         FROM "${table.name}" WHERE ${where} GROUP BY 2`;
+    if (table.owner === 'tenant_id') {
+      parts.push(select('tenant_id::text', 'tenant_id = ANY($1::uuid[])'));
+    } else if (table.owner === 'reseller_id') {
+      parts.push(select('reseller_id::text', 'reseller_id = ANY($2::uuid[])'));
+    } else if (table.owner === 'user_id') {
+      parts.push(select(`'people'::text`, `user_id IN ${people}`));
+    } else if (table.name === 'users') {
+      parts.push(select(`'people'::text`, `id IN ${people}`));
+    } else {
+      const ids = table.name === 'institutes' ? '$1' : '$2';
+      parts.push(select('id::text', `id = ANY(${ids}::uuid[])`));
+    }
+  }
+  const res = await pool.query<{ tbl: string; owner: string; n: string; u: string; d: string }>(
+    parts.join('\nUNION ALL\n'),
+    [watched.tenantIds, watched.resellerIds],
+  );
+  const lines = new Map<string, string>();
+  for (const row of res.rows) {
+    lines.set(
+      `${row.tbl} of ${row.owner}`,
+      `${row.n} rows, last change ${row.u}, ${row.d} deleted`,
+    );
+  }
+  return lines;
+}
+
+/** What differs between two snapshots, one sentence per table and owner. */
+export function snapshotChanges(
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+): string[] {
+  const changes: string[] = [];
+  for (const key of new Set([...before.keys(), ...after.keys()])) {
+    const was = before.get(key) ?? 'no rows';
+    const is = after.get(key) ?? 'no rows';
+    if (was !== is) changes.push(`${key}: ${was} → ${is}`);
+  }
+  return changes.sort();
 }

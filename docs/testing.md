@@ -123,10 +123,14 @@ CI runs the database and session specs as the named step **Auth Security Invaria
 
 ## Two-institute response scan
 
-`e2e/api-gateway-e2e/src/two-institute.api-e2e.spec.ts` calls every field of `Query` and looks in each whole response for an id that belongs to an institute the caller has nothing to do with. The queries come from the running gateway by introspection, so a new query is covered the day it is added.
+`e2e/api-gateway-e2e/src/two-institute.api-e2e.spec.ts` calls every field of `Query`, and every field of `Mutation` that takes an id, and looks in each whole response for an id that belongs to an institute the caller has nothing to do with. The operations come from the running gateway by introspection, so a new one is covered the day it is added.
 
 - **Callers**: the admin of an institute created for the run, the seeded admin, teacher, student and guardian of the first institute, the seeded reseller, and a reseller created for the run that owns no institute.
 - **Forbidden ids**: read with the superuser connection (read-only): the institute id, the primary key of every row that carries its `tenant_id`, and the users whose only memberships are in it. For a reseller: its own id, team, roles and plans.
+- **An id of no row** is a random id in the UUIDv7 form the database generates, so an input that checks the version does not turn it away.
+
+### Queries
+
 - **Two calls per query**: one with the caller's own ids in the required id arguments, one with another institute's ids in every id argument. Each selects every scalar three levels deep. A nested field the caller may not read is left out and the query is asked again.
 - **A query fails** when a response holds a forbidden id, or when the generated call is refused as invalid. An id the request itself sent may be repeated in an error message, never in the data.
 
@@ -140,9 +144,41 @@ The tables are in `e2e/api-gateway-e2e/src/two-institute-queries.ts`:
 | `WITHOUT_DATA` | queries that answer no caller with data, with the reason (mostly a kind the seed has no row of) | a query answers nobody with data and is not listed |
 | `EXPECTED_TO_FAIL` | queries whose check does not pass yet | a listed query passes |
 
-A new query needs no entry when its id arguments use the names in `KIND_BY_NAME`. Set `TWO_INSTITUTE_REPORT=<file>` to write every call's result as JSON.
+A new query needs no entry when its id arguments use the names in `KIND_BY_NAME`.
 
-The spec reads only. What a mutation refuses, and that a refused call writes nothing, is proven by the foreign-id specs (`apps/api-gateway/src/__tests__/foreign-id-coverage.ts`).
+### Mutations
+
+A mutation is never called with the caller's own ids, so the spec leaves the seed as it found it.
+
+- **Two calls per mutation and caller**: one with another institute's ids in every id argument, required or optional, and one with ids of no row in the same places. The first is left out when the other institute has no row of any kind the mutation names.
+- **A mutation fails** when:
+  - a response holds a forbidden id;
+  - the two calls are answered differently (another institute's id must look exactly like an id that does not exist);
+  - the answer is `INTERNAL_ERROR`, or the generated document is not valid GraphQL;
+  - a row changed. Before the first mutation and after each one, the spec counts the rows, the latest `updated_at` and the deleted rows of every table that belongs to the three institutes, the two resellers and their people (read-only), and compares.
+- **Arguments that are not ids** are generated from their type. A mutation that every caller is refused as invalid input never looked at an id: it fails the spec until `VALUE_BY_PATH` gives it a value that passes validation.
+
+The tables are in `e2e/api-gateway-e2e/src/two-institute-mutations.ts`:
+
+| Table | Holds | The spec fails when |
+|---|---|---|
+| `KIND_BY_NAME`, `KIND_BY_PATH` | which table an id argument names (added to the query table's names) | an argument of type `ID` has no rule, required or not; a kind names no table |
+| `KINDS_WITHOUT_INSTITUTE` | kinds whose rows belong to a person or the platform, so an id of no row is always sent | — |
+| `VALUE_BY_PATH`, `VALUE_BY_TYPE` | values for arguments that are not ids | a required argument has no value |
+| `MUTATIONS_NOT_CALLED` | mutations with an id that are not called, with the reason | an entry names a mutation that no longer exists |
+| `MUTATIONS_REFUSED_AS_INVALID` | mutations refused as invalid input by every caller, with the reason | a mutation is refused that way and not listed, or is listed and no longer is |
+| `MUTATIONS_EXPECTED_TO_FAIL` | mutations whose check does not pass yet | a listed mutation passes |
+| `TABLES_NOT_COMPARED` | tables left out of the row comparison, with the reason | — |
+
+An id typed as `String` in the schema gets a kind only when it is listed by hand.
+
+### What the scan does not prove
+
+- A mutation is sent another institute's id only for kinds that institute has a row of. Alone on a fresh seed that leaves out the mutations on files, groups, invoices, payments, certificates and transfer certificates; in a full run the earlier specs create some of those rows.
+- Every id of a mutation is replaced at once, so the scan does not say which id was refused, and it never runs the normal case. The foreign-id specs (`apps/api-gateway/src/__tests__/foreign-id-coverage.ts`) send each id on its own with every other argument valid, and stay the proof for a single operation.
+- Subscriptions are not called.
+
+Set `TWO_INSTITUTE_REPORT=<file>` to write every call's result as JSON.
 
 ## Docker Compose Files
 
