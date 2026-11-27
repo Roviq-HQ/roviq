@@ -258,7 +258,7 @@ export const MUTATIONS_REFUSED_AS_INVALID: Readonly<Record<string, string>> = {}
  * Mutations whose check does not pass yet. Each is run and must still fail: when one starts
  * passing, the spec fails until its name is removed from this list.
  */
-export const MUTATIONS_EXPECTED_TO_FAIL: readonly string[] = ['resellerStartImpersonation'];
+export const MUTATIONS_EXPECTED_TO_FAIL: readonly string[] = [];
 
 /**
  * Tables left out of the before-and-after row comparison, each with the reason. Every other

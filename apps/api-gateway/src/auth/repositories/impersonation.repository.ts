@@ -1,3 +1,4 @@
+import type { ResellerContext } from '@roviq/common-types';
 import type {
   ExpiredImpersonationSession,
   ImpersonationActorMembership,
@@ -11,7 +12,10 @@ import type {
   RankedRole,
 } from './types';
 
-/** Queries behind ImpersonationService. Every check reads live views as the admin role. */
+/**
+ * Queries behind ImpersonationService. A reseller's institute is read as the reseller; the
+ * other checks read live views as the admin role.
+ */
 export abstract class ImpersonationRepository {
   abstract findUserStatus(userId: string): Promise<{ id: string; status: string } | null>;
   /** Active memberships of the user in the institute, oldest first, with their role. */
@@ -20,7 +24,8 @@ export abstract class ImpersonationRepository {
     tenantId: string,
   ): Promise<ImpersonationTargetMembership[]>;
   abstract findInstitute(tenantId: string): Promise<ImpersonationInstitute | null>;
-  abstract findInstituteResellerId(tenantId: string): Promise<{ resellerId: string } | null>;
+  /** Reads the institute as the reseller: true only for one of its own institutes. */
+  abstract isInstituteOfReseller(reseller: ResellerContext, tenantId: string): Promise<boolean>;
   /** The four reads of a code exchange, in one transaction. */
   abstract findExchangeRows(params: {
     sessionId: string;
