@@ -349,7 +349,11 @@ export function createTCIssuanceActivities(db: DrizzleDB): TCIssuanceActivities 
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
           return tx
-            .select()
+            .select({
+              userId: studentProfilesLive.userId,
+              socialCategory: studentProfilesLive.socialCategory,
+              isRteAdmitted: studentProfilesLive.isRteAdmitted,
+            })
             .from(studentProfilesLive)
             .where(eq(studentProfilesLive.id, studentProfileId))
             .limit(1);
@@ -364,7 +368,12 @@ export function createTCIssuanceActivities(db: DrizzleDB): TCIssuanceActivities 
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
           return tx
-            .select()
+            .select({
+              firstName: tenantUserProfilesLive.firstName,
+              lastName: tenantUserProfilesLive.lastName,
+              dateOfBirth: tenantUserProfilesLive.dateOfBirth,
+              nationality: tenantUserProfilesLive.nationality,
+            })
             .from(tenantUserProfilesLive)
             .where(
               and(

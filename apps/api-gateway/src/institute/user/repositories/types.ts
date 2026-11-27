@@ -14,9 +14,41 @@ export interface ProfileMembershipRecord {
   userId: string;
 }
 
-export type UserProfileRow = typeof userProfilesLive.$inferSelect;
-export type UpdatedUserProfileRow = typeof userProfiles.$inferSelect;
-export type TenantUserProfileRow = typeof tenantUserProfilesLive.$inferSelect;
+/** What the profile page shows of the account profile. */
+export const OWN_PROFILE_COLUMNS = [
+  'id',
+  'userId',
+  'firstName',
+  'lastName',
+  'gender',
+  'dateOfBirth',
+  'bloodGroup',
+  'nationality',
+  'profileImageFileId',
+] as const;
+
+/** What the profile page shows of the institute's own record of the person. */
+export const INSTITUTE_PROFILE_COLUMNS = [
+  'firstName',
+  'lastName',
+  'gender',
+  'dateOfBirth',
+  'bloodGroup',
+  'nationality',
+] as const;
+
+export type UserProfileRow = Pick<
+  typeof userProfilesLive.$inferSelect,
+  (typeof OWN_PROFILE_COLUMNS)[number]
+>;
+export type UpdatedUserProfileRow = Pick<
+  typeof userProfiles.$inferSelect,
+  (typeof OWN_PROFILE_COLUMNS)[number]
+>;
+export type TenantUserProfileRow = Pick<
+  typeof tenantUserProfilesLive.$inferSelect,
+  (typeof INSTITUTE_PROFILE_COLUMNS)[number]
+>;
 export type StudentProfileRow = typeof studentProfilesLive.$inferSelect;
 export type StudentAcademicRow = typeof studentAcademicsLive.$inferSelect;
 export type StaffProfileRow = typeof staffProfilesLive.$inferSelect;

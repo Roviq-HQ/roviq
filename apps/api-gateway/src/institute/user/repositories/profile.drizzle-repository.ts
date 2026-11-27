@@ -3,12 +3,16 @@ import type { SignedInUser } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  GUARDIAN_PROFILE_COLUMNS,
   guardianProfilesLive,
   membershipsLive,
   mkInstituteCtx,
+  namedColumns,
   phoneNumbers,
   phoneNumbersLive,
   rolesLive,
+  STAFF_PROFILE_COLUMNS,
+  STUDENT_PROFILE_COLUMNS,
   staffProfilesLive,
   studentAcademicsLive,
   studentGuardianLinksLive,
@@ -21,17 +25,19 @@ import {
 } from '@roviq/database';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ProfileRepository } from './profile.repository';
-import type {
-  GuardianChildRecord,
-  GuardianProfileRow,
-  OwnProfileUpdate,
-  ProfileMembershipRecord,
-  StaffProfileRow,
-  StudentAcademicRow,
-  StudentProfileRow,
-  TenantUserProfileRow,
-  UpdatedUserProfileRow,
-  UserProfileRow,
+import {
+  type GuardianChildRecord,
+  type GuardianProfileRow,
+  INSTITUTE_PROFILE_COLUMNS,
+  OWN_PROFILE_COLUMNS,
+  type OwnProfileUpdate,
+  type ProfileMembershipRecord,
+  type StaffProfileRow,
+  type StudentAcademicRow,
+  type StudentProfileRow,
+  type TenantUserProfileRow,
+  type UpdatedUserProfileRow,
+  type UserProfileRow,
 } from './types';
 
 @Injectable()
@@ -78,7 +84,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
   async findUserProfile(user: SignedInUser): Promise<UserProfileRow | null> {
     return withUser(this.db, user, 'IMPERSONATOR_MAY_READ', async (tx) => {
       const rows = await tx
-        .select()
+        .select(namedColumns(userProfilesLive, OWN_PROFILE_COLUMNS))
         .from(userProfilesLive)
         .where(eq(userProfilesLive.userId, user.userId))
         .limit(1);
@@ -95,7 +101,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
       mkInstituteCtx(tenantId, 'service:profile'),
       (tx) =>
         tx
-          .select()
+          .select(namedColumns(tenantUserProfilesLive, INSTITUTE_PROFILE_COLUMNS))
           .from(tenantUserProfilesLive)
           .where(
             and(
@@ -114,7 +120,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
       mkInstituteCtx(tenantId, 'service:profile'),
       async (tx) => {
         return tx
-          .select()
+          .select(namedColumns(studentProfilesLive, STUDENT_PROFILE_COLUMNS))
           .from(studentProfilesLive)
           .where(eq(studentProfilesLive.userId, userId))
           .limit(1);
@@ -147,7 +153,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
       mkInstituteCtx(tenantId, 'service:profile'),
       async (tx) => {
         return tx
-          .select()
+          .select(namedColumns(staffProfilesLive, STAFF_PROFILE_COLUMNS))
           .from(staffProfilesLive)
           .where(eq(staffProfilesLive.userId, userId))
           .limit(1);
@@ -162,7 +168,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
       mkInstituteCtx(tenantId, 'service:profile'),
       async (tx) => {
         return tx
-          .select()
+          .select(namedColumns(guardianProfilesLive, GUARDIAN_PROFILE_COLUMNS))
           .from(guardianProfilesLive)
           .where(eq(guardianProfilesLive.userId, userId))
           .limit(1);
@@ -215,7 +221,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
         .update(userProfiles)
         .set({ ...fields, updatedBy: user.userId })
         .where(eq(userProfiles.userId, user.userId))
-        .returning();
+        .returning(namedColumns(userProfiles, OWN_PROFILE_COLUMNS));
       return rows[0] ?? null;
     });
   }

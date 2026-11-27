@@ -391,6 +391,7 @@ launch gates bash -c 'set -e
   pnpm -s check:live-views-coverage
   pnpm -s check:rls-coverage
   pnpm -s check:tenant-foreign-keys
+  pnpm -s check:select-columns
   pnpm -s check:testids
   pnpm -s check:field-help
   pnpm -s check:form-errors

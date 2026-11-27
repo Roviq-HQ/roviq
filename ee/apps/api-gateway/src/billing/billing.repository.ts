@@ -5,6 +5,7 @@ import {
   type DrizzleDB,
   institutesLive,
   mkAdminCtx,
+  namedColumns,
   softDelete,
   withAdmin,
 } from '@roviq/database';
@@ -18,6 +19,7 @@ import {
 } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, desc, eq, gte, isNull, lte, type SQL, sql } from 'drizzle-orm';
+import { GATEWAY_CONFIG_COLUMNS } from './repositories/gateway-config.repository';
 
 // TODO: Phase 4 — replace with proper CASL-to-Drizzle adapter (@roviq/casl-drizzle)
 // For now, CASL ability filtering is a no-op. The RLS policies still enforce tenant isolation.
@@ -347,7 +349,7 @@ export class BillingRepository {
             deletedBy: null,
           },
         })
-        .returning();
+        .returning(namedColumns(gatewayConfigs, GATEWAY_CONFIG_COLUMNS));
       return config;
     });
   }

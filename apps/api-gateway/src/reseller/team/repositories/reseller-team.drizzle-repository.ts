@@ -12,7 +12,7 @@ import {
   resellerMembershipsLive,
   resellersLive,
   rolesLive,
-  userProfilesLive,
+  userProfiles,
   usersLive,
   withAdmin,
   withReseller,
@@ -42,6 +42,10 @@ import {
 
 const CTX = 'repository:reseller-team';
 
+// The reseller role holds column privileges on user_profiles that leave some
+// columns out, and the live view selects every column; the join filters deleted rows itself.
+const liveProfileOf = and(eq(userProfiles.userId, usersLive.id), isNull(userProfiles.deletedAt));
+
 const memberColumns = {
   id: resellerMembershipsLive.id,
   userId: usersLive.id,
@@ -50,9 +54,9 @@ const memberColumns = {
   roleId: resellerMembershipsLive.roleId,
   isActive: resellerMembershipsLive.isActive,
   joinedAt: resellerMembershipsLive.createdAt,
-  firstName: userProfilesLive.firstName,
-  lastName: userProfilesLive.lastName,
-  profileImageFileId: userProfilesLive.profileImageFileId,
+  firstName: userProfiles.firstName,
+  lastName: userProfiles.lastName,
+  profileImageFileId: userProfiles.profileImageFileId,
 };
 
 interface MemberRow {
@@ -96,7 +100,7 @@ export class ResellerTeamDrizzleRepository extends ResellerTeamRepository {
         or(
           ilike(usersLive.username, `%${search}%`),
           ilike(usersLive.email, `%${search}%`),
-          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${search})`,
+          sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${search})`,
         ),
       );
     }
@@ -107,14 +111,14 @@ export class ResellerTeamDrizzleRepository extends ResellerTeamRepository {
           .select(memberColumns)
           .from(resellerMembershipsLive)
           .innerJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id));
+          .leftJoin(userProfiles, liveProfileOf); // allow-base-read: reseller column privileges
 
       const [totals, rows] = await Promise.all([
         tx
           .select({ value: count() })
           .from(resellerMembershipsLive)
           .innerJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
+          .leftJoin(userProfiles, liveProfileOf) // allow-base-read: reseller column privileges
           .where(and(...filters)),
         base()
           .where(
@@ -252,7 +256,7 @@ export class ResellerTeamDrizzleRepository extends ResellerTeamRepository {
         .select(memberColumns)
         .from(resellerMembershipsLive)
         .innerJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
-        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
+        .leftJoin(userProfiles, liveProfileOf) // allow-base-read: reseller column privileges
         .where(and(eq(resellerMembershipsLive.resellerId, resellerId), condition))
         .limit(1),
     );
