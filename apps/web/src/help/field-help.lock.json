@@ -484,13 +484,13 @@
     }
   },
   "staff.new.employeeId": {
-    "reviewedReason": "create() only passes the institute as the new account's origin; this field is handled as before",
+    "reviewedReason": "the staff insert now names the columns it returns; the same columns are stored and returned, so the help text still describes the field",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
       "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.employeeId": "641f121582967b66",
       "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.isEmployeeIdTaken": "bc568858ff5191e4",
-      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#insertWithSeriesId": "3d12b0f632b1b374",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#insertWithSeriesId": "e1fcd80ba6c7f1dc",
       "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "b115c0a824d111f1",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employeeId": "f9e8a61520422893",
       "libs/database/migrations/20261125103827_staff-employee-id-unique/migration.sql": "39095d7d920e7ed1",
@@ -510,13 +510,13 @@
     }
   },
   "staff.new.socialCategory": {
-    "reviewedReason": "only the membership insert moved into a shared helper; this field is handled as before",
+    "reviewedReason": "the staff insert now names the columns it returns; the same columns are stored and returned, so the help text still describes the field",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#socialCategoryLabel": "3bbe711f064dffa2",
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
       "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.socialCategory": "2b09f0b294718d21",
-      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.create": "65967999f7935517",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.create": "39591e15a5390dde",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.socialCategory": "dedf1ebf4ff4ed89",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#SOCIAL_CATEGORY_VALUES": "bbeddad581aafbe2"
     }

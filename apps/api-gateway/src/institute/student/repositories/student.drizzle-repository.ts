@@ -13,11 +13,13 @@ import {
   mapUniqueViolation,
   mkAdminCtx,
   mkInstituteCtx,
+  namedColumns,
   studentAcademicsLive,
   studentProfiles,
   studentProfilesLive,
   tenantUserProfilesLive,
   type UniqueViolationErrors,
+  USER_DOCUMENT_COLUMNS,
   userDocuments,
   userDocumentsLive,
   withAdmin,
@@ -132,7 +134,7 @@ export class StudentDrizzleRepository extends StudentRepository {
           description: data.description,
           referenceNumber: data.referenceNumber,
         })
-        .returning();
+        .returning(namedColumns(userDocuments, USER_DOCUMENT_COLUMNS));
       const document = rows[0];
       await attachUserDocumentFiles(tx, {
         documentId: document.id,

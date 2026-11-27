@@ -6,13 +6,17 @@ import {
   membershipsLive,
   mkResellerCtx,
   rolesLive,
-  userProfilesLive,
+  userProfiles,
   usersLive,
   withReseller,
 } from '@roviq/database';
-import { and, asc, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { ResellerUserRepository } from './reseller-user.repository';
 import type { ResellerUserListQuery, ResellerUserListResult } from './types';
+
+// The reseller role holds column privileges on user_profiles that leave some
+// columns out, and the live view selects every column; the join filters deleted rows itself.
+const liveProfileOf = and(eq(userProfiles.userId, usersLive.id), isNull(userProfiles.deletedAt));
 
 @Injectable()
 export class ResellerUserDrizzleRepository extends ResellerUserRepository {
@@ -41,14 +45,14 @@ export class ResellerUserDrizzleRepository extends ResellerUserRepository {
           .map((w) => `${w}:*`)
           .join(' & ');
         const searchCondition = or(
-          sql`${userProfilesLive.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
+          sql`${userProfiles.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
           sql`${usersLive.username} ILIKE ${`%${searchTerm}%`}`,
         );
         if (searchCondition) conditions.push(searchCondition);
       } else {
         const pattern = `%${searchTerm}%`;
         const searchCondition = or(
-          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
+          sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
           sql`${usersLive.username} ILIKE ${pattern}`,
         );
         if (searchCondition) conditions.push(searchCondition);
@@ -94,7 +98,7 @@ export class ResellerUserDrizzleRepository extends ResellerUserRepository {
         tx
           .select({ value: count() })
           .from(usersLive)
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
+          .leftJoin(userProfiles, liveProfileOf) // allow-base-read: reseller column privileges
           .where(where),
         tx
           .select({
@@ -103,12 +107,12 @@ export class ResellerUserDrizzleRepository extends ResellerUserRepository {
             username: usersLive.username,
             status: usersLive.status,
             createdAt: usersLive.createdAt,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
-            profileImageFileId: userProfilesLive.profileImageFileId,
+            firstName: userProfiles.firstName,
+            lastName: userProfiles.lastName,
+            profileImageFileId: userProfiles.profileImageFileId,
           })
           .from(usersLive)
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
+          .leftJoin(userProfiles, liveProfileOf) // allow-base-read: reseller column privileges
           .where(where)
           .orderBy(asc(usersLive.createdAt))
           .limit(limit + 1),

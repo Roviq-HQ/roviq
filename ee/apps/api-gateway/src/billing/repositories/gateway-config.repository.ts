@@ -1,9 +1,36 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE_DB, type DrizzleDB, mkResellerCtx, withReseller } from '@roviq/database';
+import {
+  DRIZZLE_DB,
+  type DrizzleDB,
+  mkResellerCtx,
+  namedColumns,
+  withReseller,
+} from '@roviq/database';
 import { gatewayConfigs, gatewayConfigsLive, payments } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import { billingError } from '../billing.errors';
+
+/** Every column of a gateway config as of today; its readers decrypt and mask the secrets. */
+export const GATEWAY_CONFIG_COLUMNS = [
+  'id',
+  'resellerId',
+  'provider',
+  'status',
+  'displayName',
+  'isDefault',
+  'credentials',
+  'webhookSecret',
+  'testMode',
+  'supportedMethods',
+  'createdAt',
+  'updatedAt',
+  'createdBy',
+  'updatedBy',
+  'deletedAt',
+  'deletedBy',
+  'version',
+] as const;
 
 @Injectable()
 export class GatewayConfigRepository {
@@ -18,7 +45,10 @@ export class GatewayConfigRepository {
       this.db,
       mkResellerCtx(resellerId, 'repository:gateway-config'),
       async (tx) => {
-        return tx.select().from(gatewayConfigsLive).orderBy(desc(gatewayConfigsLive.createdAt));
+        return tx
+          .select(namedColumns(gatewayConfigsLive, GATEWAY_CONFIG_COLUMNS))
+          .from(gatewayConfigsLive)
+          .orderBy(desc(gatewayConfigsLive.createdAt));
       },
     );
   }
@@ -29,7 +59,7 @@ export class GatewayConfigRepository {
       mkResellerCtx(resellerId, 'repository:gateway-config'),
       async (tx) => {
         const [config] = await tx
-          .select()
+          .select(namedColumns(gatewayConfigsLive, GATEWAY_CONFIG_COLUMNS))
           .from(gatewayConfigsLive)
           .where(eq(gatewayConfigsLive.id, id))
           .limit(1);
@@ -44,7 +74,10 @@ export class GatewayConfigRepository {
       mkResellerCtx(resellerId, 'repository:gateway-config'),
       async (tx) => {
         if (data.isDefault) await this.clearDefault(tx, resellerId);
-        const [config] = await tx.insert(gatewayConfigs).values(data).returning();
+        const [config] = await tx
+          .insert(gatewayConfigs)
+          .values(data)
+          .returning(namedColumns(gatewayConfigs, GATEWAY_CONFIG_COLUMNS));
         return config;
       },
     );
@@ -69,7 +102,7 @@ export class GatewayConfigRepository {
           .update(gatewayConfigs)
           .set({ ...data, updatedAt: new Date(), updatedBy: this.userId })
           .where(eq(gatewayConfigs.id, id))
-          .returning();
+          .returning(namedColumns(gatewayConfigs, GATEWAY_CONFIG_COLUMNS));
         return config;
       },
     );
@@ -95,7 +128,7 @@ export class GatewayConfigRepository {
       mkResellerCtx(resellerId, 'repository:gateway-config'),
       async (tx) => {
         const [config] = await tx
-          .select()
+          .select(namedColumns(gatewayConfigsLive, GATEWAY_CONFIG_COLUMNS))
           .from(gatewayConfigsLive)
           .where(eq(gatewayConfigsLive.id, id))
           .limit(1);
@@ -127,7 +160,7 @@ export class GatewayConfigRepository {
             updatedBy: this.userId,
           })
           .where(eq(gatewayConfigs.id, id))
-          .returning();
+          .returning(namedColumns(gatewayConfigs, GATEWAY_CONFIG_COLUMNS));
         return deleted;
       },
     );

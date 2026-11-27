@@ -4,7 +4,9 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   mkInstituteCtx,
+  namedColumns,
   rolesLive,
+  STAFF_PROFILE_COLUMNS,
   staffProfiles,
   staffProfilesLive,
   tenantSequences,
@@ -179,7 +181,7 @@ export class StaffDrizzleRepository extends StaffRepository {
           const [row] = await tx
             .insert(staffProfiles)
             .values({ ...values, employeeId: data.employeeId })
-            .returning();
+            .returning(namedColumns(staffProfiles, STAFF_PROFILE_COLUMNS));
           return { kind: 'ok' as const, row };
         }
         return { kind: 'ok' as const, row: await insertWithSeriesId(tx, tenantId, values) };
@@ -239,7 +241,7 @@ export class StaffDrizzleRepository extends StaffRepository {
             isNull(staffProfiles.deletedAt),
           ),
         )
-        .returning();
+        .returning(namedColumns(staffProfiles, STAFF_PROFILE_COLUMNS));
 
       if (rows.length === 0) return { kind: 'version_mismatch' } as const;
       await updateTenantUserProfile(tx, {
@@ -278,7 +280,7 @@ export class StaffDrizzleRepository extends StaffRepository {
         .update(staffProfiles)
         .set({ deletedAt: at, deletedBy: actorId, updatedBy: actorId, dateOfLeaving })
         .where(eq(staffProfiles.id, id))
-        .returning();
+        .returning(namedColumns(staffProfiles, STAFF_PROFILE_COLUMNS));
       if (decision === 'end') {
         await endMembership(tx, { membershipId: profile.membershipId, actorId, at });
       }
@@ -401,7 +403,7 @@ async function insertWithSeriesId(
         target: [staffProfiles.tenantId, staffProfiles.employeeId],
         where: sql`${staffProfiles.deletedAt} IS NULL`,
       })
-      .returning();
+      .returning(namedColumns(staffProfiles, STAFF_PROFILE_COLUMNS));
     if (row) return row;
   }
   throw new Error(`employee_id series of ${tenantId} has no free value`);

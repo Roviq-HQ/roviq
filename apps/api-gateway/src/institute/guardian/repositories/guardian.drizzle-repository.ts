@@ -3,9 +3,11 @@ import { DefaultRoles } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  GUARDIAN_PROFILE_COLUMNS,
   guardianProfiles,
   guardianProfilesLive,
   mkInstituteCtx,
+  namedColumns,
   phoneNumbersLive,
   rolesLive,
   softDelete,
@@ -166,7 +168,7 @@ export class GuardianDrizzleRepository extends GuardianRepository {
           createdBy: data.actorId,
           updatedBy: data.actorId,
         })
-        .returning();
+        .returning(namedColumns(guardianProfiles, GUARDIAN_PROFILE_COLUMNS));
       return rows[0];
     });
   }

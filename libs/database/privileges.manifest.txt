@@ -215,7 +215,7 @@ grant  | roviq_audit_writer | dlq_messages | INSERT | *
 grant  | roviq_audit_writer | dlq_messages | SELECT | dlq_stream_seq
 grant  | roviq_audit_writer | institutes | SELECT | id, reseller_id
 grant  | roviq_reseller | academic_years | SELECT | *
-grant  | roviq_reseller | admission_applications | SELECT | *
+grant  | roviq_reseller | admission_applications | SELECT | academic_year_id, created_at, created_by, deleted_at, deleted_by, enquiry_id, id, interview_score, is_rte_application, merit_rank, offer_accepted_at, offer_expires_at, offered_at, rejected_at, rejection_reason, rte_lottery_rank, section_id, standard_id, status, student_profile_id, tenant_id, test_score, updated_at, updated_by, version
 grant  | roviq_reseller | application_document_files | SELECT | *
 grant  | roviq_reseller | application_documents | SELECT | *
 grant  | roviq_reseller | attendance_entries | SELECT | *
@@ -227,7 +227,7 @@ grant  | roviq_reseller | certificate_templates | SELECT | *
 grant  | roviq_reseller | co_scholastic_areas | SELECT | *
 grant  | roviq_reseller | co_scholastic_assessments | SELECT | *
 grant  | roviq_reseller | consent_records | SELECT | *
-grant  | roviq_reseller | enquiries | SELECT | *
+grant  | roviq_reseller | enquiries | SELECT | academic_year_id, assigned_to, class_requested, converted_to_application_id, created_at, created_by, date_of_birth, deleted_at, deleted_by, enquiry_number, follow_up_date, gender, id, last_contacted_at, notes, parent_email, parent_name, parent_phone, parent_relation, previous_board, previous_school, referred_by, sibling_admission_no, sibling_in_school, source, status, student_name, tenant_id, updated_at, updated_by, version
 grant  | roviq_reseller | exam_marks | SELECT | *
 grant  | roviq_reseller | exam_schedules | SELECT | *
 grant  | roviq_reseller | exam_terms | SELECT | *
@@ -243,7 +243,7 @@ grant  | roviq_reseller | group_children | SELECT | *
 grant  | roviq_reseller | group_members | SELECT | *
 grant  | roviq_reseller | group_rules | SELECT | *
 grant  | roviq_reseller | groups | SELECT | *
-grant  | roviq_reseller | guardian_profiles | SELECT | *
+grant  | roviq_reseller | guardian_profiles | SELECT | created_at, created_by, deleted_at, deleted_by, designation, education_level, id, membership_id, occupation, organization, tenant_id, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | holidays | SELECT | *
 grant  | roviq_reseller | impersonation_sessions | SELECT | *
 grant  | roviq_reseller | institute_affiliations | SELECT | *
@@ -293,13 +293,13 @@ grant  | roviq_reseller | resellers | UPDATE | address, branding, contact, favic
 grant  | roviq_reseller | roles | SELECT | *
 grant  | roviq_reseller | section_subjects | SELECT | *
 grant  | roviq_reseller | sections | SELECT | *
-grant  | roviq_reseller | staff_profiles | SELECT | *
+grant  | roviq_reseller | staff_profiles | SELECT | created_at, created_by, date_of_joining, date_of_leaving, deleted_at, deleted_by, department, designation, employee_id, employment_type, id, is_class_teacher, leaving_reason, membership_id, nature_of_appointment, specialization, tenant_id, trained_for_cwsn, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | staff_qualifications | SELECT | *
 grant  | roviq_reseller | standard_subjects | SELECT | *
 grant  | roviq_reseller | standards | SELECT | *
 grant  | roviq_reseller | student_academics | SELECT | *
 grant  | roviq_reseller | student_guardian_links | SELECT | *
-grant  | roviq_reseller | student_profiles | SELECT | *
+grant  | roviq_reseller | student_profiles | SELECT | academic_status, admission_class, admission_date, admission_number, admission_type, batch_end_date, batch_start_date, course_name, created_at, created_by, date_of_leaving, deleted_at, deleted_by, id, incoming_tc_date, incoming_tc_number, is_bpl, is_rte_admitted, membership_id, previous_school_board, previous_school_name, previous_school_udise, rte_certificate, stream, tc_issued, tc_issued_date, tc_number, tc_reason, tenant_id, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | subject_topics | SELECT | *
 grant  | roviq_reseller | subjects | SELECT | *
 grant  | roviq_reseller | subscriptions | DELETE | *
@@ -308,7 +308,7 @@ grant  | roviq_reseller | subscriptions | SELECT | *
 grant  | roviq_reseller | subscriptions | UPDATE | *
 grant  | roviq_reseller | tc_register | SELECT | *
 grant  | roviq_reseller | tenant_sequences | SELECT | *
-grant  | roviq_reseller | tenant_user_profiles | SELECT | *
+grant  | roviq_reseller | tenant_user_profiles | SELECT | blood_group, created_at, created_by, date_of_birth, deleted_at, deleted_by, first_name, gender, id, last_name, mother_tongue, nationality, profile_image_file_id, search_vector, tenant_id, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | timetable_day_overrides | SELECT | *
 grant  | roviq_reseller | timetable_entries | SELECT | *
 grant  | roviq_reseller | timetable_periods | SELECT | *
@@ -317,8 +317,8 @@ grant  | roviq_reseller | timetables | SELECT | *
 grant  | roviq_reseller | user_addresses | SELECT | *
 grant  | roviq_reseller | user_document_files | SELECT | *
 grant  | roviq_reseller | user_documents | SELECT | *
-grant  | roviq_reseller | user_identifiers | SELECT | *
-grant  | roviq_reseller | user_profiles | SELECT | *
+grant  | roviq_reseller | user_identifiers | SELECT | created_at, created_by, deleted_at, deleted_by, id, is_verified, issuing_authority, type, updated_at, updated_by, user_id, valid_from, valid_to, verified_at, verified_by, version
+grant  | roviq_reseller | user_profiles | SELECT | blood_group, cover_image_url, created_at, created_by, date_of_birth, deleted_at, deleted_by, first_name, gender, id, last_name, mother_tongue, nationality, profile_image_file_id, search_vector, updated_at, updated_by, user_id, version
 grant  | roviq_reseller | users | SELECT | avatar_url, created_at, created_by, deleted_at, deleted_by, email, email_verified_at, id, must_change_password, password_changed_at, preferred_locale, status, updated_at, updated_by, username, version
 grant  | roviq_reseller | year_rollover_section_map | SELECT | *
 grant  | roviq_user | auth_providers | INSERT | *

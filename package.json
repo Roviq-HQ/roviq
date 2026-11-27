@@ -27,6 +27,7 @@
     "help:ack": "pnpx tsx scripts/help-ack.ts",
     "check:rls-coverage": "pnpx tsx scripts/check-rls-coverage.ts",
     "check:tenant-foreign-keys": "pnpx tsx scripts/check-tenant-foreign-keys.ts",
+    "check:select-columns": "pnpx tsx scripts/check-select-columns.ts",
     "check:synthetic-context-usage": "pnpx tsx scripts/check-synthetic-context-usage.ts",
     "check:admin-context-reach": "pnpx tsx scripts/check-admin-context-reach.ts",
     "check:direct-nats-emit": "pnpx tsx scripts/check-direct-nats-emit.ts",

@@ -5,6 +5,13 @@ export { escapeLikePattern, i18nDisplay, i18nLocaleEquals, i18nNameSearch } from
 export { refreshInstituteDefaultRoles } from './institute-default-roles';
 export { RoviqDrizzleLogger } from './logger';
 export {
+  GUARDIAN_PROFILE_COLUMNS,
+  namedColumns,
+  STAFF_PROFILE_COLUMNS,
+  STUDENT_PROFILE_COLUMNS,
+  USER_DOCUMENT_COLUMNS,
+} from './named-columns';
+export {
   mapUniqueViolation,
   pgErrorCode,
   type UniqueViolationErrors,
