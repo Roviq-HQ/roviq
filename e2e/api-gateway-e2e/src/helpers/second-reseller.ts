@@ -1,6 +1,7 @@
 /** A second reseller that owns no institute, built through GraphQL, and its removal. */
 import assert from 'node:assert';
 import type pg from 'pg';
+import { vi } from 'vitest';
 import { gql } from './gql-client';
 import { waitForEmail } from './mailpit';
 
@@ -59,8 +60,30 @@ export async function createSecondReseller(platformToken: string): Promise<Secon
   return { id, token };
 }
 
-/** Removes the reseller, so later specs count the seeded resellers only. */
+/**
+ * Removes the reseller, so later specs count the seeded resellers only. A mutation it was
+ * refused is recorded in the audit log a moment after the call, and such a row would hold the
+ * reseller in place: wait until no more arrive, then remove them first.
+ */
 export async function removeSecondReseller(pool: pg.Pool, id: string): Promise<void> {
+  const auditRows = async () => {
+    const res = await pool.query<{ n: string }>(
+      'SELECT count(*) AS n FROM audit_logs WHERE reseller_id = $1',
+      [id],
+    );
+    return Number(res.rows[0]?.n);
+  };
+  let seen = -1;
+  await vi.waitFor(
+    async () => {
+      const now = await auditRows();
+      const settled = now === seen;
+      seen = now;
+      if (!settled) throw new Error('audit rows of the second reseller are still arriving');
+    },
+    { timeout: 30_000, interval: 1_000 },
+  );
+  await pool.query('DELETE FROM audit_logs WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM reseller_memberships WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM roles WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM resellers WHERE id = $1', [id]);

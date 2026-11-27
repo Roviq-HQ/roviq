@@ -121,4 +121,4 @@ export const WITHOUT_DATA: Readonly<Record<string, string>> = {
  * Queries whose check does not pass yet. Each is run and must still fail: when one starts
  * passing, the spec fails until its name is removed from this list.
  */
-export const EXPECTED_TO_FAIL: readonly string[] = ['timetableDaySchedule'];
+export const EXPECTED_TO_FAIL: readonly string[] = [];
