@@ -26,7 +26,7 @@ export class EnquiryResolver {
   ) {}
 
   @Query(() => EnquiryConnection, { description: 'List enquiries with filters and pagination' })
-  @CheckAbility({ action: 'read', subject: 'Enquiry' })
+  @CheckAbility({ action: 'read', subject: 'Enquiry', rows: 'scoped' })
   async listEnquiries(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: EnquiryFilterInput,
@@ -74,7 +74,7 @@ export class EnquiryResolver {
       );
     },
   })
-  @CheckAbility({ action: 'read', subject: 'Enquiry' })
+  @CheckAbility({ action: 'read', subject: 'Enquiry', rows: 'scoped' })
   enquiryCreated() {
     return pubSub.asyncIterableIterator('ENQUIRY.created');
   }

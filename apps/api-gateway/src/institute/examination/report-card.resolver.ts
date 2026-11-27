@@ -106,17 +106,21 @@ export class ReportCardResolver {
   // ── Report cards ─────────────────────────────────────────────────────────────
 
   @Query(() => [ReportCardModel])
-  @CheckAbility({ action: 'read', subject: 'ReportCard' })
+  @CheckAbility({ action: 'read', subject: 'ReportCard', rows: 'scoped' })
   reportCards(
     @Args('academicYearId', { type: () => ID }) academicYearId: string,
+    @CurrentAbility() ability: AppAbility,
   ): Promise<ReportCardModel[]> {
-    return this.cards.listReportCards(academicYearId) as Promise<ReportCardModel[]>;
+    return this.cards.listReportCards(academicYearId, ability) as Promise<ReportCardModel[]>;
   }
 
   @Query(() => ReportCardModel)
-  @CheckAbility({ action: 'read', subject: 'ReportCard' })
-  reportCard(@Args('id', { type: () => ID }) id: string): Promise<ReportCardModel> {
-    return this.cards.getReportCard(id) as Promise<ReportCardModel>;
+  @CheckAbility({ action: 'read', subject: 'ReportCard', rows: 'scoped' })
+  reportCard(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentAbility() ability: AppAbility,
+  ): Promise<ReportCardModel> {
+    return this.cards.getReadableReportCard(id, ability) as Promise<ReportCardModel>;
   }
 
   @Mutation(() => ReportCardModel)
@@ -163,7 +167,7 @@ export class ReportCardResolver {
   // `payload` already matches ReportCardPayloadModel field-for-field, so it is
   // returned as the record type (a record→model cast can't bridge the jsonb).
   @Query(() => [ReportCardInstanceModel], { description: 'Instances of a report card.' })
-  @CheckAbility({ action: 'read', subject: 'ReportCard' })
+  @CheckAbility({ action: 'read', subject: 'ReportCard', rows: 'scoped' })
   reportCardInstances(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
     @CurrentAbility() ability: AppAbility,
@@ -172,7 +176,7 @@ export class ReportCardResolver {
   }
 
   @Query(() => ReportCardInstanceModel)
-  @CheckAbility({ action: 'read', subject: 'ReportCard' })
+  @CheckAbility({ action: 'read', subject: 'ReportCard', rows: 'scoped' })
   reportCardInstance(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
@@ -184,14 +188,14 @@ export class ReportCardResolver {
   @Query(() => [ReportCardInstanceModel], {
     description: 'Published report cards for the signed-in student.',
   })
-  @CheckAbility({ action: 'read', subject: 'ReportCard' })
+  @CheckAbility({ action: 'read', subject: 'ReportCard', rows: 'scoped' })
   myReportCards(@CurrentUser() user: AuthUser): Promise<ReportCardInstanceRecord[]> {
     assertTenantContext(user);
     return this.cards.listForMembership(user.membershipId);
   }
 
   @Query(() => String, { description: 'Base64-encoded report-card PDF.' })
-  @CheckAbility({ action: 'read', subject: 'ReportCard' })
+  @CheckAbility({ action: 'read', subject: 'ReportCard', rows: 'scoped' })
   async reportCardPdf(
     @Args('instanceId', { type: () => ID }) instanceId: string,
     @CurrentAbility() ability: AppAbility,

@@ -30,7 +30,7 @@ export class StudentResolver {
   ) {}
 
   @Query(() => StudentConnection, { description: 'List students with filters and pagination' })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   async listStudents(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: StudentFilterInput,
@@ -39,7 +39,7 @@ export class StudentResolver {
   }
 
   @Query(() => StudentModel, { description: 'Get a student by ID' })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   async getStudent(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -48,7 +48,7 @@ export class StudentResolver {
   }
 
   @Query(() => StudentStatisticsModel, { description: 'Aggregate student statistics' })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   async studentStatistics(
     @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentStatisticsModel> {
@@ -58,7 +58,7 @@ export class StudentResolver {
   @Query(() => [StudentDocumentModel], {
     description: 'List uploaded documents for a single student (Documents tab on detail page).',
   })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   async listStudentDocuments(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -156,7 +156,7 @@ export class StudentResolver {
       );
     },
   })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   studentUpdated(@Args('studentId', { type: () => ID }) _studentId: string) {
     return pubSub.asyncIterableIterator('STUDENT.updated');
   }
@@ -177,7 +177,7 @@ export class StudentResolver {
       );
     },
   })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  @CheckAbility({ action: 'read', subject: 'Student', rows: 'scoped' })
   studentsInTenantUpdated() {
     return pubSub.asyncIterableIterator('STUDENT.updated');
   }

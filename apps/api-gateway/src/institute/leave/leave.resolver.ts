@@ -19,7 +19,7 @@ export class LeaveResolver {
     description:
       'List leave applications, ordered by `startDate` DESC (most recent first — leave UIs are decision-driven, not calendar-driven). Optional filters narrow by user, status, type, and overlapping date range.',
   })
-  @CheckAbility({ action: 'read', subject: 'Leave' })
+  @CheckAbility({ action: 'read', subject: 'Leave', rows: 'scoped' })
   async leaves(
     @Args('userId', { type: () => ID, nullable: true }, new ParseUUIDPipe({ optional: true }))
     userId: string | null,
@@ -42,7 +42,7 @@ export class LeaveResolver {
   }
 
   @Query(() => LeaveModel)
-  @CheckAbility({ action: 'read', subject: 'Leave' })
+  @CheckAbility({ action: 'read', subject: 'Leave', rows: 'scoped' })
   async leave(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
@@ -51,7 +51,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Submit a new leave application (PENDING).' })
-  @CheckAbility({ action: 'create', subject: 'Leave' })
+  @CheckAbility({ action: 'create', subject: 'Leave', rows: 'scoped' })
   async applyLeave(
     @Args('input') input: CreateLeaveInput,
     @CurrentAbility() ability: AppAbility,
@@ -60,7 +60,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Edit a PENDING leave before it is decided.' })
-  @CheckAbility({ action: 'update', subject: 'Leave' })
+  @CheckAbility({ action: 'update', subject: 'Leave', rows: 'scoped' })
   async updateLeave(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @Args('input') input: UpdateLeaveInput,
@@ -70,7 +70,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Approve a PENDING leave.' })
-  @CheckAbility({ action: 'update', subject: 'Leave' })
+  @CheckAbility({ action: 'update', subject: 'Leave', rows: 'scoped' })
   async approveLeave(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
@@ -80,7 +80,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Reject a PENDING leave.' })
-  @CheckAbility({ action: 'update', subject: 'Leave' })
+  @CheckAbility({ action: 'update', subject: 'Leave', rows: 'scoped' })
   async rejectLeave(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
@@ -93,7 +93,7 @@ export class LeaveResolver {
     description:
       'Cancel a leave. Applicants (and guardians, for their children) may withdraw a pending one; approvers may cancel any leave they manage.',
   })
-  @CheckAbility({ action: 'withdraw', subject: 'Leave' })
+  @CheckAbility({ action: 'withdraw', subject: 'Leave', rows: 'scoped' })
   async cancelLeave(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
@@ -106,7 +106,7 @@ export class LeaveResolver {
     description:
       'Soft-delete a leave application. Returns true on success. Mirrors `deleteHoliday`.',
   })
-  @CheckAbility({ action: 'delete', subject: 'Leave' })
+  @CheckAbility({ action: 'delete', subject: 'Leave', rows: 'scoped' })
   async deleteLeave(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,

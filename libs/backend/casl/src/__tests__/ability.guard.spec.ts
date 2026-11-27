@@ -12,6 +12,12 @@ class FixtureResolver {
   @CheckAbility({ action: 'create', subject: 'Attendance' })
   guarded() {}
 
+  @CheckAbility({ action: 'read', subject: 'Leave' })
+  readsEveryRow() {}
+
+  @CheckAbility({ action: 'read', subject: 'Leave', rows: 'scoped' })
+  readsScopedRows() {}
+
   unguarded() {}
 }
 
@@ -75,5 +81,84 @@ describe('AbilityGuard', () => {
     await expect(guard.canActivate(buildContext(resolver.guarded, {}))).rejects.toThrow(
       new BusinessException(ErrorCode.FORBIDDEN, 'Authentication required'),
     );
+  });
+
+  describe('row conditions', () => {
+    const user = { userId: 'user-1' };
+    const refusal = new BusinessException(ErrorCode.FORBIDDEN, 'You are not allowed to read Leave');
+    const own = {
+      action: 'read',
+      subject: 'Leave',
+      conditions: { userId: 'membership-1' },
+    } as const;
+
+    it('should refuse a caller whose only rule has a condition on an operation that declares no row scoping', async () => {
+      const { guard } = buildGuard(createMongoAbility<AppAbility>([own]));
+
+      await expect(
+        guard.canActivate(buildContext(resolver.readsEveryRow, { user })),
+      ).rejects.toThrow(refusal);
+    });
+
+    it('should allow that caller on an operation that declares row scoping', async () => {
+      const ability = createMongoAbility<AppAbility>([own]);
+      const { guard } = buildGuard(ability);
+      const req: FixtureRequest = { user };
+
+      expect(await guard.canActivate(buildContext(resolver.readsScopedRows, req))).toBe(true);
+      expect(req.ability).toBe(ability);
+    });
+
+    it('should allow a caller with an unconditional rule on an operation that declares no row scoping', async () => {
+      const { guard } = buildGuard(
+        createMongoAbility<AppAbility>([{ action: 'read', subject: 'Leave' }]),
+      );
+
+      expect(await guard.canActivate(buildContext(resolver.readsEveryRow, { user }))).toBe(true);
+    });
+
+    it('should allow a caller who holds the pair both with and without a condition', async () => {
+      const { guard } = buildGuard(
+        createMongoAbility<AppAbility>([own, { action: 'manage', subject: 'Leave' }]),
+      );
+
+      expect(await guard.canActivate(buildContext(resolver.readsEveryRow, { user }))).toBe(true);
+    });
+
+    it('should allow a caller whose unconditional rule is limited to fields only', async () => {
+      const { guard } = buildGuard(
+        createMongoAbility<AppAbility>([
+          { action: 'read', subject: 'Leave' },
+          { action: 'read', subject: 'Leave', fields: ['reason'], inverted: true },
+        ]),
+      );
+
+      expect(await guard.canActivate(buildContext(resolver.readsEveryRow, { user }))).toBe(true);
+    });
+
+    it('should refuse a caller whose unconditional rule is narrowed by a conditional cannot rule', async () => {
+      const { guard } = buildGuard(
+        createMongoAbility<AppAbility>([
+          { action: 'read', subject: 'Leave' },
+          { action: 'read', subject: 'Leave', inverted: true, conditions: { status: 'PENDING' } },
+        ]),
+      );
+
+      await expect(
+        guard.canActivate(buildContext(resolver.readsEveryRow, { user })),
+      ).rejects.toThrow(refusal);
+    });
+
+    it('should refuse a caller whose manage-all rule has a condition', async () => {
+      const { guard } = buildGuard(
+        createMongoAbility<AppAbility>([
+          { action: 'manage', subject: 'all', conditions: { tenantId: 'tenant-1' } },
+        ]),
+      );
+
+      await expect(
+        guard.canActivate(buildContext(resolver.readsEveryRow, { user })),
+      ).rejects.toThrow(refusal);
+    });
   });
 });

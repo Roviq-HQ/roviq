@@ -25,7 +25,7 @@ export class ApplicationDocumentResolver {
   @Query(() => [ApplicationDocumentModel], {
     description: 'Documents submitted with one admission application',
   })
-  @CheckAbility({ action: 'read', subject: 'Application' })
+  @CheckAbility({ action: 'read', subject: 'Application', rows: 'scoped' })
   listApplicationDocuments(
     @Args('applicationId', { type: () => ID }, ParseUUIDPipe) applicationId: string,
     @CurrentReadAccess() access: InstituteReadAccess,

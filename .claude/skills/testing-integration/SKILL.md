@@ -49,7 +49,7 @@ expect(res.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
 
 1. **The normal case** through the real database, asserting the stored rows, not only the response.
 2. **Another institute's id is refused** for every id the operation takes (and another reseller's, in reseller scope), with the entity's not-found code, and **nothing is written in either institute**: compare the rows before and after. Use a real row of a second institute, not a random UUID, and test each id of the operation on its own. Then list the operation in `apps/api-gateway/src/__tests__/foreign-id-coverage.ts` with this spec: `foreign-id-coverage.spec.ts` fails for an institute- or reseller-scope operation that takes an id and has no entry.
-3. **A role without the ability is refused** (`FORBIDDEN`). A new `@CheckAbility` pair must also pass `ability-coverage.spec.ts`.
+3. **A role without the ability is refused** (`FORBIDDEN`). For an operation declared `rows: 'scoped'`: a role with a conditional rule is allowed a row inside its condition and refused one outside it, and the operation is listed in `row-scope-coverage.ts` with this spec. A new `@CheckAbility` pair must also pass `ability-coverage.spec.ts`.
 4. **Wrong scope is refused** for a new resolver class: a reseller or platform token on an institute resolver, and the reverse.
 5. **Each business refusal** with its `ErrorCode`, and no event emitted on a refusal.
 6. **Ids that disagree with each other** (a class of another year, a section of another class).
