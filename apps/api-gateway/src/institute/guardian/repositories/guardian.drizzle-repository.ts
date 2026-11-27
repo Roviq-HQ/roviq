@@ -20,6 +20,7 @@ import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   type DeleteProfileResult,
   decideMembershipEnd,
+  decideMembershipRestore,
   endMembership,
   insertOrRestoreMembership,
   type RestoreProfileResult,
@@ -277,14 +278,15 @@ export class GuardianDrizzleRepository extends GuardianRepository {
           profileId: id,
           actorId,
         });
-        if (decision === 'own_membership' || decision === 'last_admin') return { kind: decision };
+        if (decision !== 'keep' && decision !== 'end') return { kind: decision };
 
+        const at = new Date();
         await tx
           .update(guardianProfiles)
-          .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId })
+          .set({ deletedAt: at, deletedBy: actorId, updatedBy: actorId })
           .where(eq(guardianProfiles.id, id));
         if (decision === 'end') {
-          await endMembership(tx, { membershipId: profile.membershipId, actorId });
+          await endMembership(tx, { membershipId: profile.membershipId, actorId, at });
         }
         return { kind: 'deleted', membershipEnded: decision === 'end' };
       },
@@ -324,11 +326,19 @@ export class GuardianDrizzleRepository extends GuardianRepository {
           .where(and(eq(guardianProfiles.id, id), isNotNull(guardianProfiles.deletedAt)))
           .for('update');
         if (!deleted) return 'not_found';
+        const back = await decideMembershipRestore(tx, {
+          membershipId: deleted.membershipId,
+          actorId,
+        });
+        if (back === 'needs_full_control') return back;
+
         await tx
           .update(guardianProfiles)
           .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
           .where(eq(guardianProfiles.id, id));
-        await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        if (back === 'restore') {
+          await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        }
         return 'restored';
       },
     );

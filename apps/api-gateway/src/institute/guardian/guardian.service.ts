@@ -257,6 +257,12 @@ export class GuardianService {
         'You cannot delete your own record: it would end your access to this institute',
       );
     }
+    if (deleted.kind === 'needs_full_control') {
+      throw new BusinessException(
+        ErrorCode.FULL_CONTROL_REQUIRED,
+        'Only a member with full control of the institute can remove or bring back this person',
+      );
+    }
     if (deleted.kind === 'last_admin') {
       throw new BusinessException(
         ErrorCode.LAST_ADMIN_CANNOT_BE_REMOVED,
@@ -273,6 +279,12 @@ export class GuardianService {
 
   async restore(id: string): Promise<boolean> {
     const restored = await this.repo.restore(this.tenantId, id, this.userId);
+    if (restored === 'needs_full_control') {
+      throw new BusinessException(
+        ErrorCode.FULL_CONTROL_REQUIRED,
+        'Only a member with full control of the institute can remove or bring back this person',
+      );
+    }
     if (restored === 'not_found') {
       throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, 'Deleted guardian not found');
     }

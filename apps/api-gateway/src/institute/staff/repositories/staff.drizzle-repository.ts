@@ -15,6 +15,7 @@ import {
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   decideMembershipEnd,
+  decideMembershipRestore,
   endMembership,
   insertOrRestoreMembership,
   restoreMembership,
@@ -270,15 +271,16 @@ export class StaffDrizzleRepository extends StaffRepository {
         profileId: id,
         actorId,
       });
-      if (decision === 'own_membership' || decision === 'last_admin') return { kind: decision };
+      if (decision !== 'keep' && decision !== 'end') return { kind: decision };
 
+      const at = new Date();
       const [row] = await tx
         .update(staffProfiles)
-        .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId, dateOfLeaving })
+        .set({ deletedAt: at, deletedBy: actorId, updatedBy: actorId, dateOfLeaving })
         .where(eq(staffProfiles.id, id))
         .returning();
       if (decision === 'end') {
-        await endMembership(tx, { membershipId: profile.membershipId, actorId });
+        await endMembership(tx, { membershipId: profile.membershipId, actorId, at });
       }
       return { kind: 'deleted', membershipEnded: decision === 'end', row };
     });
@@ -316,12 +318,20 @@ export class StaffDrizzleRepository extends StaffRepository {
           .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
           .for('update');
         if (!deleted) return 'not_found';
+        const back = await decideMembershipRestore(tx, {
+          membershipId: deleted.membershipId,
+          actorId,
+        });
+        if (back === 'needs_full_control') return back;
+
         await tx
           .update(staffProfiles)
           // delete() stamps the leaving date, so restore has to clear it again.
           .set({ deletedAt: null, deletedBy: null, dateOfLeaving: null, updatedBy: actorId })
           .where(eq(staffProfiles.id, id));
-        await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        if (back === 'restore') {
+          await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        }
         return 'restored';
       });
     } catch (err) {

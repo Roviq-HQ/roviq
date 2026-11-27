@@ -174,6 +174,8 @@ export const ErrorCode = {
   CANNOT_REMOVE_OWN_MEMBERSHIP: 'CANNOT_REMOVE_OWN_MEMBERSHIP',
   /** Deleting this profile would leave the institute with no member who has full control */
   LAST_ADMIN_CANNOT_BE_REMOVED: 'LAST_ADMIN_CANNOT_BE_REMOVED',
+  /** Removing or bringing back a member with full control needs a caller with full control */
+  FULL_CONTROL_REQUIRED: 'FULL_CONTROL_REQUIRED',
 
   // ── Timetable ──────────────────────────────────────────
   /** Timetable not found or soft-deleted */
@@ -556,6 +558,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   LAST_GUARDIAN_CANNOT_BE_DELETED: HttpStatus.UNPROCESSABLE_ENTITY,
   CANNOT_REMOVE_OWN_MEMBERSHIP: HttpStatus.UNPROCESSABLE_ENTITY,
   LAST_ADMIN_CANNOT_BE_REMOVED: HttpStatus.UNPROCESSABLE_ENTITY,
+  FULL_CONTROL_REQUIRED: HttpStatus.FORBIDDEN,
   STREAM_REQUIRED: HttpStatus.BAD_REQUEST,
   SECTION_CAPACITY_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   SECTION_HAS_STUDENTS: HttpStatus.CONFLICT,

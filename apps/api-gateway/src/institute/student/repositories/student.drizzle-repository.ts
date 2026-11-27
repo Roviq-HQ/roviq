@@ -13,7 +13,6 @@ import {
   mapUniqueViolation,
   mkAdminCtx,
   mkInstituteCtx,
-  softDelete,
   studentAcademicsLive,
   studentProfiles,
   studentProfilesLive,
@@ -28,6 +27,7 @@ import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import {
   type DeleteProfileResult,
   decideMembershipEnd,
+  decideMembershipRestore,
   endMembership,
   restoreMembership,
 } from '../../../auth/membership-lifecycle';
@@ -320,11 +320,15 @@ export class StudentDrizzleRepository extends StudentRepository {
           profileId: id,
           actorId,
         });
-        if (decision === 'own_membership' || decision === 'last_admin') return { kind: decision };
+        if (decision !== 'keep' && decision !== 'end') return { kind: decision };
 
-        await softDelete(tx, studentProfiles, id);
+        const at = new Date();
+        await tx
+          .update(studentProfiles)
+          .set({ deletedAt: at, deletedBy: actorId, updatedBy: actorId })
+          .where(eq(studentProfiles.id, id));
         if (decision === 'end') {
-          await endMembership(tx, { membershipId: profile.membershipId, actorId });
+          await endMembership(tx, { membershipId: profile.membershipId, actorId, at });
         }
         return { kind: 'deleted', membershipEnded: decision === 'end' };
       },
@@ -378,12 +382,19 @@ export class StudentDrizzleRepository extends StudentRepository {
         if (taken) {
           return { kind: 'admission_number_taken', admissionNumber: deleted.admissionNumber };
         }
+        const back = await decideMembershipRestore(tx, {
+          membershipId: deleted.membershipId,
+          actorId,
+        });
+        if (back === 'needs_full_control') return { kind: back };
 
         await tx
           .update(studentProfiles)
           .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
           .where(eq(studentProfiles.id, id));
-        await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        if (back === 'restore') {
+          await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        }
         return { kind: 'restored' };
       },
     ).catch(mapUniqueViolation(ADMISSION_NUMBER_TAKEN));

@@ -1,12 +1,17 @@
 import type { AbilityRule } from '@roviq/common-types';
 import {
+  botProfiles,
   botProfilesLive,
   type DrizzleDB,
+  guardianProfiles,
   guardianProfilesLive,
   memberships,
+  membershipsLive,
   roles,
   rolesLive,
+  staffProfiles,
   staffProfilesLive,
+  studentProfiles,
   studentProfilesLive,
 } from '@roviq/database';
 import { and, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
@@ -16,12 +21,49 @@ import { and, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
  * - `keep`: another profile of the person still uses it, or it has ended already.
  * - `end`: this was its last profile; the membership ends with it.
  * - `own_membership`: the caller would end their own membership.
+ * - `needs_full_control`: the member has full control and the caller has not.
  * - `last_admin`: it is the institute's last membership with full control.
  */
-export type MembershipEndDecision = 'keep' | 'end' | 'own_membership' | 'last_admin';
+export type MembershipEndDecision =
+  | 'keep'
+  | 'end'
+  | 'own_membership'
+  | 'needs_full_control'
+  | 'last_admin';
+
+/** What restoring a profile does to its membership; `needs_full_control` as above. */
+export type MembershipRestoreDecision = 'keep' | 'restore' | 'needs_full_control';
 
 /** A role whose rules include full control of the institute. */
 const FULL_CONTROL = sql`'[{"action":"manage","subject":"all"}]'::jsonb`;
+
+/**
+ * True when the caller holds full control of the institute through a live, active membership.
+ * Read from the database inside the transaction, never from a value the request carries.
+ */
+async function actorHasFullControl(tx: DrizzleDB, actorId: string): Promise<boolean> {
+  const [own] = await tx
+    .select({ id: membershipsLive.id })
+    .from(membershipsLive)
+    .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
+    .where(
+      and(
+        eq(membershipsLive.userId, actorId),
+        eq(membershipsLive.status, 'ACTIVE'),
+        sql`${rolesLive.abilities} @> ${FULL_CONTROL}`,
+      ),
+    )
+    .limit(1);
+  return own !== undefined;
+}
+
+async function roleHasFullControl(tx: DrizzleDB, roleId: string): Promise<boolean> {
+  const [role] = await tx
+    .select({ id: rolesLive.id })
+    .from(rolesLive)
+    .where(and(eq(rolesLive.id, roleId), sql`${rolesLive.abilities} @> ${FULL_CONTROL}`));
+  return role !== undefined;
+}
 
 /**
  * Decides, before the profile is deleted, what its membership does. Run inside the same
@@ -56,11 +98,9 @@ export async function decideMembershipEnd(
 
   if (member.userId === actorId) return 'own_membership';
 
-  const [fullControl] = await tx
-    .select({ id: rolesLive.id })
-    .from(rolesLive)
-    .where(and(eq(rolesLive.id, member.roleId), sql`${rolesLive.abilities} @> ${FULL_CONTROL}`));
-  if (fullControl) {
+  if (await roleHasFullControl(tx, member.roleId)) {
+    // Deleting a record is not a way to decide who runs the institute.
+    if (!(await actorHasFullControl(tx, actorId))) return 'needs_full_control';
     const others = await tx
       .select({ id: memberships.id })
       .from(memberships) // allow-base-read: FOR UPDATE needs the table, not the view
@@ -80,15 +120,56 @@ export async function decideMembershipEnd(
   return 'end';
 }
 
-/** Ends a membership. A trigger then ends the sessions that were opened with it. */
+/**
+ * Ends a membership with its last profile. `at` is the moment written to the profile's own
+ * `deleted_at`: the equal stamps are how a restore knows the membership ended this way.
+ * A trigger then ends the sessions that were opened with it.
+ */
 export async function endMembership(
   tx: DrizzleDB,
-  params: { membershipId: string; actorId: string },
+  params: { membershipId: string; actorId: string; at: Date },
 ): Promise<void> {
   await tx
     .update(memberships)
-    .set({ deletedAt: new Date(), deletedBy: params.actorId, updatedBy: params.actorId })
+    .set({ deletedAt: params.at, deletedBy: params.actorId, updatedBy: params.actorId })
     .where(and(eq(memberships.id, params.membershipId), isNull(memberships.deletedAt)));
+}
+
+/**
+ * Decides, before a profile is restored, what its membership does. Only a membership that
+ * ended with a profile comes back: one of its profiles carries the same `deleted_at`. One the
+ * platform ended, or a revoked one, stays as it is.
+ */
+export async function decideMembershipRestore(
+  tx: DrizzleDB,
+  params: { membershipId: string; actorId: string },
+): Promise<MembershipRestoreDecision> {
+  const { membershipId, actorId } = params;
+  const [member] = await tx
+    .select({ roleId: memberships.roleId, deletedAt: memberships.deletedAt })
+    .from(memberships) // allow-base-read: looks at an ended membership
+    .where(eq(memberships.id, membershipId))
+    .for('update');
+  if (!member?.deletedAt) return 'keep';
+
+  let endedWithProfile = false;
+  for (const profiles of [studentProfiles, staffProfiles, guardianProfiles, botProfiles]) {
+    const [match] = await tx
+      .select({ id: profiles.id })
+      .from(profiles) // allow-base-read: the deleted profile that ended the membership
+      .where(and(eq(profiles.membershipId, membershipId), eq(profiles.deletedAt, member.deletedAt)))
+      .limit(1);
+    if (match) {
+      endedWithProfile = true;
+      break;
+    }
+  }
+  if (!endedWithProfile) return 'keep';
+
+  if ((await roleHasFullControl(tx, member.roleId)) && !(await actorHasFullControl(tx, actorId))) {
+    return 'needs_full_control';
+  }
+  return 'restore';
 }
 
 /**
@@ -160,8 +241,9 @@ export async function insertOrRestoreMembership(
 export type DeleteProfileResult =
   | { kind: 'not_found' }
   | { kind: 'own_membership' }
+  | { kind: 'needs_full_control' }
   | { kind: 'last_admin' }
   | { kind: 'deleted'; membershipEnded: boolean };
 
 /** The outcome of restoring a deleted profile. */
-export type RestoreProfileResult = 'restored' | 'not_found';
+export type RestoreProfileResult = 'restored' | 'not_found' | 'needs_full_control';

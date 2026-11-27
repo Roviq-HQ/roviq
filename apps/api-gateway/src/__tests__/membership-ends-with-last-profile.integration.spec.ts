@@ -383,6 +383,96 @@ describe('ROV-382 a membership ends with the last profile', () => {
   });
 
   describe('refusals', () => {
+    describe('a member with full control', () => {
+      let fifth: TestInstitute;
+      let secondAdmin: Person;
+      let staffId: string;
+      let sessionId: string;
+      let clerkToken: string;
+      let fifthAdminToken: string;
+
+      const staffDeletedAt = async () => {
+        const [row] = await withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+          tx
+            .select({ deletedAt: staffProfiles.deletedAt })
+            .from(staffProfiles)
+            .where(eq(staffProfiles.id, staffId)),
+        );
+        return row.deletedAt;
+      };
+
+      beforeAll(async () => {
+        fifth = await createTestInstitute(result.db);
+        fifthAdminToken = createInstituteToken({
+          sub: fifth.userId,
+          tenantId: fifth.tenantId,
+          membershipId: fifth.membershipId,
+          roleId: fifth.roleId,
+        });
+        // Not the last one: the institute's own admin has full control too.
+        secondAdmin = await createPerson(result.db, fifth.tenantId, FULL_CONTROL);
+        staffId = await createProfile(result.db, fifth.tenantId, 'staff', secondAdmin);
+        sessionId = await openSession(result.db, fifth.tenantId, secondAdmin);
+        const clerk = await createPerson(result.db, fifth.tenantId, [
+          { action: 'delete', subject: 'Staff' },
+          { action: 'restore', subject: 'Staff' },
+        ]);
+        clerkToken = createInstituteToken({
+          sub: clerk.userId,
+          tenantId: fifth.tenantId,
+          membershipId: clerk.membershipId,
+          roleId: clerk.roleId,
+        });
+      });
+
+      it('is not removed by a caller without full control, and nothing is written', async () => {
+        const removed = await mutate('deleteStaffMember', staffId, clerkToken);
+        expect(codeOf(removed)).toBe('FULL_CONTROL_REQUIRED');
+        expect(await staffDeletedAt()).toBeNull();
+        expect((await membershipOf(secondAdmin)).deletedAt).toBeNull();
+        expect((await sessionOf(sessionId)).revokedAt).toBeNull();
+      });
+
+      it('is not brought back by a caller without full control, and nothing is written', async () => {
+        expect(
+          (await mutate('deleteStaffMember', staffId, fifthAdminToken)).errors,
+        ).toBeUndefined();
+        expect((await membershipOf(secondAdmin)).deletedAt).toBeInstanceOf(Date);
+
+        const restored = await mutate('restoreStaffMember', staffId, clerkToken);
+        expect(codeOf(restored)).toBe('FULL_CONTROL_REQUIRED');
+        expect(await staffDeletedAt()).toBeInstanceOf(Date);
+        expect((await membershipOf(secondAdmin)).deletedAt).toBeInstanceOf(Date);
+      });
+
+      it('is brought back by a caller with full control', async () => {
+        expect(
+          (await mutate('restoreStaffMember', staffId, fifthAdminToken)).errors,
+        ).toBeUndefined();
+        expect((await membershipOf(secondAdmin)).deletedAt).toBeNull();
+      });
+    });
+
+    it('does not bring back a membership that ended some other way than a profile delete', async () => {
+      const person = await createPerson(result.db, institute.tenantId);
+      const staffId = await createProfile(result.db, institute.tenantId, 'staff', person);
+      const guardianId = await createProfile(result.db, institute.tenantId, 'guardian', person);
+      // The staff record goes while the guardian record keeps the membership.
+      expect((await mutate('deleteStaffMember', staffId)).errors).toBeUndefined();
+      expect((await membershipOf(person)).deletedAt).toBeNull();
+      // The platform then ends the membership itself.
+      await withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+        tx
+          .update(memberships)
+          .set({ deletedAt: new Date(Date.now() + 5_000), deletedBy: SYSTEM_USER_ID })
+          .where(eq(memberships.id, person.membershipId)),
+      );
+
+      expect((await mutate('restoreStaffMember', staffId)).errors).toBeUndefined();
+      expect((await membershipOf(person)).deletedAt).toBeInstanceOf(Date);
+      expect(guardianId).toEqual(expect.any(String));
+    });
+
     it('refuses a caller who would end their own membership, and deletes nothing', async () => {
       const second = await createTestInstitute(result.db);
       const caller: Person = {
@@ -427,7 +517,7 @@ describe('ROV-382 a membership ends with the last profile', () => {
       expect(membership.deletedAt).toBeNull();
     });
 
-    it('refuses to end the last membership with full control, then allows it once there is another', async () => {
+    it('lets only another member with full control remove a member with full control', async () => {
       const third = await createTestInstitute(result.db);
       const onlyAdmin: Person = {
         userId: third.userId,
@@ -454,12 +544,23 @@ describe('ROV-382 a membership ends with the last profile', () => {
         roleId: clerk.roleId,
       });
 
+      // A caller without full control is refused before the last-member rule is reached; the
+      // database holds that rule for every other path (see the database role tests below).
       const refused = await mutate('deleteStaffMember', staffId, clerkToken);
-      expect(codeOf(refused)).toBe('LAST_ADMIN_CANNOT_BE_REMOVED');
+      expect(codeOf(refused)).toBe('FULL_CONTROL_REQUIRED');
       expect((await membershipOf(onlyAdmin)).deletedAt).toBeNull();
 
-      await createPerson(result.db, third.tenantId, FULL_CONTROL);
-      const removed = await mutate('deleteStaffMember', staffId, clerkToken);
+      const second = await createPerson(result.db, third.tenantId, FULL_CONTROL);
+      const stillRefused = await mutate('deleteStaffMember', staffId, clerkToken);
+      expect(codeOf(stillRefused)).toBe('FULL_CONTROL_REQUIRED');
+
+      const secondToken = createInstituteToken({
+        sub: second.userId,
+        tenantId: third.tenantId,
+        membershipId: second.membershipId,
+        roleId: second.roleId,
+      });
+      const removed = await mutate('deleteStaffMember', staffId, secondToken);
       expect(removed.errors).toBeUndefined();
       expect((await membershipOf(onlyAdmin)).deletedAt).toBeInstanceOf(Date);
     });
