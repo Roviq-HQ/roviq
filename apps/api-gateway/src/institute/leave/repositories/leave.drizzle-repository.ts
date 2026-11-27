@@ -14,6 +14,7 @@ import {
   leaveFilesLive,
   leaves,
   leavesLive,
+  memberships,
   membershipsLive,
   mkInstituteCtx,
   softDelete,
@@ -96,21 +97,21 @@ async function loadApplicants(
   if (unique.length === 0) return new Map();
   const rows = await tx
     .select({
-      membershipId: membershipsLive.id,
+      membershipId: memberships.id,
       firstName: tenantUserProfilesLive.firstName,
       lastName: tenantUserProfilesLive.lastName,
       admissionNumber: studentProfilesLive.admissionNumber,
     })
-    .from(membershipsLive)
+    .from(memberships) // allow-base-read: a leave keeps the name of a member who has left
     .innerJoin(
       tenantUserProfilesLive,
       and(
-        eq(tenantUserProfilesLive.userId, membershipsLive.userId),
-        eq(tenantUserProfilesLive.tenantId, membershipsLive.tenantId),
+        eq(tenantUserProfilesLive.userId, memberships.userId),
+        eq(tenantUserProfilesLive.tenantId, memberships.tenantId),
       ),
     )
-    .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, membershipsLive.id))
-    .where(inArray(membershipsLive.id, unique));
+    .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, memberships.id))
+    .where(inArray(memberships.id, unique));
   return new Map(rows.map(({ membershipId, ...applicant }) => [membershipId, applicant]));
 }
 

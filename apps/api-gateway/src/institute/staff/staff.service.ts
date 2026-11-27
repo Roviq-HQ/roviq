@@ -224,12 +224,30 @@ export class StaffService {
     const today = new Date().toISOString().split('T')[0];
 
     const deleted = await this.repo.softDelete(tenantId, id, actorId, today);
-    if (!deleted)
+    if (deleted.kind === 'not_found')
       throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, `Staff profile ${id} not found`);
+    if (deleted.kind === 'own_membership') {
+      throw new BusinessException(
+        ErrorCode.CANNOT_REMOVE_OWN_MEMBERSHIP,
+        'You cannot delete your own record: it would end your access to this institute',
+      );
+    }
+    if (deleted.kind === 'needs_full_control') {
+      throw new BusinessException(
+        ErrorCode.FULL_CONTROL_REQUIRED,
+        'Only a member with full control of the institute can remove or bring back this person',
+      );
+    }
+    if (deleted.kind === 'last_admin') {
+      throw new BusinessException(
+        ErrorCode.LAST_ADMIN_CANNOT_BE_REMOVED,
+        'This person is the only member with full control of the institute',
+      );
+    }
 
     this.eventBus.emit(EVENT_PATTERNS.STAFF.left, {
       staffProfileId: id,
-      reason: deleted.leavingReason ?? 'deleted',
+      reason: deleted.row.leavingReason ?? 'deleted',
       tenantId,
     });
 
@@ -247,6 +265,12 @@ export class StaffService {
     const restored = await this.repo.restore(tenantId, id, actorId);
     if (restored === 'not_found') {
       throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, 'Deleted staff member not found');
+    }
+    if (restored === 'needs_full_control') {
+      throw new BusinessException(
+        ErrorCode.FULL_CONTROL_REQUIRED,
+        'Only a member with full control of the institute can remove or bring back this person',
+      );
     }
     if (restored === 'employee_id_taken') {
       throw new BusinessException(

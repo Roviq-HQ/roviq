@@ -408,7 +408,28 @@ export class StudentService {
       );
     }
 
-    await this.repository.softDelete(tenantId, id);
+    const result = await this.repository.softDelete(tenantId, id, this.getUserId());
+    if (result.kind === 'not_found') {
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
+    }
+    if (result.kind === 'own_membership') {
+      throw new BusinessException(
+        ErrorCode.CANNOT_REMOVE_OWN_MEMBERSHIP,
+        'You cannot delete your own record: it would end your access to this institute',
+      );
+    }
+    if (result.kind === 'needs_full_control') {
+      throw new BusinessException(
+        ErrorCode.FULL_CONTROL_REQUIRED,
+        'Only a member with full control of the institute can remove or bring back this person',
+      );
+    }
+    if (result.kind === 'last_admin') {
+      throw new BusinessException(
+        ErrorCode.LAST_ADMIN_CANNOT_BE_REMOVED,
+        'This person is the only member with full control of the institute',
+      );
+    }
 
     return true;
   }
@@ -424,6 +445,12 @@ export class StudentService {
     const result = await this.repository.restore(tenantId, id, actorId);
     if (result.kind === 'not_found') {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Deleted student not found');
+    }
+    if (result.kind === 'needs_full_control') {
+      throw new BusinessException(
+        ErrorCode.FULL_CONTROL_REQUIRED,
+        'Only a member with full control of the institute can remove or bring back this person',
+      );
     }
     if (result.kind === 'admission_number_taken') {
       throw new BusinessException(

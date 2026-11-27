@@ -5,7 +5,6 @@ import {
   type DrizzleDB,
   guardianProfiles,
   guardianProfilesLive,
-  memberships,
   mkInstituteCtx,
   phoneNumbersLive,
   rolesLive,
@@ -18,6 +17,15 @@ import {
   withTenant,
 } from '@roviq/database';
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  type DeleteProfileResult,
+  decideMembershipEnd,
+  decideMembershipRestore,
+  endMembership,
+  insertOrRestoreMembership,
+  type RestoreProfileResult,
+  restoreMembership,
+} from '../../../auth/membership-lifecycle';
 import {
   ensureTenantUserProfile,
   type TenantUserProfileFields,
@@ -126,27 +134,22 @@ export class GuardianDrizzleRepository extends GuardianRepository {
   async createMembership(data: CreateGuardianMembershipData): Promise<{ id: string }> {
     const { tenantId, actorId } = data;
     const inserted = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .insert(memberships)
-        .values({
-          userId: data.userId,
-          tenantId,
-          roleId: data.roleId,
-          status: 'ACTIVE',
-          abilities: [],
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .returning({ id: memberships.id });
+      const id = await insertOrRestoreMembership(tx, {
+        userId: data.userId,
+        tenantId,
+        roleId: data.roleId,
+        abilities: [],
+        actorId,
+      });
       await ensureTenantUserProfile(tx, {
         tenantId,
         userId: data.userId,
         actorId,
         ...data.profile,
       });
-      return rows;
+      return { id };
     });
-    return inserted[0];
+    return inserted;
   }
 
   async createProfile(data: CreateGuardianProfileData): Promise<GuardianProfileRow> {
@@ -258,15 +261,36 @@ export class GuardianDrizzleRepository extends GuardianRepository {
     return otherGuardians.length > 0;
   }
 
-  async softDelete(tenantId: string, id: string, actorId: string): Promise<boolean> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .update(guardianProfiles)
-        .set({ deletedAt: new Date(), deletedBy: actorId })
-        .where(and(eq(guardianProfiles.id, id), sql`${guardianProfiles.deletedAt} IS NULL`))
-        .returning();
-      return rows.length > 0;
-    });
+  softDelete(tenantId: string, id: string, actorId: string): Promise<DeleteProfileResult> {
+    return withTenant<DeleteProfileResult>(
+      this.db,
+      mkInstituteCtx(tenantId, ORIGIN),
+      async (tx) => {
+        const [profile] = await tx
+          .select({ membershipId: guardianProfiles.membershipId })
+          .from(guardianProfiles) // allow-base-read: FOR UPDATE needs the table, not the view
+          .where(and(eq(guardianProfiles.id, id), isNull(guardianProfiles.deletedAt)))
+          .for('update');
+        if (!profile) return { kind: 'not_found' };
+
+        const decision = await decideMembershipEnd(tx, {
+          membershipId: profile.membershipId,
+          profileId: id,
+          actorId,
+        });
+        if (decision !== 'keep' && decision !== 'end') return { kind: decision };
+
+        const at = new Date();
+        await tx
+          .update(guardianProfiles)
+          .set({ deletedAt: at, deletedBy: actorId, updatedBy: actorId })
+          .where(eq(guardianProfiles.id, id));
+        if (decision === 'end') {
+          await endMembership(tx, { membershipId: profile.membershipId, actorId, at });
+        }
+        return { kind: 'deleted', membershipEnded: decision === 'end' };
+      },
+    );
   }
 
   async listDeleted(tenantId: string): Promise<DeletedGuardianRecord[]> {
@@ -291,15 +315,33 @@ export class GuardianDrizzleRepository extends GuardianRepository {
     });
   }
 
-  async restore(tenantId: string, id: string, actorId: string): Promise<boolean> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .update(guardianProfiles)
-        .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
-        .where(and(eq(guardianProfiles.id, id), isNotNull(guardianProfiles.deletedAt)))
-        .returning({ id: guardianProfiles.id });
-      return rows.length > 0;
-    });
+  restore(tenantId: string, id: string, actorId: string): Promise<RestoreProfileResult> {
+    return withTenant<RestoreProfileResult>(
+      this.db,
+      mkInstituteCtx(tenantId, ORIGIN),
+      async (tx) => {
+        const [deleted] = await tx
+          .select({ membershipId: guardianProfiles.membershipId })
+          .from(guardianProfiles) // allow-base-read: restore looks up a trashed row
+          .where(and(eq(guardianProfiles.id, id), isNotNull(guardianProfiles.deletedAt)))
+          .for('update');
+        if (!deleted) return 'not_found';
+        const back = await decideMembershipRestore(tx, {
+          membershipId: deleted.membershipId,
+          actorId,
+        });
+        if (back === 'needs_full_control') return back;
+
+        await tx
+          .update(guardianProfiles)
+          .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
+          .where(eq(guardianProfiles.id, id));
+        if (back === 'restore') {
+          await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        }
+        return 'restored';
+      },
+    );
   }
 
   async studentExists(tenantId: string, studentProfileId: string): Promise<boolean> {

@@ -146,10 +146,10 @@
     }
   },
   "displaySettings.sampleAdmissionNumber": {
-    "reviewedReason": "ROV-367 review: blank still gets the next free number of the series; the jump past taken numbers and the overflow refusal do not contradict the copy",
+    "reviewedReason": "only the membership insert moved into a shared helper; this field is handled as before",
     "targets": {
       "apps/api-gateway/src/institute/student/admission-number.sequence.ts#nextAdmissionNumber": "96d06b70888b1dfe",
-      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "2c543fcc39b089cf"
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "46ae38e4c7661ece"
     }
   },
   "groups.new.memberTypes": {
@@ -239,9 +239,9 @@
     }
   },
   "instituteSettings.config.optimalStrength": {
-    "reviewedReason": "ROV-367 review changed how admitStudent inserts the profile (savepoint retry, supplied-number clash); section strength and its notification are unchanged",
+    "reviewedReason": "only the membership insert moved into a shared helper; this field is handled as before",
     "targets": {
-      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "2c543fcc39b089cf",
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "46ae38e4c7661ece",
       "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockSectionForPlacement": "37ca1a64a2a1d924",
       "apps/api-gateway/src/institute/student/repositories/section-strength.ts#lockStudentSections": "f4a41d4fe6a7c2f9",
       "apps/api-gateway/src/institute/student/section-norms.ts#sectionCapacityWarning": "8674a3b46ed2f6e6",
@@ -510,13 +510,13 @@
     }
   },
   "staff.new.socialCategory": {
-    "reviewedReason": "Social category is still saved as typed; it is now written in the one staff create transaction",
+    "reviewedReason": "only the membership insert moved into a shared helper; this field is handled as before",
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
       "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#socialCategoryLabel": "3bbe711f064dffa2",
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
       "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.socialCategory": "2b09f0b294718d21",
-      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.create": "8832dd688e327a75",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.create": "65967999f7935517",
       "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.socialCategory": "dedf1ebf4ff4ed89",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#SOCIAL_CATEGORY_VALUES": "bbeddad581aafbe2"
     }

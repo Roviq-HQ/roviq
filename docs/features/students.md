@@ -76,7 +76,9 @@ only after the transaction commits.
 
 `bulkCreateStudents` makes the same read before it claims the uploaded file or starts the
 import workflow, with the same three codes. `deleteStudent` answers `STUDENT_NOT_FOUND` for a
-student that is not in the institute.
+student that is not in the institute. It also ends the student's membership of the institute when
+this was the last profile that used it, and `restoreStudent` brings the same membership back
+(`docs/auth.md` → "Leaving an institute").
 
 ## Admission numbers
 

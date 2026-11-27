@@ -1,6 +1,6 @@
 import type { AbilityRule } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
-import { foreignKey, index, jsonb, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, foreignKey, index, jsonb, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { tenantColumns } from '../common/columns';
 import { membershipStatus } from '../common/enums';
@@ -40,6 +40,11 @@ export const memberships = pgTable(
       'btree',
       table.tenantId.asc().nullsLast(),
       table.roleId.asc().nullsLast(),
+    ),
+    // A member cannot end their own membership; another member of the institute does it.
+    check(
+      'chk_membership_not_ended_by_self',
+      sql`${table.deletedBy} IS NULL OR ${table.deletedBy} <> ${table.userId}`,
     ),
     ...tenantPolicies('memberships'),
   ],

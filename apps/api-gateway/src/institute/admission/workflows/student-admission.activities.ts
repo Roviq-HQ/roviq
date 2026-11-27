@@ -21,7 +21,6 @@ import {
   enquiriesLive,
   guardianProfiles,
   guardianProfilesLive,
-  memberships,
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
@@ -40,6 +39,7 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { ApplicationFailure } from '@temporalio/common';
 import { and, eq, sql } from 'drizzle-orm';
 import type { IdentityService } from '../../../auth/identity.service';
+import { insertOrRestoreMembership } from '../../../auth/membership-lifecycle';
 import {
   ensureTenantUserProfile,
   findActiveGuardianByPhone,
@@ -406,22 +406,16 @@ export function createStudentAdmissionActivities(
         const created = await withTenant(
           db,
           mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-          async (tx) => {
-            return tx
-              .insert(memberships)
-              .values({
-                userId: guardianUserId,
-                tenantId,
-                roleId: parentRole[0].id,
-                status: 'ACTIVE',
-                abilities: [],
-                createdBy,
-                updatedBy: createdBy,
-              })
-              .returning({ id: memberships.id });
-          },
+          (tx) =>
+            insertOrRestoreMembership(tx, {
+              userId: guardianUserId,
+              tenantId,
+              roleId: parentRole[0].id,
+              abilities: [],
+              actorId: createdBy,
+            }),
         );
-        return created[0].id;
+        return created;
       })();
 
       // An existing copy (a sibling's parent) is left as the institute recorded it.

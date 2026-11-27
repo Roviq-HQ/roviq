@@ -9,6 +9,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   mapUniqueViolation,
+  memberships,
   membershipsLive,
   mkInstituteCtx,
   sectionsLive,
@@ -562,12 +563,13 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
           eq(attendanceEntriesLive.sessionId, attendanceSessionsLive.id),
         )
         .innerJoin(sectionsLive, eq(sectionsLive.id, attendanceSessionsLive.sectionId))
-        .leftJoin(membershipsLive, eq(membershipsLive.id, attendanceEntriesLive.studentId))
+        // The record keeps the name of a student whose membership has ended.
+        .leftJoin(memberships, eq(memberships.id, attendanceEntriesLive.studentId)) // allow-base-read: see above
         .leftJoin(
           tenantUserProfilesLive,
           and(
-            eq(tenantUserProfilesLive.userId, membershipsLive.userId),
-            eq(tenantUserProfilesLive.tenantId, membershipsLive.tenantId),
+            eq(tenantUserProfilesLive.userId, memberships.userId),
+            eq(tenantUserProfilesLive.tenantId, memberships.tenantId),
           ),
         )
         .leftJoin(
@@ -717,20 +719,20 @@ async function namesByMembership(
   if (membershipIds.length === 0) return new Map();
   const rows = await tx
     .select({
-      membershipId: membershipsLive.id,
+      membershipId: memberships.id,
       firstName: tenantUserProfilesLive.firstName,
       lastName: tenantUserProfilesLive.lastName,
       admissionNumber: studentProfilesLive.admissionNumber,
     })
-    .from(membershipsLive)
+    .from(memberships) // allow-base-read: a record keeps the name of a member who has left
     .leftJoin(
       tenantUserProfilesLive,
       and(
-        eq(tenantUserProfilesLive.userId, membershipsLive.userId),
-        eq(tenantUserProfilesLive.tenantId, membershipsLive.tenantId),
+        eq(tenantUserProfilesLive.userId, memberships.userId),
+        eq(tenantUserProfilesLive.tenantId, memberships.tenantId),
       ),
     )
-    .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, membershipsLive.id))
-    .where(inArray(membershipsLive.id, membershipIds));
+    .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, memberships.id))
+    .where(inArray(memberships.id, membershipIds));
   return new Map(rows.map(({ membershipId, ...name }) => [membershipId, name]));
 }

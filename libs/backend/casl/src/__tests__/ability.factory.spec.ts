@@ -279,7 +279,7 @@ describe('AbilityFactory', () => {
       });
     });
 
-    it('should handle user record not found gracefully', async () => {
+    it('should give no rule when the membership has ended, whatever the role allows', async () => {
       const roleAbilities = [{ action: 'read', subject: 'Student' }];
       mockRedis.get.mockResolvedValue(JSON.stringify(roleAbilities));
       mockMembershipAbilityRepo.findAbilities.mockResolvedValue(null);
@@ -292,8 +292,8 @@ describe('AbilityFactory', () => {
         roleId: 'role-1',
       });
 
-      expect(ability.can('read', 'Student')).toBe(true);
-      expect(ability.rules).toHaveLength(1);
+      expect(ability.can('read', 'Student')).toBe(false);
+      expect(ability.rules).toHaveLength(0);
     });
 
     it('should treat user abilities as empty array when field is null', async () => {

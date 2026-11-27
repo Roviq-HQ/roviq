@@ -1,3 +1,4 @@
+import type { DeleteProfileResult, RestoreProfileResult } from '../../../auth/membership-lifecycle';
 import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
 import type { SignInTarget } from '../../sign-in-details/sign-in-details.service';
 import type {
@@ -48,10 +49,11 @@ export abstract class GuardianRepository {
     guardianProfileId: string,
   ): Promise<boolean>;
   /** False when no live guardian matched. */
-  abstract softDelete(tenantId: string, id: string, actorId: string): Promise<boolean>;
+  /** Deletes the guardian and, when it was their last profile, ends their membership. */
+  abstract softDelete(tenantId: string, id: string, actorId: string): Promise<DeleteProfileResult>;
   abstract listDeleted(tenantId: string): Promise<DeletedGuardianRecord[]>;
   /** False when no deleted guardian matched. */
-  abstract restore(tenantId: string, id: string, actorId: string): Promise<boolean>;
+  abstract restore(tenantId: string, id: string, actorId: string): Promise<RestoreProfileResult>;
   abstract studentExists(tenantId: string, studentProfileId: string): Promise<boolean>;
   abstract guardianExists(tenantId: string, guardianProfileId: string): Promise<boolean>;
   abstract clearPrimaryContact(

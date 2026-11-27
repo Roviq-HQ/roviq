@@ -36,6 +36,10 @@ export class AbilityFactory {
       ? await this.membershipAbilityRepo.findAbilities(user.membershipId, user.tenantId)
       : null;
 
+    // A membership that ended or was revoked gives nothing, whatever its role allows: an access
+    // token issued before then stays valid until it expires.
+    if (user.tenantId && !membership) return createMongoAbility<AppAbility>([]);
+
     const memberAbilities = membership?.abilities ?? [];
 
     const needsAssignments = [...roleAbilities, ...memberAbilities].some((rule) => {

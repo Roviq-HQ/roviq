@@ -169,6 +169,14 @@ export const ErrorCode = {
   /** Cannot unlink a student's only guardian — link another guardian first */
   LAST_GUARDIAN_CANNOT_BE_DELETED: 'LAST_GUARDIAN_CANNOT_BE_DELETED',
 
+  // ── Leaving an institute ───────────────────────────────
+  /** Deleting this profile would end the caller's own membership of the institute */
+  CANNOT_REMOVE_OWN_MEMBERSHIP: 'CANNOT_REMOVE_OWN_MEMBERSHIP',
+  /** Deleting this profile would leave the institute with no member who has full control */
+  LAST_ADMIN_CANNOT_BE_REMOVED: 'LAST_ADMIN_CANNOT_BE_REMOVED',
+  /** Removing or bringing back a member with full control needs a caller with full control */
+  FULL_CONTROL_REQUIRED: 'FULL_CONTROL_REQUIRED',
+
   // ── Timetable ──────────────────────────────────────────
   /** Timetable not found or soft-deleted */
   TIMETABLE_NOT_FOUND: 'TIMETABLE_NOT_FOUND',
@@ -548,6 +556,9 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   HAS_RECORDED_ASSESSMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
   TC_REQUIRED_FOR_TRANSFER: HttpStatus.UNPROCESSABLE_ENTITY,
   LAST_GUARDIAN_CANNOT_BE_DELETED: HttpStatus.UNPROCESSABLE_ENTITY,
+  CANNOT_REMOVE_OWN_MEMBERSHIP: HttpStatus.UNPROCESSABLE_ENTITY,
+  LAST_ADMIN_CANNOT_BE_REMOVED: HttpStatus.UNPROCESSABLE_ENTITY,
+  FULL_CONTROL_REQUIRED: HttpStatus.FORBIDDEN,
   STREAM_REQUIRED: HttpStatus.BAD_REQUEST,
   SECTION_CAPACITY_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   SECTION_HAS_STUDENTS: HttpStatus.CONFLICT,

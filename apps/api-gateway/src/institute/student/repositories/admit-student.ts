@@ -1,7 +1,6 @@
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   type DrizzleDB,
-  memberships,
   rolesLive,
   studentAcademics,
   studentProfiles,
@@ -9,6 +8,7 @@ import {
   uniqueViolationConstraint,
 } from '@roviq/database';
 import { and, eq, sql } from 'drizzle-orm';
+import { insertOrRestoreMembership } from '../../../auth/membership-lifecycle';
 import {
   ensureTenantUserProfile,
   type TenantUserProfileFields,
@@ -70,18 +70,13 @@ export async function admitStudent(
   const roleId = await findStudentRoleId(tx, tenantId);
   if (!roleId) return { kind: 'role_not_found' };
 
-  const [membership] = await tx
-    .insert(memberships)
-    .values({
-      userId,
-      tenantId,
-      roleId,
-      status: 'ACTIVE',
-      abilities: [],
-      createdBy: actorId,
-      updatedBy: actorId,
-    })
-    .returning({ id: memberships.id });
+  const membershipId = await insertOrRestoreMembership(tx, {
+    userId,
+    tenantId,
+    roleId,
+    abilities: [],
+    actorId,
+  });
   await ensureTenantUserProfile(tx, { tenantId, userId, actorId, ...data.tenantProfile });
 
   const insertProfile = async (db: DrizzleDB, admissionNumber: string) => {
@@ -90,7 +85,7 @@ export async function admitStudent(
       .values({
         ...data.profile,
         userId,
-        membershipId: membership.id,
+        membershipId,
         tenantId,
         admissionNumber,
         createdBy: actorId,
@@ -126,7 +121,7 @@ export async function admitStudent(
 
   return {
     kind: 'ok',
-    membershipId: membership.id,
+    membershipId,
     studentProfileId: profile.id,
     admissionNumber,
     strength,

@@ -1,0 +1,1 @@
+ALTER TABLE "memberships" ADD CONSTRAINT "chk_membership_not_ended_by_self" CHECK ("deleted_by" IS NULL OR "deleted_by" <> "user_id");

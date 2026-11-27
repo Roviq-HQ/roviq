@@ -82,6 +82,8 @@ export interface DeletedStudentRecord {
 
 export type RestoreStudentResult =
   | { kind: 'not_found' }
+  /** The membership has full control and the caller has not. */
+  | { kind: 'needs_full_control' }
   | { kind: 'admission_number_taken'; admissionNumber: string }
   | { kind: 'restored' };
 

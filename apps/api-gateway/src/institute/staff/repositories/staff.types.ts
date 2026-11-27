@@ -1,5 +1,6 @@
 import type { EmploymentType, SocialCategory } from '@roviq/common-types';
 import type { staffProfiles, staffProfilesLive, tenantUserProfilesLive } from '@roviq/database';
+import type { DeleteProfileResult, RestoreProfileResult } from '../../../auth/membership-lifecycle';
 import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
 import type { SignInState } from '../../sign-in-details/sign-in-status';
 
@@ -68,7 +69,12 @@ export type CreateStaffResult =
   | { kind: 'ok'; row: StaffProfileRow }
   | { kind: 'employee_id_taken' };
 
-export type RestoreStaffResult = 'restored' | 'not_found' | 'employee_id_taken';
+export type RestoreStaffResult = RestoreProfileResult | 'employee_id_taken';
+
+/** As `DeleteProfileResult`, with the deleted row for the `STAFF.left` event. */
+export type DeleteStaffResult =
+  | Exclude<DeleteProfileResult, { kind: 'deleted' }>
+  | { kind: 'deleted'; membershipEnded: boolean; row: StaffProfileRow };
 
 /** Changed staff fields only; an absent key keeps the stored value. */
 export type StaffProfilePatch = Partial<

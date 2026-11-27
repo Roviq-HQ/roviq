@@ -26,6 +26,7 @@ import {
   withTenant,
 } from '@roviq/database';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { insertOrRestoreMembership } from '../membership-lifecycle';
 import { ensureTenantUserProfile } from '../tenant-user-profile';
 import { IdentityRepository } from './identity.repository';
 import type {
@@ -62,18 +63,7 @@ async function insertMembershipWithProfile(
   tx: DrizzleDB,
   input: NewInstituteMembership,
 ): Promise<string> {
-  const [membership] = await tx
-    .insert(memberships)
-    .values({
-      userId: input.userId,
-      tenantId: input.tenantId,
-      roleId: input.roleId,
-      status: 'ACTIVE',
-      abilities: input.abilities,
-      createdBy: input.actorId,
-      updatedBy: input.actorId,
-    })
-    .returning({ id: memberships.id });
+  const membershipId = await insertOrRestoreMembership(tx, input);
   // The institute's own copy of the person's name starts from the account name.
   const [account] = await tx
     .select({ firstName: userProfilesLive.firstName, lastName: userProfilesLive.lastName })
@@ -89,7 +79,7 @@ async function insertMembershipWithProfile(
       lastName: account.lastName,
     });
   }
-  return membership.id;
+  return membershipId;
 }
 
 @Injectable()

@@ -3,9 +3,9 @@ import type {
   CreateStaffData,
   CreateStaffResult,
   DeletedStaffRecord,
+  DeleteStaffResult,
   RestoreStaffResult,
   StaffListQuery,
-  StaffProfileRow,
   StaffStatistics,
   StaffWithSignIn,
   UpdateStaffData,
@@ -29,13 +29,16 @@ export abstract class StaffRepository {
   abstract findSignInTarget(tenantId: string, id: string): Promise<SignInTarget | null>;
   /** Existence check, versioned update and institute profile change, in one transaction. */
   abstract update(data: UpdateStaffData): Promise<UpdateStaffResult>;
-  /** Soft-deletes and stamps the leaving date; null when no live row matched. */
+  /**
+   * Soft-deletes and stamps the leaving date and, when it was the person's last profile, ends
+   * their membership.
+   */
   abstract softDelete(
     tenantId: string,
     id: string,
     actorId: string,
     dateOfLeaving: string,
-  ): Promise<StaffProfileRow | null>;
+  ): Promise<DeleteStaffResult>;
   abstract listDeleted(tenantId: string): Promise<DeletedStaffRecord[]>;
   /** `employee_id_taken` when a current staff member now holds the deleted row's employee ID. */
   abstract restore(tenantId: string, id: string, actorId: string): Promise<RestoreStaffResult>;
