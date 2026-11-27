@@ -77,5 +77,10 @@
     "loadFailed": "Could not load your saved settings. Forms use the default for now.",
     "retry": "Retry",
     "impersonating": "You are viewing as another person, so their settings cannot be changed. Forms show the default."
+  },
+  "ownAccountNotice": {
+    "title": "Not available while you view this account as support",
+    "body": "The password, email verification, passkeys and signed-in devices of this account belong to its owner. They are hidden in a support session, and nothing here was changed.",
+    "nextStep": "Ask the account's owner to sign in and make the change. To leave this session, press Exit Impersonation in the banner at the top."
   }
 }

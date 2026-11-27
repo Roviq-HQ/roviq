@@ -41,19 +41,6 @@ export function notificationViewerOf(user: AuthUser): NotificationViewer {
   }
 }
 
-/**
- * Support staff acting as someone may read that person's inbox but not change it, and
- * must never point that person's push messages at a device of their own.
- */
-export function assertOwnSession(user: AuthUser): void {
-  if (user.isImpersonated) {
-    throw new BusinessException(
-      ErrorCode.FORBIDDEN,
-      'Notifications and devices cannot be changed while impersonating',
-    );
-  }
-}
-
 export const DEVICE_TOKEN_MAX_LENGTH = 4096;
 
 export function assertValidDeviceToken(token: string): void {

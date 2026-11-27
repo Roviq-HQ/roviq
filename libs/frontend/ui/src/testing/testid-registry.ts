@@ -53,6 +53,10 @@ export const testIds = {
     save: 'institute-locales-save',
   },
 
+  ownAccountNotice: {
+    notice: 'own-account-notice',
+  },
+
   accountEmail: {
     card: 'account-email-card',
     loading: 'account-email-loading',

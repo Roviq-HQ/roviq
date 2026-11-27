@@ -1,5 +1,5 @@
 import type { FormHelpMode, SignedInUser } from '@roviq/common-types';
-import type { UserRecord } from './types';
+import type { OwnAccountName, UserRecord } from './types';
 
 export abstract class UserRepository {
   // Methods that take the signed-in user run as that person: the database gives them the
@@ -11,6 +11,8 @@ export abstract class UserRepository {
   abstract updateFormHelpMode(user: SignedInUser, mode: FormHelpMode): Promise<void>;
   /** The signed-in person's own account; null when it was deleted mid-session. */
   abstract findOwn(user: SignedInUser): Promise<UserRecord | null>;
+  /** Sign-in name and email of the account, for the app shell; also read in an impersonation session. */
+  abstract findOwnName(user: SignedInUser): Promise<OwnAccountName | null>;
   /** Sign-in and token flows only, where no one is signed in yet. */
   abstract findById(id: string): Promise<UserRecord | null>;
   abstract findByUsername(username: string): Promise<UserRecord | null>;

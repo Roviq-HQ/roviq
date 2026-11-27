@@ -542,10 +542,7 @@ describe('Notification inbox (integration)', () => {
     ])('refuses %s and changes nothing', async (_name, query, variables) => {
       const response = await gql(query, impersonationToken, variables());
 
-      expect([code(response), response.errors?.[0]?.message]).toEqual([
-        'FORBIDDEN',
-        'Notifications and devices cannot be changed while impersonating',
-      ]);
+      expect(code(response)).toBe('IMPERSONATION_OWN_ACCOUNT');
       expect(await stored(row.id)).toEqual(row);
       const devices = await admin((tx) =>
         tx.select().from(deviceTokens).where(eq(deviceTokens.token, token)),

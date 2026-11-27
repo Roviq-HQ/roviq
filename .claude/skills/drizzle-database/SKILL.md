@@ -24,12 +24,12 @@ No runtime role has `BYPASSRLS`. Every query runs inside one wrapper, which open
 withTenant(db, ctx: InstituteContext, async (tx) => { … })
 withReseller(db, ctx: ResellerContext, async (tx) => { … })
 withAdmin(db, ctx: PlatformContext, async (tx) => { … })
-withUser(db, user: SignedInUser, async (tx) => { … })
+withUser(db, user: SignedInUser, 'PERSON_ONLY', async (tx) => { … })
 ```
 
 - The context is **branded**: the wrong context for a wrapper is a compile error. Resolvers narrow `req.user` with `assertTenantContext` / `assertResellerContext` / `assertPlatformContext` / `assertInstituteWithReseller` from `@roviq/auth-backend`.
 - Code with no JWT (workflow activities, seeders, event consumers, integration fixtures) builds one with `mkInstituteCtx(tenantId, origin)`, `mkResellerCtx(resellerId, origin)`, `mkAdminCtx(origin)`. These skip the JWT, so every importing file must be on the allowlist of `pnpm check:synthetic-context-usage`, with a reason.
-- `withUser` is for a query about the caller's own account (preferences, password, passkeys, sessions, own profile). It takes the user of a verified token, never a `mk*Ctx()` context. `roviq_user` gets nothing by default: a new table or column it needs is a grant plus a `selfPolicies(table, column, commands)` policy in a migration, and a case in `signed-in-user-rls.integration.spec.ts`.
+- `withUser` is for a query about the caller's own account (preferences, password, passkeys, sessions, own profile). It takes the user of a verified token, never a `mk*Ctx()` context. Its third argument is `'PERSON_ONLY'` (an impersonation session is refused with `IMPERSONATION_OWN_ACCOUNT`) unless a screen the impersonator sees needs the read: then `'IMPERSONATOR_MAY_READ'`, which runs read-only for them, plus an entry with the reason in `apps/api-gateway/src/__tests__/own-account-access.ts`. `roviq_user` gets nothing by default: a new table or column it needs is a grant plus a `selfPolicies(table, column, commands)` policy in a migration, and a case in `signed-in-user-rls.integration.spec.ts`.
 - `withAdmin` reads and writes every tenant. Institute or reseller code never hands it a caller-supplied id without first proving, under the caller's own context, that the row is theirs (`pnpm check:admin-context-reach`).
 - Never `db.transaction`, `$transaction` or a bare `db.select` outside a wrapper.
 

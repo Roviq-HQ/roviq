@@ -76,7 +76,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
   }
 
   async findUserProfile(user: SignedInUser): Promise<UserProfileRow | null> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'IMPERSONATOR_MAY_READ', async (tx) => {
       const rows = await tx
         .select()
         .from(userProfilesLive)
@@ -210,7 +210,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
     user: SignedInUser,
     fields: OwnProfileUpdate,
   ): Promise<UpdatedUserProfileRow | null> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       const rows = await tx
         .update(userProfiles)
         .set({ ...fields, updatedBy: user.userId })
@@ -221,7 +221,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
   }
 
   async setPrimaryPhone(user: SignedInUser, phone: string): Promise<void> {
-    await withUser(this.db, user, async (tx) => {
+    await withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       const existing = await tx
         .select({ id: phoneNumbersLive.id })
         .from(phoneNumbersLive)

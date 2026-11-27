@@ -43,6 +43,7 @@ function createMockUserRepo() {
   return createMock<UserRepository>({
     findById: vi.fn(),
     findOwn: vi.fn(),
+    findOwnName: vi.fn(),
     findByUsername: vi.fn(),
     updatePasswordHash: vi.fn(),
     updatePassword: vi.fn(),
@@ -305,9 +306,16 @@ describe('AuthService', () => {
 
     it('should refuse a write while impersonating', async () => {
       await expect(authService.updateFormHelpMode(impersonator, 'ICON_ONLY')).rejects.toMatchObject(
-        { code: ErrorCode.FORBIDDEN },
+        { code: ErrorCode.IMPERSONATION_OWN_ACCOUNT },
       );
       expect(mockUserRepo.updateFormHelpMode).not.toHaveBeenCalled();
+    });
+
+    it('should refuse a language write while impersonating', async () => {
+      await expect(authService.updatePreferredLocale(impersonator, 'hi')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OWN_ACCOUNT,
+      });
+      expect(mockUserRepo.updatePreferredLocale).not.toHaveBeenCalled();
     });
   });
 
@@ -1709,7 +1717,7 @@ describe('AuthService', () => {
           },
           REFRESH_TOKEN,
         ),
-        ErrorCode.FORBIDDEN,
+        ErrorCode.IMPERSONATION_OWN_ACCOUNT,
       );
 
       expect(mockRefreshTokenRepo.findByHash).not.toHaveBeenCalled();
@@ -1718,30 +1726,18 @@ describe('AuthService', () => {
     });
   });
 
-  describe('getOwnAccount', () => {
-    it('should return user when found', async () => {
-      const user = {
-        id: 'user-1',
-        username: 'admin',
-        email: 'admin@test.com',
-        passwordHash: 'mock-hash',
-        status: 'ACTIVE' as const,
-        passwordChangedAt: null,
-        mustChangePassword: false,
-        emailVerifiedAt: null,
-        tokenVersion: 0,
-      };
-      mockUserRepo.findOwn.mockResolvedValue(user);
+  describe('getOwnAccountName', () => {
+    it('should return the sign-in name and email of the account', async () => {
+      const name = { username: 'admin', email: 'admin@test.com' };
+      mockUserRepo.findOwnName.mockResolvedValue(name);
 
-      const result = await authService.getOwnAccount(signedIn('user-1'));
-      expect(result).toEqual(user);
+      expect(await authService.getOwnAccountName(signedIn('user-1'))).toEqual(name);
     });
 
-    it('should return null when not found', async () => {
-      mockUserRepo.findOwn.mockResolvedValue(null);
+    it('should return null when the account is gone', async () => {
+      mockUserRepo.findOwnName.mockResolvedValue(null);
 
-      const result = await authService.getOwnAccount(signedIn('missing'));
-      expect(result).toBeNull();
+      expect(await authService.getOwnAccountName(signedIn('missing'))).toBeNull();
     });
   });
 

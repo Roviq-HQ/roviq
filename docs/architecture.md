@@ -164,7 +164,7 @@ reads the same value. Tenant context and audit consumers use this request value.
 - **`withTenant(db, tenantId, fn)`**: sets `SET LOCAL ROLE roviq_app` + `app.current_tenant_id`. Used for institute-scope operations.
 - **`withReseller(db, resellerId, fn)`**: sets `SET LOCAL ROLE roviq_reseller` + `app.current_reseller_id`. Used for reseller-scope operations.
 - **`withAdmin(db, fn)`**: sets `SET LOCAL ROLE roviq_admin`. Used for platform admin operations and cross-tenant queries.
-- **`withUser(db, user, fn)`**: sets `SET LOCAL ROLE roviq_user` + `app.current_user_id`. Used in any scope when a signed-in person acts on their own account: preferences, password, passkeys, sessions, own profile and phone, own group memberships, own platform notifications. It takes the user of a verified token (`SignedInUser`); a `mk*Ctx()` context does not compile. What the role may reach: `docs/auth.md` → "Own-account operations run as the person".
+- **`withUser(db, user, access, fn)`**: sets `SET LOCAL ROLE roviq_user` + `app.current_user_id`. `access` is `'PERSON_ONLY'` (an impersonation session is refused) or `'IMPERSONATOR_MAY_READ'` (it runs read-only; each such call site is listed in `own-account-access.ts`). Used in any scope when a signed-in person acts on their own account: preferences, password, passkeys, sessions, own profile and phone, own group memberships, own platform notifications. It takes the user of a verified token (`SignedInUser`); a `mk*Ctx()` context does not compile. What the role may reach: `docs/auth.md` → "Own-account operations run as the person".
 - `withTrash` no longer exists — soft-delete visibility moved to the application layer (see "Soft-Delete via Live Views" below).
 
 ### Soft-Delete via Live Views

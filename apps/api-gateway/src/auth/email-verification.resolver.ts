@@ -3,7 +3,7 @@ import { Args, Field, Mutation, ObjectType, Query, Resolver } from '@nestjs/grap
 import { NoAudit } from '@roviq/audit';
 import { CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
 import type { AuthUser } from '@roviq/common-types';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { assertOwnSession } from '@roviq/common-types';
 import { EmailVerificationService } from './email-verification.service';
 
 @ObjectType({
@@ -18,16 +18,6 @@ export class EmailVerificationModel {
       'An account with an unverified email cannot be given a role by email (first admin, reseller team) by anyone but the person who created it.',
   })
   isVerified!: boolean;
-}
-
-// Impersonation must never verify an address on someone else's behalf.
-function assertOwnSession(user: AuthUser): void {
-  if (user.isImpersonated) {
-    throw new BusinessException(
-      ErrorCode.FORBIDDEN,
-      'Email verification is not available while impersonating',
-    );
-  }
 }
 
 @UseGuards(GqlAuthGuard)

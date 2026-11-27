@@ -1,9 +1,10 @@
 'use client';
 
-import { createAuthMutations, useSessions } from '@roviq/auth';
+import { createAuthMutations, useAuth, useSessions } from '@roviq/auth';
 import { useFormatDate } from '@roviq/i18n';
 import type { SessionData, SessionsPageLabels } from '@roviq/ui';
 import { SessionsPage } from '@roviq/ui';
+import { OwnAccountNotice } from '@web/components/account/own-account-notice';
 import { parseISO } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -13,7 +14,25 @@ const GRAPHQL_HTTP = `${API_URL}/api/graphql`;
 
 const authMutations = createAuthMutations(GRAPHQL_HTTP);
 
+/** The list of signed-in devices belongs to the account's owner: a support session sees a notice. */
 export default function InstituteSessionsPage() {
+  const t = useTranslations('sessions');
+  const { isImpersonated } = useAuth();
+  if (!isImpersonated) return <OwnSessions />;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
+      </div>
+      <div className="max-w-2xl">
+        <OwnAccountNotice />
+      </div>
+    </div>
+  );
+}
+
+function OwnSessions() {
   const t = useTranslations('sessions');
   const { format } = useFormatDate();
   const formatDate = React.useCallback((d: string) => format(parseISO(d), 'Pp'), [format]);

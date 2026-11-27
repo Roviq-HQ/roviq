@@ -444,7 +444,7 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
   }
 
   async findOwnMemberships(user: SignedInUser): Promise<GroupMembershipRecord[]> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'IMPERSONATOR_MAY_READ', async (tx) => {
       const rows = await tx
         .select(membershipColumns)
         .from(groupMembershipsLive)

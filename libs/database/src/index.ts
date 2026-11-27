@@ -44,6 +44,7 @@ export {
   mkAdminCtx,
   mkInstituteCtx,
   mkResellerCtx,
+  type OwnAccountAccess,
   withAdmin,
   withReseller,
   withTenant,

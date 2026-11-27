@@ -3,7 +3,6 @@ import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
 import { assertTenantContext, CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
 import type { AuthUser } from '@roviq/common-types';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
@@ -193,11 +192,6 @@ export class AuthResolver {
     @Args('input') input: UpdateLocaleInput,
     @CurrentUser() user: AuthUser,
   ): Promise<string | null> {
-    if (user.isImpersonated)
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Cannot change account preferences while impersonating',
-      );
     return this.authService.updatePreferredLocale(user, input.locale ?? null);
   }
 
@@ -228,7 +222,7 @@ export class AuthResolver {
   @AllowWhenPasswordChangeRequired()
   async me(@CurrentUser() user: AuthUser): Promise<UserType> {
     assertTenantContext(user);
-    const dbUser = await this.authService.getOwnAccount(user);
+    const dbUser = await this.authService.getOwnAccountName(user);
     const abilityRules = await this.authService.getAbilityRules(
       user.userId,
       user.scope,

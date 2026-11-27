@@ -1,11 +1,16 @@
-import type { InstituteContext, PlatformContext, ResellerContext } from '@roviq/common-types';
+import {
+  assertOwnSession,
+  ErrorCode,
+  type InstituteContext,
+  type PlatformContext,
+  type ResellerContext,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { feedEventOf } from '../notification-inbox.consumer';
 import { NotificationInboxService } from '../notification-inbox.service';
 import {
-  assertOwnSession,
   assertValidDeviceToken,
   DEVICE_TOKEN_MAX_LENGTH,
   notificationViewerOf,
@@ -91,7 +96,7 @@ describe('assertOwnSession', () => {
 
   it('should refuse an impersonated session', () => {
     expect(() => assertOwnSession(impersonated)).toThrow(
-      'Notifications and devices cannot be changed while impersonating',
+      expect.objectContaining({ code: ErrorCode.IMPERSONATION_OWN_ACCOUNT }),
     );
   });
 });
@@ -142,9 +147,9 @@ describe('NotificationInboxService writes', () => {
   ])('should refuse %s in an impersonated session before touching the database', async (_name, call) => {
     const { inbox, devices, eventBus, service } = build();
 
-    await expect(call(service)).rejects.toThrow(
-      'Notifications and devices cannot be changed while impersonating',
-    );
+    await expect(call(service)).rejects.toMatchObject({
+      code: ErrorCode.IMPERSONATION_OWN_ACCOUNT,
+    });
 
     expect(inbox.markRead).not.toHaveBeenCalled();
     expect(inbox.markAllRead).not.toHaveBeenCalled();

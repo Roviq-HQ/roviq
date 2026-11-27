@@ -95,7 +95,7 @@ export class NotificationInboxDrizzleRepository extends NotificationInboxReposit
       case 'reseller':
         return withReseller(this.db, viewer.ctx, fn);
       case 'platform':
-        return withUser(this.db, viewer.ctx, fn);
+        return withUser(this.db, viewer.ctx, 'IMPERSONATOR_MAY_READ', fn);
     }
   }
 

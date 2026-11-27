@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   type AuthUser,
+  assertOwnSession,
   BusinessException,
   type DevicePlatform,
   ErrorCode,
@@ -9,11 +10,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { isUUID } from 'class-validator';
 import { decodeIdCursor, encodeCursor } from '../common/pagination/relay-pagination.model';
-import {
-  assertOwnSession,
-  assertValidDeviceToken,
-  notificationViewerOf,
-} from './notification-viewer';
+import { assertValidDeviceToken, notificationViewerOf } from './notification-viewer';
 import { DeviceTokenRepository } from './repositories/device-token.repository';
 import {
   NotificationInboxRepository,

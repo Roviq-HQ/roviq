@@ -50,6 +50,8 @@ export const ErrorCode = {
   IMPERSONATION_ENDED: 'IMPERSONATION_ENDED',
   /** A view-only impersonation session attempted to change something */
   IMPERSONATION_READ_ONLY: 'IMPERSONATION_READ_ONLY',
+  /** An impersonation session called an operation on the account itself (sessions, passkeys, password, profile, preferences) */
+  IMPERSONATION_OWN_ACCOUNT: 'IMPERSONATION_OWN_ACCOUNT',
 
   // ── Passkey ────────────────────────────────────────────
   /** WebAuthn challenge expired or was already consumed */
@@ -498,6 +500,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SESSION_NOT_FOUND: HttpStatus.FORBIDDEN,
   IMPERSONATION_ENDED: HttpStatus.UNAUTHORIZED,
   IMPERSONATION_READ_ONLY: HttpStatus.FORBIDDEN,
+  IMPERSONATION_OWN_ACCOUNT: HttpStatus.FORBIDDEN,
   PASSKEY_CHALLENGE_EXPIRED: HttpStatus.BAD_REQUEST,
   PASSKEY_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,
   PASSKEY_AUTHENTICATION_FAILED: HttpStatus.UNAUTHORIZED,
