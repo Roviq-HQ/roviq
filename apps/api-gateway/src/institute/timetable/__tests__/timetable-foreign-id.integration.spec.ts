@@ -680,7 +680,18 @@ describe('timetable: another institute id (ROV-293)', () => {
       expect(await snapshot()).toEqual(before);
     });
 
-    it('timetableDaySchedule should show its own section and nothing of another institute section', async () => {
+    it.each([
+      ['a section of another institute', () => b.sectionId],
+      ['a section that does not exist', () => randomUUID()],
+    ] as const)('timetableDaySchedule should refuse %s and store nothing', async (_what, sectionId) => {
+      await refusesAndWritesNothing(
+        DAY_SCHEDULE,
+        { sectionId: sectionId() },
+        ErrorCode.SECTION_NOT_FOUND,
+      );
+    });
+
+    it('timetableDaySchedule should show its own section', async () => {
       expect(await query(DAY_SCHEDULE, { sectionId: a.sectionId })).toEqual({
         timetableDaySchedule: {
           timetableId: a.timetableId,
@@ -693,9 +704,6 @@ describe('timetable: another institute id (ROV-293)', () => {
             },
           ],
         },
-      });
-      expect(await query(DAY_SCHEDULE, { sectionId: b.sectionId })).toEqual({
-        timetableDaySchedule: { timetableId: null, slots: [] },
       });
     });
 
