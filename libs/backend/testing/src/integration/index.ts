@@ -14,6 +14,7 @@ export {
   createInstituteToken,
   createPlatformToken,
   createResellerToken,
+  signedInAs,
 } from '../token-factories.js';
 // Test data factories — create fresh institutes/resellers per suite.
 export {

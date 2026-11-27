@@ -2,7 +2,7 @@ import { REFRESH_TOKEN_REVOKE_REASON_VALUES } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import { check, index, inet, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
-import { tenantPolicies } from '../common/rls-policies';
+import { selfPolicies, tenantPolicies } from '../common/rls-policies';
 import { users } from './users';
 
 const REVOKE_REASONS = sql.raw(REFRESH_TOKEN_REVOKE_REASON_VALUES.map((v) => `'${v}'`).join(', '));
@@ -52,5 +52,7 @@ export const refreshTokens = pgTable(
     index('refresh_tokens_tenant_id_idx').using('btree', table.tenantId.asc().nullsLast()),
     index('refresh_tokens_token_hash_idx').using('btree', table.tokenHash.asc().nullsLast()),
     ...tenantPolicies('refresh_tokens'),
+    // A signed-in person lists and revokes their own sessions.
+    ...selfPolicies('refresh_tokens', 'user_id', ['select', 'update']),
   ],
 );

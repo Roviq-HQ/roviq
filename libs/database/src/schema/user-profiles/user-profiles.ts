@@ -3,7 +3,7 @@ import { check, customType, date, index, pgTable, text, uuid, varchar } from 'dr
 import { users } from '../auth/users';
 import { entityColumns, i18nText } from '../common/columns';
 import { gender } from '../common/enums';
-import { userScopedPolicies } from '../common/rls-policies';
+import { selfPolicies, userScopedPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
 
 /**
@@ -106,5 +106,6 @@ export const userProfiles = pgTable(
     /** GIN index on the generated tsvector for fast full-text search */
     index('idx_user_profiles_search').using('gin', sql`search_vector`),
     ...userScopedPolicies('user_profiles'),
+    ...selfPolicies('user_profiles', 'user_id', ['select', 'update']),
   ],
 );

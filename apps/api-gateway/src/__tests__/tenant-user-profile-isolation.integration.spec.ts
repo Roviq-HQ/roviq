@@ -36,6 +36,7 @@ import {
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  signedInAs,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -438,7 +439,9 @@ describe('Per-institute profiles and phone numbers (integration)', () => {
         const claimer = await createGuardian(a, { phone: mobile() });
         assert(claimer.data);
         const claimerUserId = claimer.data.createGuardian.userId;
-        await app.app.get(ProfileService).updateMyProfile(claimerUserId, { phone: claimed });
+        await app.app
+          .get(ProfileService)
+          .updateMyProfile(signedInAs(claimerUserId), { phone: claimed });
         expect(await holdersOf(claimed)).toEqual([{ userId: claimerUserId, isVerified: false }]);
 
         expect(await admitWithParentPhone(claimed)).not.toBe(claimerUserId);

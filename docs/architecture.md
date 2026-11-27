@@ -93,7 +93,7 @@ Every library is imported as `@roviq/<name>`.
 | `@roviq/common-types` | `libs/shared/common-types` | CASL subjects and actions, `AuthUser`, error codes, event patterns, state machines, date ranges |
 | `@roviq/domain` | `libs/shared/domain` | Value objects |
 | `@roviq/request-context` | `libs/shared/request-context` | Per-request context (tenant, reseller, user, scope, correlation id) |
-| `@roviq/database` | `libs/database` | Drizzle schema, RLS policies, `withTenant` / `withReseller` / `withAdmin`, migrations, seeds |
+| `@roviq/database` | `libs/database` | Drizzle schema, RLS policies, `withTenant` / `withReseller` / `withAdmin` / `withUser`, migrations, seeds |
 | `@roviq/auth-backend` | `libs/backend/auth` | Scope guards, JWT strategy, context assertions |
 | `@roviq/casl` | `libs/backend/casl` | Ability factory, `AbilityGuard`, `@CheckAbility` |
 | `@roviq/audit` | `libs/backend/audit` | Audit decorators and emitter |
@@ -159,11 +159,12 @@ reads the same value. Tenant context and audit consumers use this request value.
 - **Tenant-scoped (RLS via `tenantPolicies()`):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, `academic_years`, `standards`, `sections`, `subjects`, `institute_branding`, `institute_configs`, `institute_identifiers`, `institute_affiliations`, `timetables`, `timetable_sections`, `timetable_periods`, `timetable_entries`, `timetable_day_overrides`, and all business data
 - Membership links User↔Institute. The institute role inserts one only for a user its own institute created or an active member (`docs/auth.md` → "People and phone numbers").
 
-### Three DB Contexts
+### DB Contexts
 
 - **`withTenant(db, tenantId, fn)`**: sets `SET LOCAL ROLE roviq_app` + `app.current_tenant_id`. Used for institute-scope operations.
 - **`withReseller(db, resellerId, fn)`**: sets `SET LOCAL ROLE roviq_reseller` + `app.current_reseller_id`. Used for reseller-scope operations.
 - **`withAdmin(db, fn)`**: sets `SET LOCAL ROLE roviq_admin`. Used for platform admin operations and cross-tenant queries.
+- **`withUser(db, user, fn)`**: sets `SET LOCAL ROLE roviq_user` + `app.current_user_id`. Used in any scope when a signed-in person acts on their own account: preferences, password, passkeys, sessions, own profile and phone, own group memberships, own platform notifications. It takes the user of a verified token (`SignedInUser`); a `mk*Ctx()` context does not compile. What the role may reach: `docs/auth.md` → "Own-account operations run as the person".
 - `withTrash` no longer exists — soft-delete visibility moved to the application layer (see "Soft-Delete via Live Views" below).
 
 ### Soft-Delete via Live Views

@@ -8,7 +8,6 @@ export interface AuthProviderRecord {
 }
 
 export interface CreatePasskeyData {
-  userId: string;
   provider: 'passkey';
   providerUserId: string;
   providerData: unknown;

@@ -24,7 +24,7 @@ export class ProfileResolver {
    */
   @Query(() => MyProfileUnion, { description: 'Get current user profile based on membership type' })
   async myProfile(@CurrentUser() user: AuthUser) {
-    return this.profileService.getMyProfile(user.userId, user.membershipId);
+    return this.profileService.getMyProfile(user, user.membershipId);
   }
 
   /**
@@ -38,7 +38,7 @@ export class ProfileResolver {
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateMyProfileInput,
   ): Promise<UserProfileData> {
-    return this.profileService.updateMyProfile(user.userId, input) as Promise<UserProfileData>;
+    return this.profileService.updateMyProfile(user, input) as Promise<UserProfileData>;
   }
 
   /**
@@ -50,7 +50,7 @@ export class ProfileResolver {
     description: 'Guardian-specific: returns linked children (sibling discovery)',
   })
   async myChildren(@CurrentUser() user: AuthUser) {
-    const profile = await this.profileService.getMyProfile(user.userId, user.membershipId);
+    const profile = await this.profileService.getMyProfile(user, user.membershipId);
     if (profile.type !== 'guardian') return null;
     return profile;
   }

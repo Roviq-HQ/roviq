@@ -13,11 +13,19 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { entityColumns, i18nText } from '../common/columns';
-import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
+import {
+  currentUserId,
+  roviqAdmin,
+  roviqApp,
+  roviqReseller,
+  roviqUser,
+} from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
 import { institutes } from '../tenant/institutes';
 
 const ownInstitute = sql`scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid`;
+/** A platform notification belongs to no institute or reseller, only to its recipient. */
+const ownPlatform = sql`scope = 'platform' AND recipient_user_id = ${currentUserId}`;
 const ownReseller = sql`scope = 'reseller' AND reseller_id = current_setting('app.current_reseller_id', true)::uuid`;
 
 /**
@@ -100,6 +108,13 @@ export const notifications = pgTable(
       to: roviqReseller,
       using: ownReseller,
       withCheck: ownReseller,
+    }),
+    pgPolicy('notifications_self_select', { for: 'select', to: roviqUser, using: ownPlatform }),
+    pgPolicy('notifications_self_update', {
+      for: 'update',
+      to: roviqUser,
+      using: ownPlatform,
+      withCheck: ownPlatform,
     }),
     pgPolicy('notifications_admin_all', {
       for: 'all',

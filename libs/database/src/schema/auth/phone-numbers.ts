@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
-import { userScopedPolicies } from '../common/rls-policies';
+import { selfPolicies, userScopedPolicies } from '../common/rls-policies';
 import { users } from './users';
 
 export const phoneNumbers = pgTable(
@@ -32,5 +32,7 @@ export const phoneNumbers = pgTable(
       .where(sql`${table.isPrimary} = true AND ${table.deletedAt} IS NULL`),
     // Writes are platform-only: the custom migration revokes them from roviq_app and roviq_reseller.
     ...userScopedPolicies('phone_numbers'),
+    // A signed-in person keeps their own primary number.
+    ...selfPolicies('phone_numbers', 'user_id', ['select', 'insert', 'update']),
   ],
 );

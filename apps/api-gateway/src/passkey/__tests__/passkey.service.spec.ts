@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { ErrorCode } from '@roviq/common-types';
+import { ErrorCode, type SignedInUser } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,16 @@ import { AuthEventService } from '../../auth/auth-event.service';
 import { UserRepository } from '../../auth/repositories/user.repository';
 import { PasskeyService } from '../passkey.service';
 import { AuthProviderRepository } from '../repositories/auth-provider.repository';
+
+/** The signed-in person, as a verified token gives it. */
+const OWNER: SignedInUser = {
+  _scope: 'platform',
+  scope: 'platform',
+  userId: 'user-1',
+  membershipId: 'membership-1',
+  roleId: 'role-1',
+  type: 'access',
+};
 
 // Mock @simplewebauthn/server
 vi.mock('@simplewebauthn/server', () => ({
@@ -55,6 +65,7 @@ function createMockAuthProviderRepo() {
 function createMockUserRepo() {
   return createMock<UserRepository>({
     findById: vi.fn(),
+    findOwn: vi.fn(),
     findByUsername: vi.fn(),
   });
 }
@@ -123,7 +134,7 @@ describe('PasskeyService', () => {
       mockAuth.verifyPassword.mockResolvedValue(false);
 
       const failure = await expectBusinessError(
-        service.generateRegistrationOptions('user-1', 'wrong-password'),
+        service.generateRegistrationOptions(OWNER, 'wrong-password'),
         ErrorCode.CURRENT_PASSWORD_INCORRECT,
       );
       expect(failure.message).toBe('Invalid password');
@@ -132,7 +143,7 @@ describe('PasskeyService', () => {
     it('should generate options and store challenge in Redis', async () => {
       mockAuth.verifyPassword.mockResolvedValue(true);
       mockAuthProviderRepo.findPasskeysByUserId.mockResolvedValue([]);
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -149,7 +160,7 @@ describe('PasskeyService', () => {
       } as PublicKeyCredentialCreationOptionsJSON;
       vi.mocked(generateRegistrationOptions).mockResolvedValue(mockOptions);
 
-      const result = await service.generateRegistrationOptions('user-1', 'correct-password');
+      const result = await service.generateRegistrationOptions(OWNER, 'correct-password');
 
       expect(result).toEqual(mockOptions);
       expect(mockRedis.set).toHaveBeenCalledWith(
@@ -162,7 +173,7 @@ describe('PasskeyService', () => {
 
     it('should exclude existing passkeys from registration options', async () => {
       mockAuth.verifyPassword.mockResolvedValue(true);
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -188,7 +199,7 @@ describe('PasskeyService', () => {
         user: { id: 'uid', name: 'admin', displayName: 'admin' },
       } as PublicKeyCredentialCreationOptionsJSON);
 
-      await service.generateRegistrationOptions('user-1', 'correct-password');
+      await service.generateRegistrationOptions(OWNER, 'correct-password');
 
       expect(generateRegistrationOptions).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -203,7 +214,7 @@ describe('PasskeyService', () => {
       mockRedis.get.mockResolvedValue(null);
 
       const failure = await expectBusinessError(
-        service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
+        service.verifyRegistration(OWNER, {} as RegistrationResponseJSON, 'My Key'),
         ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
       );
       expect(failure.message).toBe('Challenge expired or not found');
@@ -216,7 +227,7 @@ describe('PasskeyService', () => {
       });
 
       const failure = await expectBusinessError(
-        service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
+        service.verifyRegistration(OWNER, {} as RegistrationResponseJSON, 'My Key'),
         ErrorCode.PASSKEY_VERIFICATION_FAILED,
       );
       expect(failure.message).toBe('Verification failed');
@@ -229,7 +240,7 @@ describe('PasskeyService', () => {
       );
 
       const failure = await expectBusinessError(
-        service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
+        service.verifyRegistration(OWNER, {} as RegistrationResponseJSON, 'My Key'),
         ErrorCode.PASSKEY_VERIFICATION_FAILED,
       );
 
@@ -268,7 +279,7 @@ describe('PasskeyService', () => {
       });
 
       const result = await service.verifyRegistration(
-        'user-1',
+        OWNER,
         {} as RegistrationResponseJSON,
         'My Key',
       );
@@ -276,8 +287,8 @@ describe('PasskeyService', () => {
       expect(result.name).toBe('My Key');
       expect(mockRedis.del).toHaveBeenCalledWith('webauthn:reg:user-1');
       expect(mockAuthProviderRepo.create).toHaveBeenCalledWith(
+        OWNER,
         expect.objectContaining({
-          userId: 'user-1',
           provider: 'passkey',
           providerUserId: 'cred-id',
         }),
@@ -464,7 +475,7 @@ describe('PasskeyService', () => {
         },
       ]);
 
-      const result = await service.myPasskeys('user-1');
+      const result = await service.myPasskeys(OWNER);
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('MacBook');
@@ -474,7 +485,7 @@ describe('PasskeyService', () => {
 
   describe('removePasskey', () => {
     it('should throw if passkey is last auth method and user has no password', async () => {
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -488,14 +499,14 @@ describe('PasskeyService', () => {
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
 
       const failure = await expectBusinessError(
-        service.removePasskey('user-1', 'ap-1'),
+        service.removePasskey(OWNER, 'ap-1'),
         ErrorCode.PASSKEY_LAST_AUTH_METHOD,
       );
       expect(failure.message).toBe('Cannot remove your only authentication method');
     });
 
     it('should allow removal if user still has a password', async () => {
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -509,13 +520,13 @@ describe('PasskeyService', () => {
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(1);
 
-      await service.removePasskey('user-1', 'ap-1');
+      await service.removePasskey(OWNER, 'ap-1');
 
-      expect(mockAuthProviderRepo.deletePasskey).toHaveBeenCalledWith('ap-1', 'user-1');
+      expect(mockAuthProviderRepo.deletePasskey).toHaveBeenCalledWith(OWNER, 'ap-1');
     });
 
     it('should allow removal if user has other passkeys', async () => {
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -529,13 +540,13 @@ describe('PasskeyService', () => {
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(1);
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(1);
 
-      await service.removePasskey('user-1', 'ap-1');
+      await service.removePasskey(OWNER, 'ap-1');
 
       expect(mockAuthProviderRepo.deletePasskey).toHaveBeenCalled();
     });
 
     it('should throw if passkey does not belong to user', async () => {
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -550,7 +561,7 @@ describe('PasskeyService', () => {
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(0);
 
       const failure = await expectBusinessError(
-        service.removePasskey('user-1', 'other-users-ap'),
+        service.removePasskey(OWNER, 'other-users-ap'),
         ErrorCode.PASSKEY_NOT_FOUND,
       );
       expect(failure.message).toBe('Passkey not found');

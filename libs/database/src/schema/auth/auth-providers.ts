@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, jsonb, pgPolicy, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
-import { roviqAdmin } from '../common/rls-policies';
+import { roviqAdmin, selfPolicies } from '../common/rls-policies';
 import { users } from './users';
 
 export const authProviders = pgTable(
@@ -22,6 +22,8 @@ export const authProviders = pgTable(
       .where(sql`${table.deletedAt} IS NULL`),
     index('auth_providers_user_id_idx').using('btree', table.userId.asc().nullsLast()),
     // Passkeys and sign-in providers are read and written only by the platform role.
+    // A signed-in person lists, adds and removes their own passkeys.
+    ...selfPolicies('auth_providers', 'user_id', ['select', 'insert', 'update']),
     pgPolicy('auth_providers_admin_all', {
       for: 'all',
       to: roviqAdmin,

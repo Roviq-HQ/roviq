@@ -1,3 +1,4 @@
+import type { SignedInUser } from '@roviq/common-types';
 import type {
   GuardianChildRecord,
   GuardianProfileRow,
@@ -18,7 +19,8 @@ export abstract class ProfileRepository {
   ): Promise<ProfileMembershipRecord | null>;
   abstract findRoleName(tenantId: string, roleId: string): Promise<Record<string, string> | null>;
   /** The account profile; keyed by the token user only. */
-  abstract findUserProfile(userId: string): Promise<UserProfileRow | null>;
+  /** The signed-in person's own account profile, read as that person. */
+  abstract findUserProfile(user: SignedInUser): Promise<UserProfileRow | null>;
   /** The institute's own copy of the person's details. */
   abstract findInstituteProfile(
     tenantId: string,
@@ -41,9 +43,9 @@ export abstract class ProfileRepository {
   ): Promise<GuardianChildRecord[]>;
   /** Null when the user has no account profile. Keyed by the token user only. */
   abstract updateOwnProfile(
-    userId: string,
+    user: SignedInUser,
     fields: OwnProfileUpdate,
   ): Promise<UpdatedUserProfileRow | null>;
   /** Replaces the primary phone number, or adds one. Keyed by the token user only. */
-  abstract setPrimaryPhone(userId: string, phone: string): Promise<void>;
+  abstract setPrimaryPhone(user: SignedInUser, phone: string): Promise<void>;
 }

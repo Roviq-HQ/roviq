@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { REFRESH_TOKEN_REVOKE_REASON_VALUES } from '@roviq/common-types';
+import { REFRESH_TOKEN_REVOKE_REASON_VALUES, type SignedInUser } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -11,10 +11,11 @@ import {
   rolesLive,
   users,
   withAdmin,
+  withUser,
 } from '@roviq/database';
 import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import { RefreshTokenRepository, type RefreshTokenRevokeReason } from './refresh-token.repository';
-import type { CreateRefreshTokenData, RefreshTokenWithRelations } from './types';
+import type { CreateRefreshTokenData, OwnSessionRecord, RefreshTokenWithRelations } from './types';
 
 const VALID_REVOKE_REASONS: ReadonlySet<RefreshTokenRevokeReason> = new Set(
   REFRESH_TOKEN_REVOKE_REASON_VALUES,
@@ -168,102 +169,47 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
     });
   }
 
-  async findActiveByUserId(userId: string): Promise<RefreshTokenWithRelations[]> {
-    return withAdmin(this.db, mkAdminCtx('repository:refresh-token'), async (tx) => {
-      const rows = await tx
+  async findOwnActive(user: SignedInUser): Promise<OwnSessionRecord[]> {
+    return withUser(this.db, user, (tx) =>
+      tx
         .select({
           id: refreshTokensLive.id,
           tokenHash: refreshTokensLive.tokenHash,
-          userId: refreshTokensLive.userId,
-          membershipScope: refreshTokensLive.membershipScope,
-          revokedAt: refreshTokensLive.revokedAt,
-          revokedReason: refreshTokensLive.revokedReason,
           expiresAt: refreshTokensLive.expiresAt,
           createdAt: refreshTokensLive.createdAt,
           deviceInfo: refreshTokensLive.deviceInfo,
           ipAddress: refreshTokensLive.ipAddress,
           userAgent: refreshTokensLive.userAgent,
           lastUsedAt: refreshTokensLive.lastUsedAt,
-          user: {
-            id: users.id,
-            username: users.username,
-            email: users.email,
-            status: users.status,
-            passwordChangedAt: users.passwordChangedAt,
-            mustChangePassword: users.mustChangePassword,
-            emailVerifiedAt: users.emailVerifiedAt,
-            tokenVersion: users.tokenVersion,
-          },
-          membershipId: membershipsLive.id,
-          membershipTenantId: membershipsLive.tenantId,
-          membershipRoleId: membershipsLive.roleId,
-          membershipAbilities: membershipsLive.abilities,
-          roleId: rolesLive.id,
-          roleAbilities: rolesLive.abilities,
-          instituteId: institutesLive.id,
-          instituteName: institutesLive.name,
-          instituteSlug: institutesLive.slug,
-          instituteResellerId: institutesLive.resellerId,
         })
         .from(refreshTokensLive)
-        .innerJoin(users, and(eq(refreshTokensLive.userId, users.id), isNull(users.deletedAt))) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
-        .leftJoin(membershipsLive, eq(refreshTokensLive.membershipId, membershipsLive.id))
-        .leftJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
-        .leftJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
         .where(
           and(
-            eq(refreshTokensLive.userId, userId),
+            eq(refreshTokensLive.userId, user.userId),
             isNull(refreshTokensLive.revokedAt),
             gt(refreshTokensLive.expiresAt, new Date()),
           ),
-        );
+        ),
+    );
+  }
 
-      return rows.map((row) => ({
-        id: row.id,
-        tokenHash: row.tokenHash,
-        userId: row.userId,
-        membershipScope: row.membershipScope,
-        revokedAt: row.revokedAt,
-        revokedReason: coerceRevokedReason(row.revokedReason),
-        expiresAt: row.expiresAt,
-        createdAt: row.createdAt,
-        deviceInfo: row.deviceInfo,
-        ipAddress: row.ipAddress,
-        userAgent: row.userAgent,
-        lastUsedAt: row.lastUsedAt,
-        user: row.user,
-        membership:
-          // The guards on every institute field are TS-driven, not just
-          // defensive: drizzle's LEFT JOIN inference marks all joined columns
-          // as nullable even though name/slug/reseller_id are NOT NULL in the
-          // schema. The runtime checks are what narrow the type so the
-          // `institute: { ... }` literal below satisfies `InstituteInfo`.
-          row.membershipId &&
-          row.membershipTenantId &&
-          row.membershipRoleId &&
-          row.roleId &&
-          row.instituteId &&
-          row.instituteName &&
-          row.instituteSlug !== null &&
-          row.instituteResellerId
-            ? {
-                id: row.membershipId,
-                tenantId: row.membershipTenantId,
-                roleId: row.membershipRoleId,
-                abilities: row.membershipAbilities,
-                role: {
-                  id: row.roleId,
-                  abilities: row.roleAbilities,
-                },
-                institute: {
-                  id: row.instituteId,
-                  name: row.instituteName,
-                  slug: row.instituteSlug,
-                  resellerId: row.instituteResellerId,
-                },
-              }
-            : null,
-      }));
+  async revokeOwn(
+    user: SignedInUser,
+    id: string,
+    reason: RefreshTokenRevokeReason,
+  ): Promise<boolean> {
+    return withUser(this.db, user, async (tx) => {
+      const [session] = await tx
+        .select({ id: refreshTokensLive.id })
+        .from(refreshTokensLive)
+        .where(and(eq(refreshTokensLive.id, id), eq(refreshTokensLive.userId, user.userId)))
+        .limit(1);
+      if (!session) return false;
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), revokedReason: reason })
+        .where(and(eq(refreshTokens.id, id), isNull(refreshTokens.revokedAt)));
+      return true;
     });
   }
 
@@ -285,18 +231,27 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
     );
   }
 
+  async revokeAllOwn(user: SignedInUser, reason: RefreshTokenRevokeReason): Promise<void> {
+    await withUser(this.db, user, (tx) =>
+      tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), revokedReason: reason })
+        .where(and(eq(refreshTokens.userId, user.userId), isNull(refreshTokens.revokedAt))),
+    );
+  }
+
   async revokeAllOtherForUser(
-    userId: string,
+    user: SignedInUser,
     currentTokenId: string,
     reason: RefreshTokenRevokeReason,
   ): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('repository:refresh-token'), (tx) =>
+    await withUser(this.db, user, (tx) =>
       tx
         .update(refreshTokens)
         .set({ revokedAt: new Date(), revokedReason: reason })
         .where(
           and(
-            eq(refreshTokens.userId, userId),
+            eq(refreshTokens.userId, user.userId),
             isNull(refreshTokens.revokedAt),
             ne(refreshTokens.id, currentTokenId),
           ),

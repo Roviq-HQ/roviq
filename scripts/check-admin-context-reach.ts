@@ -101,18 +101,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. Foreign-id test: student-document-upload.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.removeDocument':
     'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts. Foreign-id test: student-document-removal.integration.spec.ts.',
-  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.findUserProfile':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.setPrimaryPhone':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.updateOwnProfile':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/notification-inbox/repositories/notification-inbox.drizzle-repository.ts#NotificationInboxDrizzleRepository.run':
-    "Admin role only for a platform-scope token (the caller's own PlatformContext); every query adds ownedBy(): scope = 'platform' AND recipient_user_id = the token user, so another user's or scope's id answers NOTIFICATION_NOT_FOUND. Foreign-id test: notification-inbox.integration.spec.ts.",
   'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts#DeviceTokenDrizzleRepository.run':
     'device_tokens is platform-role only. Every write is keyed by the token user id, never an argument; unregister retires only a row whose user_id is the caller, and register moves a token to the caller only by retiring the old row.',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.markEmailVerified':
-    'The user id is the caller’s own, from the token, after the code sent to that account’s email was checked; impersonation sessions are refused.',
   'apps/api-gateway/src/public-verification/tc-verification.repository.ts#TcVerificationRepository.findByToken':
     'Public TC check by the 32-character random token from the printed QR code; runs only the verify_tc() function, which returns the six fields of the verification page.',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#AuditQueryDrizzleRepository.findAuditLogs':
@@ -129,8 +119,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
   'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.create':
     'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
-  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.findActiveByUserId':
-    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.findByHash':
     'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
   'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.findByIdWithRelations':
@@ -138,31 +126,17 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.revoke':
     'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
   'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.revokeAllForUser':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.revokeAllOtherForUser':
-    'Keyed by the user id in the verified token.',
+    'Token flow only: runs when a rotated refresh token is presented again, for the user id stored on that token row. A signed-in person revokes their own sessions through revokeAllOwn, as roviq_user.',
   'apps/api-gateway/src/auth/repositories/reseller-membership.drizzle-repository.ts#ResellerMembershipDrizzleRepository.findByUserId':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findById':
-    'Keyed by the user id in the verified token.',
+    'Sign-in and token flows only: the id comes from a verified passkey credential, a verified refresh token, or the token of the caller choosing or switching institute. A signed-in person reads their own account through findOwn, as roviq_user.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findByUsername':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.getFormHelpMode':
-    'Keyed by the user id in the verified token; form_help_mode is not granted to the institute or reseller roles (ROV-344).',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.getPreferredLocale':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updateFormHelpMode':
-    'Keyed by the user id in the verified token; the mutation takes no id (ROV-344).',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePassword':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePreferredLocale':
-    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts#ExportReportDrizzleRepository.run':
     'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts). Foreign-id test: compliance-export.integration.spec.ts.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.create':
     'Reseller scope passes its own reseller id from the token as owner; no existing group is read or changed.',
-  'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.findMembershipsByUser':
-    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.create':
     'Reseller scope only: reseller id comes from the token and a named group must be owned by that reseller (assertOwnedByReseller).',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findAffiliations':
@@ -185,18 +159,10 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateStatus':
     'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership. Foreign-id test: reseller-institute-foreign-id.integration.spec.ts.',
-  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.countOtherPasskeys':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.create':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.deletePasskey':
-    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findByActiveUsername':
     'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findByCredentialId':
     'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
-  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findPasskeysByUserId':
-    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.updateProviderData':
     'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
   'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.findLastActive':

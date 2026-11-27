@@ -101,7 +101,7 @@ The app connects as `roviq_pooler` and each wrapper switches to `roviq_app`, `ro
 Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. Read it before touching the area a line names.
 
 - `selectInstitute(membershipId)`, not `tenantId` · abilities live on `Membership`, not `User`
-- `withTenant/withReseller/withAdmin(db, ctx, fn)` with the branded ctx — no `$transaction`, no `tenantTransaction()`
+- `withTenant/withReseller/withAdmin(db, ctx, fn)` with the branded ctx — no `$transaction`, no `tenantTransaction()` · the caller's own account rows: `withUser(db, user, fn)`, never `withAdmin` with the user id in the `WHERE`
 - `assertTenantContext()` / `assertResellerContext()` / `assertPlatformContext()` / `assertInstituteWithReseller()` instead of inline `ForbiddenException`
 - A scope guard is not tenant isolation: institute/reseller code never passes a caller-supplied id to `withAdmin` code without an ownership check · platform operations live in `admin/` resolvers (`pnpm check:admin-context-reach`)
 - Foreign keys do not apply RLS: read every caller-supplied id under the caller's own context before storing a reference to it

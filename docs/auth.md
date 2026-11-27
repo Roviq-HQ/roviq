@@ -109,6 +109,26 @@ A scope guard only proves the token's scope. Which rows the caller may touch is 
 - `apps/api-gateway/src/__tests__/foreign-id-coverage.spec.ts` keeps that proof complete (ROV-293). It reads the generated schema, takes every Query and Mutation outside `admin/` that has an `ID` argument or an input object with an `ID` field, and fails when one is missing from the registry `foreign-id-coverage.ts` beside it. An entry is the spec that holds the test (the file must exist and name the operation) or an exemption with its reason. Every operation has one, so a new operation that takes an id fails the check until its test is written.
 - The test sends a real id of a second institute (for reseller scope: of another reseller, and of an institute the platform owns), asserts the refusal code, and for a mutation reads the foreign row back unchanged and checks that nothing was written in the caller's institute. A filter query answers a foreign id with an empty result and no error, so that it does not confirm the id exists; its test pins the exact rows returned.
 
+
+### Own-account operations run as the person
+
+An operation on the caller's own account runs under `withUser(db, user, fn)` in every scope. The wrapper switches to `roviq_user` and sets `app.current_user_id` from the verified token, so PostgreSQL returns and changes only that person's rows, whatever id the query names.
+
+| Table | `roviq_user` may |
+| -- | -- |
+| `users` | read the own row; update language, form help mode, password fields and e-mail verification |
+| `user_profiles` | read the own row; update nationality, religion and mother tongue |
+| `phone_numbers` | read own numbers; add one; change the number of one |
+| `auth_providers` | read, add and soft-delete own passkeys |
+| `refresh_tokens` | read own sessions; revoke them |
+| `group_memberships` | read own rows |
+| `notifications` | read own platform-scope rows; mark read and archive |
+
+- The role holds nothing else: no membership, institute, role or student table. A new own-account query that needs more gets a grant and a policy in a migration, and a line in `signed-in-user-rls.integration.spec.ts`.
+- A repository method that runs this way takes the `SignedInUser` as its first parameter, and the resolver passes `@CurrentUser()` through the service. There is no synthetic context for it.
+- Sign-in, token refresh and institute switch still read the account as the platform role (`UserRepository.findById`): no one is signed in yet, or the method serves both flows.
+- The profile picture and device tokens are not moved: the first also writes `files`, the second must retire a token that another person registered on the same device.
+
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes
 - Frontend: `<ProtectedRoute>` component redirects to `/login` with return URL

@@ -39,7 +39,7 @@ export class EmailVerificationResolver {
     description: "The signed-in user's email address and whether it is verified.",
   })
   myEmailVerification(@CurrentUser() user: AuthUser): Promise<EmailVerificationModel> {
-    return this.verifications.state(user.userId);
+    return this.verifications.state(user);
   }
 
   @Mutation(() => Boolean, {
@@ -48,7 +48,7 @@ export class EmailVerificationResolver {
   })
   async requestEmailVerification(@CurrentUser() user: AuthUser): Promise<boolean> {
     assertOwnSession(user);
-    await this.verifications.request(user.userId);
+    await this.verifications.request(user);
     return true;
   }
 
@@ -58,7 +58,7 @@ export class EmailVerificationResolver {
   })
   async verifyEmail(@CurrentUser() user: AuthUser, @Args('code') code: string): Promise<boolean> {
     assertOwnSession(user);
-    await this.verifications.verify(user.userId, code);
+    await this.verifications.verify(user, code);
     return true;
   }
 }

@@ -36,6 +36,7 @@ import {
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  signedInAs,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { and, eq } from 'drizzle-orm';
@@ -350,16 +351,16 @@ describe('Soft delete + audit columns (integration)', () => {
     it('delete soft-deletes the credential and lets it be registered again', async () => {
       const repo = result.app.get(AuthProviderRepository);
       const credentialId = `cred-${randomUUID()}`;
+      const owner = signedInAs(institute.userId);
       const data = {
-        userId: institute.userId,
         provider: 'passkey' as const,
         providerUserId: credentialId,
         providerData: { counter: 0 },
       };
 
-      const created = await repo.create(data);
-      expect(await repo.deletePasskey(created.id, institute.userId)).toBe(1);
-      expect(await repo.deletePasskey(created.id, institute.userId)).toBe(0);
+      const created = await repo.create(owner, data);
+      expect(await repo.deletePasskey(owner, created.id)).toBe(1);
+      expect(await repo.deletePasskey(owner, created.id)).toBe(0);
       expect(await repo.findByCredentialId(credentialId)).toBeNull();
 
       const base = await admin((tx) =>
@@ -370,7 +371,7 @@ describe('Soft delete + audit columns (integration)', () => {
       );
       expect(base).toEqual([{ deletedBy: institute.userId, createdBy: institute.userId }]);
 
-      const again = await repo.create(data);
+      const again = await repo.create(owner, data);
       const live = await admin((tx) =>
         tx
           .select({ id: authProvidersLive.id })

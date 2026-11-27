@@ -1,12 +1,17 @@
-import type { FormHelpMode } from '@roviq/common-types';
+import type { FormHelpMode, SignedInUser } from '@roviq/common-types';
 import type { UserRecord } from './types';
 
 export abstract class UserRepository {
-  abstract getPreferredLocale(userId: string): Promise<string | null>;
-  abstract updatePreferredLocale(userId: string, locale: string | null): Promise<void>;
+  // Methods that take the signed-in user run as that person: the database gives them the
+  // account row of the token's user and no other.
+  abstract getPreferredLocale(user: SignedInUser): Promise<string | null>;
+  abstract updatePreferredLocale(user: SignedInUser, locale: string | null): Promise<void>;
   /** Null when the account does not exist or is deleted. */
-  abstract getFormHelpMode(userId: string): Promise<FormHelpMode | null>;
-  abstract updateFormHelpMode(userId: string, mode: FormHelpMode): Promise<void>;
+  abstract getFormHelpMode(user: SignedInUser): Promise<FormHelpMode | null>;
+  abstract updateFormHelpMode(user: SignedInUser, mode: FormHelpMode): Promise<void>;
+  /** The signed-in person's own account; null when it was deleted mid-session. */
+  abstract findOwn(user: SignedInUser): Promise<UserRecord | null>;
+  /** Sign-in and token flows only, where no one is signed in yet. */
   abstract findById(id: string): Promise<UserRecord | null>;
   abstract findByUsername(username: string): Promise<UserRecord | null>;
   abstract updatePasswordHash(id: string, passwordHash: string, changedAt: Date): Promise<void>;
@@ -16,6 +21,6 @@ export abstract class UserRepository {
    * `must_change_password = false`. Used by the changePassword mutation.
    * Also raises `token_version`, which ends every access token issued before, and returns it.
    */
-  abstract updatePassword(userId: string, passwordHash: string): Promise<number>;
-  abstract markEmailVerified(userId: string): Promise<void>;
+  abstract updatePassword(user: SignedInUser, passwordHash: string): Promise<number>;
+  abstract markEmailVerified(user: SignedInUser): Promise<void>;
 }

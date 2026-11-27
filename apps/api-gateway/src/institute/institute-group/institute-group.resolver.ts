@@ -31,6 +31,6 @@ export class InstituteGroupResolver {
   @Query(() => [GroupMembershipModel])
   @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
   async myGroups(@CurrentUser() user: AuthUser): Promise<GroupMembershipModel[]> {
-    return this.instituteGroupService.findMyGroups(user.userId);
+    return this.instituteGroupService.findMyGroups(user);
   }
 }

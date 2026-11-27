@@ -16,6 +16,7 @@ PostgreSQL 18 with row-level security, Drizzle ORM **v1 beta** (`drizzle-orm@bet
 | `roviq_app` | Institute scope. RLS filters on `app.current_tenant_id` |
 | `roviq_reseller` | Reseller scope. RLS filters on `app.current_reseller_id` |
 | `roviq_admin` | Platform scope. Policies are `USING (true)`: it sees every tenant |
+| `roviq_user` | A signed-in person's own account rows, in any scope. RLS filters on `app.current_user_id`; every privilege is an explicit grant |
 
 No runtime role has `BYPASSRLS`. Every query runs inside one wrapper, which opens a transaction and does `SET LOCAL ROLE` plus the context variable:
 
@@ -23,10 +24,12 @@ No runtime role has `BYPASSRLS`. Every query runs inside one wrapper, which open
 withTenant(db, ctx: InstituteContext, async (tx) => { … })
 withReseller(db, ctx: ResellerContext, async (tx) => { … })
 withAdmin(db, ctx: PlatformContext, async (tx) => { … })
+withUser(db, user: SignedInUser, async (tx) => { … })
 ```
 
 - The context is **branded**: the wrong context for a wrapper is a compile error. Resolvers narrow `req.user` with `assertTenantContext` / `assertResellerContext` / `assertPlatformContext` / `assertInstituteWithReseller` from `@roviq/auth-backend`.
 - Code with no JWT (workflow activities, seeders, event consumers, integration fixtures) builds one with `mkInstituteCtx(tenantId, origin)`, `mkResellerCtx(resellerId, origin)`, `mkAdminCtx(origin)`. These skip the JWT, so every importing file must be on the allowlist of `pnpm check:synthetic-context-usage`, with a reason.
+- `withUser` is for a query about the caller's own account (preferences, password, passkeys, sessions, own profile). It takes the user of a verified token, never a `mk*Ctx()` context. `roviq_user` gets nothing by default: a new table or column it needs is a grant plus a `selfPolicies(table, column, commands)` policy in a migration, and a case in `signed-in-user-rls.integration.spec.ts`.
 - `withAdmin` reads and writes every tenant. Institute or reseller code never hands it a caller-supplied id without first proving, under the caller's own context, that the row is theirs (`pnpm check:admin-context-reach`).
 - Never `db.transaction`, `$transaction` or a bare `db.select` outside a wrapper.
 

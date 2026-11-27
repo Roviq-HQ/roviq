@@ -14,6 +14,7 @@ Words: **institute** (never "school" or "organization"), **tenant** for the infr
 | Institute | `@InstituteScope()` | `withTenant(db, ctx, fn)` | `assertTenantContext(user)` |
 | Reseller | `@ResellerScope()` | `withReseller(db, ctx, fn)` | `assertResellerContext(user)` |
 | Platform | `@PlatformScope()` | `withAdmin(db, ctx, fn)` | `assertPlatformContext(user)` |
+| Any scope, the caller's own account | the scope's own guard | `withUser(db, user, fn)` | pass `@CurrentUser()` down as `SignedInUser` |
 | Institute with a reseller (EE billing) | `@InstituteScope()` | `withTenant`, read `ctx.resellerId` | `assertInstituteWithReseller(user)` |
 
 - Guards go on the class, never `APP_GUARD`. Use the assert helpers, never an inline `ForbiddenException`.
@@ -26,6 +27,7 @@ A scope guard proves who the caller is, not which rows are theirs.
 
 - **Look up every id the caller sends under the caller's own context first** (the `*Live` view inside `withTenant` / `withReseller`). A missing row answers that entity's not-found code. RLS makes another institute's row "missing", but only for rows you actually read: foreign keys accept any id.
 - **Check the ids agree with each other** (the class belongs to the year, the section to the class) before writing.
+- **A query about the caller's own account runs under `withUser`**, not `withAdmin` with the user id in the `WHERE`: the repository method takes the `SignedInUser` first and the service passes it through (`UserRepository.findOwn`, `RefreshTokenRepository.revokeOwn`).
 - **Never pass a caller-supplied id to admin-context code** (`withAdmin`, `IdentityService` methods that use it). Pass only an id read from the caller's own row, and add the reached method to `ADMIN_METHOD_ALLOWLIST` with the reason.
 - **A rule with a row condition must be applied to the row.** When a role holds the pair only with a condition (own leaves, linked children, assigned sections), the operation applies it (a `caslToSqlWhere` predicate in the query, or `ability.can(action, subject(type, row))` on the loaded row) and declares `@CheckAbility({ action, subject, rows: 'scoped' })`. Without the declaration `AbilityGuard` refuses that role. Every declared operation is listed in `apps/api-gateway/src/__tests__/row-scope-coverage.ts` with the spec that proves a row outside the condition is refused (`row-scope-coverage.spec.ts`).
 - **Authorize with `@CheckAbility({ action, subject })`** or `ability.can()`, never a role name. A new pair must be reachable by a role and every grant used (`ability-coverage.spec.ts`).
@@ -35,7 +37,7 @@ A scope guard proves who the caller is, not which rows are theirs.
 ## Resolvers, services, repositories
 
 - Code-first GraphQL only (`@ObjectType`, `@InputType`, `@Resolver`); no `.graphql` schema files. Resolvers are thin: validate input through the DTO, call one service method, return.
-- **Services never touch the database.** A `*.service.ts` file imports no `DRIZZLE_DB`, wrapper (`withTenant` / `withAdmin` / `withReseller`), `mk*Ctx`, table, `*Live` view or `drizzle-orm` operator; `pnpm check:service-db-access` fails otherwise (types and a few pure helpers are allowed). The service holds the rules: validation, state transitions, error codes, events, calls to other services.
+- **Services never touch the database.** A `*.service.ts` file imports no `DRIZZLE_DB`, wrapper (`withTenant` / `withAdmin` / `withReseller` / `withUser`), `mk*Ctx`, table, `*Live` view or `drizzle-orm` operator; `pnpm check:service-db-access` fails otherwise (types and a few pure helpers are allowed). The service holds the rules: validation, state transitions, error codes, events, calls to other services.
 - **Every query lives in a repository**, in the feature's `repositories/` folder: `<name>.repository.ts` (abstract class the service injects), `<name>.drizzle-repository.ts` (the implementation with `@Inject(DRIZZLE_DB)`), `types.ts` (record and input types) and `<name>-repository.module.ts`. Model: `apps/api-gateway/src/institute/leave/`.
 - **One repository method per unit of work.** Statements that must commit together run in one method and one transaction. When a rule decides between two statements, the method returns a small typed result (`{ kind: 'not_found' } | { kind: 'ok', row }`) and the service turns it into the `BusinessException`; the repository does not decide business meaning.
 - Unit-test a service against a mocked repository (`createMock<Repository>()`); test the repository's SQL in an integration spec. Never mock the Drizzle transaction.

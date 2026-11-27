@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
-import type { AuthScope, InstituteContext } from '@roviq/common-types';
+import type { AuthScope, InstituteContext, SignedInUser } from '@roviq/common-types';
 import { ErrorCode, NEW_PASSWORD_MIN_LENGTH, ResellerStatus } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
@@ -19,15 +19,30 @@ import { RefreshTokenRepository } from '../repositories/refresh-token.repository
 import { ResellerMembershipRepository } from '../repositories/reseller-membership.repository';
 import type {
   MembershipWithInstituteAndRole,
+  OwnSessionRecord,
   RefreshTokenWithRelations,
   ResellerMembershipWithResellerAndRole,
   UserRecord,
 } from '../repositories/types';
 import { UserRepository } from '../repositories/user.repository';
 
+/** A signed-in person, as a verified token gives it. */
+function signedIn(userId: string, isImpersonated = false): SignedInUser {
+  return {
+    _scope: 'platform',
+    scope: 'platform',
+    userId,
+    membershipId: 'membership-1',
+    roleId: 'role-1',
+    type: 'access',
+    isImpersonated,
+  };
+}
+
 function createMockUserRepo() {
   return createMock<UserRepository>({
     findById: vi.fn(),
+    findOwn: vi.fn(),
     findByUsername: vi.fn(),
     updatePasswordHash: vi.fn(),
     updatePassword: vi.fn(),
@@ -69,10 +84,12 @@ function createMockRefreshTokenRepo() {
     create: vi.fn(),
     findByIdWithRelations: vi.fn(),
     findByHash: vi.fn(),
-    findActiveByUserId: vi.fn(),
+    findOwnActive: vi.fn(),
     hasMembershipInUnusableInstitute: vi.fn(),
     revoke: vi.fn(),
+    revokeOwn: vi.fn(),
     revokeAllForUser: vi.fn(),
+    revokeAllOwn: vi.fn(),
     revokeAllOtherForUser: vi.fn(),
   });
 }
@@ -248,8 +265,9 @@ describe('AuthService', () => {
   describe('account language', () => {
     it('should read the authenticated account preference', async () => {
       mockUserRepo.getPreferredLocale.mockResolvedValue('hi');
-      expect(await authService.getPreferredLocale('user-1')).toBe('hi');
-      expect(mockUserRepo.getPreferredLocale).toHaveBeenCalledWith('user-1');
+      const owner = signedIn('user-1');
+      expect(await authService.getPreferredLocale(owner)).toBe('hi');
+      expect(mockUserRepo.getPreferredLocale).toHaveBeenCalledWith(owner);
     });
 
     it.each([
@@ -257,21 +275,22 @@ describe('AuthService', () => {
       'hi',
       null,
     ])('should save %s without changing identity fields', async (locale) => {
-      expect(await authService.updatePreferredLocale('user-1', locale)).toBe(locale);
-      expect(mockUserRepo.updatePreferredLocale).toHaveBeenCalledWith('user-1', locale);
+      const owner = signedIn('user-1');
+      expect(await authService.updatePreferredLocale(owner, locale)).toBe(locale);
+      expect(mockUserRepo.updatePreferredLocale).toHaveBeenCalledWith(owner, locale);
     });
   });
 
   describe('form help mode', () => {
-    const owner = { userId: 'user-1', isImpersonated: false };
-    const impersonator = { userId: 'user-1', isImpersonated: true };
+    const owner = signedIn('user-1');
+    const impersonator = signedIn('user-1', true);
 
     it('should read the saved mode, and the default when the account has none', async () => {
       mockUserRepo.getFormHelpMode.mockResolvedValueOnce('ICON_ONLY');
       expect(await authService.getFormHelpMode(owner)).toBe('ICON_ONLY');
       mockUserRepo.getFormHelpMode.mockResolvedValueOnce(null);
       expect(await authService.getFormHelpMode(owner)).toBe('ICON_AND_HINT');
-      expect(mockUserRepo.getFormHelpMode).toHaveBeenCalledWith('user-1');
+      expect(mockUserRepo.getFormHelpMode).toHaveBeenCalledWith(owner);
     });
 
     it('should show the default to an impersonator without reading the account', async () => {
@@ -281,7 +300,7 @@ describe('AuthService', () => {
 
     it('should save the mode for the caller only', async () => {
       expect(await authService.updateFormHelpMode(owner, 'ICON_ONLY')).toBe('ICON_ONLY');
-      expect(mockUserRepo.updateFormHelpMode).toHaveBeenCalledWith('user-1', 'ICON_ONLY');
+      expect(mockUserRepo.updateFormHelpMode).toHaveBeenCalledWith(owner, 'ICON_ONLY');
     });
 
     it('should refuse a write while impersonating', async () => {
@@ -755,7 +774,7 @@ describe('AuthService', () => {
   describe('verifyPassword', () => {
     it('should return true for correct password', async () => {
       const passwordHash = await hash('correct-password');
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -767,13 +786,13 @@ describe('AuthService', () => {
         tokenVersion: 0,
       });
 
-      const result = await authService.verifyPassword('user-1', 'correct-password');
+      const result = await authService.verifyPassword(signedIn('user-1'), 'correct-password');
       expect(result).toBe(true);
     });
 
     it('should return false for wrong password', async () => {
       const passwordHash = await hash('correct-password');
-      mockUserRepo.findById.mockResolvedValue({
+      mockUserRepo.findOwn.mockResolvedValue({
         id: 'user-1',
         username: 'admin',
         email: 'admin@test.com',
@@ -785,14 +804,14 @@ describe('AuthService', () => {
         tokenVersion: 0,
       });
 
-      const result = await authService.verifyPassword('user-1', 'wrong-password');
+      const result = await authService.verifyPassword(signedIn('user-1'), 'wrong-password');
       expect(result).toBe(false);
     });
 
     it('should return false for non-existent user', async () => {
-      mockUserRepo.findById.mockResolvedValue(null);
+      mockUserRepo.findOwn.mockResolvedValue(null);
 
-      const result = await authService.verifyPassword('missing', 'password');
+      const result = await authService.verifyPassword(signedIn('missing'), 'password');
       expect(result).toBe(false);
     });
   });
@@ -1699,7 +1718,7 @@ describe('AuthService', () => {
     });
   });
 
-  describe('getUserById', () => {
+  describe('getOwnAccount', () => {
     it('should return user when found', async () => {
       const user = {
         id: 'user-1',
@@ -1712,16 +1731,16 @@ describe('AuthService', () => {
         emailVerifiedAt: null,
         tokenVersion: 0,
       };
-      mockUserRepo.findById.mockResolvedValue(user);
+      mockUserRepo.findOwn.mockResolvedValue(user);
 
-      const result = await authService.getUserById('user-1');
+      const result = await authService.getOwnAccount(signedIn('user-1'));
       expect(result).toEqual(user);
     });
 
     it('should return null when not found', async () => {
-      mockUserRepo.findById.mockResolvedValue(null);
+      mockUserRepo.findOwn.mockResolvedValue(null);
 
-      const result = await authService.getUserById('missing');
+      const result = await authService.getOwnAccount(signedIn('missing'));
       expect(result).toBeNull();
     });
   });
@@ -1734,8 +1753,9 @@ describe('AuthService', () => {
     const NEW_TOKEN_VERSION = 4;
     const NEW = 'NewPassword12!';
     const userId = 'user-1';
+    const actor = signedIn(userId);
 
-    let storedUser: NonNullable<Awaited<ReturnType<UserRepository['findById']>>>;
+    let storedUser: NonNullable<Awaited<ReturnType<UserRepository['findOwn']>>>;
 
     beforeEach(async () => {
       storedUser = {
@@ -1749,29 +1769,29 @@ describe('AuthService', () => {
         emailVerifiedAt: null,
         tokenVersion: 0,
       };
-      mockUserRepo.findById.mockResolvedValue(storedUser);
+      mockUserRepo.findOwn.mockResolvedValue(storedUser);
       mockUserRepo.updatePassword.mockResolvedValue(NEW_TOKEN_VERSION);
-      mockRefreshTokenRepo.revokeAllForUser.mockResolvedValue(undefined);
+      mockRefreshTokenRepo.revokeAllOwn.mockResolvedValue(undefined);
     });
 
     it('hashes new password, persists via updatePassword, and revokes all refresh tokens', async () => {
-      const result = await authService.changePassword(userId, CURRENT, NEW);
+      const result = await authService.changePassword(actor, CURRENT, NEW);
 
       // New contract returns void/undefined — no token blob.
       expect(result).toBeUndefined();
 
       expect(mockUserRepo.updatePassword).toHaveBeenCalledTimes(1);
       const [updatedId, updatedHash] = mockUserRepo.updatePassword.mock.calls[0];
-      expect(updatedId).toBe(userId);
+      expect(updatedId).toBe(actor);
       expect(typeof updatedHash).toBe('string');
       expect(updatedHash).not.toBe(storedUser.passwordHash);
       expect(updatedHash.startsWith('$argon2id$')).toBe(true);
 
-      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith(userId, 'PASSWORD_CHANGE');
+      expect(mockRefreshTokenRepo.revokeAllOwn).toHaveBeenCalledWith(actor, 'PASSWORD_CHANGE');
     });
 
     it('publishes the new token version so older access tokens are refused at once', async () => {
-      await authService.changePassword(userId, CURRENT, NEW);
+      await authService.changePassword(actor, CURRENT, NEW);
 
       const key = `auth:token-version:${userId}`;
       expect(mockRedis.set).toHaveBeenCalledWith(key, String(NEW_TOKEN_VERSION), 'EX', 60);
@@ -1784,15 +1804,15 @@ describe('AuthService', () => {
     });
 
     it('revokes refresh tokens AFTER persisting the new password hash', async () => {
-      await authService.changePassword(userId, CURRENT, NEW);
+      await authService.changePassword(actor, CURRENT, NEW);
 
       const updateOrder = mockUserRepo.updatePassword.mock.invocationCallOrder[0];
-      const revokeOrder = mockRefreshTokenRepo.revokeAllForUser.mock.invocationCallOrder[0];
+      const revokeOrder = mockRefreshTokenRepo.revokeAllOwn.mock.invocationCallOrder[0];
       expect(updateOrder).toBeLessThan(revokeOrder);
     });
 
     it('emits both PASSWORD_CHANGE and ALL_SESSIONS_REVOKED auth events', async () => {
-      await authService.changePassword(userId, CURRENT, NEW, {
+      await authService.changePassword(actor, CURRENT, NEW, {
         ip: '127.0.0.1',
         userAgent: 'jest',
       });
@@ -1816,14 +1836,14 @@ describe('AuthService', () => {
 
     it('rejects wrong current password with CURRENT_PASSWORD_INCORRECT', async () => {
       const failure = await expectBusinessError(
-        authService.changePassword(userId, 'not-the-current-password', NEW),
+        authService.changePassword(actor, 'not-the-current-password', NEW),
         ErrorCode.CURRENT_PASSWORD_INCORRECT,
       );
 
       expect(failure.message).toBe('Current password is incorrect');
 
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
-      expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.revokeAllOwn).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -1832,7 +1852,7 @@ describe('AuthService', () => {
       ['without a digit', 'abcdefghIJ'],
     ])('rejects a new password %s with VALIDATION_FAILED', async (_case, rejected) => {
       await expectBusinessError(
-        authService.changePassword(userId, CURRENT, rejected),
+        authService.changePassword(actor, CURRENT, rejected),
         ErrorCode.VALIDATION_FAILED,
       );
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
@@ -1840,7 +1860,7 @@ describe('AuthService', () => {
 
     it('rejects when new password equals current with PASSWORD_UNCHANGED', async () => {
       await expectBusinessError(
-        authService.changePassword(userId, CURRENT, CURRENT),
+        authService.changePassword(actor, CURRENT, CURRENT),
         ErrorCode.PASSWORD_UNCHANGED,
       );
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
@@ -1966,51 +1986,38 @@ describe('AuthService', () => {
     });
   });
   describe('session management', () => {
-    function session(id: string, token: string): RefreshTokenWithRelations {
+    const owner = signedIn('user-1');
+
+    function session(id: string, token: string): OwnSessionRecord {
       return {
         id,
         tokenHash: createHash('sha256').update(token).digest('hex'),
-        userId: 'user-1',
-        membershipScope: 'institute',
-        revokedAt: null,
-        revokedReason: null,
         expiresAt: new Date('2099-01-01T00:00:00.000Z'),
         createdAt: new Date('2026-11-16T00:00:00.000Z'),
         deviceInfo: null,
         ipAddress: null,
         userAgent: null,
         lastUsedAt: null,
-        user: {
-          id: 'user-1',
-          username: 'session-user',
-          email: 'session@example.com',
-          status: 'ACTIVE',
-          passwordChangedAt: null,
-          mustChangePassword: false,
-          emailVerifiedAt: null,
-          tokenVersion: 0,
-        },
-        membership: null,
       };
     }
 
     it('should mark only the matching active session as current', async () => {
       const current = session('current', 'refresh');
       const other = session('other', 'other-refresh');
-      mockRefreshTokenRepo.findActiveByUserId.mockResolvedValue([current, other]);
+      mockRefreshTokenRepo.findOwnActive.mockResolvedValue([current, other]);
 
-      expect(await authService.getActiveSessions('user-1', 'refresh')).toEqual([
+      expect(await authService.getActiveSessions(owner, 'refresh')).toEqual([
         { ...current, isCurrent: true },
         { ...other, isCurrent: false },
       ]);
-      expect(mockRefreshTokenRepo.findActiveByUserId).toHaveBeenCalledWith('user-1');
+      expect(mockRefreshTokenRepo.findOwnActive).toHaveBeenCalledWith(owner);
     });
 
     it('should reject a refresh token outside the active sessions', async () => {
-      mockRefreshTokenRepo.findActiveByUserId.mockResolvedValue([session('current', 'refresh')]);
+      mockRefreshTokenRepo.findOwnActive.mockResolvedValue([session('current', 'refresh')]);
 
       await expectBusinessError(
-        authService.getActiveSessions('user-1', 'foreign-token'),
+        authService.getActiveSessions(owner, 'foreign-token'),
         ErrorCode.SESSION_EXPIRED,
       );
     });
@@ -2018,13 +2025,13 @@ describe('AuthService', () => {
     it('should preserve the matching session when revoking other sessions', async () => {
       mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'current', userId: 'user-1' });
 
-      await authService.revokeAllOtherSessions('user-1', 'refresh');
+      await authService.revokeAllOtherSessions(owner, 'refresh');
 
       expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(
         createHash('sha256').update('refresh').digest('hex'),
       );
       expect(mockRefreshTokenRepo.revokeAllOtherForUser).toHaveBeenCalledWith(
-        'user-1',
+        owner,
         'current',
         'USER_INITIATED',
       );
@@ -2034,7 +2041,7 @@ describe('AuthService', () => {
       mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'foreign', userId: 'other-user' });
 
       await expectBusinessError(
-        authService.revokeAllOtherSessions('user-1', 'foreign-token'),
+        authService.revokeAllOtherSessions(owner, 'foreign-token'),
         ErrorCode.SESSION_EXPIRED,
       );
 

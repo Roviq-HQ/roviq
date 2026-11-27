@@ -11,6 +11,7 @@ import type {
   AuthUser,
   FormHelpMode,
   InstituteContext,
+  SignedInUser,
 } from '@roviq/common-types';
 import {
   BusinessException,
@@ -112,31 +113,28 @@ export class AuthService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  getPreferredLocale(userId: string): Promise<string | null> {
-    return this.userRepo.getPreferredLocale(userId);
+  getPreferredLocale(user: SignedInUser): Promise<string | null> {
+    return this.userRepo.getPreferredLocale(user);
   }
 
-  async updatePreferredLocale(userId: string, locale: string | null): Promise<string | null> {
-    await this.userRepo.updatePreferredLocale(userId, locale);
+  async updatePreferredLocale(user: SignedInUser, locale: string | null): Promise<string | null> {
+    await this.userRepo.updatePreferredLocale(user, locale);
     return locale;
   }
 
   /** An impersonator sees the default, not the impersonated account's choice. */
-  async getFormHelpMode(user: Pick<AuthUser, 'userId' | 'isImpersonated'>): Promise<FormHelpMode> {
+  async getFormHelpMode(user: SignedInUser): Promise<FormHelpMode> {
     if (user.isImpersonated) return DEFAULT_FORM_HELP_MODE;
-    return (await this.userRepo.getFormHelpMode(user.userId)) ?? DEFAULT_FORM_HELP_MODE;
+    return (await this.userRepo.getFormHelpMode(user)) ?? DEFAULT_FORM_HELP_MODE;
   }
 
-  async updateFormHelpMode(
-    user: Pick<AuthUser, 'userId' | 'isImpersonated'>,
-    mode: FormHelpMode,
-  ): Promise<FormHelpMode> {
+  async updateFormHelpMode(user: SignedInUser, mode: FormHelpMode): Promise<FormHelpMode> {
     if (user.isImpersonated)
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
         'Cannot change account preferences while impersonating',
       );
-    await this.userRepo.updateFormHelpMode(user.userId, mode);
+    await this.userRepo.updateFormHelpMode(user, mode);
     return mode;
   }
 
@@ -641,9 +639,9 @@ export class AuthService {
 
   // ── Session management ─────────────────────────────────
 
-  async getActiveSessions(userId: string, currentRefreshToken: string) {
+  async getActiveSessions(user: SignedInUser, currentRefreshToken: string) {
     const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
-    const sessions = await this.refreshTokenRepo.findActiveByUserId(userId);
+    const sessions = await this.refreshTokenRepo.findOwnActive(user);
     if (!sessions.some((session) => session.tokenHash === tokenHash)) {
       throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
@@ -653,26 +651,23 @@ export class AuthService {
     }));
   }
 
-  async revokeSession(userId: string, sessionId: string): Promise<void> {
-    // Verify the session belongs to this user
-    const session = await this.refreshTokenRepo.findByIdWithRelations(sessionId);
-    if (!session || session.userId !== userId) {
-      throw new BusinessException(ErrorCode.SESSION_NOT_FOUND, 'Session not found');
-    }
-    await this.refreshTokenRepo.revoke(sessionId, 'USER_INITIATED');
+  async revokeSession(user: SignedInUser, sessionId: string): Promise<void> {
+    const revoked = await this.refreshTokenRepo.revokeOwn(user, sessionId, 'USER_INITIATED');
+    if (!revoked) throw new BusinessException(ErrorCode.SESSION_NOT_FOUND, 'Session not found');
   }
 
   async revokeAllOtherSessions(
-    userId: string,
+    user: SignedInUser,
     currentRefreshToken: string,
     meta?: RequestMeta,
   ): Promise<void> {
+    const userId = user.userId;
     const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
     const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
     if (!currentToken || currentToken.userId !== userId) {
       throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
-    await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentToken.id, 'USER_INITIATED');
+    await this.refreshTokenRepo.revokeAllOtherForUser(user, currentToken.id, 'USER_INITIATED');
 
     this.authEventService
       .emit({
@@ -688,14 +683,15 @@ export class AuthService {
 
   // ── User queries ───────────────────────────────────────
 
-  async getUserById(id: string): Promise<UserRecord | null> {
-    return this.userRepo.findById(id);
+  /** The signed-in person's own account. */
+  async getOwnAccount(user: SignedInUser): Promise<UserRecord | null> {
+    return this.userRepo.findOwn(user);
   }
 
-  async verifyPassword(userId: string, password: string): Promise<boolean> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) return false;
-    return verify(user.passwordHash, password);
+  async verifyPassword(user: SignedInUser, password: string): Promise<boolean> {
+    const account = await this.userRepo.findOwn(user);
+    if (!account) return false;
+    return verify(account.passwordHash, password);
   }
 
   // ── Password change (ROV-96) ───────────────────────────
@@ -713,11 +709,12 @@ export class AuthService {
    * always get a definitive yes/no instead of a token blob.
    */
   async changePassword(
-    userId: string,
+    actor: SignedInUser,
     currentPassword: string,
     newPassword: string,
     meta?: RequestMeta,
   ): Promise<void> {
+    const userId = actor.userId;
     if (currentPassword === newPassword) {
       throw new BusinessException(
         ErrorCode.PASSWORD_UNCHANGED,
@@ -735,7 +732,7 @@ export class AuthService {
     // This endpoint is behind GqlAuthGuard — userId is taken from the signed
     // JWT, not from user input. A null findById result means the account was
     // deleted mid-session; it is not an enumeration surface.
-    const user = await this.userRepo.findById(userId);
+    const user = await this.userRepo.findOwn(actor);
     if (!user) {
       throw new BusinessException(
         ErrorCode.CURRENT_PASSWORD_INCORRECT,
@@ -752,8 +749,8 @@ export class AuthService {
     }
 
     const newHash = await hash(newPassword);
-    const tokenVersion = await this.userRepo.updatePassword(userId, newHash);
-    await this.refreshTokenRepo.revokeAllForUser(userId, 'PASSWORD_CHANGE');
+    const tokenVersion = await this.userRepo.updatePassword(actor, newHash);
+    await this.refreshTokenRepo.revokeAllOwn(actor, 'PASSWORD_CHANGE');
     // Ends the access tokens already issued, on their next request.
     await recordTokenVersion(this.redis, userId, tokenVersion);
 

@@ -1,3 +1,4 @@
+import type { SignedInUser } from '@roviq/common-types';
 import { type SignOptions, sign } from 'jsonwebtoken';
 
 /**
@@ -48,6 +49,21 @@ export function createInstituteToken(
     getJwtSecret(),
     { expiresIn: options.expiresIn ?? '15m' },
   );
+}
+
+/**
+ * The user a guard would attach for a verified token of `userId`, for a spec that calls a
+ * service or repository directly instead of going through GraphQL.
+ */
+export function signedInAs(userId: string): SignedInUser {
+  return {
+    _scope: 'platform',
+    scope: 'platform',
+    userId,
+    membershipId: userId,
+    roleId: userId,
+    type: 'access',
+  };
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { SignedInUser } from '@roviq/common-types';
 import type {
   CreateInstituteGroupData,
   GroupMembershipRecord,
@@ -61,5 +62,6 @@ export abstract class InstituteGroupRepository {
   ): Promise<GroupMembershipRecord>;
   abstract removeMember(groupId: string, userId: string): Promise<void>;
   abstract findMembershipsByGroup(groupId: string): Promise<GroupMembershipRecord[]>;
-  abstract findMembershipsByUser(userId: string): Promise<GroupMembershipRecord[]>;
+  /** The signed-in person's own group memberships, read as that person. */
+  abstract findOwnMemberships(user: SignedInUser): Promise<GroupMembershipRecord[]>;
 }

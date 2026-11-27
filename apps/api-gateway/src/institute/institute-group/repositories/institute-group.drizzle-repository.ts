@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode, type GroupType } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  type GroupType,
+  type SignedInUser,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -18,6 +23,7 @@ import {
   withAdmin,
   withReseller,
   withTenant,
+  withUser,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, count, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
@@ -437,12 +443,12 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
     });
   }
 
-  async findMembershipsByUser(userId: string): Promise<GroupMembershipRecord[]> {
-    return withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
+  async findOwnMemberships(user: SignedInUser): Promise<GroupMembershipRecord[]> {
+    return withUser(this.db, user, async (tx) => {
       const rows = await tx
         .select(membershipColumns)
         .from(groupMembershipsLive)
-        .where(eq(groupMembershipsLive.userId, userId));
+        .where(eq(groupMembershipsLive.userId, user.userId));
 
       return rows as GroupMembershipRecord[];
     });
