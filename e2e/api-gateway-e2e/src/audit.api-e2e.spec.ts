@@ -62,7 +62,8 @@ async function queryWithRls(
 
 /**
  * Execute a query with admin role, bypassing tenant isolation.
- * Uses SET LOCAL ROLE roviq_admin so all admin policies pass.
+ * Uses SET LOCAL ROLE roviq_admin so all admin policies pass. Fixture rows are inserted this
+ * way: the institute and reseller roles hold no INSERT on audit_logs.
  */
 async function queryAsPlatformAdmin(
   pool: pg.Pool,
@@ -206,9 +207,8 @@ describe('Audit E2E', () => {
 
     beforeAll(async () => {
       testCorrelationId = crypto.randomUUID();
-      await queryWithRls(
+      await queryAsPlatformAdmin(
         pool,
-        adminTenantId,
         `INSERT INTO audit_logs
           (scope, tenant_id, user_id, actor_id, action, action_type, entity_type,
            entity_id, correlation_id, source, metadata)
@@ -265,9 +265,8 @@ describe('Audit E2E', () => {
 
     it('should support cursor-based pagination', async () => {
       for (let i = 0; i < 3; i++) {
-        await queryWithRls(
+        await queryAsPlatformAdmin(
           pool,
-          adminTenantId,
           `INSERT INTO audit_logs
             (scope, tenant_id, user_id, actor_id, action, action_type,
              entity_type, correlation_id, source)
@@ -522,14 +521,14 @@ describe('Audit E2E', () => {
         ON CONFLICT (id, created_at) DO NOTHING`;
 
       // Insert twice with same id + created_at
-      await queryWithRls(pool, adminTenantId, insertSql, [
+      await queryAsPlatformAdmin(pool, insertSql, [
         id,
         adminTenantId,
         correlationId,
         createdAt,
         AUDIT_USER_ID,
       ]);
-      await queryWithRls(pool, adminTenantId, insertSql, [
+      await queryAsPlatformAdmin(pool, insertSql, [
         id,
         adminTenantId,
         correlationId,
@@ -559,9 +558,8 @@ describe('Audit E2E', () => {
       const impersonatorId = actorId;
       const correlationId = crypto.randomUUID();
 
-      await queryWithRls(
+      await queryAsPlatformAdmin(
         pool,
-        adminTenantId,
         `INSERT INTO audit_logs
           (scope, tenant_id, user_id, actor_id, impersonator_id,
            action, action_type, entity_type,
@@ -598,9 +596,8 @@ describe('Audit E2E', () => {
 
       // Insert 3 rows with same correlation ID (simulating cascading side effects)
       for (const action of ['createEnrollment', 'createAttendance', 'assignSection']) {
-        await queryWithRls(
+        await queryAsPlatformAdmin(
           pool,
-          adminTenantId,
           `INSERT INTO audit_logs
             (scope, tenant_id, user_id, actor_id, action, action_type,
              entity_type, correlation_id, source)

@@ -8350,11 +8350,6 @@ input UpdateInstituteInfoInput {
   """Physical address of the institute."""
   address: InstituteAddressInput
 
-  """
-  Short internal code for the institute, e.g. "SAJ". Unique per reseller.
-  """
-  code: String
-
   """Phone and email contact details."""
   contact: InstituteContactInput
 

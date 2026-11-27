@@ -1,8 +1,9 @@
 /**
- * CI guard — every pgTable definition must opt into RLS.
+ * CI guard — every pgTable definition must opt into RLS, and must have at least one policy
+ * line in `libs/database/privileges.manifest.txt`.
  *
- * Detects RLS via any of: `tenantPolicies(`, `entityPolicies(`,
- * `filePolicies(`, `userScopedPolicies(`, `pgPolicy(`.
+ * Detects RLS via any of: `tenantPolicies(`, `filePolicies(`, `userScopedPolicies(`,
+ * `pgPolicy(`.
  * drizzle-kit enables row security on any table with a policy, so the deprecated
  * `.enableRLS()` is refused rather than counted.
  *
@@ -14,6 +15,7 @@ import { basename, join, relative } from 'node:path';
 const ROOT = process.cwd();
 export const SCHEMA_ROOT = join(ROOT, 'libs/database/src/schema');
 export const EE_SCHEMA_ROOT = join(ROOT, 'ee/libs/database/src/schema');
+const MANIFEST = join(ROOT, 'libs/database/privileges.manifest.txt');
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '__tests__', 'common']);
 const SKIP_BASENAMES = new Set([
@@ -31,13 +33,7 @@ const SKIP_BASENAMES = new Set([
 // Tables allowed without RLS. Empty: adding one needs a security review first.
 export const RLS_EXEMPT_BASENAMES = new Set<string>();
 
-const RLS_INDICATORS = [
-  'tenantPolicies(',
-  'entityPolicies(',
-  'filePolicies(',
-  'userScopedPolicies(',
-  'pgPolicy(',
-];
+const RLS_INDICATORS = ['tenantPolicies(', 'filePolicies(', 'userScopedPolicies(', 'pgPolicy('];
 
 export function hasPgTable(text: string): boolean {
   return /\bpgTable\s*\(/.test(text);
@@ -88,6 +84,25 @@ export function findMissingRls(schemaRoot: string): Missing[] {
   return missing;
 }
 
+/** The table names a schema file declares with `pgTable('name', …)`. */
+export function tableNames(text: string): string[] {
+  return [...text.matchAll(/\bpgTable\s*\(\s*['"]([a-z0-9_]+)['"]/g)].map((match) => match[1]);
+}
+
+/** Tables with no policy line in the privilege manifest: nobody wrote down who may reach them. */
+export function findMissingFromManifest(schemaRoots: string[], manifest: string): string[] {
+  const listed = new Set(
+    manifest
+      .split('\n')
+      .filter((line) => line.startsWith('policy | '))
+      .map((line) => line.split(' | ')[1]),
+  );
+  const files: string[] = [];
+  for (const root of schemaRoots) walk(root, files);
+  const names = files.flatMap((file) => tableNames(readFileSync(file, 'utf8')));
+  return [...new Set(names)].filter((name) => !listed.has(name)).sort();
+}
+
 export function findDeprecatedEnableRls(schemaRoot: string): string[] {
   const files: string[] = [];
   walk(schemaRoot, files);
@@ -108,11 +123,24 @@ function main(): number {
   }
   const missing = [...findMissingRls(SCHEMA_ROOT), ...findMissingRls(EE_SCHEMA_ROOT)];
   if (missing.length === 0) {
-    process.stdout.write('check:rls-coverage — every non-exempt pgTable opts into RLS.\n');
+    const unlisted = findMissingFromManifest(
+      [SCHEMA_ROOT, EE_SCHEMA_ROOT],
+      readFileSync(MANIFEST, 'utf8'),
+    );
+    if (unlisted.length > 0) {
+      process.stderr.write(
+        `check:rls-coverage — ${unlisted.length} table(s) have no line in ${relative(ROOT, MANIFEST)}. Grant what the table needs in its migration, then update the file as its header says:\n\n`,
+      );
+      for (const name of unlisted) process.stderr.write(`  ${name}\n`);
+      return 1;
+    }
+    process.stdout.write(
+      'check:rls-coverage — every non-exempt pgTable opts into RLS and is in the privilege manifest.\n',
+    );
     return 0;
   }
   process.stderr.write(
-    `check:rls-coverage — ${missing.length} pgTable(s) missing RLS policies. Add tenantPolicies()/entityPolicies()/userScopedPolicies()/pgPolicy(), or add the file to RLS_EXEMPT_BASENAMES with a justification:\n\n`,
+    `check:rls-coverage — ${missing.length} pgTable(s) missing RLS policies. Add tenantPolicies()/userScopedPolicies()/pgPolicy(), or add the file to RLS_EXEMPT_BASENAMES with a justification:\n\n`,
   );
   for (const m of missing) {
     process.stderr.write(`  ${relative(ROOT, m.file)}\n`);

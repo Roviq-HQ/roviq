@@ -3,7 +3,8 @@
  * by attempting each statement as the database role.
  *
  * Group branding is written by the platform only; an institute reads the branding of its own
- * group. An institute or reseller role may insert an audit row only for its own context.
+ * group. Audit rows are written by the audit writer and the platform: an institute or reseller
+ * role inserts none.
  */
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
@@ -12,9 +13,8 @@ import { asInstitute, asReseller, become, expectRefused, inRolledBackTx } from '
 import { TEST_POOLER_URL } from './test-helpers';
 
 const SYSTEM = '00000000-0000-0000-0000-000000000000';
-const RLS_REFUSED = /row-level security policy/;
-// A pooled connection that held a context before reads '' for the setting, which is no uuid.
-const NO_CONTEXT_REFUSED = /row-level security policy|invalid input syntax for type uuid/;
+// Neither role holds the write privilege, so the refusal comes before any row rule.
+const DENIED = /permission denied/;
 
 let pool: pg.Pool;
 
@@ -94,8 +94,8 @@ describe('institute_group_branding', () => {
       );
       await asInstitute(client, a.instituteId);
       const insert = `INSERT INTO institute_group_branding (group_id, created_by, updated_by) VALUES ($1, $2, $2)`;
-      await expectRefused(client, RLS_REFUSED, insert, [other.rows[0].id, SYSTEM]);
-      await expectRefused(client, RLS_REFUSED, insert, [a.groupId, SYSTEM]);
+      await expectRefused(client, DENIED, insert, [other.rows[0].id, SYSTEM]);
+      await expectRefused(client, DENIED, insert, [a.groupId, SYSTEM]);
     });
   });
 
@@ -105,15 +105,15 @@ describe('institute_group_branding', () => {
       const b = await createParty(client);
       await asInstitute(client, a.instituteId);
       for (const id of [a.brandingId, b.brandingId]) {
-        const updated = await client.query(
+        await expectRefused(
+          client,
+          DENIED,
           `UPDATE institute_group_branding SET primary_color = '#ff0000' WHERE id = $1`,
           [id],
         );
-        expect(updated.rowCount).toBe(0);
-        const deleted = await client.query('DELETE FROM institute_group_branding WHERE id = $1', [
+        await expectRefused(client, DENIED, 'DELETE FROM institute_group_branding WHERE id = $1', [
           id,
         ]);
-        expect(deleted.rowCount).toBe(0);
       }
       await become(client, 'roviq_admin');
       const after = await client.query<{ primary_color: string }>(
@@ -150,12 +150,11 @@ describe('institute_group_branding', () => {
 });
 
 describe('audit_logs inserts by the institute and reseller roles', () => {
-  it('an institute inserts a row for itself', async () => {
+  it('an institute cannot insert a row, even for itself', async () => {
     await inRolledBackTx(pool, async (client) => {
       const a = await createParty(client);
       await asInstitute(client, a.instituteId);
-      const res = await client.query(INSERT_AUDIT, ['institute', a.instituteId, null, SYSTEM]);
-      expect(res.rowCount).toBe(1);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['institute', a.instituteId, null, SYSTEM]);
     });
   });
 
@@ -164,12 +163,7 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
       const a = await createParty(client);
       const b = await createParty(client);
       await asInstitute(client, a.instituteId);
-      await expectRefused(client, RLS_REFUSED, INSERT_AUDIT, [
-        'institute',
-        b.instituteId,
-        null,
-        SYSTEM,
-      ]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['institute', b.instituteId, null, SYSTEM]);
     });
   });
 
@@ -177,13 +171,8 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
     await inRolledBackTx(pool, async (client) => {
       const a = await createParty(client);
       await asInstitute(client, a.instituteId);
-      await expectRefused(client, RLS_REFUSED, INSERT_AUDIT, ['platform', null, null, SYSTEM]);
-      await expectRefused(client, RLS_REFUSED, INSERT_AUDIT, [
-        'reseller',
-        null,
-        a.resellerId,
-        SYSTEM,
-      ]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['platform', null, null, SYSTEM]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['reseller', null, a.resellerId, SYSTEM]);
     });
   });
 
@@ -194,7 +183,7 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
       await asInstitute(client, a.instituteId);
       await expectRefused(
         client,
-        /row-level security policy|chk_audit_subject_tenant/,
+        DENIED,
         `INSERT INTO audit_logs
           (scope, tenant_id, subject_tenant_id, user_id, actor_id, action, action_type, entity_type, correlation_id, source)
          VALUES ('institute', $1, $2, $3, $3, 'rov371', 'CREATE', 'Test', uuidv7(), 'TEST')`,
@@ -203,12 +192,11 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
     });
   });
 
-  it('a reseller inserts a row for itself', async () => {
+  it('a reseller cannot insert a row, even for itself', async () => {
     await inRolledBackTx(pool, async (client) => {
       const a = await createParty(client);
       await asReseller(client, a.resellerId);
-      const res = await client.query(INSERT_AUDIT, ['reseller', null, a.resellerId, SYSTEM]);
-      expect(res.rowCount).toBe(1);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['reseller', null, a.resellerId, SYSTEM]);
     });
   });
 
@@ -217,12 +205,7 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
       const a = await createParty(client);
       const b = await createParty(client);
       await asReseller(client, a.resellerId);
-      await expectRefused(client, RLS_REFUSED, INSERT_AUDIT, [
-        'reseller',
-        null,
-        b.resellerId,
-        SYSTEM,
-      ]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['reseller', null, b.resellerId, SYSTEM]);
     });
   });
 
@@ -230,13 +213,8 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
     await inRolledBackTx(pool, async (client) => {
       const a = await createParty(client);
       await asReseller(client, a.resellerId);
-      await expectRefused(client, RLS_REFUSED, INSERT_AUDIT, ['platform', null, null, SYSTEM]);
-      await expectRefused(client, RLS_REFUSED, INSERT_AUDIT, [
-        'institute',
-        a.instituteId,
-        null,
-        SYSTEM,
-      ]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['platform', null, null, SYSTEM]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['institute', a.instituteId, null, SYSTEM]);
     });
   });
 
@@ -244,19 +222,9 @@ describe('audit_logs inserts by the institute and reseller roles', () => {
     await inRolledBackTx(pool, async (client) => {
       const a = await createParty(client);
       await become(client, 'roviq_app');
-      await expectRefused(client, NO_CONTEXT_REFUSED, INSERT_AUDIT, [
-        'institute',
-        a.instituteId,
-        null,
-        SYSTEM,
-      ]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['institute', a.instituteId, null, SYSTEM]);
       await become(client, 'roviq_reseller');
-      await expectRefused(client, NO_CONTEXT_REFUSED, INSERT_AUDIT, [
-        'reseller',
-        null,
-        a.resellerId,
-        SYSTEM,
-      ]);
+      await expectRefused(client, DENIED, INSERT_AUDIT, ['reseller', null, a.resellerId, SYSTEM]);
     });
   });
 });

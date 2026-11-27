@@ -285,13 +285,13 @@
     }
   },
   "institutes.new.code": {
-    "reviewedReason": "The own-institute queries moved to the institute database role and the institutes table gained an update policy; this field is read and saved as before",
+    "reviewedReason": "only row policies and their comments changed in the institutes schema file; the create form stores this field as before",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
-      "libs/database/src/schema/tenant/institutes.ts": "80cb8224a7a72549"
+      "libs/database/src/schema/tenant/institutes.ts": "b77db775bd16fb13"
     }
   },
   "institutes.new.firstAdmin": {
@@ -314,7 +314,7 @@
     }
   },
   "institutes.new.type": {
-    "reviewedReason": "The own-institute queries moved to the institute database role and the institutes table gained an update policy; this field is read and saved as before",
+    "reviewedReason": "only row policies and their comments changed in the institutes schema file; the create form stores this field as before",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/institute/academic-year/academic-year.service.ts": "0f4990b980d1fccc",
@@ -322,7 +322,7 @@
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
-      "libs/database/src/schema/tenant/institutes.ts": "80cb8224a7a72549",
+      "libs/database/src/schema/tenant/institutes.ts": "b77db775bd16fb13",
       "libs/shared/common-types/src/lib/enums/institute.ts": "38613559a9bfc4a5"
     }
   },

@@ -4,10 +4,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   findDeprecatedEnableRls,
+  findMissingFromManifest,
   findMissingRls,
   hasPgTable,
   hasRls,
   RLS_EXEMPT_BASENAMES,
+  tableNames,
 } from '../check-rls-coverage';
 
 describe('hasPgTable', () => {
@@ -27,10 +29,6 @@ describe('hasPgTable', () => {
 describe('hasRls', () => {
   it('detects tenantPolicies', () => {
     expect(hasRls("...tenantPolicies('foo'),")).toBe(true);
-  });
-
-  it('detects entityPolicies', () => {
-    expect(hasRls("...entityPolicies('foo'),")).toBe(true);
   });
 
   it('detects pgPolicy', () => {
@@ -162,5 +160,43 @@ describe('findDeprecatedEnableRls', () => {
       `export const g = pgTable('g', {}, () => [pgPolicy('p', {})]);`,
     );
     expect(findDeprecatedEnableRls(dir)).toEqual([]);
+  });
+});
+
+describe('privilege manifest coverage', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'rlsmanifest-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('should read the table names a schema file declares', () => {
+    expect(
+      tableNames(
+        `export const a = pgTable('subjects', {});\nexport const b = pgTable(\n  "exam_terms",\n  {});`,
+      ),
+    ).toEqual(['subjects', 'exam_terms']);
+  });
+
+  it('should name a table that has no policy line in the manifest', () => {
+    writeFileSync(join(dir, 'subjects.ts'), `export const subjects = pgTable('subjects', {});`);
+    writeFileSync(join(dir, 'holidays.ts'), `export const holidays = pgTable('holidays', {});`);
+    const manifest = [
+      '# a comment',
+      'grant  | roviq_app | holidays | SELECT | *',
+      'policy | subjects | subjects_app_select | roviq_app | SELECT | using: true | check: ',
+    ].join('\n');
+    expect(findMissingFromManifest([dir], manifest)).toEqual(['holidays']);
+  });
+
+  it('should pass when every table has a policy line', () => {
+    writeFileSync(join(dir, 'subjects.ts'), `export const subjects = pgTable('subjects', {});`);
+    const manifest =
+      'policy | subjects | subjects_admin_all | roviq_admin | ALL | using: true | check: true';
+    expect(findMissingFromManifest([dir], manifest)).toEqual([]);
   });
 });

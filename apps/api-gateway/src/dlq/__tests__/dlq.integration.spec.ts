@@ -160,19 +160,18 @@ describeDb('DLQ messages (integration)', () => {
       });
     });
 
-    it('roviq_app CANNOT see a dlq_messages row (RLS denies, platform-only)', async () => {
+    it('roviq_app CANNOT read dlq_messages (no privilege, platform-only)', async () => {
       const seq = BigInt(Date.now()) * 1000n + 2n;
       await insertDlqRow(seq);
 
       await asRole('roviq_app', { 'app.current_tenant_id': SEED_INSTITUTE_1 }, async (client) => {
-        const res = await client.query(`SELECT id FROM dlq_messages WHERE dlq_stream_seq = $1`, [
-          seq.toString(),
-        ]);
-        expect(res.rows).toHaveLength(0);
+        await expect(
+          client.query(`SELECT id FROM dlq_messages WHERE dlq_stream_seq = $1`, [seq.toString()]),
+        ).rejects.toThrow(/permission denied/);
       });
     });
 
-    it('roviq_reseller CANNOT see a dlq_messages row (RLS denies, platform-only)', async () => {
+    it('roviq_reseller CANNOT read dlq_messages (no privilege, platform-only)', async () => {
       const seq = BigInt(Date.now()) * 1000n + 3n;
       await insertDlqRow(seq);
 
@@ -180,10 +179,9 @@ describeDb('DLQ messages (integration)', () => {
         'roviq_reseller',
         { 'app.current_reseller_id': SEED_RESELLER_DIRECT },
         async (client) => {
-          const res = await client.query(`SELECT id FROM dlq_messages WHERE dlq_stream_seq = $1`, [
-            seq.toString(),
-          ]);
-          expect(res.rows).toHaveLength(0);
+          await expect(
+            client.query(`SELECT id FROM dlq_messages WHERE dlq_stream_seq = $1`, [seq.toString()]),
+          ).rejects.toThrow(/permission denied/);
         },
       );
     });

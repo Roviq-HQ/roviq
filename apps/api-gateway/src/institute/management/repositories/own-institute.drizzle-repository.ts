@@ -62,7 +62,6 @@ export class OwnInstituteDrizzleRepository extends OwnInstituteRepository {
         .update(institutes)
         .set({
           ...(data.name !== undefined && { name: data.name }),
-          ...(data.code !== undefined && { code: data.code }),
           ...(data.contact !== undefined && { contact: data.contact }),
           ...(data.address !== undefined && { address: data.address }),
           ...(data.timezone !== undefined && { timezone: data.timezone }),

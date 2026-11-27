@@ -1,0 +1,4 @@
+DROP POLICY "audit_app_insert" ON "audit_logs";--> statement-breakpoint
+DROP POLICY "audit_reseller_insert" ON "audit_logs";--> statement-breakpoint
+DROP POLICY "institutes_reseller_insert" ON "institutes";--> statement-breakpoint
+ALTER POLICY "institutes_reseller_update" ON "institutes" TO "roviq_reseller" USING (reseller_id = current_setting('app.current_reseller_id', true)::uuid) WITH CHECK (reseller_id = current_setting('app.current_reseller_id', true)::uuid AND (group_id IS NULL OR group_id IN (SELECT id FROM institute_groups WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid)));

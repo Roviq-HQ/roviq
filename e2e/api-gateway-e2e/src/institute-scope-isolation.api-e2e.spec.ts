@@ -115,7 +115,7 @@ describe('Institute scope isolation (ROV-290)', () => {
         }`,
         {
           id: SEED.INSTITUTE_2.id,
-          input: { version: before.data.myInstitute.version, code: `HIJACK-${SUFFIX}` },
+          input: { version: before.data.myInstitute.version, timezone: 'Asia/Dubai' },
         },
         instituteToken,
       );
@@ -134,16 +134,16 @@ describe('Institute scope isolation (ROV-290)', () => {
 
     it('updates the caller’s own institute without an id', async () => {
       const current = await gql<{
-        myInstitute: { id: string; version: number; code: string | null };
-      }>('query { myInstitute { id version code } }', undefined, instituteToken);
+        myInstitute: { id: string; version: number; timezone: string };
+      }>('query { myInstitute { id version timezone } }', undefined, instituteToken);
       assert(current.data);
-      const { id, version, code } = current.data.myInstitute;
+      const { id, version, timezone } = current.data.myInstitute;
 
       const res = await gql<{ updateInstituteInfo: { id: string; version: number } }>(
         `mutation ($input: UpdateInstituteInfoInput!) {
           updateInstituteInfo(input: $input) { id version }
         }`,
-        { input: { version, code } },
+        { input: { version, timezone } },
         instituteToken,
       );
       expect(res.errors).toBeUndefined();

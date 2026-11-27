@@ -169,12 +169,10 @@ describe('M7: consent_records append-only enforcement', () => {
         SEED.INSTITUTE_1,
       ]);
 
-      // Attempt UPDATE — blocked by RLS (UPDATE policy uses USING(false), so 0 rows visible)
-      const updateRes = await client.query(
-        'UPDATE consent_records SET is_granted = false WHERE id = $1',
-        [consentId],
-      );
-      expect(updateRes.rowCount).toBe(0);
+      // The role holds no UPDATE on the table: a consent record is never changed.
+      await expect(
+        client.query('UPDATE consent_records SET is_granted = false WHERE id = $1', [consentId]),
+      ).rejects.toThrow(/permission denied/);
     });
   });
 
@@ -217,11 +215,10 @@ describe('M7: consent_records append-only enforcement', () => {
         SEED.INSTITUTE_1,
       ]);
 
-      // Attempt DELETE — blocked by RLS (DELETE policy uses USING(false), so 0 rows visible)
-      const deleteRes = await client.query('DELETE FROM consent_records WHERE id = $1', [
-        consentId,
-      ]);
-      expect(deleteRes.rowCount).toBe(0);
+      // The role holds no DELETE on the table: a consent record is never removed.
+      await expect(
+        client.query('DELETE FROM consent_records WHERE id = $1', [consentId]),
+      ).rejects.toThrow(/permission denied/);
     });
   });
 

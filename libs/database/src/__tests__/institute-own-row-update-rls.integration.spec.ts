@@ -17,7 +17,6 @@ const PERMISSION_DENIED = /permission denied for table institutes/;
 /** Columns the institute role may update. The manifest of the grant. */
 const EDITABLE = [
   'name',
-  'code',
   'contact',
   'address',
   'timezone',
@@ -61,12 +60,12 @@ describe('institutes, as the institute role', () => {
       await asInstitute(client, a.id);
       const updated = await client.query(
         `UPDATE institutes
-            SET name = $2, code = $3, contact = '{"phones":[],"emails":[]}', address = '{}',
+            SET name = $2, contact = '{"phones":[],"emails":[]}', address = '{}',
                 timezone = 'Asia/Kolkata', currency = 'INR',
                 supported_locales = '["en","hi"]', default_locale = 'en',
-                version = version + 1, updated_at = now(), updated_by = $4
+                version = version + 1, updated_at = now(), updated_by = $3
           WHERE id = $1 RETURNING id`,
-        [a.id, JSON.stringify({ en: 'Renamed' }), `R383${randomUUID().slice(0, 6)}`, SYSTEM],
+        [a.id, JSON.stringify({ en: 'Renamed' }), SYSTEM],
       );
       expect(updated.rowCount).toBe(1);
     });

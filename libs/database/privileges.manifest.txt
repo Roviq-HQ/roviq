@@ -1,0 +1,1038 @@
+# What each application role may do in the database, and every row policy.
+# Compared with the database by privilege-manifest.integration.spec.ts, in both directions.
+# A migration that grants, revokes or changes a policy edits this file in the same change:
+#   UPDATE_PRIVILEGE_MANIFEST=1 pnpm vitest run --project integration privilege-manifest
+# then read the diff: every added line is an access somebody now has.
+grant  | roviq_app | academic_years | INSERT | *
+grant  | roviq_app | academic_years | SELECT | *
+grant  | roviq_app | academic_years | UPDATE | *
+grant  | roviq_app | admission_applications | INSERT | *
+grant  | roviq_app | admission_applications | SELECT | *
+grant  | roviq_app | admission_applications | UPDATE | *
+grant  | roviq_app | application_document_files | INSERT | *
+grant  | roviq_app | application_document_files | SELECT | *
+grant  | roviq_app | application_document_files | UPDATE | *
+grant  | roviq_app | application_documents | INSERT | *
+grant  | roviq_app | application_documents | SELECT | *
+grant  | roviq_app | application_documents | UPDATE | *
+grant  | roviq_app | attendance_entries | INSERT | *
+grant  | roviq_app | attendance_entries | SELECT | *
+grant  | roviq_app | attendance_entries | UPDATE | *
+grant  | roviq_app | attendance_sessions | INSERT | *
+grant  | roviq_app | attendance_sessions | SELECT | *
+grant  | roviq_app | attendance_sessions | UPDATE | *
+grant  | roviq_app | audit_logs | SELECT | *
+grant  | roviq_app | auth_events | INSERT | *
+grant  | roviq_app | bot_profiles | INSERT | *
+grant  | roviq_app | bot_profiles | SELECT | *
+grant  | roviq_app | bot_profiles | UPDATE | *
+grant  | roviq_app | certificate_templates | INSERT | *
+grant  | roviq_app | certificate_templates | SELECT | *
+grant  | roviq_app | certificate_templates | UPDATE | *
+grant  | roviq_app | co_scholastic_areas | INSERT | *
+grant  | roviq_app | co_scholastic_areas | SELECT | *
+grant  | roviq_app | co_scholastic_areas | UPDATE | *
+grant  | roviq_app | co_scholastic_assessments | INSERT | *
+grant  | roviq_app | co_scholastic_assessments | SELECT | *
+grant  | roviq_app | co_scholastic_assessments | UPDATE | *
+grant  | roviq_app | consent_records | INSERT | *
+grant  | roviq_app | consent_records | SELECT | *
+grant  | roviq_app | enquiries | INSERT | *
+grant  | roviq_app | enquiries | SELECT | *
+grant  | roviq_app | enquiries | UPDATE | *
+grant  | roviq_app | exam_marks | INSERT | *
+grant  | roviq_app | exam_marks | SELECT | *
+grant  | roviq_app | exam_marks | UPDATE | *
+grant  | roviq_app | exam_schedules | INSERT | *
+grant  | roviq_app | exam_schedules | SELECT | *
+grant  | roviq_app | exam_schedules | UPDATE | *
+grant  | roviq_app | exam_terms | INSERT | *
+grant  | roviq_app | exam_terms | SELECT | *
+grant  | roviq_app | exam_terms | UPDATE | *
+grant  | roviq_app | exam_topic_assessments | INSERT | *
+grant  | roviq_app | exam_topic_assessments | SELECT | *
+grant  | roviq_app | exam_topic_assessments | UPDATE | *
+grant  | roviq_app | exams | INSERT | *
+grant  | roviq_app | exams | SELECT | *
+grant  | roviq_app | exams | UPDATE | *
+grant  | roviq_app | export_reports | INSERT | *
+grant  | roviq_app | export_reports | SELECT | *
+grant  | roviq_app | export_reports | UPDATE | *
+grant  | roviq_app | files | INSERT | *
+grant  | roviq_app | files | SELECT | *
+grant  | roviq_app | files | UPDATE | *
+grant  | roviq_app | grade_bands | INSERT | *
+grant  | roviq_app | grade_bands | SELECT | *
+grant  | roviq_app | grade_bands | UPDATE | *
+grant  | roviq_app | grading_schemes | INSERT | *
+grant  | roviq_app | grading_schemes | SELECT | *
+grant  | roviq_app | grading_schemes | UPDATE | *
+grant  | roviq_app | group_children | INSERT | *
+grant  | roviq_app | group_children | SELECT | *
+grant  | roviq_app | group_children | UPDATE | *
+grant  | roviq_app | group_members | INSERT | *
+grant  | roviq_app | group_members | SELECT | *
+grant  | roviq_app | group_members | UPDATE | *
+grant  | roviq_app | group_rules | INSERT | *
+grant  | roviq_app | group_rules | SELECT | *
+grant  | roviq_app | group_rules | UPDATE | *
+grant  | roviq_app | groups | INSERT | *
+grant  | roviq_app | groups | SELECT | *
+grant  | roviq_app | groups | UPDATE | *
+grant  | roviq_app | guardian_profiles | INSERT | *
+grant  | roviq_app | guardian_profiles | SELECT | *
+grant  | roviq_app | guardian_profiles | UPDATE | *
+grant  | roviq_app | holidays | INSERT | *
+grant  | roviq_app | holidays | SELECT | *
+grant  | roviq_app | holidays | UPDATE | *
+grant  | roviq_app | impersonation_sessions | SELECT | *
+grant  | roviq_app | institute_affiliations | INSERT | *
+grant  | roviq_app | institute_affiliations | SELECT | *
+grant  | roviq_app | institute_affiliations | UPDATE | *
+grant  | roviq_app | institute_branding | INSERT | *
+grant  | roviq_app | institute_branding | SELECT | *
+grant  | roviq_app | institute_branding | UPDATE | *
+grant  | roviq_app | institute_configs | INSERT | *
+grant  | roviq_app | institute_configs | SELECT | *
+grant  | roviq_app | institute_configs | UPDATE | *
+grant  | roviq_app | institute_group_branding | SELECT | *
+grant  | roviq_app | institute_groups | SELECT | *
+grant  | roviq_app | institute_identifiers | INSERT | *
+grant  | roviq_app | institute_identifiers | SELECT | *
+grant  | roviq_app | institute_identifiers | UPDATE | *
+grant  | roviq_app | institute_notification_configs | INSERT | *
+grant  | roviq_app | institute_notification_configs | SELECT | *
+grant  | roviq_app | institute_notification_configs | UPDATE | *
+grant  | roviq_app | institutes | SELECT | *
+grant  | roviq_app | institutes | UPDATE | address, contact, currency, default_locale, name, supported_locales, timezone, updated_at, updated_by, version
+grant  | roviq_app | invoices | SELECT | *
+grant  | roviq_app | issued_certificates | INSERT | *
+grant  | roviq_app | issued_certificates | SELECT | *
+grant  | roviq_app | issued_certificates | UPDATE | *
+grant  | roviq_app | leave_files | INSERT | *
+grant  | roviq_app | leave_files | SELECT | *
+grant  | roviq_app | leave_files | UPDATE | *
+grant  | roviq_app | leaves | INSERT | *
+grant  | roviq_app | leaves | SELECT | *
+grant  | roviq_app | leaves | UPDATE | *
+grant  | roviq_app | memberships | INSERT | *
+grant  | roviq_app | memberships | SELECT | *
+grant  | roviq_app | memberships | UPDATE | *
+grant  | roviq_app | messaging_senders | SELECT | *
+grant  | roviq_app | messaging_templates | SELECT | *
+grant  | roviq_app | notification_deliveries | SELECT | *
+grant  | roviq_app | notifications | SELECT | *
+grant  | roviq_app | notifications | UPDATE | archived_at, read_at, updated_at, updated_by, version
+grant  | roviq_app | payments | SELECT | *
+grant  | roviq_app | phone_numbers | SELECT | *
+grant  | roviq_app | plans | SELECT | *
+grant  | roviq_app | privacy_notices | INSERT | *
+grant  | roviq_app | privacy_notices | SELECT | *
+grant  | roviq_app | privacy_notices | UPDATE | *
+grant  | roviq_app | refresh_tokens | INSERT | *
+grant  | roviq_app | refresh_tokens | SELECT | *
+grant  | roviq_app | refresh_tokens | UPDATE | *
+grant  | roviq_app | report_card_instances | INSERT | *
+grant  | roviq_app | report_card_instances | SELECT | *
+grant  | roviq_app | report_card_instances | UPDATE | *
+grant  | roviq_app | report_cards | INSERT | *
+grant  | roviq_app | report_cards | SELECT | *
+grant  | roviq_app | report_cards | UPDATE | *
+grant  | roviq_app | resellers | SELECT | *
+grant  | roviq_app | roles | INSERT | *
+grant  | roviq_app | roles | SELECT | *
+grant  | roviq_app | roles | UPDATE | *
+grant  | roviq_app | section_subjects | INSERT | *
+grant  | roviq_app | section_subjects | SELECT | *
+grant  | roviq_app | section_subjects | UPDATE | *
+grant  | roviq_app | sections | INSERT | *
+grant  | roviq_app | sections | SELECT | *
+grant  | roviq_app | sections | UPDATE | *
+grant  | roviq_app | staff_profiles | INSERT | *
+grant  | roviq_app | staff_profiles | SELECT | *
+grant  | roviq_app | staff_profiles | UPDATE | *
+grant  | roviq_app | staff_qualifications | INSERT | *
+grant  | roviq_app | staff_qualifications | SELECT | *
+grant  | roviq_app | staff_qualifications | UPDATE | *
+grant  | roviq_app | standard_subjects | INSERT | *
+grant  | roviq_app | standard_subjects | SELECT | *
+grant  | roviq_app | standard_subjects | UPDATE | *
+grant  | roviq_app | standards | INSERT | *
+grant  | roviq_app | standards | SELECT | *
+grant  | roviq_app | standards | UPDATE | *
+grant  | roviq_app | student_academics | INSERT | *
+grant  | roviq_app | student_academics | SELECT | *
+grant  | roviq_app | student_academics | UPDATE | *
+grant  | roviq_app | student_guardian_links | INSERT | *
+grant  | roviq_app | student_guardian_links | SELECT | *
+grant  | roviq_app | student_guardian_links | UPDATE | *
+grant  | roviq_app | student_profiles | INSERT | *
+grant  | roviq_app | student_profiles | SELECT | *
+grant  | roviq_app | student_profiles | UPDATE | *
+grant  | roviq_app | subject_topics | INSERT | *
+grant  | roviq_app | subject_topics | SELECT | *
+grant  | roviq_app | subject_topics | UPDATE | *
+grant  | roviq_app | subjects | INSERT | *
+grant  | roviq_app | subjects | SELECT | *
+grant  | roviq_app | subjects | UPDATE | *
+grant  | roviq_app | subscriptions | SELECT | *
+grant  | roviq_app | tc_register | INSERT | *
+grant  | roviq_app | tc_register | SELECT | *
+grant  | roviq_app | tc_register | UPDATE | *
+grant  | roviq_app | tenant_sequences | INSERT | *
+grant  | roviq_app | tenant_sequences | SELECT | *
+grant  | roviq_app | tenant_sequences | UPDATE | *
+grant  | roviq_app | tenant_user_profiles | INSERT | *
+grant  | roviq_app | tenant_user_profiles | SELECT | *
+grant  | roviq_app | tenant_user_profiles | UPDATE | *
+grant  | roviq_app | timetable_day_overrides | INSERT | *
+grant  | roviq_app | timetable_day_overrides | SELECT | *
+grant  | roviq_app | timetable_day_overrides | UPDATE | *
+grant  | roviq_app | timetable_entries | INSERT | *
+grant  | roviq_app | timetable_entries | SELECT | *
+grant  | roviq_app | timetable_entries | UPDATE | *
+grant  | roviq_app | timetable_periods | INSERT | *
+grant  | roviq_app | timetable_periods | SELECT | *
+grant  | roviq_app | timetable_periods | UPDATE | *
+grant  | roviq_app | timetable_sections | INSERT | *
+grant  | roviq_app | timetable_sections | SELECT | *
+grant  | roviq_app | timetable_sections | UPDATE | *
+grant  | roviq_app | timetables | INSERT | *
+grant  | roviq_app | timetables | SELECT | *
+grant  | roviq_app | timetables | UPDATE | *
+grant  | roviq_app | user_addresses | SELECT | *
+grant  | roviq_app | user_document_files | SELECT | *
+grant  | roviq_app | user_documents | SELECT | *
+grant  | roviq_app | user_identifiers | SELECT | *
+grant  | roviq_app | user_profiles | SELECT | *
+grant  | roviq_app | users | SELECT | avatar_url, created_at, created_by, deleted_at, deleted_by, email, email_verified_at, id, must_change_password, password_changed_at, preferred_locale, status, updated_at, updated_by, username, version
+grant  | roviq_app | year_rollover_section_map | INSERT | *
+grant  | roviq_app | year_rollover_section_map | SELECT | *
+grant  | roviq_app | year_rollover_section_map | UPDATE | *
+grant  | roviq_audit_writer | audit_logs | INSERT | *
+grant  | roviq_audit_writer | audit_logs | SELECT | created_at, id
+grant  | roviq_audit_writer | dlq_messages | INSERT | *
+grant  | roviq_audit_writer | dlq_messages | SELECT | dlq_stream_seq
+grant  | roviq_audit_writer | institutes | SELECT | id, reseller_id
+grant  | roviq_reseller | academic_years | SELECT | *
+grant  | roviq_reseller | admission_applications | SELECT | *
+grant  | roviq_reseller | application_document_files | SELECT | *
+grant  | roviq_reseller | application_documents | SELECT | *
+grant  | roviq_reseller | attendance_entries | SELECT | *
+grant  | roviq_reseller | attendance_sessions | SELECT | *
+grant  | roviq_reseller | audit_logs | SELECT | *
+grant  | roviq_reseller | auth_events | INSERT | *
+grant  | roviq_reseller | bot_profiles | SELECT | *
+grant  | roviq_reseller | certificate_templates | SELECT | *
+grant  | roviq_reseller | co_scholastic_areas | SELECT | *
+grant  | roviq_reseller | co_scholastic_assessments | SELECT | *
+grant  | roviq_reseller | consent_records | SELECT | *
+grant  | roviq_reseller | enquiries | SELECT | *
+grant  | roviq_reseller | exam_marks | SELECT | *
+grant  | roviq_reseller | exam_schedules | SELECT | *
+grant  | roviq_reseller | exam_terms | SELECT | *
+grant  | roviq_reseller | exam_topic_assessments | SELECT | *
+grant  | roviq_reseller | exams | SELECT | *
+grant  | roviq_reseller | export_reports | SELECT | *
+grant  | roviq_reseller | files | INSERT | *
+grant  | roviq_reseller | files | SELECT | *
+grant  | roviq_reseller | files | UPDATE | *
+grant  | roviq_reseller | grade_bands | SELECT | *
+grant  | roviq_reseller | grading_schemes | SELECT | *
+grant  | roviq_reseller | group_children | SELECT | *
+grant  | roviq_reseller | group_members | SELECT | *
+grant  | roviq_reseller | group_rules | SELECT | *
+grant  | roviq_reseller | groups | SELECT | *
+grant  | roviq_reseller | guardian_profiles | SELECT | *
+grant  | roviq_reseller | holidays | SELECT | *
+grant  | roviq_reseller | impersonation_sessions | SELECT | *
+grant  | roviq_reseller | institute_affiliations | SELECT | *
+grant  | roviq_reseller | institute_branding | SELECT | *
+grant  | roviq_reseller | institute_configs | SELECT | *
+grant  | roviq_reseller | institute_groups | SELECT | *
+grant  | roviq_reseller | institute_identifiers | SELECT | *
+grant  | roviq_reseller | institute_notification_configs | SELECT | *
+grant  | roviq_reseller | institutes | SELECT | *
+grant  | roviq_reseller | institutes | UPDATE | group_id, updated_at
+grant  | roviq_reseller | invoices | DELETE | *
+grant  | roviq_reseller | invoices | INSERT | *
+grant  | roviq_reseller | invoices | SELECT | *
+grant  | roviq_reseller | invoices | UPDATE | *
+grant  | roviq_reseller | issued_certificates | SELECT | *
+grant  | roviq_reseller | leave_files | SELECT | *
+grant  | roviq_reseller | leaves | SELECT | *
+grant  | roviq_reseller | memberships | SELECT | *
+grant  | roviq_reseller | notifications | SELECT | *
+grant  | roviq_reseller | notifications | UPDATE | archived_at, read_at, updated_at, updated_by, version
+grant  | roviq_reseller | payment_gateway_configs | DELETE | *
+grant  | roviq_reseller | payment_gateway_configs | INSERT | *
+grant  | roviq_reseller | payment_gateway_configs | SELECT | *
+grant  | roviq_reseller | payment_gateway_configs | UPDATE | *
+grant  | roviq_reseller | payments | DELETE | *
+grant  | roviq_reseller | payments | INSERT | *
+grant  | roviq_reseller | payments | SELECT | *
+grant  | roviq_reseller | payments | UPDATE | *
+grant  | roviq_reseller | phone_numbers | SELECT | *
+grant  | roviq_reseller | plans | INSERT | *
+grant  | roviq_reseller | plans | SELECT | *
+grant  | roviq_reseller | plans | UPDATE | *
+grant  | roviq_reseller | privacy_notices | SELECT | *
+grant  | roviq_reseller | refresh_tokens | SELECT | *
+grant  | roviq_reseller | report_card_instances | SELECT | *
+grant  | roviq_reseller | report_cards | SELECT | *
+grant  | roviq_reseller | reseller_invoice_sequences | DELETE | *
+grant  | roviq_reseller | reseller_invoice_sequences | INSERT | *
+grant  | roviq_reseller | reseller_invoice_sequences | SELECT | *
+grant  | roviq_reseller | reseller_invoice_sequences | UPDATE | *
+grant  | roviq_reseller | reseller_memberships | DELETE | *
+grant  | roviq_reseller | reseller_memberships | INSERT | *
+grant  | roviq_reseller | reseller_memberships | SELECT | *
+grant  | roviq_reseller | reseller_memberships | UPDATE | *
+grant  | roviq_reseller | resellers | SELECT | *
+grant  | roviq_reseller | resellers | UPDATE | address, branding, contact, favicon_file_id, logo_file_id, name, registration_number, registration_state, updated_at, updated_by, version
+grant  | roviq_reseller | roles | SELECT | *
+grant  | roviq_reseller | section_subjects | SELECT | *
+grant  | roviq_reseller | sections | SELECT | *
+grant  | roviq_reseller | staff_profiles | SELECT | *
+grant  | roviq_reseller | staff_qualifications | SELECT | *
+grant  | roviq_reseller | standard_subjects | SELECT | *
+grant  | roviq_reseller | standards | SELECT | *
+grant  | roviq_reseller | student_academics | SELECT | *
+grant  | roviq_reseller | student_guardian_links | SELECT | *
+grant  | roviq_reseller | student_profiles | SELECT | *
+grant  | roviq_reseller | subject_topics | SELECT | *
+grant  | roviq_reseller | subjects | SELECT | *
+grant  | roviq_reseller | subscriptions | DELETE | *
+grant  | roviq_reseller | subscriptions | INSERT | *
+grant  | roviq_reseller | subscriptions | SELECT | *
+grant  | roviq_reseller | subscriptions | UPDATE | *
+grant  | roviq_reseller | tc_register | SELECT | *
+grant  | roviq_reseller | tenant_sequences | SELECT | *
+grant  | roviq_reseller | tenant_user_profiles | SELECT | *
+grant  | roviq_reseller | timetable_day_overrides | SELECT | *
+grant  | roviq_reseller | timetable_entries | SELECT | *
+grant  | roviq_reseller | timetable_periods | SELECT | *
+grant  | roviq_reseller | timetable_sections | SELECT | *
+grant  | roviq_reseller | timetables | SELECT | *
+grant  | roviq_reseller | user_addresses | SELECT | *
+grant  | roviq_reseller | user_document_files | SELECT | *
+grant  | roviq_reseller | user_documents | SELECT | *
+grant  | roviq_reseller | user_identifiers | SELECT | *
+grant  | roviq_reseller | user_profiles | SELECT | *
+grant  | roviq_reseller | users | SELECT | avatar_url, created_at, created_by, deleted_at, deleted_by, email, email_verified_at, id, must_change_password, password_changed_at, preferred_locale, status, updated_at, updated_by, username, version
+grant  | roviq_reseller | year_rollover_section_map | SELECT | *
+grant  | roviq_user | auth_providers | INSERT | *
+grant  | roviq_user | auth_providers | SELECT | *
+grant  | roviq_user | auth_providers | UPDATE | deleted_at, deleted_by, updated_at, updated_by
+grant  | roviq_user | group_memberships | SELECT | *
+grant  | roviq_user | notifications | SELECT | *
+grant  | roviq_user | notifications | UPDATE | archived_at, read_at, updated_at, updated_by, version
+grant  | roviq_user | phone_numbers | INSERT | *
+grant  | roviq_user | phone_numbers | SELECT | *
+grant  | roviq_user | phone_numbers | UPDATE | is_verified, number, updated_at, updated_by
+grant  | roviq_user | refresh_tokens | SELECT | *
+grant  | roviq_user | refresh_tokens | UPDATE | revoked_at, revoked_reason, updated_at
+grant  | roviq_user | user_profiles | SELECT | *
+grant  | roviq_user | user_profiles | UPDATE | mother_tongue, nationality, religion, updated_at, updated_by
+grant  | roviq_user | users | SELECT | avatar_url, created_at, created_by, deleted_at, deleted_by, email, email_verified_at, form_help_mode, id, must_change_password, password_changed_at, password_hash, preferred_locale, status, token_version, updated_at, updated_by, username, version
+grant  | roviq_user | users | UPDATE | email_verified_at, form_help_mode, must_change_password, password_changed_at, password_hash, preferred_locale, token_version, updated_at, updated_by
+policy | academic_years | academic_years_admin_all | roviq_admin | ALL | using: true | check: true
+policy | academic_years | academic_years_app_delete | roviq_app | DELETE | using: false | check: 
+policy | academic_years | academic_years_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | academic_years | academic_years_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | academic_years | academic_years_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | academic_years | academic_years_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | admission_applications | admission_applications_admin_all | roviq_admin | ALL | using: true | check: true
+policy | admission_applications | admission_applications_app_delete | roviq_app | DELETE | using: false | check: 
+policy | admission_applications | admission_applications_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | admission_applications | admission_applications_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | admission_applications | admission_applications_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | admission_applications | admission_applications_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | application_document_files | application_document_files_admin_all | roviq_admin | ALL | using: true | check: true
+policy | application_document_files | application_document_files_app_delete | roviq_app | DELETE | using: false | check: 
+policy | application_document_files | application_document_files_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | application_document_files | application_document_files_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | application_document_files | application_document_files_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | application_document_files | application_document_files_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | application_documents | application_documents_admin_all | roviq_admin | ALL | using: true | check: true
+policy | application_documents | application_documents_app_delete | roviq_app | DELETE | using: false | check: 
+policy | application_documents | application_documents_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | application_documents | application_documents_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | application_documents | application_documents_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | application_documents | application_documents_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | attendance_entries | attendance_entries_admin_all | roviq_admin | ALL | using: true | check: true
+policy | attendance_entries | attendance_entries_app_delete | roviq_app | DELETE | using: false | check: 
+policy | attendance_entries | attendance_entries_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | attendance_entries | attendance_entries_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | attendance_entries | attendance_entries_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | attendance_entries | attendance_entries_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | attendance_sessions | attendance_sessions_admin_all | roviq_admin | ALL | using: true | check: true
+policy | attendance_sessions | attendance_sessions_app_delete | roviq_app | DELETE | using: false | check: 
+policy | attendance_sessions | attendance_sessions_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | attendance_sessions | attendance_sessions_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | attendance_sessions | attendance_sessions_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | attendance_sessions | attendance_sessions_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | audit_logs | audit_admin_all | roviq_admin | ALL | using: true | check: true
+policy | audit_logs | audit_app_read | roviq_app | SELECT | using: ((((scope)::text = 'institute'::text) AND (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) OR (subject_tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) | check: 
+policy | audit_logs | audit_reseller_read | roviq_reseller | SELECT | using: ((((scope)::text = 'institute'::text) AND (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) OR (((scope)::text = 'reseller'::text) AND (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | audit_logs | audit_writer_conflict_key | roviq_audit_writer | SELECT | using: true | check: 
+policy | audit_logs | audit_writer_insert | roviq_audit_writer | INSERT | using:  | check: true
+policy | auth_events | auth_events_admin_insert | roviq_admin | INSERT | using:  | check: true
+policy | auth_events | auth_events_admin_select | roviq_admin | SELECT | using: true | check: 
+policy | auth_events | auth_events_app_insert | roviq_app | INSERT | using:  | check: true
+policy | auth_events | auth_events_reseller_insert | roviq_reseller | INSERT | using:  | check: true
+policy | auth_providers | auth_providers_admin_all | roviq_admin | ALL | using: true | check: true
+policy | auth_providers | auth_providers_self_insert | roviq_user | INSERT | using:  | check: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | auth_providers | auth_providers_self_select | roviq_user | SELECT | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: 
+policy | auth_providers | auth_providers_self_update | roviq_user | UPDATE | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | bot_profiles | bot_profiles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | bot_profiles | bot_profiles_app_delete | roviq_app | DELETE | using: false | check: 
+policy | bot_profiles | bot_profiles_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | bot_profiles | bot_profiles_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | bot_profiles | bot_profiles_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | bot_profiles | bot_profiles_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | certificate_templates | certificate_templates_admin_all | roviq_admin | ALL | using: true | check: true
+policy | certificate_templates | certificate_templates_app_delete | roviq_app | DELETE | using: false | check: 
+policy | certificate_templates | certificate_templates_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | certificate_templates | certificate_templates_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | certificate_templates | certificate_templates_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | certificate_templates | certificate_templates_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | co_scholastic_areas | co_scholastic_areas_admin_all | roviq_admin | ALL | using: true | check: true
+policy | co_scholastic_areas | co_scholastic_areas_app_delete | roviq_app | DELETE | using: false | check: 
+policy | co_scholastic_areas | co_scholastic_areas_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | co_scholastic_areas | co_scholastic_areas_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | co_scholastic_areas | co_scholastic_areas_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | co_scholastic_areas | co_scholastic_areas_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | co_scholastic_assessments | co_scholastic_assessments_admin_all | roviq_admin | ALL | using: true | check: true
+policy | co_scholastic_assessments | co_scholastic_assessments_app_delete | roviq_app | DELETE | using: false | check: 
+policy | co_scholastic_assessments | co_scholastic_assessments_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | co_scholastic_assessments | co_scholastic_assessments_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | co_scholastic_assessments | co_scholastic_assessments_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | co_scholastic_assessments | co_scholastic_assessments_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | consent_records | consent_records_admin_all | roviq_admin | ALL | using: true | check: true
+policy | consent_records | consent_records_app_delete | roviq_app | DELETE | using: false | check: 
+policy | consent_records | consent_records_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | consent_records | consent_records_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | consent_records | consent_records_app_update | roviq_app | UPDATE | using: false | check: 
+policy | consent_records | consent_records_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | device_tokens | device_tokens_admin_all | roviq_admin | ALL | using: true | check: true
+policy | dlq_messages | dlq_admin_all | roviq_admin | ALL | using: true | check: true
+policy | dlq_messages | dlq_writer_conflict_key | roviq_audit_writer | SELECT | using: true | check: 
+policy | dlq_messages | dlq_writer_insert | roviq_audit_writer | INSERT | using:  | check: true
+policy | enquiries | enquiries_admin_all | roviq_admin | ALL | using: true | check: true
+policy | enquiries | enquiries_app_delete | roviq_app | DELETE | using: false | check: 
+policy | enquiries | enquiries_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | enquiries | enquiries_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | enquiries | enquiries_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | enquiries | enquiries_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | exam_marks | exam_marks_admin_all | roviq_admin | ALL | using: true | check: true
+policy | exam_marks | exam_marks_app_delete | roviq_app | DELETE | using: false | check: 
+policy | exam_marks | exam_marks_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_marks | exam_marks_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | exam_marks | exam_marks_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_marks | exam_marks_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | exam_schedules | exam_schedules_admin_all | roviq_admin | ALL | using: true | check: true
+policy | exam_schedules | exam_schedules_app_delete | roviq_app | DELETE | using: false | check: 
+policy | exam_schedules | exam_schedules_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_schedules | exam_schedules_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | exam_schedules | exam_schedules_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_schedules | exam_schedules_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | exam_terms | exam_terms_admin_all | roviq_admin | ALL | using: true | check: true
+policy | exam_terms | exam_terms_app_delete | roviq_app | DELETE | using: false | check: 
+policy | exam_terms | exam_terms_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_terms | exam_terms_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | exam_terms | exam_terms_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_terms | exam_terms_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | exam_topic_assessments | exam_topic_assessments_admin_all | roviq_admin | ALL | using: true | check: true
+policy | exam_topic_assessments | exam_topic_assessments_app_delete | roviq_app | DELETE | using: false | check: 
+policy | exam_topic_assessments | exam_topic_assessments_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_topic_assessments | exam_topic_assessments_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | exam_topic_assessments | exam_topic_assessments_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exam_topic_assessments | exam_topic_assessments_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | exams | exams_admin_all | roviq_admin | ALL | using: true | check: true
+policy | exams | exams_app_delete | roviq_app | DELETE | using: false | check: 
+policy | exams | exams_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exams | exams_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | exams | exams_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | exams | exams_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | export_reports | export_reports_admin_all | roviq_admin | ALL | using: true | check: true
+policy | export_reports | export_reports_app_delete | roviq_app | DELETE | using: false | check: 
+policy | export_reports | export_reports_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | export_reports | export_reports_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | export_reports | export_reports_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | export_reports | export_reports_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | files | files_admin_all | roviq_admin | ALL | using: true | check: true
+policy | files | files_app_delete | roviq_app | DELETE | using: false | check: 
+policy | files | files_app_insert | roviq_app | INSERT | using:  | check: ((tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) OR ((tenant_id IS NULL) AND (reseller_id IS NULL) AND (subject_user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL))))))
+policy | files | files_app_select | roviq_app | SELECT | using: ((tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) OR ((tenant_id IS NULL) AND (reseller_id IS NULL) AND (subject_user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))))) | check: 
+policy | files | files_app_update | roviq_app | UPDATE | using: ((tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) OR ((tenant_id IS NULL) AND (reseller_id IS NULL) AND (subject_user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))))) | check: ((tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) OR ((tenant_id IS NULL) AND (reseller_id IS NULL) AND (subject_user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL))))))
+policy | files | files_reseller_insert | roviq_reseller | INSERT | using:  | check: ((reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (tenant_id IS NULL))
+policy | files | files_reseller_select | roviq_reseller | SELECT | using: ((reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) OR (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) OR ((tenant_id IS NULL) AND (reseller_id IS NULL) AND ((subject_user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (subject_user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))))) | check: 
+policy | files | files_reseller_update | roviq_reseller | UPDATE | using: ((reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (tenant_id IS NULL)) | check: ((reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (tenant_id IS NULL))
+policy | grade_bands | grade_bands_admin_all | roviq_admin | ALL | using: true | check: true
+policy | grade_bands | grade_bands_app_delete | roviq_app | DELETE | using: false | check: 
+policy | grade_bands | grade_bands_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | grade_bands | grade_bands_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | grade_bands | grade_bands_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | grade_bands | grade_bands_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | grading_schemes | grading_schemes_admin_all | roviq_admin | ALL | using: true | check: true
+policy | grading_schemes | grading_schemes_app_delete | roviq_app | DELETE | using: false | check: 
+policy | grading_schemes | grading_schemes_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | grading_schemes | grading_schemes_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | grading_schemes | grading_schemes_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | grading_schemes | grading_schemes_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | group_children | group_children_admin_all | roviq_admin | ALL | using: true | check: true
+policy | group_children | group_children_app_delete | roviq_app | DELETE | using: false | check: 
+policy | group_children | group_children_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | group_children | group_children_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | group_children | group_children_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | group_children | group_children_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | group_members | group_members_admin_all | roviq_admin | ALL | using: true | check: true
+policy | group_members | group_members_app_delete | roviq_app | DELETE | using: false | check: 
+policy | group_members | group_members_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | group_members | group_members_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | group_members | group_members_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | group_members | group_members_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | group_memberships | group_memberships_admin_all | roviq_admin | ALL | using: true | check: true
+policy | group_memberships | group_memberships_self_select | roviq_user | SELECT | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: 
+policy | group_rules | group_rules_admin_all | roviq_admin | ALL | using: true | check: true
+policy | group_rules | group_rules_app_delete | roviq_app | DELETE | using: false | check: 
+policy | group_rules | group_rules_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | group_rules | group_rules_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | group_rules | group_rules_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | group_rules | group_rules_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | groups | groups_admin_all | roviq_admin | ALL | using: true | check: true
+policy | groups | groups_app_delete | roviq_app | DELETE | using: false | check: 
+policy | groups | groups_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | groups | groups_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | groups | groups_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | groups | groups_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | guardian_profiles | guardian_profiles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | guardian_profiles | guardian_profiles_app_delete | roviq_app | DELETE | using: false | check: 
+policy | guardian_profiles | guardian_profiles_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | guardian_profiles | guardian_profiles_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | guardian_profiles | guardian_profiles_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | guardian_profiles | guardian_profiles_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | holidays | holidays_admin_all | roviq_admin | ALL | using: true | check: true
+policy | holidays | holidays_app_delete | roviq_app | DELETE | using: false | check: 
+policy | holidays | holidays_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | holidays | holidays_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | holidays | holidays_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | holidays | holidays_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | impersonation_sessions | impersonation_sessions_admin_all | roviq_admin | ALL | using: true | check: true
+policy | impersonation_sessions | impersonation_sessions_app_select | roviq_app | SELECT | using: (target_tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | impersonation_sessions | impersonation_sessions_reseller_select | roviq_reseller | SELECT | using: (target_tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | institute_affiliations | institute_affiliations_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_affiliations | institute_affiliations_app_delete | roviq_app | DELETE | using: false | check: 
+policy | institute_affiliations | institute_affiliations_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_affiliations | institute_affiliations_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | institute_affiliations | institute_affiliations_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_affiliations | institute_affiliations_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | institute_branding | institute_branding_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_branding | institute_branding_app_delete | roviq_app | DELETE | using: false | check: 
+policy | institute_branding | institute_branding_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_branding | institute_branding_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | institute_branding | institute_branding_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_branding | institute_branding_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | institute_configs | institute_configs_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_configs | institute_configs_app_delete | roviq_app | DELETE | using: false | check: 
+policy | institute_configs | institute_configs_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_configs | institute_configs_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | institute_configs | institute_configs_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_configs | institute_configs_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | institute_group_branding | institute_group_branding_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_group_branding | institute_group_branding_app_select | roviq_app | SELECT | using: (group_id = ( SELECT institutes.group_id FROM institutes WHERE (institutes.id = (current_setting('app.current_tenant_id'::text, true))::uuid))) | check: 
+policy | institute_groups | institute_groups_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_groups | institute_groups_app_delete | roviq_app | DELETE | using: false | check: 
+policy | institute_groups | institute_groups_app_insert | roviq_app | INSERT | using:  | check: false
+policy | institute_groups | institute_groups_app_select | roviq_app | SELECT | using: (id = ( SELECT institutes.group_id FROM institutes WHERE (institutes.id = (current_setting('app.current_tenant_id'::text, true))::uuid))) | check: 
+policy | institute_groups | institute_groups_app_update | roviq_app | UPDATE | using: false | check: 
+policy | institute_groups | institute_groups_reseller_read | roviq_reseller | SELECT | using: ((reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) OR (id IN ( SELECT institutes.group_id FROM institutes WHERE ((institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (institutes.group_id IS NOT NULL))))) | check: 
+policy | institute_identifiers | institute_identifiers_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_identifiers | institute_identifiers_app_delete | roviq_app | DELETE | using: false | check: 
+policy | institute_identifiers | institute_identifiers_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_identifiers | institute_identifiers_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | institute_identifiers | institute_identifiers_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_identifiers | institute_identifiers_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | institute_notification_configs | institute_notification_configs_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institute_notification_configs | institute_notification_configs_app_delete | roviq_app | DELETE | using: false | check: 
+policy | institute_notification_configs | institute_notification_configs_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_notification_configs | institute_notification_configs_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | institute_notification_configs | institute_notification_configs_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institute_notification_configs | institute_notification_configs_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | institutes | institutes_admin_all | roviq_admin | ALL | using: true | check: true
+policy | institutes | institutes_app_select | roviq_app | SELECT | using: (id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | institutes | institutes_app_update | roviq_app | UPDATE | using: (id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | institutes | institutes_audit_writer_select | roviq_audit_writer | SELECT | using: true | check: 
+policy | institutes | institutes_reseller_select | roviq_reseller | SELECT | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: 
+policy | institutes | institutes_reseller_update | roviq_reseller | UPDATE | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: ((reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND ((group_id IS NULL) OR (group_id IN ( SELECT institute_groups.id FROM institute_groups WHERE (institute_groups.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))))
+policy | invoices | inv_admin_all | roviq_admin | ALL | using: true | check: true
+policy | invoices | inv_app_read | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | invoices | inv_reseller_all | roviq_reseller | ALL | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | issued_certificates | issued_certificates_admin_all | roviq_admin | ALL | using: true | check: true
+policy | issued_certificates | issued_certificates_app_delete | roviq_app | DELETE | using: false | check: 
+policy | issued_certificates | issued_certificates_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | issued_certificates | issued_certificates_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | issued_certificates | issued_certificates_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | issued_certificates | issued_certificates_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | leave_files | leave_files_admin_all | roviq_admin | ALL | using: true | check: true
+policy | leave_files | leave_files_app_delete | roviq_app | DELETE | using: false | check: 
+policy | leave_files | leave_files_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | leave_files | leave_files_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | leave_files | leave_files_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | leave_files | leave_files_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | leaves | leaves_admin_all | roviq_admin | ALL | using: true | check: true
+policy | leaves | leaves_app_delete | roviq_app | DELETE | using: false | check: 
+policy | leaves | leaves_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | leaves | leaves_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | leaves | leaves_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | leaves | leaves_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | memberships | memberships_admin_all | roviq_admin | ALL | using: true | check: true
+policy | memberships | memberships_app_delete | roviq_app | DELETE | using: false | check: 
+policy | memberships | memberships_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | memberships | memberships_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | memberships | memberships_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | memberships | memberships_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | messaging_inbound_events | messaging_inbound_events_admin_insert | roviq_admin | INSERT | using:  | check: true
+policy | messaging_inbound_events | messaging_inbound_events_admin_select | roviq_admin | SELECT | using: true | check: 
+policy | messaging_opt_outs | messaging_opt_outs_admin_insert | roviq_admin | INSERT | using:  | check: true
+policy | messaging_opt_outs | messaging_opt_outs_admin_select | roviq_admin | SELECT | using: true | check: 
+policy | messaging_sender_secrets | messaging_sender_secrets_admin_all | roviq_admin | ALL | using: true | check: true
+policy | messaging_senders | messaging_senders_admin_all | roviq_admin | ALL | using: true | check: true
+policy | messaging_senders | messaging_senders_app_select | roviq_app | SELECT | using: (((scope)::text = 'institute'::text) AND (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) | check: 
+policy | messaging_senders | messaging_senders_reseller_none | roviq_reseller | SELECT | using: false | check: 
+policy | messaging_templates | messaging_templates_admin_all | roviq_admin | ALL | using: true | check: true
+policy | messaging_templates | messaging_templates_app_select | roviq_app | SELECT | using: (provider_account_id IN ( SELECT s.provider_account_id FROM messaging_senders s WHERE (((s.scope)::text = 'institute'::text) AND (s.deleted_at IS NULL) AND (s.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)))) | check: 
+policy | messaging_templates | messaging_templates_reseller_none | roviq_reseller | SELECT | using: false | check: 
+policy | notification_deliveries | notification_deliveries_admin_insert | roviq_admin | INSERT | using:  | check: true
+policy | notification_deliveries | notification_deliveries_admin_select | roviq_admin | SELECT | using: true | check: 
+policy | notification_deliveries | notification_deliveries_app_select | roviq_app | SELECT | using: (((scope)::text = 'institute'::text) AND (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) | check: 
+policy | notification_deliveries | notification_deliveries_reseller_none | roviq_reseller | SELECT | using: false | check: 
+policy | notifications | notifications_admin_all | roviq_admin | ALL | using: true | check: true
+policy | notifications | notifications_app_select | roviq_app | SELECT | using: (((scope)::text = 'institute'::text) AND (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) | check: 
+policy | notifications | notifications_app_update | roviq_app | UPDATE | using: (((scope)::text = 'institute'::text) AND (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) | check: (((scope)::text = 'institute'::text) AND (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid))
+policy | notifications | notifications_reseller_select | roviq_reseller | SELECT | using: (((scope)::text = 'reseller'::text) AND (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)) | check: 
+policy | notifications | notifications_reseller_update | roviq_reseller | UPDATE | using: (((scope)::text = 'reseller'::text) AND (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)) | check: (((scope)::text = 'reseller'::text) AND (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))
+policy | notifications | notifications_self_select | roviq_user | SELECT | using: (((scope)::text = 'platform'::text) AND (recipient_user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)) | check: 
+policy | notifications | notifications_self_update | roviq_user | UPDATE | using: (((scope)::text = 'platform'::text) AND (recipient_user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)) | check: (((scope)::text = 'platform'::text) AND (recipient_user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid))
+policy | payment_gateway_configs | gwc_admin_all | roviq_admin | ALL | using: true | check: true
+policy | payment_gateway_configs | gwc_reseller_all | roviq_reseller | ALL | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | payments | pay_admin_all | roviq_admin | ALL | using: true | check: true
+policy | payments | pay_app_read | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | payments | pay_reseller_all | roviq_reseller | ALL | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | phone_numbers | phone_numbers_admin_all | roviq_admin | ALL | using: true | check: true
+policy | phone_numbers | phone_numbers_app_select | roviq_app | SELECT | using: (user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | phone_numbers | phone_numbers_reseller_read | roviq_reseller | SELECT | using: ((user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | phone_numbers | phone_numbers_self_insert | roviq_user | INSERT | using:  | check: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | phone_numbers | phone_numbers_self_select | roviq_user | SELECT | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: 
+policy | phone_numbers | phone_numbers_self_update | roviq_user | UPDATE | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | plans | plan_admin_all | roviq_admin | ALL | using: true | check: true
+policy | plans | plan_app_read | roviq_app | SELECT | using: (id IN ( SELECT subscriptions.plan_id FROM subscriptions WHERE (subscriptions.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid))) | check: 
+policy | plans | plan_reseller_delete | roviq_reseller | DELETE | using: false | check: 
+policy | plans | plan_reseller_insert | roviq_reseller | INSERT | using:  | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | plans | plan_reseller_select | roviq_reseller | SELECT | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: 
+policy | plans | plan_reseller_update | roviq_reseller | UPDATE | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | platform_memberships | platform_membership_admin | roviq_admin | ALL | using: true | check: true
+policy | privacy_notices | privacy_notices_admin_all | roviq_admin | ALL | using: true | check: true
+policy | privacy_notices | privacy_notices_app_delete | roviq_app | DELETE | using: false | check: 
+policy | privacy_notices | privacy_notices_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | privacy_notices | privacy_notices_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | privacy_notices | privacy_notices_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | privacy_notices | privacy_notices_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | refresh_tokens | refresh_tokens_admin_all | roviq_admin | ALL | using: true | check: true
+policy | refresh_tokens | refresh_tokens_app_delete | roviq_app | DELETE | using: false | check: 
+policy | refresh_tokens | refresh_tokens_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | refresh_tokens | refresh_tokens_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | refresh_tokens | refresh_tokens_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | refresh_tokens | refresh_tokens_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | refresh_tokens | refresh_tokens_self_select | roviq_user | SELECT | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: 
+policy | refresh_tokens | refresh_tokens_self_update | roviq_user | UPDATE | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | report_card_instances | report_card_instances_admin_all | roviq_admin | ALL | using: true | check: true
+policy | report_card_instances | report_card_instances_app_delete | roviq_app | DELETE | using: false | check: 
+policy | report_card_instances | report_card_instances_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | report_card_instances | report_card_instances_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | report_card_instances | report_card_instances_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | report_card_instances | report_card_instances_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | report_cards | report_cards_admin_all | roviq_admin | ALL | using: true | check: true
+policy | report_cards | report_cards_app_delete | roviq_app | DELETE | using: false | check: 
+policy | report_cards | report_cards_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | report_cards | report_cards_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | report_cards | report_cards_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | report_cards | report_cards_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | reseller_invoice_sequences | seq_admin_all | roviq_admin | ALL | using: true | check: true
+policy | reseller_invoice_sequences | seq_reseller_all | roviq_reseller | ALL | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | reseller_memberships | reseller_membership_admin | roviq_admin | ALL | using: true | check: true
+policy | reseller_memberships | reseller_membership_own | roviq_reseller | ALL | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | resellers | reseller_admin_all | roviq_admin | ALL | using: true | check: true
+policy | resellers | reseller_own_read | roviq_reseller | SELECT | using: (id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: 
+policy | resellers | reseller_own_update | roviq_reseller | UPDATE | using: (id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | roles | roles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | roles | roles_app_delete | roviq_app | DELETE | using: false | check: 
+policy | roles | roles_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | roles | roles_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | roles | roles_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | roles | roles_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | section_subjects | section_subjects_admin_all | roviq_admin | ALL | using: true | check: true
+policy | section_subjects | section_subjects_app_delete | roviq_app | DELETE | using: false | check: 
+policy | section_subjects | section_subjects_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | section_subjects | section_subjects_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | section_subjects | section_subjects_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | section_subjects | section_subjects_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | sections | sections_admin_all | roviq_admin | ALL | using: true | check: true
+policy | sections | sections_app_delete | roviq_app | DELETE | using: false | check: 
+policy | sections | sections_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | sections | sections_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | sections | sections_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | sections | sections_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | staff_profiles | staff_profiles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | staff_profiles | staff_profiles_app_delete | roviq_app | DELETE | using: false | check: 
+policy | staff_profiles | staff_profiles_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | staff_profiles | staff_profiles_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | staff_profiles | staff_profiles_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | staff_profiles | staff_profiles_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | staff_qualifications | staff_qualifications_admin_all | roviq_admin | ALL | using: true | check: true
+policy | staff_qualifications | staff_qualifications_app_delete | roviq_app | DELETE | using: false | check: 
+policy | staff_qualifications | staff_qualifications_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | staff_qualifications | staff_qualifications_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | staff_qualifications | staff_qualifications_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | staff_qualifications | staff_qualifications_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | standard_subjects | standard_subjects_admin_all | roviq_admin | ALL | using: true | check: true
+policy | standard_subjects | standard_subjects_app_delete | roviq_app | DELETE | using: false | check: 
+policy | standard_subjects | standard_subjects_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | standard_subjects | standard_subjects_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | standard_subjects | standard_subjects_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | standard_subjects | standard_subjects_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | standards | standards_admin_all | roviq_admin | ALL | using: true | check: true
+policy | standards | standards_app_delete | roviq_app | DELETE | using: false | check: 
+policy | standards | standards_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | standards | standards_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | standards | standards_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | standards | standards_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | student_academics | student_academics_admin_all | roviq_admin | ALL | using: true | check: true
+policy | student_academics | student_academics_app_delete | roviq_app | DELETE | using: false | check: 
+policy | student_academics | student_academics_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | student_academics | student_academics_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | student_academics | student_academics_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | student_academics | student_academics_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | student_guardian_links | student_guardian_links_admin_all | roviq_admin | ALL | using: true | check: true
+policy | student_guardian_links | student_guardian_links_app_delete | roviq_app | DELETE | using: false | check: 
+policy | student_guardian_links | student_guardian_links_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | student_guardian_links | student_guardian_links_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | student_guardian_links | student_guardian_links_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | student_guardian_links | student_guardian_links_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | student_profiles | student_profiles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | student_profiles | student_profiles_app_delete | roviq_app | DELETE | using: false | check: 
+policy | student_profiles | student_profiles_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | student_profiles | student_profiles_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | student_profiles | student_profiles_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | student_profiles | student_profiles_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | subject_topics | subject_topics_admin_all | roviq_admin | ALL | using: true | check: true
+policy | subject_topics | subject_topics_app_delete | roviq_app | DELETE | using: false | check: 
+policy | subject_topics | subject_topics_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | subject_topics | subject_topics_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | subject_topics | subject_topics_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | subject_topics | subject_topics_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | subjects | subjects_admin_all | roviq_admin | ALL | using: true | check: true
+policy | subjects | subjects_app_delete | roviq_app | DELETE | using: false | check: 
+policy | subjects | subjects_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | subjects | subjects_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | subjects | subjects_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | subjects | subjects_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | subscriptions | sub_admin_all | roviq_admin | ALL | using: true | check: true
+policy | subscriptions | sub_app_read | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | subscriptions | sub_reseller_all | roviq_reseller | ALL | using: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) | check: (reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)
+policy | tc_register | tc_register_admin_all | roviq_admin | ALL | using: true | check: true
+policy | tc_register | tc_register_app_delete | roviq_app | DELETE | using: false | check: 
+policy | tc_register | tc_register_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | tc_register | tc_register_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | tc_register | tc_register_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | tc_register | tc_register_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | tenant_sequences | tenant_sequences_admin_all | roviq_admin | ALL | using: true | check: true
+policy | tenant_sequences | tenant_sequences_app_delete | roviq_app | DELETE | using: false | check: 
+policy | tenant_sequences | tenant_sequences_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | tenant_sequences | tenant_sequences_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | tenant_sequences | tenant_sequences_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | tenant_sequences | tenant_sequences_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | tenant_user_profiles | tenant_user_profiles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | tenant_user_profiles | tenant_user_profiles_app_delete | roviq_app | DELETE | using: false | check: 
+policy | tenant_user_profiles | tenant_user_profiles_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | tenant_user_profiles | tenant_user_profiles_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | tenant_user_profiles | tenant_user_profiles_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | tenant_user_profiles | tenant_user_profiles_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | timetable_day_overrides | timetable_day_overrides_admin_all | roviq_admin | ALL | using: true | check: true
+policy | timetable_day_overrides | timetable_day_overrides_app_delete | roviq_app | DELETE | using: false | check: 
+policy | timetable_day_overrides | timetable_day_overrides_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_day_overrides | timetable_day_overrides_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | timetable_day_overrides | timetable_day_overrides_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_day_overrides | timetable_day_overrides_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | timetable_entries | timetable_entries_admin_all | roviq_admin | ALL | using: true | check: true
+policy | timetable_entries | timetable_entries_app_delete | roviq_app | DELETE | using: false | check: 
+policy | timetable_entries | timetable_entries_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_entries | timetable_entries_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | timetable_entries | timetable_entries_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_entries | timetable_entries_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | timetable_periods | timetable_periods_admin_all | roviq_admin | ALL | using: true | check: true
+policy | timetable_periods | timetable_periods_app_delete | roviq_app | DELETE | using: false | check: 
+policy | timetable_periods | timetable_periods_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_periods | timetable_periods_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | timetable_periods | timetable_periods_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_periods | timetable_periods_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | timetable_sections | timetable_sections_admin_all | roviq_admin | ALL | using: true | check: true
+policy | timetable_sections | timetable_sections_app_delete | roviq_app | DELETE | using: false | check: 
+policy | timetable_sections | timetable_sections_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_sections | timetable_sections_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | timetable_sections | timetable_sections_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetable_sections | timetable_sections_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | timetables | timetables_admin_all | roviq_admin | ALL | using: true | check: true
+policy | timetables | timetables_app_delete | roviq_app | DELETE | using: false | check: 
+policy | timetables | timetables_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetables | timetables_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | timetables | timetables_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | timetables | timetables_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+policy | user_addresses | user_addresses_admin_all | roviq_admin | ALL | using: true | check: true
+policy | user_addresses | user_addresses_app_select | roviq_app | SELECT | using: (user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | user_addresses | user_addresses_reseller_read | roviq_reseller | SELECT | using: ((user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | user_document_files | user_document_files_admin_all | roviq_admin | ALL | using: true | check: true
+policy | user_document_files | user_document_files_app_select | roviq_app | SELECT | using: (user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | user_document_files | user_document_files_reseller_read | roviq_reseller | SELECT | using: ((user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | user_documents | user_documents_admin_all | roviq_admin | ALL | using: true | check: true
+policy | user_documents | user_documents_app_select | roviq_app | SELECT | using: (user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | user_documents | user_documents_reseller_read | roviq_reseller | SELECT | using: ((user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | user_identifiers | user_identifiers_admin_all | roviq_admin | ALL | using: true | check: true
+policy | user_identifiers | user_identifiers_app_select | roviq_app | SELECT | using: (user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | user_identifiers | user_identifiers_reseller_read | roviq_reseller | SELECT | using: ((user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | user_profiles | user_profiles_admin_all | roviq_admin | ALL | using: true | check: true
+policy | user_profiles | user_profiles_app_select | roviq_app | SELECT | using: (user_id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | user_profiles | user_profiles_reseller_read | roviq_reseller | SELECT | using: ((user_id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (user_id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | user_profiles | user_profiles_self_select | roviq_user | SELECT | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: 
+policy | user_profiles | user_profiles_self_update | roviq_user | UPDATE | using: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: (user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | users | users_admin_all | roviq_admin | ALL | using: true | check: true
+policy | users | users_app_select | roviq_app | SELECT | using: (id IN ( SELECT m.user_id FROM memberships m WHERE ((m.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) | check: 
+policy | users | users_reseller_select | roviq_reseller | SELECT | using: ((id IN ( SELECT m.user_id FROM (memberships m JOIN institutes i ON ((i.id = m.tenant_id))) WHERE ((i.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid) AND (m.deleted_at IS NULL)))) OR (id IN ( SELECT rm.user_id FROM reseller_memberships rm WHERE (rm.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid)))) | check: 
+policy | users | users_self_select | roviq_user | SELECT | using: (id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: 
+policy | users | users_self_update | roviq_user | UPDATE | using: (id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) | check: (id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)
+policy | year_rollover_section_map | year_rollover_section_map_admin_all | roviq_admin | ALL | using: true | check: true
+policy | year_rollover_section_map | year_rollover_section_map_app_delete | roviq_app | DELETE | using: false | check: 
+policy | year_rollover_section_map | year_rollover_section_map_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | year_rollover_section_map | year_rollover_section_map_app_select | roviq_app | SELECT | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: 
+policy | year_rollover_section_map | year_rollover_section_map_app_update | roviq_app | UPDATE | using: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)
+policy | year_rollover_section_map | year_rollover_section_map_reseller_read | roviq_reseller | SELECT | using: (tenant_id IN ( SELECT institutes.id FROM institutes WHERE (institutes.reseller_id = (current_setting('app.current_reseller_id'::text, true))::uuid))) | check: 
+view   | roviq_app | academic_years_live | SELECT
+view   | roviq_app | academic_years_live | UPDATE
+view   | roviq_app | admission_applications_live | SELECT
+view   | roviq_app | admission_applications_live | UPDATE
+view   | roviq_app | application_document_files_live | SELECT
+view   | roviq_app | application_document_files_live | UPDATE
+view   | roviq_app | application_documents_live | SELECT
+view   | roviq_app | application_documents_live | UPDATE
+view   | roviq_app | attendance_entries_live | SELECT
+view   | roviq_app | attendance_entries_live | UPDATE
+view   | roviq_app | attendance_sessions_live | SELECT
+view   | roviq_app | attendance_sessions_live | UPDATE
+view   | roviq_app | bot_profiles_live | SELECT
+view   | roviq_app | bot_profiles_live | UPDATE
+view   | roviq_app | certificate_templates_live | SELECT
+view   | roviq_app | certificate_templates_live | UPDATE
+view   | roviq_app | co_scholastic_areas_live | SELECT
+view   | roviq_app | co_scholastic_areas_live | UPDATE
+view   | roviq_app | co_scholastic_assessments_live | SELECT
+view   | roviq_app | co_scholastic_assessments_live | UPDATE
+view   | roviq_app | device_tokens_live | SELECT
+view   | roviq_app | enquiries_live | SELECT
+view   | roviq_app | enquiries_live | UPDATE
+view   | roviq_app | exam_marks_live | SELECT
+view   | roviq_app | exam_marks_live | UPDATE
+view   | roviq_app | exam_schedules_live | SELECT
+view   | roviq_app | exam_schedules_live | UPDATE
+view   | roviq_app | exam_terms_live | SELECT
+view   | roviq_app | exam_terms_live | UPDATE
+view   | roviq_app | exam_topic_assessments_live | SELECT
+view   | roviq_app | exam_topic_assessments_live | UPDATE
+view   | roviq_app | exams_live | SELECT
+view   | roviq_app | exams_live | UPDATE
+view   | roviq_app | export_reports_live | SELECT
+view   | roviq_app | export_reports_live | UPDATE
+view   | roviq_app | files_live | SELECT
+view   | roviq_app | files_live | UPDATE
+view   | roviq_app | grade_bands_live | SELECT
+view   | roviq_app | grade_bands_live | UPDATE
+view   | roviq_app | grading_schemes_live | SELECT
+view   | roviq_app | grading_schemes_live | UPDATE
+view   | roviq_app | group_children_live | SELECT
+view   | roviq_app | group_children_live | UPDATE
+view   | roviq_app | group_members_live | SELECT
+view   | roviq_app | group_members_live | UPDATE
+view   | roviq_app | group_rules_live | SELECT
+view   | roviq_app | group_rules_live | UPDATE
+view   | roviq_app | groups_live | SELECT
+view   | roviq_app | groups_live | UPDATE
+view   | roviq_app | guardian_profiles_live | SELECT
+view   | roviq_app | guardian_profiles_live | UPDATE
+view   | roviq_app | holidays_live | SELECT
+view   | roviq_app | holidays_live | UPDATE
+view   | roviq_app | institute_affiliations_live | SELECT
+view   | roviq_app | institute_affiliations_live | UPDATE
+view   | roviq_app | institute_branding_live | SELECT
+view   | roviq_app | institute_branding_live | UPDATE
+view   | roviq_app | institute_configs_live | SELECT
+view   | roviq_app | institute_configs_live | UPDATE
+view   | roviq_app | institute_group_branding_live | SELECT
+view   | roviq_app | institute_groups_live | SELECT
+view   | roviq_app | institute_identifiers_live | SELECT
+view   | roviq_app | institute_identifiers_live | UPDATE
+view   | roviq_app | institute_notification_configs_live | SELECT
+view   | roviq_app | institute_notification_configs_live | UPDATE
+view   | roviq_app | institutes_live | SELECT
+view   | roviq_app | institutes_live | UPDATE
+view   | roviq_app | issued_certificates_live | SELECT
+view   | roviq_app | issued_certificates_live | UPDATE
+view   | roviq_app | leave_files_live | SELECT
+view   | roviq_app | leave_files_live | UPDATE
+view   | roviq_app | leaves_live | SELECT
+view   | roviq_app | leaves_live | UPDATE
+view   | roviq_app | memberships_live | SELECT
+view   | roviq_app | memberships_live | UPDATE
+view   | roviq_app | messaging_senders_live | SELECT
+view   | roviq_app | notifications_live | SELECT
+view   | roviq_app | notifications_live | UPDATE
+view   | roviq_app | payment_gateway_configs_live | SELECT
+view   | roviq_app | phone_numbers_live | SELECT
+view   | roviq_app | plans_live | SELECT
+view   | roviq_app | privacy_notices_live | SELECT
+view   | roviq_app | privacy_notices_live | UPDATE
+view   | roviq_app | refresh_tokens_live | SELECT
+view   | roviq_app | refresh_tokens_live | UPDATE
+view   | roviq_app | report_card_instances_live | SELECT
+view   | roviq_app | report_card_instances_live | UPDATE
+view   | roviq_app | report_cards_live | SELECT
+view   | roviq_app | report_cards_live | UPDATE
+view   | roviq_app | resellers_live | SELECT
+view   | roviq_app | roles_live | SELECT
+view   | roviq_app | roles_live | UPDATE
+view   | roviq_app | section_subjects_live | SELECT
+view   | roviq_app | section_subjects_live | UPDATE
+view   | roviq_app | sections_live | SELECT
+view   | roviq_app | sections_live | UPDATE
+view   | roviq_app | staff_profiles_live | SELECT
+view   | roviq_app | staff_profiles_live | UPDATE
+view   | roviq_app | staff_qualifications_live | SELECT
+view   | roviq_app | staff_qualifications_live | UPDATE
+view   | roviq_app | standard_subjects_live | SELECT
+view   | roviq_app | standard_subjects_live | UPDATE
+view   | roviq_app | standards_live | SELECT
+view   | roviq_app | standards_live | UPDATE
+view   | roviq_app | student_academics_live | SELECT
+view   | roviq_app | student_academics_live | UPDATE
+view   | roviq_app | student_guardian_links_live | SELECT
+view   | roviq_app | student_guardian_links_live | UPDATE
+view   | roviq_app | student_profiles_live | SELECT
+view   | roviq_app | student_profiles_live | UPDATE
+view   | roviq_app | subject_topics_live | SELECT
+view   | roviq_app | subject_topics_live | UPDATE
+view   | roviq_app | subjects_live | SELECT
+view   | roviq_app | subjects_live | UPDATE
+view   | roviq_app | tc_register_live | SELECT
+view   | roviq_app | tc_register_live | UPDATE
+view   | roviq_app | tenant_user_profiles_live | SELECT
+view   | roviq_app | tenant_user_profiles_live | UPDATE
+view   | roviq_app | timetable_day_overrides_live | SELECT
+view   | roviq_app | timetable_day_overrides_live | UPDATE
+view   | roviq_app | timetable_entries_live | SELECT
+view   | roviq_app | timetable_entries_live | UPDATE
+view   | roviq_app | timetable_periods_live | SELECT
+view   | roviq_app | timetable_periods_live | UPDATE
+view   | roviq_app | timetable_sections_live | SELECT
+view   | roviq_app | timetable_sections_live | UPDATE
+view   | roviq_app | timetables_live | SELECT
+view   | roviq_app | timetables_live | UPDATE
+view   | roviq_app | user_addresses_live | SELECT
+view   | roviq_app | user_document_files_live | SELECT
+view   | roviq_app | user_documents_live | SELECT
+view   | roviq_app | user_identifiers_live | SELECT
+view   | roviq_app | user_profiles_live | SELECT
+view   | roviq_app | users_live | SELECT
+view   | roviq_app | year_rollover_section_map_live | SELECT
+view   | roviq_app | year_rollover_section_map_live | UPDATE
+view   | roviq_reseller | academic_years_live | SELECT
+view   | roviq_reseller | admission_applications_live | SELECT
+view   | roviq_reseller | application_document_files_live | SELECT
+view   | roviq_reseller | application_documents_live | SELECT
+view   | roviq_reseller | attendance_entries_live | SELECT
+view   | roviq_reseller | attendance_sessions_live | SELECT
+view   | roviq_reseller | bot_profiles_live | SELECT
+view   | roviq_reseller | certificate_templates_live | SELECT
+view   | roviq_reseller | co_scholastic_areas_live | SELECT
+view   | roviq_reseller | co_scholastic_assessments_live | SELECT
+view   | roviq_reseller | device_tokens_live | SELECT
+view   | roviq_reseller | enquiries_live | SELECT
+view   | roviq_reseller | exam_marks_live | SELECT
+view   | roviq_reseller | exam_schedules_live | SELECT
+view   | roviq_reseller | exam_terms_live | SELECT
+view   | roviq_reseller | exam_topic_assessments_live | SELECT
+view   | roviq_reseller | exams_live | SELECT
+view   | roviq_reseller | export_reports_live | SELECT
+view   | roviq_reseller | files_live | SELECT
+view   | roviq_reseller | grade_bands_live | SELECT
+view   | roviq_reseller | grading_schemes_live | SELECT
+view   | roviq_reseller | group_children_live | SELECT
+view   | roviq_reseller | group_members_live | SELECT
+view   | roviq_reseller | group_rules_live | SELECT
+view   | roviq_reseller | groups_live | SELECT
+view   | roviq_reseller | guardian_profiles_live | SELECT
+view   | roviq_reseller | holidays_live | SELECT
+view   | roviq_reseller | institute_affiliations_live | SELECT
+view   | roviq_reseller | institute_branding_live | SELECT
+view   | roviq_reseller | institute_configs_live | SELECT
+view   | roviq_reseller | institute_group_branding_live | SELECT
+view   | roviq_reseller | institute_groups_live | SELECT
+view   | roviq_reseller | institute_identifiers_live | SELECT
+view   | roviq_reseller | institute_notification_configs_live | SELECT
+view   | roviq_reseller | institutes_live | SELECT
+view   | roviq_reseller | issued_certificates_live | SELECT
+view   | roviq_reseller | leave_files_live | SELECT
+view   | roviq_reseller | leaves_live | SELECT
+view   | roviq_reseller | memberships_live | SELECT
+view   | roviq_reseller | messaging_senders_live | SELECT
+view   | roviq_reseller | notifications_live | SELECT
+view   | roviq_reseller | payment_gateway_configs_live | SELECT
+view   | roviq_reseller | phone_numbers_live | SELECT
+view   | roviq_reseller | plans_live | SELECT
+view   | roviq_reseller | privacy_notices_live | SELECT
+view   | roviq_reseller | refresh_tokens_live | SELECT
+view   | roviq_reseller | report_card_instances_live | SELECT
+view   | roviq_reseller | report_cards_live | SELECT
+view   | roviq_reseller | reseller_memberships_live | SELECT
+view   | roviq_reseller | resellers_live | SELECT
+view   | roviq_reseller | roles_live | SELECT
+view   | roviq_reseller | section_subjects_live | SELECT
+view   | roviq_reseller | sections_live | SELECT
+view   | roviq_reseller | staff_profiles_live | SELECT
+view   | roviq_reseller | staff_qualifications_live | SELECT
+view   | roviq_reseller | standard_subjects_live | SELECT
+view   | roviq_reseller | standards_live | SELECT
+view   | roviq_reseller | student_academics_live | SELECT
+view   | roviq_reseller | student_guardian_links_live | SELECT
+view   | roviq_reseller | student_profiles_live | SELECT
+view   | roviq_reseller | subject_topics_live | SELECT
+view   | roviq_reseller | subjects_live | SELECT
+view   | roviq_reseller | tc_register_live | SELECT
+view   | roviq_reseller | tenant_user_profiles_live | SELECT
+view   | roviq_reseller | timetable_day_overrides_live | SELECT
+view   | roviq_reseller | timetable_entries_live | SELECT
+view   | roviq_reseller | timetable_periods_live | SELECT
+view   | roviq_reseller | timetable_sections_live | SELECT
+view   | roviq_reseller | timetables_live | SELECT
+view   | roviq_reseller | user_addresses_live | SELECT
+view   | roviq_reseller | user_document_files_live | SELECT
+view   | roviq_reseller | user_documents_live | SELECT
+view   | roviq_reseller | user_identifiers_live | SELECT
+view   | roviq_reseller | user_profiles_live | SELECT
+view   | roviq_reseller | users_live | SELECT
+view   | roviq_reseller | year_rollover_section_map_live | SELECT
+view   | roviq_user | auth_providers_live | SELECT
+view   | roviq_user | group_memberships_live | SELECT
+view   | roviq_user | notifications_live | SELECT
+view   | roviq_user | phone_numbers_live | SELECT
+view   | roviq_user | refresh_tokens_live | SELECT
+view   | roviq_user | user_profiles_live | SELECT
+view   | roviq_user | users_live | SELECT
