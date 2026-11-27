@@ -655,7 +655,7 @@ describe('institute deletion', () => {
       ]);
       await expectRefused(
         client,
-        /only the platform can delete or restore an institute/,
+        /permission denied/,
         'UPDATE institutes SET deleted_at = now() WHERE id = $1',
         [SEED_IDS.INSTITUTE_1],
       );
@@ -740,10 +740,11 @@ describe('reseller self-service profile (ROV-186)', () => {
 
   it('an institute role cannot edit any reseller', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED_IDS.INSTITUTE_1 }, async (client) => {
-      const res = await client.query(`UPDATE resellers SET name = 'Hijacked' WHERE id = $1`, [
-        SEED_IDS.RESELLER_DIRECT,
-      ]);
-      expect(res.rowCount).toBe(0);
+      await expect(
+        client.query(`UPDATE resellers SET name = 'Hijacked' WHERE id = $1`, [
+          SEED_IDS.RESELLER_DIRECT,
+        ]),
+      ).rejects.toThrow(/permission denied/);
     });
   });
 });

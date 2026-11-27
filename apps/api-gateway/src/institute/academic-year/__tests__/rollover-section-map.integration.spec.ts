@@ -713,12 +713,13 @@ describe('Rollover section capacity and overrides (integration)', () => {
           .where(eq(yearRolloverSectionMap.tenantId, a.tenantId))
           .returning({ id: yearRolloverSectionMap.id }),
       );
-      const deleted = await asTenant(a.tenantId, (tx) =>
-        tx.delete(yearRolloverSectionMap).returning({ id: yearRolloverSectionMap.id }),
-      );
+      await expect(
+        asTenant(a.tenantId, (tx) =>
+          tx.delete(yearRolloverSectionMap).returning({ id: yearRolloverSectionMap.id }),
+        ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
 
       expect(updated).toEqual([]);
-      expect(deleted).toEqual([]);
       expect(await liveMapRows()).toHaveLength(1);
     });
 

@@ -179,11 +179,11 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
     });
 
     it('should not hard-delete even its own file', async () => {
-      const deleted = await withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
-        tx.delete(files).where(eq(files.id, fileA)).returning({ id: files.id }),
-      );
-
-      expect(deleted).toEqual([]);
+      await expect(
+        withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
+          tx.delete(files).where(eq(files.id, fileA)).returning({ id: files.id }),
+        ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
     });
   });
 

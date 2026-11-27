@@ -520,10 +520,11 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
     });
 
     it('institute cannot delete a row, even for its own member', async () => {
-      const deleted = await withTenant(app.db, mkInstituteCtx(tenant.tenantId, CTX), (tx) =>
-        tx.delete(table).where(eq(userId, student.userId)).returning({ userId }),
-      );
-      expect(deleted).toEqual([]);
+      await expect(
+        withTenant(app.db, mkInstituteCtx(tenant.tenantId, CTX), (tx) =>
+          tx.delete(table).where(eq(userId, student.userId)).returning({ userId }),
+        ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
     });
 
     it('reseller reads rows of its own institutes only', async () => {

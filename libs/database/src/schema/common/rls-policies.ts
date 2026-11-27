@@ -86,37 +86,6 @@ export const tenantPolicies = (tableName: string) => [
   }),
 ];
 
-/** RLS policies for entity tables WITHOUT tenantId (e.g., institutes, EE billing) */
-export const entityPolicies = (tableName: string) => [
-  pgPolicy(`${tableName}_app_select`, {
-    for: 'select',
-    to: roviqApp,
-    using: sql`true`,
-  }),
-  pgPolicy(`${tableName}_app_insert`, {
-    for: 'insert',
-    to: roviqApp,
-    withCheck: sql`true`,
-  }),
-  pgPolicy(`${tableName}_app_update`, {
-    for: 'update',
-    to: roviqApp,
-    using: sql`true`,
-    withCheck: sql`true`,
-  }),
-  pgPolicy(`${tableName}_app_delete`, {
-    for: 'delete',
-    to: roviqApp,
-    using: sql`false`,
-  }),
-  pgPolicy(`${tableName}_admin_all`, {
-    for: 'all',
-    to: roviqAdmin,
-    using: sql`true`,
-    withCheck: sql`true`,
-  }),
-];
-
 /**
  * RLS policies for personal-data tables keyed by `user_id` with no `tenant_id`.
  * A row is readable only where its user holds a membership that is not deleted; writes are

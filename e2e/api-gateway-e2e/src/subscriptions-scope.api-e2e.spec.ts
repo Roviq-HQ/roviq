@@ -61,7 +61,7 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
     let instituteToken: string;
     let instituteId: string;
     let instituteVersion: number;
-    let originalCode: string | null;
+    let originalTimezone: string;
 
     let studentId: string;
     let studentVersion: number;
@@ -71,12 +71,12 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
       instituteToken = (await loginAsInstituteAdmin()).accessToken;
 
       const instRes = await gql<{
-        myInstitute: { id: string; code: string | null; version: number };
-      }>(`query { myInstitute { id code version } }`, undefined, instituteToken);
+        myInstitute: { id: string; timezone: string; version: number };
+      }>(`query { myInstitute { id timezone version } }`, undefined, instituteToken);
       assert(instRes.data?.myInstitute);
       instituteId = instRes.data.myInstitute.id;
       instituteVersion = instRes.data.myInstitute.version;
-      originalCode = instRes.data.myInstitute.code;
+      originalTimezone = instRes.data.myInstitute.timezone;
 
       const studentRes = await gql<{
         getStudent: { id: string; version: number; socialCategory: SocialCategory | null };
@@ -93,7 +93,7 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
     });
 
     afterAll(async () => {
-      // Restore the institute's code so re-runs are stable. Re-read the
+      // Restore the institute's timezone so re-runs are stable. Re-read the
       // version because the test itself mutated it.
       const cur = await gql<{ myInstitute: { version: number } }>(
         `query { myInstitute { version } }`,
@@ -106,7 +106,7 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
             updateInstituteInfo(input: $input) { id }
           }`,
           {
-            input: { version: cur.data.myInstitute.version, code: originalCode ?? undefined },
+            input: { version: cur.data.myInstitute.version, timezone: originalTimezone },
           },
           instituteToken,
         );
@@ -134,18 +134,18 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
     });
 
     it('instituteUpdated fires after updateInstituteInfo', async () => {
-      const newCode = `E2E-${randomUUID().slice(0, 6)}`;
+      const newTimezone = originalTimezone === 'Asia/Dubai' ? 'Asia/Kolkata' : 'Asia/Dubai';
 
       const eventPromise = subscribeOnce<
-        Envelope<'instituteUpdated', { id: string; code: string | null }>
-      >(`subscription { instituteUpdated { id code } }`, {}, instituteToken);
+        Envelope<'instituteUpdated', { id: string; timezone: string }>
+      >(`subscription { instituteUpdated { id timezone } }`, {}, instituteToken);
       await wait(WS_REGISTRATION_DELAY_MS);
 
       const res = await gql<Pick<Mutation, 'updateInstituteInfo'>>(
         `mutation ($input: UpdateInstituteInfoInput!) {
-          updateInstituteInfo(input: $input) { id code version }
+          updateInstituteInfo(input: $input) { id timezone version }
         }`,
-        { input: { version: instituteVersion, code: newCode } },
+        { input: { version: instituteVersion, timezone: newTimezone } },
         instituteToken,
       );
       if (res.errors) {
@@ -157,7 +157,7 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
 
       const event = await eventPromise;
       expect(event.instituteUpdated.id).toBe(instituteId);
-      expect(event.instituteUpdated.code).toBe(newCode);
+      expect(event.instituteUpdated.timezone).toBe(newTimezone);
     });
 
     it('studentUpdated fires after updateStudent', async () => {

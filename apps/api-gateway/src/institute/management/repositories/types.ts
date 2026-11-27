@@ -97,9 +97,9 @@ export interface InstituteStatistics {
   recentlyCreated: number;
 }
 
+/** What an institute edits about itself. Its code is assigned by the platform at creation. */
 export interface UpdateInstituteInfoData {
   name?: Record<string, string>;
-  code?: string;
   contact?: InstituteContact;
   address?: InstituteAddress;
   timezone?: string;

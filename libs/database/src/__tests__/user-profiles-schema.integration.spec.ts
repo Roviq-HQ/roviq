@@ -57,7 +57,7 @@ describe('ROV-151: user_profiles', () => {
   const clearExistingProfile = (client: pg.PoolClient, userId: string) =>
     client.query(`DELETE FROM user_profiles WHERE user_id = $1`, [userId]);
 
-  it('INSERT as roviq_app is rejected by RLS (writes are admin-only)', async () => {
+  it('INSERT as roviq_app is refused (writes are admin-only)', async () => {
     await inTransaction(async (client) => {
       await clearExistingProfile(client, SEED.USER_ADMIN);
       await client.query(`SET LOCAL ROLE roviq_app`);
@@ -68,7 +68,7 @@ describe('ROV-151: user_profiles', () => {
            VALUES ($1, $2::jsonb, $3::jsonb, $1, $1)`,
           [SEED.USER_ADMIN, enName('Test'), enName('User')],
         ),
-      ).rejects.toThrow('new row violates row-level security policy for table "user_profiles"');
+      ).rejects.toThrow('permission denied for table user_profiles');
     });
   });
 

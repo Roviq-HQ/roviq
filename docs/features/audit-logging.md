@@ -45,8 +45,8 @@ Service side-effects → AuditEmitter → NATS JetStream (AUDIT.log)
 
 | Role | SELECT | INSERT | UPDATE | DELETE |
 |------|--------|--------|--------|--------|
-| `roviq_app` | scope='institute' + tenant match, or `subject_tenant_id` = tenant | scope='institute' rows of its own tenant | **Denied** | **Denied** |
-| `roviq_reseller` | their institutes + own reseller entries | scope='reseller' rows of its own reseller | **Denied** | **Denied** |
+| `roviq_app` | scope='institute' + tenant match, or `subject_tenant_id` = tenant | **Denied** (no privilege) | **Denied** | **Denied** |
+| `roviq_reseller` | their institutes + own reseller entries | **Denied** (no privilege) | **Denied** | **Denied** |
 | `roviq_admin` | All | All | All | All |
 | `roviq_pooler` | **Denied** (NOINHERIT) | — | — | — |
 

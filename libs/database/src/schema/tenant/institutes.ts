@@ -143,7 +143,8 @@ export const institutes = pgTable(
       withCheck: sql`id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
 
-    // roviq_reseller: its own institutes.
+    // roviq_reseller: reads its own institutes and takes one out of its own group (a column
+    // grant on `group_id`). Creating an institute and every other column is the platform's.
     // SECURITY: no DELETE policy — removing an institute is a platform decision (ROV-102).
     // The `institutes_delete_admin_only` trigger refuses a reseller soft-delete as well.
     pgPolicy('institutes_reseller_select', {
@@ -151,16 +152,12 @@ export const institutes = pgTable(
       to: roviqReseller,
       using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
     }),
-    pgPolicy('institutes_reseller_insert', {
-      for: 'insert',
-      to: roviqReseller,
-      withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
-    }),
     pgPolicy('institutes_reseller_update', {
       for: 'update',
       to: roviqReseller,
       using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
-      withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
+      // The group it puts an institute in is one of its own.
+      withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid AND (group_id IS NULL OR group_id IN (SELECT id FROM institute_groups WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid))`,
     }),
 
     // roviq_admin: full access

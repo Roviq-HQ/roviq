@@ -98,29 +98,19 @@ export const auditLogs = pgTable(
 
     // === RLS Policies (5-role model) ===
 
-    // roviq_app: can INSERT institute rows of its own institute, can SELECT its own institute-scoped rows and the
-    // platform/reseller rows that name it as their subject
+    // roviq_app: reads its own institute-scoped rows and the platform/reseller rows that name it
+    // as their subject. It never writes: every row comes from the audit writer.
     pgPolicy('audit_app_read', {
       for: 'select',
       to: roviqApp,
       using: sql`(scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid) OR subject_tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
-    pgPolicy('audit_app_insert', {
-      for: 'insert',
-      to: roviqApp,
-      withCheck: sql`scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-    }),
 
-    // roviq_reseller: can INSERT its own reseller rows, can SELECT their institutes + own reseller entries
+    // roviq_reseller: reads its institutes' rows and its own reseller rows; never writes
     pgPolicy('audit_reseller_read', {
       for: 'select',
       to: roviqReseller,
       using: sql`(scope = 'institute' AND tenant_id IN (SELECT id FROM institutes WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid)) OR (scope = 'reseller' AND reseller_id = current_setting('app.current_reseller_id', true)::uuid)`,
-    }),
-    pgPolicy('audit_reseller_insert', {
-      for: 'insert',
-      to: roviqReseller,
-      withCheck: sql`scope = 'reseller' AND reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
     }),
 
     // roviq_admin: full access (SELECT, INSERT, UPDATE, DELETE)

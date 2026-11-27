@@ -12,7 +12,7 @@ The Institute Service manages the tenant root entity and its academic structure.
 
 | Table | Scope | RLS | Description |
 |-------|-------|-----|-------------|
-| `institutes` | Platform | entityPolicies + custom reseller | Tenant root entity |
+| `institutes` | Platform | Custom (an institute reads its row and edits its profile columns; a reseller reads its institutes and may clear `group_id`; the platform does the rest) | Tenant root entity |
 | `institute_branding` | Tenant | tenantPolicies | One-to-one: logo, colors, theme |
 | `institute_configs` | Tenant | tenantPolicies | One-to-one: attendance, shifts, norms |
 | `institute_identifiers` | Tenant | tenantPolicies | One-to-many: UDISE+, CBSE, BSEH codes |
@@ -117,7 +117,7 @@ Located in `apps/api-gateway/src/institute/management/`:
 | Resolver | CASL Action | Description |
 |----------|-------------|-------------|
 | `myInstitute` | `read:Institute` | Own institute with @ResolveField for branding/config/identifiers/affiliations |
-| `updateInstituteInfo` | `update_info:Institute` | Name, code, contact, address + optimistic concurrency |
+| `updateInstituteInfo` | `update_info:Institute` | Name, contact, address, timezone, currency + optimistic concurrency. The code is assigned by the platform and not editable here |
 | `updateInstituteBranding` | `update_branding:Institute` | Logo, colors, theme |
 | `updateInstituteConfig` | `update_config:Institute` | Attendance, shifts, grading, norms |
 
@@ -136,7 +136,7 @@ Granular actions defined in `AppAction`:
 
 | Action | Used For |
 |--------|----------|
-| `update_info` | Institute basic info (name, code, contact) |
+| `update_info` | Institute basic info (name, contact, address) |
 | `update_branding` | Visual branding (logo, colors) |
 | `update_config` | Operational config (attendance, shifts) |
 | `approve` | Approve a pending entity (e.g. institute approval) |
@@ -150,12 +150,12 @@ Granular actions defined in `AppAction`:
 
 ### Institute Tables
 
-- `roviq_app`: SELECT on its own `institutes` row, and UPDATE of that row's profile and locale columns only (`name`, `code`, `contact`, `address`, `timezone`, `currency`, `supported_locales`, `default_locale`, with `version`, `updated_at`, `updated_by`). Status, setup status, reseller, group, slug, type, departments, settings, the demo flag and the first admin are never writable by an institute; it cannot insert or delete an institute
+- `roviq_app`: SELECT on its own `institutes` row, and UPDATE of that row's profile and locale columns only (`name`, `contact`, `address`, `timezone`, `currency`, `supported_locales`, `default_locale`, with `version`, `updated_at`, `updated_by`). Status, setup status, reseller, group, slug, type, departments, settings, the demo flag and the first admin are never writable by an institute; it cannot insert or delete an institute
 - `roviq_app`: Full CRUD on child tables (branding, configs, identifiers, affiliations)
-- `roviq_reseller`: SELECT + INSERT + UPDATE on `institutes` (create with approval, suspend)
+- `roviq_reseller`: SELECT on its own `institutes` rows, and UPDATE of `group_id` only (taking an institute out of its own group). Creating an institute and changing its status run as the platform role after the service has checked the reseller
 - `roviq_reseller`: SELECT only on child tables
 - `roviq_admin`: Full access everywhere
-- All audit_logs: immutable for non-admin (SELECT + INSERT only)
+- `audit_logs`: read-only for the institute and reseller roles; rows are inserted by the audit writer and the platform role
 - FORCE ROW LEVEL SECURITY on every table
 
 ### Request Context

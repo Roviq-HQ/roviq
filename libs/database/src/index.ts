@@ -19,7 +19,6 @@ export {
 } from './reseller-system-roles';
 export * from './schema';
 export {
-  entityPolicies,
   roviqAdmin,
   roviqApp,
   roviqReseller,

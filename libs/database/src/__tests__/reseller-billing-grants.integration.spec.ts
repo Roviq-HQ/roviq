@@ -37,12 +37,9 @@ describe('reseller billing GRANTs', () => {
     }
   }
 
-  it('plans: reseller has INSERT, UPDATE, DELETE, SELECT', async () => {
+  it('plans: reseller has INSERT, UPDATE, SELECT and no DELETE (no policy lets it delete one)', async () => {
     const grants = await getResellerGrants('plans');
-    expect(grants).toContain('SELECT');
-    expect(grants).toContain('INSERT');
-    expect(grants).toContain('UPDATE');
-    expect(grants).toContain('DELETE');
+    expect(grants).toEqual(['INSERT', 'SELECT', 'UPDATE']);
   });
 
   it('subscriptions: reseller has INSERT, UPDATE, SELECT', async () => {

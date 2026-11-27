@@ -24,14 +24,6 @@ export class UpdateInstituteInfoInput {
   @IsOptional()
   name?: Record<string, string>;
 
-  @Field({
-    nullable: true,
-    description: 'Short internal code for the institute, e.g. "SAJ". Unique per reseller.',
-  })
-  @IsString()
-  @IsOptional()
-  code?: string;
-
   @Field(() => InstituteContactInput, {
     nullable: true,
     description: 'Phone and email contact details.',
