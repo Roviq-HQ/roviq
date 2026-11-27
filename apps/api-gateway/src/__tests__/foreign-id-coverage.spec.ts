@@ -109,6 +109,25 @@ describe('foreign-id test coverage of institute and reseller operations', () => 
     expect(broken).toEqual([]);
   });
 
+  it('should have every listed spec send its foreign ids through the same-as-missing helper', () => {
+    // The helper (`foreign-id-requests.ts`) sends each request again with an id of no row and
+    // compares the answers; when the spec file ends it requires every operation listed for
+    // that file to have been compared, or to be named in `notCompared` with a reason.
+    const specs = new Set(
+      Object.values(FOREIGN_ID_COVERAGE).flatMap((coverage) =>
+        'spec' in coverage ? [coverage.spec] : [],
+      ),
+    );
+    const without = [...specs].filter(
+      (spec) =>
+        existsSync(join(ROOT, spec)) &&
+        !/\bforeignIdRequests\(\{[\s\S]*?specFile: __filename/.test(
+          readFileSync(join(ROOT, spec), 'utf8'),
+        ),
+    );
+    expect(without).toEqual([]);
+  });
+
   it('should give a reason for every exempt operation', () => {
     const unexplained = Object.entries(FOREIGN_ID_COVERAGE)
       .filter(([, coverage]) => 'exempt' in coverage && coverage.exempt.trim().length < 20)

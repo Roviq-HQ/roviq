@@ -11,7 +11,6 @@ import {
   createResellerToken,
   createTestInstitute,
   createTestReseller,
-  gqlRequest,
   type IntegrationAppResult,
   RESELLER_DIRECT_ID,
   type TestInstitute,
@@ -19,6 +18,7 @@ import {
 } from '@roviq/testing/integration';
 import { inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { foreignIdRequests } from '../../__tests__/foreign-id-requests';
 import { AppModule } from '../../app/app.module';
 
 const ORIGIN = 'test:audit-foreign-id';
@@ -65,6 +65,12 @@ describe('audit log filters: another institute or reseller id (ROV-293)', () => 
   let instDirect: TestInstitute;
   let sessionB: string;
   let sessionDirect: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [resellerOther, instB, instDirect, sessionB, sessionDirect],
+    specFile: __filename,
+  });
   const ownRowId = randomUUID();
   const foreignRowIds = { b: randomUUID(), direct: randomUUID(), reseller: randomUUID() };
 
@@ -161,7 +167,7 @@ describe('audit log filters: another institute or reseller id (ROV-293)', () => 
 
   describe('auditLogs (institute scope)', () => {
     const list = async (filter: Record<string, string>) => {
-      const res = await gqlRequest<{ auditLogs: Connection }>(result.httpServer, {
+      const res = await request<{ auditLogs: Connection }>({
         query: AUDIT_LOGS,
         variables: { filter },
         token: instituteToken(),
@@ -192,7 +198,7 @@ describe('audit log filters: another institute or reseller id (ROV-293)', () => 
 
   describe('resellerAuditLogs (reseller scope)', () => {
     const list = async (filter: Record<string, string>) => {
-      const res = await gqlRequest<{ resellerAuditLogs: Connection }>(result.httpServer, {
+      const res = await request<{ resellerAuditLogs: Connection }>({
         query: RESELLER_AUDIT_LOGS,
         variables: { filter },
         token: resellerToken(),

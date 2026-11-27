@@ -41,6 +41,7 @@ import {
 } from '@roviq/testing/integration';
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:student-document-removal';
@@ -225,8 +226,17 @@ describe('deleteStudentDocument (integration)', () => {
     );
   }
 
+  /** Documents of the institute, which the other institute's admin must not reach. */
+  const documentsOfTenant: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => app.httpServer,
+    foreignIds: () => documentsOfTenant,
+    callerTokens: () => [foreignAdminToken],
+    specFile: __filename,
+  });
+
   const remove = (id: string, token: string) =>
-    gqlRequest<{ deleteStudentDocument: boolean }>(app.httpServer, {
+    request<{ deleteStudentDocument: boolean }>({
       query: DELETE,
       variables: { id },
       token,
@@ -333,6 +343,7 @@ describe('deleteStudentDocument (integration)', () => {
 
   it("answers STUDENT_NOT_FOUND to another institute's admin and changes nothing", async () => {
     const document = await createDocument('BIRTH_CERTIFICATE', 1);
+    documentsOfTenant.push(document.id);
 
     const response = await remove(document.id, foreignAdminToken);
 

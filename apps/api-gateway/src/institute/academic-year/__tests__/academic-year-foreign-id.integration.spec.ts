@@ -16,12 +16,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:academic-year-foreign-id';
@@ -77,6 +77,12 @@ describe('academic year: another institute id (ROV-293)', () => {
   let instA: TestInstitute;
   let instB: TestInstitute;
   let tokenA: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, yearB, completingYearB],
+    specFile: __filename,
+  });
   /** PLANNING: a year that activateAcademicYear could move to ACTIVE. */
   let yearB: string;
   /** COMPLETING: a year that archiveAcademicYear could move to ARCHIVED. */
@@ -141,7 +147,7 @@ describe('academic year: another institute id (ROV-293)', () => {
     const foreignBefore = await yearsOf(instB.tenantId);
     const ownBefore = await yearsOf(instA.tenantId);
 
-    const res = await gqlRequest<{ updateAcademicYear: { id: string } }>(result.httpServer, {
+    const res = await request<{ updateAcademicYear: { id: string } }>({
       query: UPDATE,
       variables: {
         id: yearB,
@@ -160,7 +166,7 @@ describe('academic year: another institute id (ROV-293)', () => {
     ['academicYear', ACADEMIC_YEAR],
     ['academicYearRolloverPreview', ROLLOVER_PREVIEW],
   ] as const)('%s should refuse another institute year and return none of it', async (_operation, query) => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { id: yearB },
       token: tokenA,
@@ -179,7 +185,7 @@ describe('academic year: another institute id (ROV-293)', () => {
     const ownBefore = await yearsOf(instA.tenantId);
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { id: pick() },
       token: tokenA,

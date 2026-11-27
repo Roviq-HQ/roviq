@@ -18,6 +18,7 @@ import {
 } from '@roviq/testing/integration';
 import { eq, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { foreignIdRequests } from '../../__tests__/foreign-id-requests';
 import { AppModule } from '../../app/app.module';
 
 const ORIGIN = 'test:files-foreign-id';
@@ -53,6 +54,12 @@ describe('files: another institute or reseller id (ROV-293)', () => {
   let instDirect: TestInstitute;
   let instituteFileB: string;
   let personFileB: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [resellerOther, instB, instDirect, instituteFileB, personFileB],
+    specFile: __filename,
+  });
 
   const instituteToken = () =>
     createInstituteToken({
@@ -144,7 +151,7 @@ describe('files: another institute or reseller id (ROV-293)', () => {
     ])('should refuse a %s upload about a member of another institute and store no file', async (purpose, contentType, fileName) => {
       const before = await filesOf(instA.userId, instB.userId);
 
-      const res = await gqlRequest<{ requestFileUpload: { fileId: string } }>(result.httpServer, {
+      const res = await request<{ requestFileUpload: { fileId: string } }>({
         query: REQUEST_UPLOAD,
         variables: {
           input: { purpose, contentType, fileName, sizeBytes: 2048, subjectUserId: instB.userId },
@@ -165,7 +172,7 @@ describe('files: another institute or reseller id (ROV-293)', () => {
     ])('should refuse %s and leave it unchanged', async (_label, fileId) => {
       const before = await fileRow(fileId());
 
-      const res = await gqlRequest<{ fileDownloadUrl: string }>(result.httpServer, {
+      const res = await request<{ fileDownloadUrl: string }>({
         query: DOWNLOAD_URL,
         variables: { fileId: fileId() },
         token: instituteToken(),
@@ -184,22 +191,19 @@ describe('files: another institute or reseller id (ROV-293)', () => {
     ])('should refuse a picture upload about a member of %s and store no file', async (_label, subjectUserId) => {
       const before = await filesOf(resellerOwn.userId, subjectUserId());
 
-      const res = await gqlRequest<{ resellerRequestFileUpload: { fileId: string } }>(
-        result.httpServer,
-        {
-          query: RESELLER_REQUEST_UPLOAD,
-          variables: {
-            input: {
-              purpose: 'PROFILE_PHOTO',
-              contentType: 'image/jpeg',
-              fileName: 'me.jpg',
-              sizeBytes: 2048,
-              subjectUserId: subjectUserId(),
-            },
+      const res = await request<{ resellerRequestFileUpload: { fileId: string } }>({
+        query: RESELLER_REQUEST_UPLOAD,
+        variables: {
+          input: {
+            purpose: 'PROFILE_PHOTO',
+            contentType: 'image/jpeg',
+            fileName: 'me.jpg',
+            sizeBytes: 2048,
+            subjectUserId: subjectUserId(),
           },
-          token: resellerToken(),
         },
-      );
+        token: resellerToken(),
+      });
 
       expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
       expect(res.data).toBeNull();

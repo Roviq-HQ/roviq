@@ -28,12 +28,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:consent-foreign-id';
@@ -71,6 +71,12 @@ describe('consent: a student of another institute (ROV-293)', () => {
   let tokenA: string;
   let ownStudentId: string;
   let foreignStudentId: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, foreignStudentId],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -203,7 +209,7 @@ describe('consent: a student of another institute (ROV-293)', () => {
     ['grantConsent', GRANT],
     ['withdrawConsent', WITHDRAW],
   ] as const)('%s should record consent for its own linked student', async (operation, query) => {
-    const res = await gqlRequest<Record<string, { id: string }>>(result.httpServer, {
+    const res = await request<Record<string, { id: string }>>({
       query,
       variables: { studentProfileId: ownStudentId },
       token: tokenA,
@@ -232,7 +238,7 @@ describe('consent: a student of another institute (ROV-293)', () => {
     const pointingBefore = await consentsPointingAtForeignStudent();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { studentProfileId: foreignStudentId },
       token: tokenA,
@@ -249,7 +255,7 @@ describe('consent: a student of another institute (ROV-293)', () => {
   it('consentStatusForStudent should return none of the consent records of another institute student', async () => {
     expect(await consentsPointingAtForeignStudent()).toHaveLength(1);
 
-    const res = await gqlRequest<{ consentStatusForStudent: unknown[] }>(result.httpServer, {
+    const res = await request<{ consentStatusForStudent: unknown[] }>({
       query: STATUS,
       variables: { studentProfileId: foreignStudentId },
       token: tokenA,
@@ -293,14 +299,14 @@ describe('consent: a student of another institute (ROV-293)', () => {
       };
     });
 
-    const own = await gqlRequest(result.httpServer, {
+    const own = await request({
       query: STATUS,
       variables: { studentProfileId: ownChildId },
       token: parentToken,
     });
     expect(own.errors).toBeUndefined();
 
-    const other = await gqlRequest(result.httpServer, {
+    const other = await request({
       query: STATUS,
       variables: { studentProfileId: otherChildId },
       token: parentToken,
@@ -318,7 +324,7 @@ describe('consent: a student of another institute (ROV-293)', () => {
       );
     const otherBefore = await consentsFor(otherChildId);
     for (const query of [GRANT, WITHDRAW]) {
-      const refused = await gqlRequest(result.httpServer, {
+      const refused = await request({
         query,
         variables: { studentProfileId: otherChildId },
         token: parentToken,
@@ -328,16 +334,16 @@ describe('consent: a student of another institute (ROV-293)', () => {
     }
     expect(await consentsFor(otherChildId)).toEqual(otherBefore);
 
-    const granted = await gqlRequest(result.httpServer, {
+    const granted = await request({
       query: GRANT,
       variables: { studentProfileId: ownChildId },
       token: parentToken,
     });
     expect(granted.errors).toBeUndefined();
-    const mine = await gqlRequest<{ myConsentStatus: { studentProfileId: string }[] }>(
-      result.httpServer,
-      { query: '{ myConsentStatus { studentProfileId purpose } }', token: parentToken },
-    );
+    const mine = await request<{ myConsentStatus: { studentProfileId: string }[] }>({
+      query: '{ myConsentStatus { studentProfileId purpose } }',
+      token: parentToken,
+    });
     expect(mine.errors).toBeUndefined();
     expect(mine.data?.myConsentStatus.map((row) => row.studentProfileId)).toEqual([ownChildId]);
   });
@@ -346,7 +352,7 @@ describe('consent: a student of another institute (ROV-293)', () => {
     const before = await consentsOf(instA.tenantId);
     // gqlRequest throws on the HTTP 400 that a variable of the wrong enum value returns.
     await expect(
-      gqlRequest(result.httpServer, {
+      request({
         query: `mutation($input: GrantConsentInput!) { grantConsent(input: $input) { id } }`,
         variables: {
           input: { studentProfileId: ownStudentId, purpose: 'photo_video_marketing' },

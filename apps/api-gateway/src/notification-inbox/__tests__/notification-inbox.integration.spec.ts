@@ -31,7 +31,6 @@ import {
   createTestReseller,
   createTestTeacher,
   type GqlResponse,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
   type TestReseller,
@@ -40,6 +39,7 @@ import {
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
+import { foreignIdRequests } from '../../__tests__/foreign-id-requests';
 import { AppModule } from '../../app/app.module';
 import { notificationFeedTopic } from '../notification-feed';
 import { NotificationInboxResolver } from '../notification-inbox.resolver';
@@ -117,8 +117,17 @@ describe('Notification inbox (integration)', () => {
   const admin = <T>(fn: Parameters<typeof withAdmin<T>>[2]) =>
     withAdmin(result.db, mkAdminCtx('test:notification-inbox'), fn);
 
+  /** Rows that are not member X's in this institute: another institute, member, scope. */
+  const notOwn: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => notOwn,
+    callerTokens: () => [tokenX],
+    specFile: __filename,
+  });
+
   const gql = <T>(query: string, token?: string, variables?: Record<string, unknown>) =>
-    gqlRequest<T>(result.httpServer, { query, token, variables });
+    request<T>({ query, token, variables });
 
   const code = (response: GqlResponse) => response.errors?.[0]?.extensions?.code;
 
@@ -278,6 +287,13 @@ describe('Notification inbox (integration)', () => {
       });
       otherMember = await insertRow({ recipientUserId: memberY.userId });
       ownPlatform = await insertRow({ recipientUserId: instituteA.userId, scope: 'platform' });
+      notOwn.push(
+        otherInstitute.id,
+        otherInstituteMember.id,
+        otherMembership.id,
+        otherMember.id,
+        ownPlatform.id,
+      );
     });
 
     it('lists only their own rows of this institute and membership, newest first', async () => {
@@ -811,6 +827,7 @@ describe('Notification inbox (integration)', () => {
         tenantId: instituteB.tenantId,
         flowId,
       });
+      notOwn.push(foreign.id);
 
       for (const query of [MARK, ARCHIVE, ACK]) {
         const response = await gql(query, tokenX, { id: foreign.id });

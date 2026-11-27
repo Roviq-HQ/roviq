@@ -42,6 +42,7 @@ import { eq } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const CTX = 'test:notification-delivery-log';
@@ -135,11 +136,17 @@ describe('notificationDeliveryLog (integration)', () => {
   let adminAToken: string;
   let adminBToken: string;
 
+  const request = foreignIdRequests({
+    httpServer: () => app.httpServer,
+    foreignIds: () => [studentB, guardianB, sessionB],
+    specFile: __filename,
+  });
+
   async function log(
     token: string,
     variables: { filter?: Record<string, unknown>; first?: number; after?: string } = {},
   ) {
-    const response = await gqlRequest<LogData>(app.httpServer, { query: LOG, variables, token });
+    const response = await request<LogData>({ query: LOG, variables, token });
     expect(response.errors).toBeUndefined();
     assert(response.data);
     return response.data.notificationDeliveryLog;

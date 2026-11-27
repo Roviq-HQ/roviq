@@ -30,12 +30,12 @@ import {
   createIntegrationApp,
   createTestInstitute,
   createTestTeacher,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { and, asc, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests, pdfWithoutStamp } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { TimetableDrizzleRepository } from '../repositories/timetable.drizzle-repository';
 import { TimetableViewService } from '../timetable-view.service';
@@ -272,6 +272,13 @@ describe('timetable: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: Fixture;
   let b: Fixture;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+    normalize: { sectionTimetablePdf: pdfWithoutStamp, staffTimetablePdf: pdfWithoutStamp },
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -520,7 +527,7 @@ describe('timetable: another institute id (ROV-293)', () => {
   };
 
   const query = async <T>(source: string, variables: Record<string, unknown>) => {
-    const res = await gqlRequest<T>(result.httpServer, { query: source, variables, token: tokenA });
+    const res = await request<T>({ query: source, variables, token: tokenA });
     expect(res.errors).toBeUndefined();
     return res.data;
   };
@@ -533,7 +540,7 @@ describe('timetable: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query: source, variables, token: tokenA });
+    const res = await request({ query: source, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -561,7 +568,7 @@ describe('timetable: another institute id (ROV-293)', () => {
 
   describe('reads', () => {
     it('timetable should refuse a timetable of another institute and return none of it', async () => {
-      const res = await gqlRequest(result.httpServer, {
+      const res = await request({
         query: TIMETABLE,
         variables: { id: b.timetableId },
         token: tokenA,
@@ -672,7 +679,9 @@ describe('timetable: another institute id (ROV-293)', () => {
           .toString(),
       ).toBe('%PDF-');
       const grids = await Promise.all(grid.mock.results.map((call) => call.value));
+      // Rendered twice: for the other institute's teacher and for a teacher that does not exist.
       expect(grids.map((g) => ({ timetableId: g?.timetableId, entries: g?.entries }))).toEqual([
+        { timetableId: a.timetableId, entries: [] },
         { timetableId: a.timetableId, entries: [] },
       ]);
       const maps = await Promise.all(labels.mock.results.map((call) => call.value));

@@ -17,6 +17,7 @@ import {
   type TestTeacher,
 } from '@roviq/testing/integration';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const CREATE_GROUP = /* GraphQL */ `
@@ -65,6 +66,15 @@ describe('Group CRUD (integration)', () => {
   let instA: TestInstitute;
   let tokenA: string;
   let tokenB: string;
+
+  /** Groups of institute A, which institute B must not be able to read. */
+  const groupsOfA: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => groupsOfA,
+    callerTokens: () => [tokenB],
+    specFile: __filename,
+  });
 
   function tokenFor(institute: TestInstitute) {
     return createInstituteToken({
@@ -219,6 +229,7 @@ describe('Group CRUD (integration)', () => {
 
     beforeAll(async () => {
       foreignGroupId = await createGroup(tokenA, 'Robotics Club');
+      groupsOfA.push(foreignGroupId);
       foreignMemberId = await withAdmin(result.db, mkAdminCtx('test:group-crud'), async (tx) => {
         const [row] = await tx
           .insert(groupMembers)
@@ -242,7 +253,7 @@ describe('Group CRUD (integration)', () => {
     });
 
     it('should return no member of the other institute group', async () => {
-      const res = await gqlRequest<{ listGroupMembers: { id: string }[] }>(result.httpServer, {
+      const res = await request<{ listGroupMembers: { id: string }[] }>({
         query: LIST_GROUP_MEMBERS,
         token: tokenB,
         variables: { groupId: foreignGroupId },
@@ -252,7 +263,7 @@ describe('Group CRUD (integration)', () => {
     });
 
     it('should answer GROUP_NOT_FOUND, as getGroup does', async () => {
-      const res = await gqlRequest<{ listGroupMembers: { id: string }[] }>(result.httpServer, {
+      const res = await request<{ listGroupMembers: { id: string }[] }>({
         query: LIST_GROUP_MEMBERS,
         token: tokenB,
         variables: { groupId: foreignGroupId },

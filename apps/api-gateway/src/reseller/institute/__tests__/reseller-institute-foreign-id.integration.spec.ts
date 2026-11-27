@@ -11,13 +11,13 @@ import {
   createResellerToken,
   createTestInstitute,
   createTestReseller,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
   type TestReseller,
 } from '@roviq/testing/integration';
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:reseller-institute-foreign-id';
@@ -49,6 +49,12 @@ describe('reseller institute status: another reseller or the platform (ROV-293)'
   let otherResellers: TestInstitute;
   let platformOwned: TestInstitute;
   let token: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [resellerOther, otherResellers, platformOwned],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -89,10 +95,11 @@ describe('reseller institute status: another reseller or the platform (ROV-293)'
   it.each(cases)('%s should change its own institute', async (operation, query, from) => {
     await setStatus([own.tenantId], from);
 
-    const res = await gqlRequest<Record<string, { id: string; status: string }>>(
-      result.httpServer,
-      { query, variables: { id: own.tenantId }, token },
-    );
+    const res = await request<Record<string, { id: string; status: string }>>({
+      query,
+      variables: { id: own.tenantId },
+      token,
+    });
 
     expect(res.errors).toBeUndefined();
     expect(res.data?.[operation]?.status).toBe(from === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE');
@@ -108,7 +115,7 @@ describe('reseller institute status: another reseller or the platform (ROV-293)'
       const before = { foreign: await instituteRow(id), own: await instituteRow(own.tenantId) };
       const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-      const res = await gqlRequest(result.httpServer, { query, variables: { id }, token });
+      const res = await request({ query, variables: { id }, token });
 
       expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.INSTITUTE_NOT_FOUND);
       expect(res.data).toBeNull();

@@ -22,12 +22,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const UPDATE_MUTATION = /* GraphQL */ `
@@ -74,6 +74,12 @@ describe('InstituteRoleResolver (integration)', () => {
   let tenantB: TestInstitute;
   let tokenA: string;
 
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [tenantB],
+    specFile: __filename,
+  });
+
   beforeAll(async () => {
     result = await createIntegrationApp({ modules: [AppModule] });
     tenantA = await createTestInstitute(result.db);
@@ -96,7 +102,7 @@ describe('InstituteRoleResolver (integration)', () => {
     it('persists the slugs to the column and the same list comes back via instituteRoles', async () => {
       const slugs = ['dashboard', 'students', 'attendance', 'profile'];
 
-      const updateRes = await gqlRequest<UpdateResponse>(result.httpServer, {
+      const updateRes = await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: { input: { roleId: tenantA.roleId, slugs } },
@@ -111,7 +117,7 @@ describe('InstituteRoleResolver (integration)', () => {
 
       // And via the list query, which reads through rolesLive (the view that
       // hides soft-deleted rows). The role must appear with the new slugs.
-      const listRes = await gqlRequest<ListResponse>(result.httpServer, {
+      const listRes = await request<ListResponse>({
         query: LIST_QUERY,
         token: tokenA,
       });
@@ -122,13 +128,13 @@ describe('InstituteRoleResolver (integration)', () => {
 
     it('accepts an empty array (clears the customization)', async () => {
       // Pre-set, then clear.
-      await gqlRequest<UpdateResponse>(result.httpServer, {
+      await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: { input: { roleId: tenantA.roleId, slugs: ['dashboard'] } },
       });
 
-      const clearRes = await gqlRequest<UpdateResponse>(result.httpServer, {
+      const clearRes = await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: { input: { roleId: tenantA.roleId, slugs: [] } },
@@ -154,7 +160,7 @@ describe('InstituteRoleResolver (integration)', () => {
       const before = await snapshot();
       const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-      const res = await gqlRequest<UpdateResponse>(result.httpServer, {
+      const res = await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: {
@@ -169,7 +175,7 @@ describe('InstituteRoleResolver (integration)', () => {
     });
 
     it('instituteRoles only returns roles for the caller tenant', async () => {
-      const res = await gqlRequest<ListResponse>(result.httpServer, {
+      const res = await request<ListResponse>({
         query: LIST_QUERY,
         token: tokenA,
       });
@@ -183,7 +189,7 @@ describe('InstituteRoleResolver (integration)', () => {
   describe('input validation (class-validator on UpdateRolePrimaryNavInput)', () => {
     it('rejects more than 4 slugs (@ArrayMaxSize)', async () => {
       const slugs = ['dashboard', 'students', 'staff', 'guardians', 'profile']; // 5
-      const res = await gqlRequest<UpdateResponse>(result.httpServer, {
+      const res = await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: { input: { roleId: tenantA.roleId, slugs } },
@@ -197,7 +203,7 @@ describe('InstituteRoleResolver (integration)', () => {
 
     it('rejects unknown slug values (@IsIn against ALL_NAV_SLUGS)', async () => {
       const slugs = ['dashboard', 'definitely-not-a-real-slug'];
-      const res = await gqlRequest<UpdateResponse>(result.httpServer, {
+      const res = await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: { input: { roleId: tenantA.roleId, slugs } },
@@ -209,7 +215,7 @@ describe('InstituteRoleResolver (integration)', () => {
 
     it('rejects duplicate slugs (@ArrayUnique)', async () => {
       const slugs = ['dashboard', 'students', 'dashboard'];
-      const res = await gqlRequest<UpdateResponse>(result.httpServer, {
+      const res = await request<UpdateResponse>({
         query: UPDATE_MUTATION,
         token: tokenA,
         variables: { input: { roleId: tenantA.roleId, slugs } },

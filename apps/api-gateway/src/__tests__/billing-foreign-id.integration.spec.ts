@@ -33,7 +33,6 @@ import {
   createResellerToken,
   createTestInstitute,
   createTestReseller,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
   type TestReseller,
@@ -42,6 +41,7 @@ import { Connection } from '@temporalio/client';
 import { asc, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app/app.module';
+import { foreignIdRequests } from './foreign-id-requests';
 
 const ORIGIN = 'test:billing-foreign-id';
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -157,6 +157,12 @@ describe('billing: another reseller or institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
   let resellerA: TestReseller;
   let resellerB: TestReseller;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [resellerB, b, billsB],
+    specFile: __filename,
+  });
   /** Institutes of reseller A: the caller of the institute-scope operations, and two more. */
   let a: [TestInstitute, TestInstitute, TestInstitute];
   let b: [TestInstitute, TestInstitute, TestInstitute];
@@ -355,7 +361,7 @@ describe('billing: another reseller or institute id (ROV-293)', () => {
     });
 
   const call = <T>(token: string, source: string, variables: Record<string, unknown>) =>
-    gqlRequest<T>(result.httpServer, { query: source, variables, token });
+    request<T>({ query: source, variables, token });
 
   const query = async <T>(
     source: string,

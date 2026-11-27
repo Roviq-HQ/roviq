@@ -38,7 +38,6 @@ import {
   createTestInstitute,
   createTestReseller,
   createTestTeacher,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
   type TestReseller,
@@ -46,6 +45,7 @@ import {
 } from '@roviq/testing/integration';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { StudentEventHandler } from '../../student/student-event.handler';
 
@@ -247,6 +247,13 @@ describe('Rollover section capacity and overrides (integration)', () => {
   let tokenB: string;
   let teacherToken: string;
 
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    callerTokens: () => [tokenA, teacherToken],
+    specFile: __filename,
+  });
+
   const tokenFor = (inst: TestInstitute) =>
     createInstituteToken({
       sub: inst.userId,
@@ -256,7 +263,7 @@ describe('Rollover section capacity and overrides (integration)', () => {
     });
 
   const preview = async (fixture: Fixture, token: string): Promise<Preview> => {
-    const res = await gqlRequest<{ academicYearRolloverPreview: Preview }>(result.httpServer, {
+    const res = await request<{ academicYearRolloverPreview: Preview }>({
       query: PREVIEW,
       variables: { academicYearId: fixture.nextYearId },
       token,
@@ -271,7 +278,7 @@ describe('Rollover section capacity and overrides (integration)', () => {
     entries: { fromSectionId: string; toSectionId: string | null }[],
     token: string,
   ) =>
-    gqlRequest<{ setRolloverSectionMap: Preview }>(result.httpServer, {
+    request<{ setRolloverSectionMap: Preview }>({
       query: SET_MAP,
       variables: { input: { academicYearId, entries } },
       token,

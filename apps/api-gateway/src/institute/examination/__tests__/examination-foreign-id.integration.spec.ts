@@ -12,12 +12,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { Connection } from '@temporalio/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests, pdfWithoutStamp } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { ExaminationDrizzleRepository } from '../repositories/examination.drizzle-repository';
 import {
@@ -124,6 +124,13 @@ describe('examination: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: ExamFixture;
   let b: ExamFixture;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+    normalize: { examDatesheetPdf: pdfWithoutStamp },
+  });
   const storage = new FakeStorageClient();
 
   const snapshot = () =>
@@ -133,7 +140,7 @@ describe('examination: another institute id (ROV-293)', () => {
     ]);
 
   const query = async <T>(source: string, variables: Record<string, unknown>) => {
-    const res = await gqlRequest<T>(result.httpServer, { query: source, variables, token: tokenA });
+    const res = await request<T>({ query: source, variables, token: tokenA });
     expect(res.errors).toBeUndefined();
     return res.data;
   };
@@ -153,7 +160,7 @@ describe('examination: another institute id (ROV-293)', () => {
       .spyOn(TemporalClientService.prototype, 'startWorkflow')
       .mockRejectedValue(new Error('No workflow may start'));
 
-    const res = await gqlRequest(result.httpServer, { query: source, variables, token: tokenA });
+    const res = await request({ query: source, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -394,7 +401,9 @@ describe('examination: another institute id (ROV-293)', () => {
           .subarray(0, 5)
           .toString(),
       ).toBe('%PDF-');
+      // Printed twice: for the other institute's id and for an id of no row.
       expect(labels.mock.calls.map(([input]) => input)).toEqual([
+        { subjectIds: [], sectionIds: [], studentMembershipIds: [], staffMembershipIds: [] },
         { subjectIds: [], sectionIds: [], studentMembershipIds: [], staffMembershipIds: [] },
       ]);
       expect(await snapshot()).toEqual(before);

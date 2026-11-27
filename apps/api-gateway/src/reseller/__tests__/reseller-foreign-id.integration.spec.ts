@@ -23,7 +23,6 @@ import {
   createResellerToken,
   createTestInstitute,
   createTestReseller,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
   type TestReseller,
@@ -31,6 +30,7 @@ import {
 import { asc, eq, inArray, or } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../__tests__/foreign-id-requests';
 import { AppModule } from '../../app/app.module';
 import { EicarFileScanner } from '../../files/scan/eicar-file-scanner';
 import { FileScanner } from '../../files/scan/file-scanner';
@@ -80,6 +80,14 @@ describe('reseller operations: another reseller id (ROV-293)', () => {
   let ownGroupId: string;
   let foreignGroupId: string;
   let token: string;
+
+  /** Uploads the caller's reseller may not attach to its branding. */
+  const unusable: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [resellerB, foreignInstitute, platformInstitute, foreignGroupId, unusable],
+    specFile: __filename,
+  });
   const storage = new FakeStorageClient();
   const uploaderIds: string[] = [];
 
@@ -175,7 +183,7 @@ describe('reseller operations: another reseller id (ROV-293)', () => {
     });
 
   const call = <T>(source: string, variables: Record<string, unknown>) =>
-    gqlRequest<T>(result.httpServer, { query: source, variables, token });
+    request<T>({ query: source, variables, token });
 
   const refusesAndWritesNothing = async (
     source: string,
@@ -376,6 +384,7 @@ describe('reseller operations: another reseller id (ROV-293)', () => {
         ],
       ])('should refuse %s', async (_label, upload) => {
         const fileId = await upload();
+        unusable.push(fileId);
 
         await refusesAndWritesNothing(
           UPDATE_BRANDING,

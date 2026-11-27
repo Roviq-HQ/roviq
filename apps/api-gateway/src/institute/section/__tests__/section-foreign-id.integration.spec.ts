@@ -18,12 +18,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:section-foreign-id';
@@ -94,6 +94,12 @@ describe('section: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: Structure;
   let b: Structure;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -199,7 +205,7 @@ describe('section: another institute id (ROV-293)', () => {
   });
 
   it('section should refuse a section of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: SECTION,
       variables: { id: b.sectionId },
       token: tokenA,
@@ -213,12 +219,12 @@ describe('section: another institute id (ROV-293)', () => {
     ['sections', SECTIONS, 'standardId', 'standardId'],
     ['sectionsByAcademicYear', SECTIONS_BY_YEAR, 'academicYearId', 'yearId'],
   ] as const)('%s should list its own section and nothing of another institute', async (operation, query, variable, key) => {
-    const own = await gqlRequest<Record<string, { id: string }[]>>(result.httpServer, {
+    const own = await request<Record<string, { id: string }[]>>({
       query,
       variables: { [variable]: a[key] },
       token: tokenA,
     });
-    const foreign = await gqlRequest<Record<string, { id: string }[]>>(result.httpServer, {
+    const foreign = await request<Record<string, { id: string }[]>>({
       query,
       variables: { [variable]: b[key] },
       token: tokenA,
@@ -231,7 +237,7 @@ describe('section: another institute id (ROV-293)', () => {
   });
 
   it('createSection should create a section with its own class, year and class teacher', async () => {
-    const res = await gqlRequest<{ createSection: { id: string } }>(result.httpServer, {
+    const res = await request<{ createSection: { id: string } }>({
       query: CREATE,
       variables: {
         input: sectionInput({
@@ -275,7 +281,7 @@ describe('section: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: CREATE,
       variables: { input: sectionInput({ ...own, [field]: foreign[field] }) },
       token: tokenA,
@@ -288,14 +294,11 @@ describe('section: another institute id (ROV-293)', () => {
   });
 
   it('assignClassTeacher should set its own staff member on its own section', async () => {
-    const res = await gqlRequest<{ assignClassTeacher: { classTeacherId: string } }>(
-      result.httpServer,
-      {
-        query: ASSIGN_TEACHER,
-        variables: { sectionId: a.sectionId, classTeacherId: a.teacherId },
-        token: tokenA,
-      },
-    );
+    const res = await request<{ assignClassTeacher: { classTeacherId: string } }>({
+      query: ASSIGN_TEACHER,
+      variables: { sectionId: a.sectionId, classTeacherId: a.teacherId },
+      token: tokenA,
+    });
 
     expect(res.errors).toBeUndefined();
     const [row] = await asAdmin((tx) =>
@@ -322,7 +325,7 @@ describe('section: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: ASSIGN_TEACHER,
       variables: variables(),
       token: tokenA,
@@ -345,7 +348,7 @@ describe('section: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: UPDATE,
       variables: variables(),
       token: tokenA,
@@ -361,7 +364,7 @@ describe('section: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: DELETE,
       variables: { id: b.sectionId },
       token: tokenA,

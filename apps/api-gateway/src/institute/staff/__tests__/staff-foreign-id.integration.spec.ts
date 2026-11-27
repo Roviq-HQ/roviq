@@ -24,12 +24,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
 import { FileScanner } from '../../../files/scan/file-scanner';
@@ -101,6 +101,12 @@ interface Fixture {
 
 describe('staff: another institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
   const storage = new FakeStorageClient();
   let instA: TestInstitute;
   let instB: TestInstitute;
@@ -255,7 +261,7 @@ describe('staff: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+    const res = await request({ query, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -307,7 +313,7 @@ describe('staff: another institute id (ROV-293)', () => {
   });
 
   it('getStaffMember should refuse a staff member of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: GET,
       variables: { id: b.staffId },
       token: tokenA,
@@ -326,12 +332,12 @@ describe('staff: another institute id (ROV-293)', () => {
   });
 
   it('listStaffQualifications should list its own staff member and nothing of another institute staff member', async () => {
-    const own = await gqlRequest<{ listStaffQualifications: unknown[] }>(result.httpServer, {
+    const own = await request<{ listStaffQualifications: unknown[] }>({
       query: LIST_QUALIFICATIONS,
       variables: { staffProfileId: a.staffId },
       token: tokenA,
     });
-    const foreign = await gqlRequest<{ listStaffQualifications: unknown[] }>(result.httpServer, {
+    const foreign = await request<{ listStaffQualifications: unknown[] }>({
       query: LIST_QUALIFICATIONS,
       variables: { staffProfileId: b.staffId },
       token: tokenA,
@@ -379,10 +385,11 @@ describe('staff: another institute id (ROV-293)', () => {
     });
 
     it('should store a qualification of its own staff member with its own certificate', async () => {
-      const res = await gqlRequest<{ createStaffQualification: { id: string } }>(
-        result.httpServer,
-        { query: CREATE_QUALIFICATION, variables: create(a.staffId, a.fileIds[0]), token: tokenA },
-      );
+      const res = await request<{ createStaffQualification: { id: string } }>({
+        query: CREATE_QUALIFICATION,
+        variables: create(a.staffId, a.fileIds[0]),
+        token: tokenA,
+      });
 
       expect(res.errors).toBeUndefined();
       expect(await qualificationRow(res.data?.createStaffQualification.id ?? '')).toEqual([
@@ -402,7 +409,7 @@ describe('staff: another institute id (ROV-293)', () => {
     });
 
     it('should attach its own certificate to its own qualification', async () => {
-      const res = await gqlRequest(result.httpServer, {
+      const res = await request({
         query: UPDATE_QUALIFICATION,
         variables: { id: a.qualificationId, input: { certificateFileId: a.fileIds[1] } },
         token: tokenA,

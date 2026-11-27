@@ -30,12 +30,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:group-foreign-id';
@@ -122,6 +122,12 @@ describe('group: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: Fixture;
   let b: Fixture;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -212,7 +218,7 @@ describe('group: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+    const res = await request({ query, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -249,7 +255,7 @@ describe('group: another institute id (ROV-293)', () => {
   });
 
   it('getGroup should refuse a group of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: GET,
       variables: { id: b.groupId },
       token: tokenA,
@@ -268,7 +274,7 @@ describe('group: another institute id (ROV-293)', () => {
   });
 
   it('createGroup should store its own parent and child groups', async () => {
-    const res = await gqlRequest<{ createGroup: { id: string } }>(result.httpServer, {
+    const res = await request<{ createGroup: { id: string } }>({
       query: CREATE,
       variables: createInput({ parentGroupId: a.hybridGroupId, childGroupIds: [a.groupId] }),
       token: tokenA,
@@ -318,7 +324,7 @@ describe('group: another institute id (ROV-293)', () => {
         ErrorCode.MEMBERSHIP_NOT_FOUND,
       );
 
-      const listed = await gqlRequest<{ listGroups: { id: string }[] }>(result.httpServer, {
+      const listed = await request<{ listGroups: { id: string }[] }>({
         query: LIST,
         variables: { filter: { search: name } },
         token: tokenA,
@@ -369,14 +375,11 @@ describe('group: another institute id (ROV-293)', () => {
     });
 
     it('should exclude a member of its own group', async () => {
-      const res = await gqlRequest<{ setGroupMemberExcluded: { id: string; isExcluded: boolean } }>(
-        result.httpServer,
-        {
-          query: SET_EXCLUDED,
-          variables: { groupId: a.hybridGroupId, memberId: a.memberId },
-          token: tokenA,
-        },
-      );
+      const res = await request<{ setGroupMemberExcluded: { id: string; isExcluded: boolean } }>({
+        query: SET_EXCLUDED,
+        variables: { groupId: a.hybridGroupId, memberId: a.memberId },
+        token: tokenA,
+      });
 
       expect(res.errors).toBeUndefined();
       expect(res.data?.setGroupMemberExcluded).toEqual({ id: a.memberId, isExcluded: true });
@@ -431,7 +434,7 @@ describe('group: another institute id (ROV-293)', () => {
     const ownMembershipId = await addStudent(instA, userId, `GRP-A-${suffix}`);
     await addStudent(instB, userId, `GRP-B-${suffix}`);
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: PREVIEW,
       variables: { rule: RULE },
       token: tokenA,

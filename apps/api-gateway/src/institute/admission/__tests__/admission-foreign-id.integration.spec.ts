@@ -29,13 +29,13 @@ import {
   createIntegrationApp,
   createTestInstitute,
   createTestTeacher,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { Connection } from '@temporalio/client';
 import { asc, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
 import { FileScanner } from '../../../files/scan/file-scanner';
@@ -186,6 +186,12 @@ interface Fixture {
 
 describe('admission: another institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b, callerFileInB],
+    specFile: __filename,
+  });
   const storage = new FakeStorageClient();
   let instA: TestInstitute;
   let instB: TestInstitute;
@@ -414,7 +420,7 @@ describe('admission: another institute id (ROV-293)', () => {
     });
 
   const query = async <T>(source: string, variables: Record<string, unknown>) => {
-    const res = await gqlRequest<T>(result.httpServer, { query: source, variables, token: tokenA });
+    const res = await request<T>({ query: source, variables, token: tokenA });
     expect(res.errors).toBeUndefined();
     return res.data;
   };
@@ -431,7 +437,7 @@ describe('admission: another institute id (ROV-293)', () => {
       .spyOn(Connection, 'connect')
       .mockRejectedValue(new Error('Temporal must not be reached'));
 
-    const res = await gqlRequest(result.httpServer, { query: source, variables, token: tokenA });
+    const res = await request({ query: source, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -467,7 +473,7 @@ describe('admission: another institute id (ROV-293)', () => {
 
   describe('reads', () => {
     it('getApplication should refuse an application of another institute and return none of it', async () => {
-      const res = await gqlRequest(result.httpServer, {
+      const res = await request({
         query: GET_APPLICATION,
         variables: { id: b.applicationId },
         token: tokenA,
@@ -482,7 +488,7 @@ describe('admission: another institute id (ROV-293)', () => {
         listApplicationDocuments: [{ id: a.documentId }],
       });
 
-      const res = await gqlRequest(result.httpServer, {
+      const res = await request({
         query: LIST_DOCUMENTS,
         variables: { applicationId: b.applicationId },
         token: tokenA,

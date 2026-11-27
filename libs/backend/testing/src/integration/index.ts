@@ -50,6 +50,14 @@ export {
 export { holdPlatformSenderLock, PLATFORM_SENDER_LOCK_WAIT_MS } from './platform-sender-lock.js';
 // Async polling helpers
 export { type AuditLogQuery, waitForAuditLog, waitForCondition } from './polling.js';
+// A foreign id must answer exactly like an id of no row.
+export {
+  type ComparableAnswer,
+  idOfNoRow,
+  requestSameAsMissing,
+  rootFieldOf,
+  type SameAsMissingResult,
+} from './same-as-missing.js';
 // Test-env defaults — callers rarely need this directly; createIntegrationApp
 // invokes it automatically before Test.createTestingModule is built.
 export {

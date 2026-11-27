@@ -28,7 +28,6 @@ import {
   createPlatformToken,
   createTestInstitute,
   createTestReseller,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
   type TestReseller,
@@ -36,6 +35,7 @@ import {
 import { eq, inArray, like } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const PASSWORD = 'Team-Test-9!';
@@ -100,8 +100,16 @@ describe('Reseller team management (integration)', () => {
     roleId: SEED_IDS.ROLE_PLATFORM_ADMIN,
   });
 
+  /** Members and roles of another reseller or of a platform-owned institute. */
+  const foreign: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => foreign,
+    specFile: __filename,
+  });
+
   const gql = (query: string, variables?: Record<string, unknown>, token?: string) =>
-    gqlRequest(result.httpServer, { query, variables, token });
+    request({ query, variables, token });
 
   const admin = <T>(fn: Parameters<typeof withAdmin<T>>[2]) =>
     withAdmin(result.db, mkAdminCtx('test:reseller-team'), fn);
@@ -551,6 +559,12 @@ describe('Reseller team management (integration)', () => {
       outsiderViewer = await invite(outsider, 'fid-outsider-viewer', 'reseller_viewer');
       platformOwned = await createTestInstitute(result.db);
       createdInstitutes.push(platformOwned);
+      foreign.push(
+        outsiderViewer.id,
+        platformOwned.membershipId,
+        platformOwned.roleId,
+        ...Object.values(outsider.roleIds),
+      );
     });
 
     const foreignMembers = [

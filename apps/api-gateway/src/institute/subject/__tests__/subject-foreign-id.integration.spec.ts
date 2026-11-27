@@ -20,12 +20,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:subject-foreign-id';
@@ -96,6 +96,12 @@ describe('subject: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: Structure;
   let b: Structure;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -199,7 +205,7 @@ describe('subject: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+    const res = await request({ query, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -226,7 +232,7 @@ describe('subject: another institute id (ROV-293)', () => {
   });
 
   it('subject should refuse a subject of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: SUBJECT,
       variables: { id: b.subjectId },
       token: tokenA,
@@ -237,12 +243,12 @@ describe('subject: another institute id (ROV-293)', () => {
   });
 
   it('subjectsByStandard should list its own standard and nothing of another institute standard', async () => {
-    const own = await gqlRequest<{ subjectsByStandard: { id: string }[] }>(result.httpServer, {
+    const own = await request<{ subjectsByStandard: { id: string }[] }>({
       query: SUBJECTS_BY_STANDARD,
       variables: { standardId: a.standardId },
       token: tokenA,
     });
-    const foreign = await gqlRequest<{ subjectsByStandard: { id: string }[] }>(result.httpServer, {
+    const foreign = await request<{ subjectsByStandard: { id: string }[] }>({
       query: SUBJECTS_BY_STANDARD,
       variables: { standardId: b.standardId },
       token: tokenA,
@@ -255,12 +261,12 @@ describe('subject: another institute id (ROV-293)', () => {
   });
 
   it('subjectsByAcademicYear should list its own year and nothing of another institute year', async () => {
-    const own = await gqlRequest<{ subjectsByAcademicYear: unknown[] }>(result.httpServer, {
+    const own = await request<{ subjectsByAcademicYear: unknown[] }>({
       query: SUBJECTS_BY_YEAR,
       variables: { academicYearId: a.yearId },
       token: tokenA,
     });
-    const foreign = await gqlRequest<{ subjectsByAcademicYear: unknown[] }>(result.httpServer, {
+    const foreign = await request<{ subjectsByAcademicYear: unknown[] }>({
       query: SUBJECTS_BY_YEAR,
       variables: { academicYearId: b.yearId },
       token: tokenA,
@@ -275,7 +281,7 @@ describe('subject: another institute id (ROV-293)', () => {
   });
 
   it('createSubject should create a subject linked to its own class and section', async () => {
-    const res = await gqlRequest<{ createSubject: { id: string } }>(result.httpServer, {
+    const res = await request<{ createSubject: { id: string } }>({
       query: CREATE,
       variables: { standardIds: [a.standardId], sectionIds: [a.sectionId] },
       token: tokenA,

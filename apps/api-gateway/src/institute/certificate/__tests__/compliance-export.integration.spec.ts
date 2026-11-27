@@ -27,7 +27,6 @@ import {
   createPlatformToken,
   createResellerToken,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   RESELLER_DIRECT_ID,
   type TestInstitute,
@@ -35,6 +34,7 @@ import {
 import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import {
   COMPLIANCE_EXPORT_EXECUTION_TIMEOUT_MS,
@@ -93,8 +93,15 @@ describe('Compliance exports (integration)', () => {
   });
   let instituteAToken: string;
 
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instituteB, yearB],
+    callerTokens: () => [instituteAToken],
+    specFile: __filename,
+  });
+
   const gql = <T>(query: string, variables: Record<string, unknown>, token: string) =>
-    gqlRequest<T>(result.httpServer, { query, variables, token });
+    request<T>({ query, variables, token });
 
   async function createYear(tenantId: string, label: string): Promise<string> {
     return withAdmin(result.db, mkAdminCtx(ORIGIN), async (tx) => {

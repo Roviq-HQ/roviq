@@ -200,20 +200,42 @@ wrong refusal is being fixed, and never `off` in production. Load the alert
   no SDK and exports nothing; set to an unreachable address, every export fails and the data
   is lost. Application logs also stay on the server's disk through Docker, which is the
   fallback when OpenObserve is down.
-- **What is exported.** Logs: the message, level, module, error stack, trace id and, for a
-  request, its method, path and status. The request logger never writes headers, bodies or
-  query strings (`libs/backend/telemetry/src/redaction.ts`), and the notification service's
-  `/webhooks/` requests are not traced, since their path or query carries a secret. Traces: HTTP method,
-  route, path with its query string, status, the client's IP address and user agent; SQL
-  statements with placeholders, never their parameter values; GraphQL documents with every
-  literal value replaced by `*`, never the variables; Redis command names without keys or
-  values. Metrics: counts and durations labelled by route, institute id (`tenant_id`),
-  stream and similar identifiers. Not exported: the host name, the process command line and
-  the operating-system user.
+- **What is exported.** Only fields from two written lists; everything else is dropped before
+  it leaves the process.
+  - **Logs** (`LOG_FIELDS` in `libs/backend/telemetry/src/log-fields.ts`): the message, level,
+    module, trace id, institute and user ids, a correlation id, an error code, and for a
+    request its method, path and status (no headers, body, cookies, variables or query
+    string). An error is written as its type, message, stack and code, and the same for its
+    causes: every other property of the error object is left out. Every logger is built by
+    `createListedLogger`, which applies the list to each record and to the bindings of every
+    child logger. A field that is not listed is dropped and its name is written in
+    `dropped_fields`, so that it is either added to the list or removed from the call.
+  - **Traces** (`SPAN_ATTRIBUTES` in `libs/backend/telemetry/src/span-fields.ts`): HTTP method,
+    route, path without its query string, status, the client's IP address and user agent;
+    SQL statements with placeholders, never their parameter values; GraphQL documents with
+    every literal value replaced by `*`, never the variables; Redis command names without
+    keys or values. `ListedAttributesSpanExporter` wraps the trace exporter and removes any
+    other attribute from a span, its events and its links, naming it in
+    `roviq.dropped_attributes`. The notification service's `/webhooks/` requests are not
+    traced, since their path or query carries a secret.
+  - **A failed query's values are never written.** The database driver appends the parameter
+    values to the error message (`Failed query: … params: …`); the values are cut from log
+    messages, error stacks and recorded span exceptions, and the statement stays.
+  - **Metrics**: counts and durations labelled by route, institute id (`tenant_id`), stream
+    and similar identifiers. Not exported: the host name in the telemetry resource, the
+    process command line and the operating-system user.
 - **What remains personal data in OpenObserve**: client IP addresses and user agents on
-  request spans, institute and record ids in metric labels and log messages, and whatever an
-  error message itself quotes. Treat the OpenObserve volume and its backups as personal data,
-  and keep its retention period no longer than the application's own log retention.
+  request spans, institute and record ids in metric labels and log messages, and whatever a
+  log message or a database error message itself quotes (PostgreSQL repeats a rejected value
+  in some messages, for example an invalid UUID). Treat the OpenObserve volume and its
+  backups as personal data, and keep its retention period no longer than the application's
+  own log retention.
+- **Adding a log field or a span attribute** is a change to the list in the same pull request.
+  A listed field holds an identifier, a name from the code, a count or a duration, never a
+  header, a variable, a cookie, a body or a person's name, phone or e-mail.
+  `log-fields.integration.spec.ts` sends requests with marker values in a header, a cookie,
+  a query string, GraphQL variables and a webhook body and fails when one reaches a log line
+  or when a line holds an unlisted field.
 - On SIGTERM the gateway and the notification service stop accepting connections, finish
   in-flight requests, stop their consumers and Temporal workers, close NATS, Temporal, database
   pools and Redis, flush telemetry (at most 2 s) and exit 0. Past 10 s they exit 1 and log what
