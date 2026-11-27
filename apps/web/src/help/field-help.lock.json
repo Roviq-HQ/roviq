@@ -206,9 +206,9 @@
     }
   },
   "instituteSettings.branding.theme": {
-    "reviewedReason": "The own-institute queries moved to the institute database role and the institutes table gained an update policy; this field is read and saved as before",
+    "reviewedReason": "the own-institute reads and writes moved to another repository and unused imports were removed; this field is stored and shown as before",
     "targets": {
-      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "6dbad217f5c4dc13",
+      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "533693f8de1c7b17",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/branding-display.tsx": "b95107c9e72b9df1"
     }
   },
@@ -226,9 +226,9 @@
     }
   },
   "instituteSettings.config.gradingSystem": {
-    "reviewedReason": "The own-institute queries moved to the institute database role and the institutes table gained an update policy; this field is read and saved as before",
+    "reviewedReason": "the own-institute reads and writes moved to another repository and unused imports were removed; this field is stored and shown as before",
     "targets": {
-      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "6dbad217f5c4dc13"
+      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "533693f8de1c7b17"
     }
   },
   "instituteSettings.config.hardMax": {
@@ -251,9 +251,9 @@
     }
   },
   "instituteSettings.config.shifts": {
-    "reviewedReason": "The own-institute queries moved to the institute database role and the institutes table gained an update policy; this field is read and saved as before",
+    "reviewedReason": "the own-institute reads and writes moved to another repository and unused imports were removed; this field is stored and shown as before",
     "targets": {
-      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "6dbad217f5c4dc13",
+      "apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts": "533693f8de1c7b17",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/config-display.tsx": "0d2100322767a143"
     }
   },
