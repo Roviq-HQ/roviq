@@ -88,6 +88,14 @@ const REVOKE = /* GraphQL */ `
     }
   }
 `;
+const RESTORE_ACCESS = /* GraphQL */ `
+  mutation RestoreGuardianAccess($input: RestoreGuardianAccessInput!) {
+    restoreGuardianAccess(input: $input) {
+      id
+      accessRevokedAt
+    }
+  }
+`;
 const LINKED_STUDENTS = /* GraphQL */ `
   query ListLinkedStudents($id: ID!) {
     listLinkedStudents(guardianProfileId: $id) {
@@ -438,6 +446,63 @@ describe('guardian: another institute id (ROV-293)', () => {
       expect(await linkRow(a.s2, a.g2)).toEqual([
         { tenantId: instA.tenantId, isPrimaryContact: false, canPickup: false, deleted: null },
       ]);
+    });
+  });
+
+  describe('restoreGuardianAccess', () => {
+    const restore = (studentProfileId: string, guardianProfileId: string) => ({
+      input: { studentProfileId, guardianProfileId },
+    });
+    const revokedAt = (studentProfileId: string, guardianProfileId: string) =>
+      asAdmin(async (tx) => {
+        const [row] = await tx
+          .select({ at: studentGuardianLinks.accessRevokedAt })
+          .from(studentGuardianLinks)
+          .where(
+            and(
+              eq(studentGuardianLinks.studentProfileId, studentProfileId),
+              eq(studentGuardianLinks.guardianProfileId, guardianProfileId),
+            ),
+          );
+        return row?.at;
+      });
+
+    beforeAll(async () => {
+      // B's own revoked link: a restore that reached it would show in the snapshot.
+      await asAdmin((tx) =>
+        tx
+          .update(studentGuardianLinks)
+          .set({ accessRevokedAt: new Date(), accessRevokedBy: instB.userId })
+          .where(
+            and(
+              eq(studentGuardianLinks.studentProfileId, b.s1),
+              eq(studentGuardianLinks.guardianProfileId, b.g2),
+            ),
+          ),
+      );
+    });
+
+    it.each([
+      ['studentProfileId', () => restore(b.s1, a.g2)],
+      ['guardianProfileId', () => restore(a.s2, b.g2)],
+      ['both ids', () => restore(b.s1, b.g2)],
+    ] as const)('should refuse %s of another institute and change no link', async (_field, variables) => {
+      await refusesAndWritesNothing(RESTORE_ACCESS, variables(), ErrorCode.GUARDIAN_LINK_NOT_FOUND);
+    });
+
+    it('should restore its own guardian on its own student', async () => {
+      // Revoked by the block above.
+      expect(await revokedAt(a.s2, a.g2)).toBeInstanceOf(Date);
+
+      const res = await gqlRequest<{ restoreGuardianAccess: { accessRevokedAt: string | null } }>(
+        result.httpServer,
+        { query: RESTORE_ACCESS, variables: restore(a.s2, a.g2), token: tokenA },
+      );
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.restoreGuardianAccess.accessRevokedAt).toBeNull();
+      expect(await revokedAt(a.s2, a.g2)).toBeNull();
+      expect(await revokedAt(b.s1, b.g2)).toBeInstanceOf(Date);
     });
   });
 

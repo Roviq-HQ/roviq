@@ -109,10 +109,10 @@ export class UnlinkGuardianInput {
 
 @InputType({
   description:
-    "Input for revoking a guardian's access to a student (divorce/separation/custody " +
-    'scenario). Unlike Unlink, this preserves the link row for audit purposes and sets ' +
-    "access flags to false — the guardian can still be viewed in the student's guardian " +
-    'history but cannot pick up, receive notifications, or make payments.',
+    "Closes a guardian's access to one student (separation, a custody order). Unlike " +
+    "unlink, the link stays on the student's record, marked as revoked. The guardian loses " +
+    'every permission on the student in the portal, pickup, primary contact, and messages ' +
+    'about the student. Their other children are unaffected.',
 })
 export class RevokeGuardianAccessInput {
   @Field(() => ID)
@@ -133,4 +133,19 @@ export class RevokeGuardianAccessInput {
   @IsString()
   @MaxLength(500)
   reason?: string;
+}
+
+@InputType({
+  description:
+    "Opens a guardian's access to a student again after it was revoked. Pickup and primary " +
+    'contact are not given back.',
+})
+export class RestoreGuardianAccessInput {
+  @Field(() => ID)
+  @IsUUID()
+  guardianProfileId!: string;
+
+  @Field(() => ID)
+  @IsUUID()
+  studentProfileId!: string;
 }

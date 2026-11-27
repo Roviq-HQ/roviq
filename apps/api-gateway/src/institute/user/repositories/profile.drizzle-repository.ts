@@ -19,7 +19,7 @@ import {
   withAdmin,
   withTenant,
 } from '@roviq/database';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ProfileRepository } from './profile.repository';
 import type {
   GuardianChildRecord,
@@ -200,6 +200,7 @@ export class ProfileDrizzleRepository extends ProfileRepository {
           and(
             eq(studentGuardianLinksLive.guardianProfileId, guardianProfileId),
             eq(studentProfilesLive.tenantId, tenantId),
+            isNull(studentGuardianLinksLive.accessRevokedAt),
           ),
         );
     });

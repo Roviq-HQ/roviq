@@ -144,6 +144,13 @@ export class GuardianLinkModel {
 
   @Field({ description: 'True if the student lives in the same household as this guardian.' })
   livesWith!: boolean;
+
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description:
+      "When the institute closed this guardian's access to the student; null while access stands. A revoked guardian keeps the link but sees nothing of the student in the portal.",
+  })
+  accessRevokedAt!: Date | null;
 }
 
 /**
@@ -209,6 +216,13 @@ export class StudentGuardianModel {
 
   @Field({ description: 'True if the student lives with this guardian.' })
   livesWith!: boolean;
+
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description:
+      "When the institute closed this guardian's access to the student; null while access stands. A revoked guardian keeps the link but sees nothing of the student in the portal.",
+  })
+  accessRevokedAt!: Date | null;
 }
 
 /**
@@ -280,4 +294,11 @@ export class GuardianLinkedStudentModel {
 
   @Field({ description: 'True if the student lives with the linked guardian.' })
   livesWith!: boolean;
+
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description:
+      "When the institute closed this guardian's access to the student; null while access stands. A revoked guardian keeps the link but sees nothing of the student in the portal.",
+  })
+  accessRevokedAt!: Date | null;
 }

@@ -303,6 +303,7 @@ const STUDENT_GUARDIANS_QUERY = gql`
       isEmergencyContact
       canPickup
       livesWith
+      accessRevokedAt
     }
   }
 `;

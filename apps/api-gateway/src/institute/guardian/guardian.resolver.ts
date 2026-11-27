@@ -11,6 +11,7 @@ import { DeletedPersonModel } from '../../common/deleted-person.model';
 import { CreateGuardianInput } from './dto/create-guardian.input';
 import {
   LinkGuardianInput,
+  RestoreGuardianAccessInput,
   RevokeGuardianAccessInput,
   UnlinkGuardianInput,
 } from './dto/link-guardian.input';
@@ -139,12 +140,23 @@ export class GuardianResolver {
 
   @Mutation(() => GuardianLinkModel, {
     description:
-      'Revoke guardian access (divorce/separation). Sets can_pickup=false, preserves link for TC history.',
+      "Close a guardian's access to one student (separation, a custody order). The link stays on the student's record; the guardian loses every permission on the student, pickup and primary contact.",
   })
   @CheckAbility({ action: 'manage', subject: 'Guardian' })
   async revokeGuardianAccess(
     @Args('input') input: RevokeGuardianAccessInput,
   ): Promise<GuardianLinkModel> {
     return this.guardianService.revokeAccess(input) as Promise<GuardianLinkModel>;
+  }
+
+  @Mutation(() => GuardianLinkModel, {
+    description:
+      "Open a guardian's access to a student again after it was revoked. Pickup and primary contact are not given back.",
+  })
+  @CheckAbility({ action: 'manage', subject: 'Guardian' })
+  async restoreGuardianAccess(
+    @Args('input') input: RestoreGuardianAccessInput,
+  ): Promise<GuardianLinkModel> {
+    return this.guardianService.restoreAccess(input) as Promise<GuardianLinkModel>;
   }
 }

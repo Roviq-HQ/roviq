@@ -28,6 +28,36 @@
       "REPLACEMENT_PRIMARY_GUARDIAN_INVALID": "The chosen primary contact is not linked to {student}. Refresh and choose again."
     }
   },
+  "access": {
+    "revokedBadge": "Access revoked",
+    "revokedSince": "Access revoked on {date}",
+    "revoke": {
+      "button": "Revoke access",
+      "buttonTitle": "Stop {guardian} from seeing {student} in the parent portal",
+      "title": "Revoke {guardian}'s access to {student}?",
+      "consequence": "{guardian} will no longer see {student} in the parent portal: no attendance, report cards, leave or consent for {student}, and no messages about them. Pickup and primary contact are removed too. {guardian} stays on this list, marked as revoked, and their other children are not affected. You can restore access later.",
+      "confirm": "Revoke access",
+      "working": "Revoking…",
+      "success": "{guardian} can no longer see {student}",
+      "failed": "Access was not revoked. {guardian} can still see {student}."
+    },
+    "restore": {
+      "button": "Restore access",
+      "buttonTitle": "Let {guardian} see {student} in the parent portal again",
+      "title": "Restore {guardian}'s access to {student}?",
+      "consequence": "{guardian} will see {student} in the parent portal again and get messages about them. Pickup and primary contact are not given back.",
+      "confirm": "Restore access",
+      "working": "Restoring…",
+      "success": "{guardian} can see {student} again",
+      "failed": "Access was not restored. {guardian} still cannot see {student}."
+    },
+    "cancel": "Cancel",
+    "errors": {
+      "GUARDIAN_LINK_NOT_FOUND": "{guardian} is no longer linked to {student}. Refresh the page.",
+      "FORBIDDEN": "Your role cannot change a guardian's access. Ask an institute admin.",
+      "unknown": "Check your connection and try again. If it keeps failing, refresh the page."
+    }
+  },
   "linkErrors": {
     "GUARDIAN_ALREADY_LINKED": "This guardian is already linked to this student.",
     "STUDENT_NOT_FOUND": "This student no longer exists. Refresh the page.",

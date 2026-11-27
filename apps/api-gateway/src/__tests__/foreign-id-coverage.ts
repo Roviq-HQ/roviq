@@ -378,6 +378,9 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   restoreGuardian: {
     spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
   },
+  restoreGuardianAccess: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
   revokeGuardianAccess: {
     spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
   },

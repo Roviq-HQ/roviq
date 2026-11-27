@@ -175,9 +175,9 @@
     }
   },
   "guardians.new.educationLevel": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "the read repository only adds the access-revoked date to the two link lists; education level is read as before",
     "targets": {
-      "apps/api-gateway/src/institute/guardian/guardian-read.repository.ts": "2767003b5bccc811",
+      "apps/api-gateway/src/institute/guardian/guardian-read.repository.ts": "967a0bca965635ea",
       "libs/shared/common-types/src/lib/enums/user-profile.ts#GUARDIAN_EDUCATION_LEVEL_VALUES": "bb2b7af5a999fd28"
     }
   },

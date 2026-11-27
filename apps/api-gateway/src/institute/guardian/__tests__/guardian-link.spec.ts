@@ -66,7 +66,7 @@ describe('GuardianService — unlinkFromStudent last-guardian guard (unit)', () 
 
   it('throws when attempting to unlink the last guardian', async () => {
     const onlyLink: LockedGuardianLink[] = [
-      { id: 'link-1', guardianProfileId: 'g-1', isPrimaryContact: false },
+      { id: 'link-1', guardianProfileId: 'g-1', isPrimaryContact: false, accessRevoked: false },
     ];
     vi.mocked(ctx.repo.unlink).mockImplementation(async (_t, _s, _a, plan) => {
       plan(onlyLink);

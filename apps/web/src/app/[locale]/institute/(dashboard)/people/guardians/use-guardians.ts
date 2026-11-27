@@ -268,6 +268,44 @@ export function useUnlinkGuardianFromStudent() {
   >(UNLINK_GUARDIAN_FROM_STUDENT, REFRESH_LINK_LISTS);
 }
 
+const REVOKE_GUARDIAN_ACCESS = gql`
+  mutation RevokeGuardianAccess($input: RevokeGuardianAccessInput!) {
+    revokeGuardianAccess(input: $input) {
+      id
+      accessRevokedAt
+    }
+  }
+`;
+
+const RESTORE_GUARDIAN_ACCESS = gql`
+  mutation RestoreGuardianAccess($input: RestoreGuardianAccessInput!) {
+    restoreGuardianAccess(input: $input) {
+      id
+      accessRevokedAt
+    }
+  }
+`;
+
+interface GuardianAccessVariables {
+  input: { guardianProfileId: string; studentProfileId: string };
+}
+
+/** Closes a guardian's access to one student; the link stays on the student's record. */
+export function useRevokeGuardianAccess() {
+  return useMutation<
+    { revokeGuardianAccess: { id: string; accessRevokedAt: string | null } },
+    GuardianAccessVariables
+  >(REVOKE_GUARDIAN_ACCESS, REFRESH_LINK_LISTS);
+}
+
+/** Opens a revoked guardian's access to the student again. */
+export function useRestoreGuardianAccess() {
+  return useMutation<
+    { restoreGuardianAccess: { id: string; accessRevokedAt: string | null } },
+    GuardianAccessVariables
+  >(RESTORE_GUARDIAN_ACCESS, REFRESH_LINK_LISTS);
+}
+
 // ─── Student picker (for "Link to student" dialog) ───────────────────────
 
 const STUDENTS_FOR_GUARDIAN_PICKER = gql`

@@ -15,7 +15,7 @@ import {
   studentProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { RecipientReadRepository } from './recipient-read.repository';
 import type { GuardianRecord, MembershipRecord, Recipient, SectionCapacityAudience } from './types';
@@ -66,6 +66,8 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
           and(
             eq(studentProfilesLive.membershipId, studentMembershipId),
             eq(membershipsLive.status, 'ACTIVE'),
+            // No message about a student goes to a guardian whose access to them is closed.
+            isNull(studentGuardianLinksLive.accessRevokedAt),
           ),
         )
         .orderBy(
@@ -100,6 +102,7 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
             eq(studentProfilesLive.membershipId, studentMembershipId),
             eq(guardianProfilesLive.userId, guardianUserId),
             eq(membershipsLive.status, 'ACTIVE'),
+            isNull(studentGuardianLinksLive.accessRevokedAt),
           ),
         )
         .limit(1);

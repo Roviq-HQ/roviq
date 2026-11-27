@@ -96,6 +96,8 @@ export interface LockedGuardianLink {
   id: string;
   guardianProfileId: string;
   isPrimaryContact: boolean;
+  /** The institute closed this guardian's access to the student. */
+  accessRevoked: boolean;
 }
 
 /** What an unlink does, decided from the locked links. */

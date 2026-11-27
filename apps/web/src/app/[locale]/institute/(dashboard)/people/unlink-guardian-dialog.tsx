@@ -110,6 +110,8 @@ function UnlinkGuardianDialog({
   const links = data?.listStudentGuardians ?? [];
   const current = links.find((l) => l.guardianProfileId === guardianProfileId);
   const others = links.filter((l) => l.guardianProfileId !== guardianProfileId);
+  // A guardian whose access is revoked cannot become the primary contact.
+  const candidates = others.filter((l) => !l.accessRevokedAt);
   const isLast = !loading && others.length === 0;
   const needsReplacement = !!current?.isPrimaryContact && !isLast;
   const canSubmit =
@@ -161,7 +163,7 @@ function UnlinkGuardianDialog({
               <SelectValue placeholder={t('unlink.replacementPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              {others.map((g) => (
+              {candidates.map((g) => (
                 <SelectItem key={g.guardianProfileId} value={g.guardianProfileId}>
                   {[resolveI18n(g.firstName), resolveI18n(g.lastName)].filter(Boolean).join(' ')}
                 </SelectItem>

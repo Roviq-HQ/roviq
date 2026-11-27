@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { tenantColumns } from '../common/columns';
 import { guardianRelationship } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
@@ -35,6 +44,14 @@ export const studentGuardianLinks = pgTable(
     canPickup: boolean('can_pickup').notNull().default(true),
     /** Whether the student resides with this guardian — affects address on records */
     livesWith: boolean('lives_with').notNull().default(true),
+    /**
+     * When the institute closed this guardian's access to the student. While set, the link
+     * stays on the student's record but gives the guardian nothing in the portal: no
+     * permission on the student, no consent, no notification about them.
+     */
+    accessRevokedAt: timestamp('access_revoked_at', { withTimezone: true }),
+    /** The staff member who closed the access. */
+    accessRevokedBy: uuid('access_revoked_by'),
 
     ...tenantColumns,
   },
@@ -56,6 +73,15 @@ export const studentGuardianLinks = pgTable(
       .where(sql`${table.isPrimaryContact} = true AND ${table.deletedAt} IS NULL`),
     /** Find all students of a guardian (sibling discovery, parent dashboard) */
     index('idx_guardian_students').on(table.guardianProfileId),
+
+    check(
+      'chk_guardian_link_revoked_not_primary',
+      sql`${table.accessRevokedAt} IS NULL OR ${table.isPrimaryContact} = false`,
+    ),
+    check(
+      'chk_guardian_link_revoked_by',
+      sql`(${table.accessRevokedAt} IS NULL) = (${table.accessRevokedBy} IS NULL)`,
+    ),
 
     ...tenantPolicies('student_guardian_links'),
   ],

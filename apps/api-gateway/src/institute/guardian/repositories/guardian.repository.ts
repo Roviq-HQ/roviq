@@ -70,8 +70,18 @@ export abstract class GuardianRepository {
     actorId: string,
     plan: (links: LockedGuardianLink[]) => UnlinkPlan,
   ): Promise<void>;
-  /** Clears pickup and primary contact; null when no link matched. */
+  /**
+   * Closes the guardian's access to the student and clears pickup and primary contact; the
+   * link stays. Null when no link matched.
+   */
   abstract revokeAccess(
+    tenantId: string,
+    studentProfileId: string,
+    guardianProfileId: string,
+    actorId: string,
+  ): Promise<StudentGuardianLinkRow | null>;
+  /** Opens the access again; pickup and primary contact stay as they are. Null when no link matched. */
+  abstract restoreAccess(
     tenantId: string,
     studentProfileId: string,
     guardianProfileId: string,

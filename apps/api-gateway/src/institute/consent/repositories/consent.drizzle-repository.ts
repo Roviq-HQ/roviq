@@ -52,7 +52,8 @@ export class ConsentDrizzleRepository extends ConsentRepository {
           .from(studentGuardianLinksLive)
           .where(
             sql`${studentGuardianLinksLive.guardianProfileId} = ${guardianProfileId}
-            AND ${studentGuardianLinksLive.studentProfileId} = ${studentProfileId}`,
+            AND ${studentGuardianLinksLive.studentProfileId} = ${studentProfileId}
+            AND ${studentGuardianLinksLive.accessRevokedAt} IS NULL`,
           )
           .limit(1);
       },
@@ -136,14 +137,21 @@ export class ConsentDrizzleRepository extends ConsentRepository {
       mkInstituteCtx(tenantId, 'service:consent'),
       async (tx) => {
         return tx.execute<LatestConsentRow>(
-          sql`SELECT DISTINCT ON (student_profile_id, purpose)
-            student_profile_id,
-            purpose,
-            is_granted,
-            created_at
-          FROM consent_records
-          WHERE guardian_profile_id = ${guardianProfileId}
-          ORDER BY student_profile_id, purpose, created_at DESC`,
+          // Only the students this guardian is linked to now, with access that stands.
+          sql`SELECT DISTINCT ON (c.student_profile_id, c.purpose)
+            c.student_profile_id,
+            c.purpose,
+            c.is_granted,
+            c.created_at
+          FROM consent_records c
+          WHERE c.guardian_profile_id = ${guardianProfileId}
+            AND EXISTS (
+              SELECT 1 FROM student_guardian_links_live l
+              WHERE l.guardian_profile_id = c.guardian_profile_id
+                AND l.student_profile_id = c.student_profile_id
+                AND l.access_revoked_at IS NULL
+            )
+          ORDER BY c.student_profile_id, c.purpose, c.created_at DESC`,
         );
       },
     );
