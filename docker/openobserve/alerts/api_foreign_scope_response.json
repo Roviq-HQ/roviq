@@ -1,6 +1,6 @@
 {
   "name": "api_foreign_scope_response",
-  "description": "In the last 15 minutes the API prepared a result that carried another institute's or reseller's id for an institute or reseller caller, and refused to send it. Find the operation in the api-gateway logs and treat it as a security finding.",
+  "description": "In the last 15 minutes the API prepared a response for an institute or reseller caller that carried another institute's or reseller's id, or was too large to check, and refused to send it. Find the operation in the api-gateway logs; a foreign id is a security finding.",
   "stream_type": "metrics",
   "stream_name": "api_foreign_scope_responses_recent",
   "is_real_time": false,

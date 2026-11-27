@@ -184,8 +184,8 @@
       },
       "api_foreign_scope_response": {
         "title": "A response was refused: it carried another institute's data",
-        "impact": "The API was about to answer an institute or reseller with a row that belongs to someone else, and stopped. The caller saw an error; a fault in the code let the row get that far.",
-        "step1": "Open the logs and search the api-gateway for \"outside the caller's scope\" to find the operation.",
+        "impact": "The API was about to answer an institute or reseller with a row that belongs to someone else, or with a result too large to check, and stopped. The caller saw an error; a fault in the code let the row get that far.",
+        "step1": "Open the logs and search the api-gateway for \"the caller's scope\" to find the operation and the reason.",
         "step2": "Follow the runbook: record it as a security finding and fix the operation."
       }
     }

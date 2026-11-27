@@ -61,18 +61,28 @@ describe('findForeignScope', () => {
     expect(findForeignScope(row, { tenantId: OWN })).toEqual({ foreign: null, truncated: false });
   });
 
-  it('should report a result deeper than the limit as not fully read', () => {
-    const result = findForeignScope(
-      { a: { b: { c: { tenantId: OTHER } } } },
-      { tenantId: OWN },
-      { maxDepth: 2, maxNodes: 100 },
-    );
-    expect(result).toEqual({ foreign: null, truncated: true });
+  it('should find a foreign id however deep it sits', () => {
+    let value: Record<string, unknown> = { tenantId: OTHER };
+    for (let level = 0; level < 500; level += 1) value = { child: [value] };
+    expect(findForeignScope(value, { tenantId: OWN }).foreign).toEqual({
+      kind: 'tenantId',
+      found: OTHER,
+    });
   });
 
-  it('should report a result with more nodes than the limit as not fully read', () => {
+  it('should report a value with more objects than the limit as not fully read', () => {
     const rows = Array.from({ length: 50 }, () => ({ tenantId: OWN }));
-    const result = findForeignScope(rows, { tenantId: OWN }, { maxDepth: 8, maxNodes: 10 });
-    expect(result).toEqual({ foreign: null, truncated: true });
+    expect(findForeignScope(rows, { tenantId: OWN }, 10)).toEqual({
+      foreign: null,
+      truncated: true,
+    });
+  });
+
+  it('should read a value exactly at the limit in full', () => {
+    const rows = Array.from({ length: 9 }, () => ({ tenantId: OWN }));
+    expect(findForeignScope(rows, { tenantId: OWN }, 10)).toEqual({
+      foreign: null,
+      truncated: false,
+    });
   });
 });

@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
-import { Args, Field, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  Field,
+  Int,
+  Mutation,
+  ObjectType,
+  Parent,
+  Query,
+  ResolveField,
+  Resolver,
+} from '@nestjs/graphql';
 import { InstituteScope, PlatformScope, ResellerScope } from '@roviq/auth-backend';
 import {
   cleanupTestInstitute,
@@ -19,6 +29,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../../app/app.module';
+import { MAX_SCAN_NODES } from '../foreign-scope-finder';
 import { ResponseScopeGauge } from '../response-scope-gauge';
 
 /** The GraphQL type exposes no institute id: the check reads what the resolver returned. */
@@ -28,12 +39,41 @@ class ProbeRow {
   label!: string;
 }
 
+@ObjectType()
+class ProbeParent {
+  @Field()
+  label!: string;
+
+  @Field(() => [ProbeRow])
+  children!: ProbeRow[];
+}
+
+/** A field resolver that loads rows of its own, as one with a loader or a repository does. */
+@Resolver(() => ProbeParent)
+class ProbeParentFieldResolver {
+  @ResolveField(() => [ProbeRow])
+  children(@Parent() parent: { childOwner: string }) {
+    return Promise.resolve([{ label: 'child', tenantId: parent.childOwner }]);
+  }
+}
+
 @InstituteScope()
 @Resolver()
 class InstituteProbeResolver {
   @Query(() => [ProbeRow])
   probeInstituteRows(@Args('owner') owner: string) {
     return [{ label: 'row', tenantId: owner }];
+  }
+
+  @Query(() => [ProbeParent])
+  probeInstituteParents(@Args('owner') owner: string, @Args('childOwner') childOwner: string) {
+    return [{ label: 'parent', tenantId: owner, childOwner }];
+  }
+
+  /** One row that drags `size` objects behind it, none of them in the GraphQL type. */
+  @Query(() => ProbeRow)
+  probeInstituteLarge(@Args('size', { type: () => Int }) size: number) {
+    return { label: 'row', rest: Array.from({ length: size }, () => ({})) };
   }
 
   @Mutation(() => ProbeRow)
@@ -60,12 +100,22 @@ class PlatformProbeResolver {
   }
 }
 
-@Module({ providers: [InstituteProbeResolver, ResellerProbeResolver, PlatformProbeResolver] })
+@Module({
+  providers: [
+    ProbeParentFieldResolver,
+    InstituteProbeResolver,
+    ResellerProbeResolver,
+    PlatformProbeResolver,
+  ],
+})
 class ProbeModule {}
 
 const INSTITUTE_ROWS = 'query($owner: String!) { probeInstituteRows(owner: $owner) { label } }';
 const INSTITUTE_WRITE =
   'mutation($owner: String!) { probeInstituteWrite(owner: $owner) { label } }';
+const INSTITUTE_PARENTS =
+  'query($owner: String!, $childOwner: String!) { probeInstituteParents(owner: $owner, childOwner: $childOwner) { label children { label } } }';
+const INSTITUTE_LARGE = 'query($size: Int!) { probeInstituteLarge(size: $size) { label } }';
 const RESELLER_ROWS =
   'query($owner: String!, $tenant: String!) { probeResellerRows(owner: $owner, tenant: $tenant) { label } }';
 const PLATFORM_ROWS = 'query($owner: String!) { probePlatformRows(owner: $owner) { label } }';
@@ -79,11 +129,14 @@ describe('response scope check through GraphQL', () => {
   let instituteToken: string;
   let resellerToken: string;
 
-  const count = (scope: 'institute' | 'reseller') =>
+  const count = (
+    scope: 'institute' | 'reseller',
+    reason: 'foreign_id' | 'too_large' = 'foreign_id',
+  ) =>
     result.app
       .get(ResponseScopeGauge)
       .readings()
-      .find((reading) => reading.scope === scope)?.count;
+      .find((reading) => reading.scope === scope && reading.reason === reason)?.count;
 
   beforeAll(async () => {
     result = await createIntegrationApp({ modules: [AppModule, ProbeModule] });
@@ -145,6 +198,52 @@ describe('response scope check through GraphQL', () => {
     });
     expect(res.errors?.map((error) => error.extensions?.code)).toEqual(['INTERNAL_ERROR']);
     expect(JSON.stringify(res)).not.toContain(other.tenantId);
+  });
+
+  it("should send rows a field resolver loaded for the caller's own institute", async () => {
+    const res = await gqlRequest<{ probeInstituteParents: unknown }>(result.httpServer, {
+      query: INSTITUTE_PARENTS,
+      variables: { owner: own.tenantId, childOwner: own.tenantId },
+      token: instituteToken,
+    });
+    expect(res.errors).toBeUndefined();
+    expect(res.data?.probeInstituteParents).toEqual([
+      { label: 'parent', children: [{ label: 'child' }] },
+    ]);
+  });
+
+  it("should refuse the whole response when a field resolver loads another institute's row", async () => {
+    const before = count('institute') ?? 0;
+    const res = await gqlRequest(result.httpServer, {
+      query: INSTITUTE_PARENTS,
+      variables: { owner: own.tenantId, childOwner: other.tenantId },
+      token: instituteToken,
+    });
+    expect(res.errors?.map((error) => error.extensions?.code)).toEqual(['INTERNAL_ERROR']);
+    expect(res.data).toBeNull();
+    expect(JSON.stringify(res)).not.toContain(other.tenantId);
+    expect(count('institute')).toBe(before + 1);
+  });
+
+  it('should send a large result that is still within the limit', async () => {
+    const res = await gqlRequest(result.httpServer, {
+      query: INSTITUTE_LARGE,
+      variables: { size: 100_000 },
+      token: instituteToken,
+    });
+    expect(res.errors).toBeUndefined();
+  });
+
+  it('should refuse and count a result too large to read in full', async () => {
+    const before = count('institute', 'too_large') ?? 0;
+    const res = await gqlRequest(result.httpServer, {
+      query: INSTITUTE_LARGE,
+      variables: { size: MAX_SCAN_NODES },
+      token: instituteToken,
+    });
+    expect(res.errors?.map((error) => error.extensions?.code)).toEqual(['INTERNAL_ERROR']);
+    expect(res.data).toBeNull();
+    expect(count('institute', 'too_large')).toBe(before + 1);
   });
 
   it('should send a reseller its own rows, whichever of its institutes they name', async () => {
