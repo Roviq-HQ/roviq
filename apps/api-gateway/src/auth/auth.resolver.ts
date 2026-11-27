@@ -120,7 +120,7 @@ export class AuthResolver {
     currentRefreshToken: string,
     @CurrentUser() user: AuthUser,
   ): Promise<SessionInfo[]> {
-    const sessions = await this.authService.getActiveSessions(user.userId, currentRefreshToken);
+    const sessions = await this.authService.getActiveSessions(user, currentRefreshToken);
     return sessions.map((s) => ({
       id: s.id,
       deviceInfo: s.deviceInfo ?? undefined,
@@ -139,7 +139,7 @@ export class AuthResolver {
     @Args('sessionId') sessionId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<boolean> {
-    await this.authService.revokeSession(user.userId, sessionId);
+    await this.authService.revokeSession(user, sessionId);
     return true;
   }
 
@@ -151,11 +151,7 @@ export class AuthResolver {
     @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<boolean> {
-    await this.authService.revokeAllOtherSessions(
-      user.userId,
-      currentRefreshToken,
-      extractMeta(ctx),
-    );
+    await this.authService.revokeAllOtherSessions(user, currentRefreshToken, extractMeta(ctx));
     return true;
   }
 
@@ -174,7 +170,7 @@ export class AuthResolver {
     @Context() ctx: GqlContext,
   ): Promise<boolean> {
     await this.authService.changePassword(
-      user.userId,
+      user,
       args.currentPassword,
       args.newPassword,
       extractMeta(ctx),
@@ -188,7 +184,7 @@ export class AuthResolver {
   })
   @UseGuards(GqlAuthGuard)
   async myPreferredLocale(@CurrentUser() user: AuthUser): Promise<string | null> {
-    return this.authService.getPreferredLocale(user.userId);
+    return this.authService.getPreferredLocale(user);
   }
 
   @Mutation(() => String, { nullable: true })
@@ -202,7 +198,7 @@ export class AuthResolver {
         ErrorCode.FORBIDDEN,
         'Cannot change account preferences while impersonating',
       );
-    return this.authService.updatePreferredLocale(user.userId, input.locale ?? null);
+    return this.authService.updatePreferredLocale(user, input.locale ?? null);
   }
 
   @Query(() => FormHelpMode, {
@@ -232,7 +228,7 @@ export class AuthResolver {
   @AllowWhenPasswordChangeRequired()
   async me(@CurrentUser() user: AuthUser): Promise<UserType> {
     assertTenantContext(user);
-    const dbUser = await this.authService.getUserById(user.userId);
+    const dbUser = await this.authService.getOwnAccount(user);
     const abilityRules = await this.authService.getAbilityRules(
       user.userId,
       user.scope,

@@ -13,7 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
 import { formHelpMode, userStatus } from '../common/enums';
-import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
+import { roviqAdmin, roviqApp, roviqReseller, selfPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 
 export const users = pgTable(
@@ -83,7 +83,9 @@ export const users = pgTable(
         WHERE rm.reseller_id = current_setting('app.current_reseller_id', true)::uuid
       )`,
     }),
-    // Only admin can INSERT/UPDATE/DELETE
+    // A signed-in person reads and updates their own row; column grants limit the update.
+    ...selfPolicies('users', 'id', ['select', 'update']),
+    // Only admin can INSERT/DELETE
     pgPolicy('users_admin_all', {
       for: 'all',
       to: roviqAdmin,

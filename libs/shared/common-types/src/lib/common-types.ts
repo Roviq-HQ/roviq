@@ -388,6 +388,12 @@ export type SyntheticAuthUser =
   | SyntheticResellerContext
   | SyntheticInstituteContext;
 
+/**
+ * The person behind a verified token, of any scope: what `withUser()` accepts. A synthetic
+ * context (one that carries `syntheticOrigin`) is not assignable.
+ */
+export type SignedInUser = AuthUser & { syntheticOrigin?: never };
+
 /** Type guard — narrows AuthUser to its synthetic-context subtype if tagged. */
 export function isSyntheticContext(u: AuthUser): u is SyntheticAuthUser {
   return (

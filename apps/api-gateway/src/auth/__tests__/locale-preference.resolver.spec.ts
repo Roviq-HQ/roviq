@@ -22,8 +22,8 @@ describe('account language ownership', () => {
 
     expect(await resolver.myPreferredLocale(actor)).toBe('hi');
     expect(await resolver.updateMyPreferredLocale({ locale: 'en' }, actor)).toBe('en');
-    expect(service.getPreferredLocale).toHaveBeenCalledWith('authenticated-user');
-    expect(service.updatePreferredLocale).toHaveBeenCalledWith('authenticated-user', 'en');
+    expect(service.getPreferredLocale).toHaveBeenCalledWith(actor);
+    expect(service.updatePreferredLocale).toHaveBeenCalledWith(actor, 'en');
   });
 
   it('should refuse preference writes while impersonating', async () => {

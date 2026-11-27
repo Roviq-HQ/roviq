@@ -8,7 +8,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { BusinessException, DefaultRoles, ErrorCode } from '@roviq/common-types';
+import { BusinessException, DefaultRoles, ErrorCode, type SignedInUser } from '@roviq/common-types';
 import { getRequestContext } from '@roviq/request-context';
 import type { UpdateMyProfileInput } from './dto/update-my-profile.input';
 import { ProfileRepository } from './repositories/profile.repository';
@@ -27,7 +27,8 @@ export class ProfileService {
    * Detect membership type by looking up the role name, then return
    * the appropriate profile shape.
    */
-  async getMyProfile(userId: string, membershipId: string) {
+  async getMyProfile(user: SignedInUser, membershipId: string) {
+    const userId = user.userId;
     const tenantId = this.tenantId;
 
     const membership = await this.repo.findMembership(tenantId, membershipId);
@@ -39,7 +40,7 @@ export class ProfileService {
 
     const roleName = roleNameText?.en ?? '';
 
-    const profile = await this.repo.findUserProfile(userId);
+    const profile = await this.repo.findUserProfile(user);
 
     if (!profile)
       throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
@@ -123,8 +124,8 @@ export class ProfileService {
   /**
    * Self-service update: phone, address, photo — NOT name, DOB, or identity docs.
    */
-  async updateMyProfile(userId: string, input: UpdateMyProfileInput) {
-    const updatedProfile = await this.repo.updateOwnProfile(userId, {
+  async updateMyProfile(user: SignedInUser, input: UpdateMyProfileInput) {
+    const updatedProfile = await this.repo.updateOwnProfile(user, {
       ...(input.nationality != null && { nationality: input.nationality }),
       ...(input.religion != null && { religion: input.religion }),
       ...(input.motherTongue != null && { motherTongue: input.motherTongue }),
@@ -134,7 +135,7 @@ export class ProfileService {
       throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
 
     if (input.phone) {
-      await this.repo.setPrimaryPhone(userId, input.phone);
+      await this.repo.setPrimaryPhone(user, input.phone);
     }
 
     return updatedProfile;

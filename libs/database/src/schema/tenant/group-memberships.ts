@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { boolean, pgPolicy, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { entityColumns } from '../common/columns';
-import { roviqAdmin } from '../common/rls-policies';
+import { roviqAdmin, selfPolicies } from '../common/rls-policies';
 import { instituteGroups } from './institute-groups';
 import { roles } from './roles';
 
@@ -26,7 +26,9 @@ export const groupMemberships = pgTable(
     uniqueIndex('group_memberships_user_group_key')
       .on(table.userId, table.groupId)
       .where(sql`${table.deletedAt} IS NULL`),
-    // Groups are managed by platform admins only — no roviq_app or roviq_reseller policy
+    // Groups are managed by platform admins only — no roviq_app or roviq_reseller policy.
+    // A signed-in person reads their own group memberships.
+    ...selfPolicies('group_memberships', 'user_id', ['select']),
     pgPolicy('group_memberships_admin_all', {
       for: 'all',
       to: roviqAdmin,

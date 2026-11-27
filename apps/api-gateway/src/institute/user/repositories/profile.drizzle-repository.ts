@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { SignedInUser } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
   guardianProfilesLive,
   membershipsLive,
-  mkAdminCtx,
   mkInstituteCtx,
   phoneNumbers,
   phoneNumbersLive,
@@ -16,8 +16,8 @@ import {
   tenantUserProfilesLive,
   userProfiles,
   userProfilesLive,
-  withAdmin,
   withTenant,
+  withUser,
 } from '@roviq/database';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ProfileRepository } from './profile.repository';
@@ -75,12 +75,12 @@ export class ProfileDrizzleRepository extends ProfileRepository {
     return role?.name ?? null;
   }
 
-  async findUserProfile(userId: string): Promise<UserProfileRow | null> {
-    return withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
+  async findUserProfile(user: SignedInUser): Promise<UserProfileRow | null> {
+    return withUser(this.db, user, async (tx) => {
       const rows = await tx
         .select()
         .from(userProfilesLive)
-        .where(eq(userProfilesLive.userId, userId))
+        .where(eq(userProfilesLive.userId, user.userId))
         .limit(1);
       return rows[0] ?? null;
     });
@@ -207,25 +207,25 @@ export class ProfileDrizzleRepository extends ProfileRepository {
   }
 
   async updateOwnProfile(
-    userId: string,
+    user: SignedInUser,
     fields: OwnProfileUpdate,
   ): Promise<UpdatedUserProfileRow | null> {
-    return withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
+    return withUser(this.db, user, async (tx) => {
       const rows = await tx
         .update(userProfiles)
-        .set({ ...fields, updatedBy: userId })
-        .where(eq(userProfiles.userId, userId))
+        .set({ ...fields, updatedBy: user.userId })
+        .where(eq(userProfiles.userId, user.userId))
         .returning();
       return rows[0] ?? null;
     });
   }
 
-  async setPrimaryPhone(userId: string, phone: string): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
+  async setPrimaryPhone(user: SignedInUser, phone: string): Promise<void> {
+    await withUser(this.db, user, async (tx) => {
       const existing = await tx
         .select({ id: phoneNumbersLive.id })
         .from(phoneNumbersLive)
-        .where(and(eq(phoneNumbersLive.userId, userId), eq(phoneNumbersLive.isPrimary, true)))
+        .where(and(eq(phoneNumbersLive.userId, user.userId), eq(phoneNumbersLive.isPrimary, true)))
         .limit(1);
 
       if (existing.length > 0) {
@@ -235,14 +235,14 @@ export class ProfileDrizzleRepository extends ProfileRepository {
             number: phone,
             // A typed number is unverified: a verified row must not carry it (SF-053).
             isVerified: sql`${phoneNumbers.number} = ${phone} AND ${phoneNumbers.isVerified}`,
-            updatedBy: userId,
+            updatedBy: user.userId,
           })
           .where(eq(phoneNumbers.id, existing[0].id));
       } else {
         await tx.insert(phoneNumbers).values({
-          createdBy: userId,
-          updatedBy: userId,
-          userId,
+          createdBy: user.userId,
+          updatedBy: user.userId,
+          userId: user.userId,
           countryCode: '+91',
           number: phone,
           isPrimary: true,

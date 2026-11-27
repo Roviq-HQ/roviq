@@ -4,9 +4,9 @@ import {
   type DrizzleDB,
   notifications,
   notificationsLive,
-  withAdmin,
   withReseller,
   withTenant,
+  withUser,
 } from '@roviq/database';
 import { type Column, count, desc, eq, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import type { NotificationViewer } from '../notification-viewer';
@@ -84,7 +84,10 @@ export class NotificationInboxDrizzleRepository extends NotificationInboxReposit
     super();
   }
 
-  /** Each scope runs as its own database role with the caller's own token context. */
+  /**
+   * Each scope runs as its own database role with the caller's own token context. A platform
+   * notification belongs to a person only, so it is read as that person.
+   */
   private run<T>(viewer: NotificationViewer, fn: (tx: DrizzleDB) => Promise<T>): Promise<T> {
     switch (viewer.scope) {
       case 'institute':
@@ -92,7 +95,7 @@ export class NotificationInboxDrizzleRepository extends NotificationInboxReposit
       case 'reseller':
         return withReseller(this.db, viewer.ctx, fn);
       case 'platform':
-        return withAdmin(this.db, viewer.ctx, fn);
+        return withUser(this.db, viewer.ctx, fn);
     }
   }
 

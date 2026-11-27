@@ -23,6 +23,8 @@ export {
   roviqAdmin,
   roviqApp,
   roviqReseller,
+  roviqUser,
+  selfPolicies,
   tenantPolicies,
 } from './schema/common/rls-policies';
 export { relations } from './schema/relations';
@@ -45,4 +47,5 @@ export {
   withAdmin,
   withReseller,
   withTenant,
+  withUser,
 } from './tenant-db';

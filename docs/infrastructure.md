@@ -209,10 +209,11 @@ gateway and admin portal ◀──HTTP queries── OpenObserve (5080) ──al
 
 ### Roles
 - `roviq` — bootstrap superuser, owns all tables. Used for **migrations only** (`DATABASE_URL_MIGRATE`), never at runtime.
-- `roviq_pooler` — NOINHERIT login role used by the connection pool (`DATABASE_URL`). Assumes one of the three scoped roles below via `SET LOCAL ROLE` per request.
+- `roviq_pooler` — NOINHERIT login role used by the connection pool (`DATABASE_URL`). Assumes one of the four runtime roles below via `SET LOCAL ROLE` per request.
 - `roviq_app` — institute-scoped runtime role (NOLOGIN, RLS enforced via `app.current_tenant_id`).
 - `roviq_reseller` — reseller-scoped runtime role (NOLOGIN, RLS enforced via `app.current_reseller_id`).
 - `roviq_admin` — platform admin runtime role (NOLOGIN, policy-based RLS bypass via `app.is_platform_admin`).
+- `roviq_user` — a signed-in person acting on their own account rows (NOLOGIN, RLS enforced via `app.current_user_id`). It holds no default privilege: each grant is listed in the `signed-in-user-role` migration and checked by `signed-in-user-rls.integration.spec.ts`.
 - `roviq_audit_writer` — NOINHERIT login role of the audit and dead-letter consumers (`DATABASE_URL_AUDIT`). It may INSERT into `audit_logs` and `dlq_messages`, read only their conflict keys and the two `institutes` columns the audit trigger checks, and nothing else (SF-082).
 
 ### RLS Policies

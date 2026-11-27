@@ -4,6 +4,8 @@ import { pgPolicy, pgRole } from 'drizzle-orm/pg-core';
 export const roviqApp = pgRole('roviq_app').existing();
 export const roviqReseller = pgRole('roviq_reseller').existing();
 export const roviqAdmin = pgRole('roviq_admin').existing();
+/** A signed-in person acting on their own account rows (`withUser`). */
+export const roviqUser = pgRole('roviq_user').existing();
 /** Login role of the audit and dead-letter consumers: INSERT into those two tables only. */
 export const roviqAuditWriter = pgRole('roviq_audit_writer').existing();
 
@@ -26,6 +28,31 @@ const resellerTenantRead = (tableName: string) =>
       WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid
     )`,
   });
+
+/** The signed-in person; NULL, so no row, when `withUser` did not set one. */
+export const currentUserId = sql`NULLIF(current_setting('app.current_user_id', true), '')::uuid`;
+
+type SelfCommand = 'select' | 'insert' | 'update';
+
+/**
+ * Own-row policies of `roviq_user` on a table keyed by a person: one policy per command
+ * listed. The privileges themselves are column grants in custom SQL.
+ */
+export const selfPolicies = (
+  tableName: string,
+  column: string,
+  commands: readonly SelfCommand[],
+) => {
+  const own = sql`${sql.identifier(column)} = ${currentUserId}`;
+  return commands.map((command) =>
+    pgPolicy(`${tableName}_self_${command}`, {
+      for: command,
+      to: roviqUser,
+      ...(command === 'insert' ? { withCheck: own } : { using: own }),
+      ...(command === 'update' ? { withCheck: own } : {}),
+    }),
+  );
+};
 
 /** RLS policies for tenant-scoped tables (have `tenant_id`; soft-delete handled in app layer) */
 export const tenantPolicies = (tableName: string) => [

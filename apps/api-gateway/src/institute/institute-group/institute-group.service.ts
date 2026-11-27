@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode, type SignedInUser } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
@@ -182,8 +182,8 @@ export class InstituteGroupService {
     return true;
   }
 
-  async findMyGroups(userId: string): Promise<GroupMembershipRecord[]> {
-    const records = await this.groupRepo.findMembershipsByUser(userId);
+  async findMyGroups(user: SignedInUser): Promise<GroupMembershipRecord[]> {
+    const records = await this.groupRepo.findOwnMemberships(user);
     return records;
   }
 

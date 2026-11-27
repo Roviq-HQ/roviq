@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type AuthFailureReason, BusinessException, ErrorCode } from '@roviq/common-types';
+import {
+  type AuthFailureReason,
+  BusinessException,
+  ErrorCode,
+  type SignedInUser,
+} from '@roviq/common-types';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type {
   AuthenticationResponseJSON,
@@ -55,26 +60,27 @@ export class PasskeyService {
   }
 
   async generateRegistrationOptions(
-    userId: string,
+    user: SignedInUser,
     password: string,
   ): Promise<PublicKeyCredentialCreationOptionsJSON> {
-    const valid = await this.authService.verifyPassword(userId, password);
+    const userId = user.userId;
+    const valid = await this.authService.verifyPassword(user, password);
     if (!valid) {
       throw new BusinessException(ErrorCode.CURRENT_PASSWORD_INCORRECT, 'Invalid password');
     }
 
-    const existingPasskeys = await this.authProviderRepo.findPasskeysByUserId(userId);
+    const existingPasskeys = await this.authProviderRepo.findPasskeysByUserId(user);
 
-    const user = await this.userRepo.findById(userId);
-    if (!user) {
+    const account = await this.userRepo.findOwn(user);
+    if (!account) {
       throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'User not found');
     }
 
     const options = await generateRegistrationOptions({
       rpName: this.rpName,
       rpID: this.rpId,
-      userName: user.username,
-      userDisplayName: user.username,
+      userName: account.username,
+      userDisplayName: account.username,
       attestationType: 'none',
       excludeCredentials: existingPasskeys
         .filter((p) => p.providerUserId !== null)
@@ -97,10 +103,11 @@ export class PasskeyService {
   }
 
   async verifyRegistration(
-    userId: string,
+    user: SignedInUser,
     credential: RegistrationResponseJSON,
     name?: string,
   ): Promise<PasskeyInfo> {
+    const userId = user.userId;
     const challenge = await this.redis.get(`webauthn:reg:${userId}`);
     if (!challenge) {
       throw new BusinessException(
@@ -147,8 +154,7 @@ export class PasskeyService {
       aaguid: aaguid ?? '00000000-0000-0000-0000-000000000000',
     };
 
-    const record = await this.authProviderRepo.create({
-      userId,
+    const record = await this.authProviderRepo.create(user, {
       provider: 'passkey',
       providerUserId: cred.id,
       providerData,
@@ -297,8 +303,8 @@ export class PasskeyService {
       .catch(() => {});
   }
 
-  async myPasskeys(userId: string): Promise<PasskeyInfo[]> {
-    const passkeys = await this.authProviderRepo.findPasskeysByUserId(userId);
+  async myPasskeys(user: SignedInUser): Promise<PasskeyInfo[]> {
+    const passkeys = await this.authProviderRepo.findPasskeysByUserId(user);
 
     return passkeys.map((p) => {
       const data = toProviderData(p.providerData);
@@ -313,11 +319,11 @@ export class PasskeyService {
     });
   }
 
-  async removePasskey(userId: string, passkeyId: string): Promise<boolean> {
-    const user = await this.userRepo.findById(userId);
-    const hasPassword = !!user?.passwordHash;
+  async removePasskey(user: SignedInUser, passkeyId: string): Promise<boolean> {
+    const account = await this.userRepo.findOwn(user);
+    const hasPassword = !!account?.passwordHash;
 
-    const otherPasskeys = await this.authProviderRepo.countOtherPasskeys(userId, passkeyId);
+    const otherPasskeys = await this.authProviderRepo.countOtherPasskeys(user, passkeyId);
 
     if (!hasPassword && otherPasskeys === 0) {
       throw new BusinessException(
@@ -326,7 +332,7 @@ export class PasskeyService {
       );
     }
 
-    const deletedCount = await this.authProviderRepo.deletePasskey(passkeyId, userId);
+    const deletedCount = await this.authProviderRepo.deletePasskey(user, passkeyId);
 
     if (deletedCount === 0) {
       throw new BusinessException(ErrorCode.PASSKEY_NOT_FOUND, 'Passkey not found');

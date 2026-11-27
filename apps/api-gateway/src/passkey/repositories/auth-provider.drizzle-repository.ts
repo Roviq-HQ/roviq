@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { SignedInUser } from '@roviq/common-types';
 import {
   authProviders,
   authProvidersLive,
@@ -7,6 +8,7 @@ import {
   mkAdminCtx,
   usersLive,
   withAdmin,
+  withUser,
 } from '@roviq/database';
 import { and, count, desc, eq, isNull, ne } from 'drizzle-orm';
 import { AuthProviderRepository } from './auth-provider.repository';
@@ -18,8 +20,8 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     super();
   }
 
-  async findPasskeysByUserId(userId: string): Promise<AuthProviderRecord[]> {
-    return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
+  async findPasskeysByUserId(user: SignedInUser): Promise<AuthProviderRecord[]> {
+    return withUser(this.db, user, async (tx) => {
       return tx
         .select({
           id: authProvidersLive.id,
@@ -30,7 +32,9 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
           createdAt: authProvidersLive.createdAt,
         })
         .from(authProvidersLive)
-        .where(and(eq(authProvidersLive.userId, userId), eq(authProvidersLive.provider, 'passkey')))
+        .where(
+          and(eq(authProvidersLive.userId, user.userId), eq(authProvidersLive.provider, 'passkey')),
+        )
         .orderBy(desc(authProvidersLive.createdAt));
     });
   }
@@ -82,14 +86,14 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     });
   }
 
-  async create(data: CreatePasskeyData): Promise<AuthProviderRecord> {
-    return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
+  async create(user: SignedInUser, data: CreatePasskeyData): Promise<AuthProviderRecord> {
+    return withUser(this.db, user, async (tx) => {
       const result = await tx
         .insert(authProviders)
         .values({
-          createdBy: data.userId,
-          updatedBy: data.userId,
-          userId: data.userId,
+          createdBy: user.userId,
+          updatedBy: user.userId,
+          userId: user.userId,
           provider: data.provider,
           providerUserId: data.providerUserId,
           providerData: data.providerData,
@@ -113,14 +117,14 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     });
   }
 
-  async countOtherPasskeys(userId: string, excludeId: string): Promise<number> {
-    return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
+  async countOtherPasskeys(user: SignedInUser, excludeId: string): Promise<number> {
+    return withUser(this.db, user, async (tx) => {
       const result = await tx
         .select({ count: count() })
         .from(authProvidersLive)
         .where(
           and(
-            eq(authProvidersLive.userId, userId),
+            eq(authProvidersLive.userId, user.userId),
             eq(authProvidersLive.provider, 'passkey'),
             ne(authProvidersLive.id, excludeId),
           ),
@@ -130,15 +134,15 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     });
   }
 
-  async deletePasskey(id: string, userId: string): Promise<number> {
-    return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
+  async deletePasskey(user: SignedInUser, id: string): Promise<number> {
+    return withUser(this.db, user, async (tx) => {
       const result = await tx
         .update(authProviders)
-        .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
+        .set({ deletedAt: new Date(), deletedBy: user.userId, updatedBy: user.userId })
         .where(
           and(
             eq(authProviders.id, id),
-            eq(authProviders.userId, userId),
+            eq(authProviders.userId, user.userId),
             isNull(authProviders.deletedAt),
           ),
         );

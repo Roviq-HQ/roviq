@@ -94,6 +94,18 @@ export interface CreateRefreshTokenData {
   deviceInfo?: string;
 }
 
+/** One live session of the signed-in person, as the session list shows it. */
+export interface OwnSessionRecord {
+  id: string;
+  tokenHash: string;
+  expiresAt: Date;
+  createdAt: Date;
+  deviceInfo: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  lastUsedAt: Date | null;
+}
+
 export interface RefreshTokenWithRelations {
   id: string;
   tokenHash: string;

@@ -3,6 +3,7 @@ import type {
   InstituteContext,
   PlatformContext,
   ResellerContext,
+  SignedInUser,
   SyntheticInstituteContext,
   SyntheticOrigin,
   SyntheticPlatformContext,
@@ -63,6 +64,28 @@ export async function withReseller<T>(
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL ROLE roviq_reseller`);
     await tx.execute(sql`SELECT set_config('app.current_reseller_id', ${ctx.resellerId}, true)`);
+    return callback(tx as DrizzleDB);
+  });
+}
+
+/**
+ * Execute a callback as the signed-in person: `ROLE roviq_user` + `app.current_user_id`.
+ * Row security then limits every statement to that person's own account rows, in any scope.
+ *
+ * The context must come from a verified token. There is no `mk*Ctx` for it, and one made by
+ * the other factories is refused by the type and again here.
+ */
+export async function withUser<T>(
+  db: DrizzleDB,
+  ctx: SignedInUser,
+  callback: (tx: DrizzleDB) => Promise<T>,
+): Promise<T> {
+  if ('syntheticOrigin' in ctx || !ctx.userId) {
+    throw new Error('withUser needs the user of a verified token');
+  }
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL ROLE roviq_user`);
+    await tx.execute(sql`SELECT set_config('app.current_user_id', ${ctx.userId}, true)`);
     return callback(tx as DrizzleDB);
   });
 }

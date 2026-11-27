@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { FormHelpMode } from '@roviq/common-types';
+import type { FormHelpMode, SignedInUser } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -7,6 +7,7 @@ import {
   users,
   usersLive,
   withAdmin,
+  withUser,
 } from '@roviq/database';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { UserRecord } from './types';
@@ -30,44 +31,55 @@ export class UserDrizzleRepository extends UserRepository {
     super();
   }
 
-  async getPreferredLocale(userId: string): Promise<string | null> {
-    const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async getPreferredLocale(user: SignedInUser): Promise<string | null> {
+    const [row] = await withUser(this.db, user, (tx) =>
       tx
         .select({ preferredLocale: usersLive.preferredLocale })
         .from(usersLive)
-        .where(eq(usersLive.id, userId))
+        .where(eq(usersLive.id, user.userId))
         .limit(1),
     );
-    return user?.preferredLocale ?? null;
+    return row?.preferredLocale ?? null;
   }
 
-  async updatePreferredLocale(userId: string, locale: string | null): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async updatePreferredLocale(user: SignedInUser, locale: string | null): Promise<void> {
+    await withUser(this.db, user, (tx) =>
       tx
         .update(users)
-        .set({ preferredLocale: locale, updatedBy: userId })
-        .where(eq(users.id, userId)),
+        .set({ preferredLocale: locale, updatedBy: user.userId })
+        .where(eq(users.id, user.userId)),
     );
   }
 
-  async getFormHelpMode(userId: string): Promise<FormHelpMode | null> {
-    const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async getFormHelpMode(user: SignedInUser): Promise<FormHelpMode | null> {
+    const [row] = await withUser(this.db, user, (tx) =>
       tx
         .select({ formHelpMode: users.formHelpMode })
         .from(users) // allow-base-read: form_help_mode is read only by its owner and is not on users_live
-        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+        .where(and(eq(users.id, user.userId), isNull(users.deletedAt)))
         .limit(1),
     );
-    return user?.formHelpMode ?? null;
+    return row?.formHelpMode ?? null;
   }
 
-  async updateFormHelpMode(userId: string, mode: FormHelpMode): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async updateFormHelpMode(user: SignedInUser, mode: FormHelpMode): Promise<void> {
+    await withUser(this.db, user, (tx) =>
       tx
         .update(users)
-        .set({ formHelpMode: mode, updatedBy: userId })
-        .where(and(eq(users.id, userId), isNull(users.deletedAt))),
+        .set({ formHelpMode: mode, updatedBy: user.userId })
+        .where(and(eq(users.id, user.userId), isNull(users.deletedAt))),
     );
+  }
+
+  async findOwn(user: SignedInUser): Promise<UserRecord | null> {
+    const [row] = await withUser(this.db, user, (tx) =>
+      tx
+        .select(userSelect)
+        .from(users) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
+        .where(and(eq(users.id, user.userId), isNull(users.deletedAt)))
+        .limit(1),
+    );
+    return row ?? null;
   }
 
   async findById(id: string): Promise<UserRecord | null> {
@@ -101,8 +113,8 @@ export class UserDrizzleRepository extends UserRepository {
     );
   }
 
-  async updatePassword(userId: string, passwordHash: string): Promise<number> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async updatePassword(user: SignedInUser, passwordHash: string): Promise<number> {
+    const [row] = await withUser(this.db, user, (tx) =>
       tx
         .update(users)
         .set({
@@ -110,21 +122,21 @@ export class UserDrizzleRepository extends UserRepository {
           passwordChangedAt: sql`now()`,
           mustChangePassword: false,
           tokenVersion: sql`${users.tokenVersion} + 1`,
-          updatedBy: userId,
+          updatedBy: user.userId,
         })
-        .where(eq(users.id, userId))
+        .where(eq(users.id, user.userId))
         .returning({ tokenVersion: users.tokenVersion }),
     );
-    if (!row) throw new Error(`User ${userId} not found while updating the password`);
+    if (!row) throw new Error(`User ${user.userId} not found while updating the password`);
     return row.tokenVersion;
   }
 
-  async markEmailVerified(userId: string): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async markEmailVerified(user: SignedInUser): Promise<void> {
+    await withUser(this.db, user, (tx) =>
       tx
         .update(users)
-        .set({ emailVerifiedAt: sql`now()`, updatedBy: userId })
-        .where(eq(users.id, userId)),
+        .set({ emailVerifiedAt: sql`now()`, updatedBy: user.userId })
+        .where(eq(users.id, user.userId)),
     );
   }
 }

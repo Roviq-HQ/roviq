@@ -26,7 +26,7 @@ export class PasskeyResolver {
     @Args('input') input: GeneratePasskeyRegistrationInput,
     @CurrentUser() user: AuthUser,
   ): Promise<PublicKeyCredentialCreationOptionsJSON> {
-    return this.passkeyService.generateRegistrationOptions(user.userId, input.password);
+    return this.passkeyService.generateRegistrationOptions(user, input.password);
   }
 
   @Mutation(() => PasskeyInfo)
@@ -35,7 +35,7 @@ export class PasskeyResolver {
     @Args('input') input: VerifyPasskeyRegistrationInput,
     @CurrentUser() user: AuthUser,
   ): Promise<PasskeyInfo> {
-    return this.passkeyService.verifyRegistration(user.userId, input.credential, input.name);
+    return this.passkeyService.verifyRegistration(user, input.credential, input.name);
   }
 
   @Mutation(() => PasskeyAuthOptions)
@@ -56,7 +56,7 @@ export class PasskeyResolver {
   @Query(() => [PasskeyInfo])
   @UseGuards(GqlAuthGuard)
   async myPasskeys(@CurrentUser() user: AuthUser): Promise<PasskeyInfo[]> {
-    return this.passkeyService.myPasskeys(user.userId);
+    return this.passkeyService.myPasskeys(user);
   }
 
   @Mutation(() => Boolean)
@@ -65,6 +65,6 @@ export class PasskeyResolver {
     @Args('passkeyId') passkeyId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<boolean> {
-    return this.passkeyService.removePasskey(user.userId, passkeyId);
+    return this.passkeyService.removePasskey(user, passkeyId);
   }
 }

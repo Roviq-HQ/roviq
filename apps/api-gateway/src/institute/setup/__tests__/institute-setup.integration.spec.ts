@@ -38,6 +38,7 @@ import {
   createMock,
   createTestInstitute,
   type IntegrationAppResult,
+  signedInAs,
 } from '@roviq/testing/integration';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -302,7 +303,9 @@ describe('Institute setup: approval workflow and direct creation (integration)',
       actorId: SYSTEM_USER_ID,
       originTenantId: null,
     });
-    await result.app.get(UserRepository).updatePassword(userId, await hash('a-real-password'));
+    await result.app
+      .get(UserRepository)
+      .updatePassword(signedInAs(userId), await hash('a-real-password'));
     const [before] = await usersWithEmail(result.db, email);
     assert(before);
     const welcome = vi.spyOn(identity, 'sendWelcomeNotification');

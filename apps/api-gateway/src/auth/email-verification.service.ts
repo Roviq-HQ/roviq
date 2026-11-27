@@ -1,6 +1,6 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode, type SignedInUser } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
@@ -41,15 +41,16 @@ export class EmailVerificationService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  async state(userId: string): Promise<EmailVerificationState> {
-    const user = await this.requireUser(userId);
-    return { email: user.email, isVerified: user.emailVerifiedAt !== null };
+  async state(user: SignedInUser): Promise<EmailVerificationState> {
+    const account = await this.requireUser(user);
+    return { email: account.email, isVerified: account.emailVerifiedAt !== null };
   }
 
   /** Sends a fresh code, replacing any earlier one. No-op for a verified address. */
-  async request(userId: string): Promise<void> {
-    const user = await this.requireUser(userId);
-    if (user.emailVerifiedAt) return;
+  async request(user: SignedInUser): Promise<void> {
+    const userId = user.userId;
+    const account = await this.requireUser(user);
+    if (account.emailVerifiedAt) return;
 
     const keys = keysOf(userId);
     const remaining = await this.redis.ttl(keys.code);
@@ -84,7 +85,7 @@ export class EmailVerificationService {
       tenantId: null,
       userId,
       eventType: 'EMAIL_VERIFICATION',
-      metadata: { otp: code, recipientEmail: user.email },
+      metadata: { otp: code, recipientEmail: account.email },
       // The address belongs to the account, not to one portal.
       scope: 'platform',
       resellerId: null,
@@ -93,7 +94,8 @@ export class EmailVerificationService {
   }
 
   /** Marks the address verified. One error for wrong, expired and exhausted codes. */
-  async verify(userId: string, code: string): Promise<void> {
+  async verify(user: SignedInUser, code: string): Promise<void> {
+    const userId = user.userId;
     const keys = keysOf(userId);
     const invalid = () =>
       new BusinessException(
@@ -113,7 +115,7 @@ export class EmailVerificationService {
     }
     if (!timingSafeEqual(Buffer.from(codeHash, 'hex'), hashCode(code))) throw invalid();
 
-    await this.users.markEmailVerified(userId);
+    await this.users.markEmailVerified(user);
     await this.redis.del(keys.code, keys.attempts);
   }
 
@@ -123,9 +125,9 @@ export class EmailVerificationService {
     await this.redis.del(keys.code, keys.attempts);
   }
 
-  private async requireUser(userId: string) {
-    const user = await this.users.findById(userId);
-    if (!user) throw new BusinessException(ErrorCode.UNAUTHENTICATED, 'Account not found');
-    return user;
+  private async requireUser(user: SignedInUser) {
+    const account = await this.users.findOwn(user);
+    if (!account) throw new BusinessException(ErrorCode.UNAUTHENTICATED, 'Account not found');
+    return account;
   }
 }
