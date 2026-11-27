@@ -15,7 +15,6 @@ import { batchStatus, genderRestriction } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from './academic-years';
 import { institutes } from './institutes';
-import { memberships } from './memberships';
 import { standards } from './standards';
 
 /** Stream assignment for senior secondary sections (e.g., Science PCM, Commerce) */
@@ -39,10 +38,8 @@ export const sections = pgTable(
     /** Language of instruction: english, hindi, bilingual, urdu. Per-section, not per-institute */
     mediumOfInstruction: text('medium_of_instruction'),
     shift: text(),
-    classTeacherId: uuid('class_teacher_id').references(() => memberships.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (class_teacher_id): custom SQL, Drizzle cannot declare it.
+    classTeacherId: uuid('class_teacher_id'),
     room: text(),
     capacity: integer().default(40),
     currentStrength: integer('current_strength').default(0).notNull(),

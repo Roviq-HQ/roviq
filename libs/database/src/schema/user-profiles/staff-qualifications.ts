@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, integer, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { qualificationType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -17,9 +17,7 @@ export const staffQualifications = pgTable(
   'staff_qualifications',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    staffProfileId: uuid('staff_profile_id')
-      .notNull()
-      .references(() => staffProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    staffProfileId: uuid('staff_profile_id').notNull(),
 
     /**
      * Qualification category:
@@ -45,6 +43,13 @@ export const staffQualifications = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'staff_qualifications_staff_profile_id_tenant_fkey',
+      [table.staffProfileId, table.tenantId],
+      [staffProfiles.id, staffProfiles.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

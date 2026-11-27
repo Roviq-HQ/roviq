@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, pgTable, smallint, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
 import { institutes } from '../tenant/institutes';
@@ -11,9 +11,7 @@ export const applicationDocumentFiles = pgTable(
   'application_document_files',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    documentId: uuid('document_id')
-      .notNull()
-      .references(() => applicationDocuments.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    documentId: uuid('document_id').notNull(),
     fileId: uuid('file_id')
       .notNull()
       .references(() => files.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -22,6 +20,13 @@ export const applicationDocumentFiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'application_document_files_document_id_tenant_fkey',
+      [table.documentId, table.tenantId],
+      [applicationDocuments.id, applicationDocuments.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

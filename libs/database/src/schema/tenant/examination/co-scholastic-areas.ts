@@ -15,14 +15,14 @@ export const coScholasticAreas = pgTable(
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     name: i18nText('name').notNull(),
-    gradingSchemeId: uuid('grading_scheme_id').references(() => gradingSchemes.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (grading_scheme_id): custom SQL, Drizzle cannot declare it.
+    gradingSchemeId: uuid('grading_scheme_id'),
     sequence: integer().default(0).notNull(),
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('co_scholastic_areas_id_tenant_key').on(table.id, table.tenantId),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

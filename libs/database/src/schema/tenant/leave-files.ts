@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
 import { institutes } from './institutes';
@@ -11,15 +11,20 @@ export const leaveFiles = pgTable(
   'leave_files',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    leaveId: uuid('leave_id')
-      .notNull()
-      .references(() => leaves.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    leaveId: uuid('leave_id').notNull(),
     fileId: uuid('file_id')
       .notNull()
       .references(() => files.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'leave_files_leave_id_tenant_fkey',
+      [table.leaveId, table.tenantId],
+      [leaves.id, leaves.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

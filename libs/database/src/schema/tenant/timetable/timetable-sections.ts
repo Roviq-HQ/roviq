@@ -11,13 +11,18 @@ export const timetableSections = pgTable(
   'timetable_sections',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    timetableId: uuid('timetable_id')
-      .notNull()
-      .references(() => timetables.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    timetableId: uuid('timetable_id').notNull(),
     sectionId: uuid('section_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'timetable_sections_timetable_id_tenant_fkey',
+      [table.timetableId, table.tenantId],
+      [timetables.id, timetables.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'timetable_sections_section_id_tenant_fkey',
       [table.sectionId, table.tenantId],

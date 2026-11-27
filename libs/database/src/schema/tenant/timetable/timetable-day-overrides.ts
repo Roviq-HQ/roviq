@@ -13,9 +13,7 @@ import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { timetableOverrideType } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
-import { memberships } from '../memberships';
 import { sections } from '../sections';
-import { subjects } from '../subjects';
 import { timetablePeriods } from './timetable-periods';
 import { timetables } from './timetables';
 
@@ -32,24 +30,16 @@ export const timetableDayOverrides = pgTable(
   'timetable_day_overrides',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    timetableId: uuid('timetable_id')
-      .notNull()
-      .references(() => timetables.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    timetableId: uuid('timetable_id').notNull(),
     date: date('date').notNull(),
     sectionId: uuid('section_id').notNull(),
-    periodId: uuid('period_id')
-      .notNull()
-      .references(() => timetablePeriods.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    periodId: uuid('period_id').notNull(),
     splitIndex: integer('split_index').default(0).notNull(),
     overrideType: timetableOverrideType('override_type').notNull(),
-    subjectId: uuid('subject_id').references(() => subjects.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
-    teacherId: uuid('teacher_id').references(() => memberships.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (subject_id): custom SQL, Drizzle cannot declare it.
+    subjectId: uuid('subject_id'),
+    // Same-institute key with ON DELETE SET NULL (teacher_id): custom SQL, Drizzle cannot declare it.
+    teacherId: uuid('teacher_id'),
     room: text(),
     originalSubjectId: uuid('original_subject_id'),
     originalTeacherId: uuid('original_teacher_id'),
@@ -57,6 +47,20 @@ export const timetableDayOverrides = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'timetable_day_overrides_timetable_id_tenant_fkey',
+      [table.timetableId, table.tenantId],
+      [timetables.id, timetables.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'timetable_day_overrides_period_id_tenant_fkey',
+      [table.periodId, table.tenantId],
+      [timetablePeriods.id, timetablePeriods.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'timetable_day_overrides_section_id_tenant_fkey',
       [table.sectionId, table.tenantId],

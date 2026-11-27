@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { daySession, periodKind } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
@@ -26,9 +26,7 @@ export const timetablePeriods = pgTable(
   'timetable_periods',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    timetableId: uuid('timetable_id')
-      .notNull()
-      .references(() => timetables.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    timetableId: uuid('timetable_id').notNull(),
     kind: periodKind().notNull(),
     /** Display label: "1","2",… for periods; the break name; "Morning Extra 1" etc. */
     label: text().notNull(),
@@ -40,6 +38,15 @@ export const timetablePeriods = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('timetable_periods_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'timetable_periods_timetable_id_tenant_fkey',
+      [table.timetableId, table.tenantId],
+      [timetables.id, timetables.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

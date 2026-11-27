@@ -24,9 +24,7 @@ export const examMarks = pgTable(
   'exam_marks',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    examScheduleId: uuid('exam_schedule_id')
-      .notNull()
-      .references(() => examSchedules.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    examScheduleId: uuid('exam_schedule_id').notNull(),
     /** The student's membership id (matches `student_academics` rosters). */
     studentId: uuid('student_id').notNull(),
     obtainedMarks: numeric('obtained_marks', { precision: 6, scale: 2, mode: 'number' }),
@@ -37,6 +35,13 @@ export const examMarks = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'exam_marks_exam_schedule_id_tenant_fkey',
+      [table.examScheduleId, table.tenantId],
+      [examSchedules.id, examSchedules.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'exam_marks_student_id_tenant_fkey',
       [table.studentId, table.tenantId],

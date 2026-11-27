@@ -10,13 +10,18 @@ export const sectionSubjects = pgTable(
   'section_subjects',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    subjectId: uuid('subject_id')
-      .notNull()
-      .references(() => subjects.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    subjectId: uuid('subject_id').notNull(),
     sectionId: uuid('section_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'section_subjects_subject_id_tenant_fkey',
+      [table.subjectId, table.tenantId],
+      [subjects.id, subjects.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'section_subjects_section_id_tenant_fkey',
       [table.sectionId, table.tenantId],

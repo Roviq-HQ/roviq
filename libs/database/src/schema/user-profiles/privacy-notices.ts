@@ -42,6 +42,8 @@ export const privacyNotices = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('privacy_notices_id_tenant_key').on(table.id, table.tenantId),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

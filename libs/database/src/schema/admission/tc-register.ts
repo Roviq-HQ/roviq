@@ -143,10 +143,13 @@ export const tcRegister = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
     /** Self-referencing FK for duplicate TCs */
-    foreignKey({
-      columns: [table.originalTcId],
-      foreignColumns: [table.id],
-    }),
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('tc_register_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'tc_register_original_tc_id_tenant_fkey',
+      [table.originalTcId, table.tenantId],
+      [table.id, table.tenantId],
+    ),
 
     /** TC serial number unique per tenant */
     uniqueIndex('uq_tc_serial').on(table.tenantId, table.tcSerialNumber),

@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm';
-import { bigint, foreignKey, index, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  foreignKey,
+  index,
+  pgTable,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { guardianEducationLevel } from '../common/enums';
@@ -46,6 +54,8 @@ export const guardianProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('guardian_profiles_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'guardian_profiles_membership_id_tenant_fkey',
       [table.membershipId, table.tenantId],

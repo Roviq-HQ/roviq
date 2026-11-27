@@ -47,9 +47,7 @@ export const consentRecords = pgTable(
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     tenantId: uuid('tenant_id').notNull(),
-    guardianProfileId: uuid('guardian_profile_id')
-      .notNull()
-      .references(() => guardianProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    guardianProfileId: uuid('guardian_profile_id').notNull(),
     studentProfileId: uuid('student_profile_id').notNull(),
 
     /** What the consent covers: one of `CONSENT_PURPOSE_VALUES` (DPDP Section 6). */
@@ -73,11 +71,23 @@ export const consentRecords = pgTable(
     /** Browser/app user agent string for audit trail */
     userAgent: text('user_agent'),
     /** Privacy notice version that was displayed when consent was given */
-    privacyNoticeId: uuid('privacy_notice_id').references(() => privacyNotices.id),
+    privacyNoticeId: uuid('privacy_notice_id'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    sameTenantForeignKey(
+      'consent_records_privacy_notice_id_tenant_fkey',
+      [table.privacyNoticeId, table.tenantId],
+      [privacyNotices.id, privacyNotices.tenantId],
+    ),
+    sameTenantForeignKey(
+      'consent_records_guardian_profile_id_tenant_fkey',
+      [table.guardianProfileId, table.tenantId],
+      [guardianProfiles.id, guardianProfiles.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'consent_records_student_profile_id_tenant_fkey',
       [table.studentProfileId, table.tenantId],

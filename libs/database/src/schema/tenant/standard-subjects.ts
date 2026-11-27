@@ -10,13 +10,18 @@ export const standardSubjects = pgTable(
   'standard_subjects',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    subjectId: uuid('subject_id')
-      .notNull()
-      .references(() => subjects.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    subjectId: uuid('subject_id').notNull(),
     standardId: uuid('standard_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'standard_subjects_subject_id_tenant_fkey',
+      [table.subjectId, table.tenantId],
+      [subjects.id, subjects.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'standard_subjects_standard_id_tenant_fkey',
       [table.standardId, table.tenantId],

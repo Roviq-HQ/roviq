@@ -27,9 +27,7 @@ export const groupMembers = pgTable(
   'group_members',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    groupId: uuid('group_id')
-      .notNull()
-      .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    groupId: uuid('group_id').notNull(),
     membershipId: uuid('membership_id').notNull(),
 
     /**
@@ -49,6 +47,13 @@ export const groupMembers = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'group_members_group_id_tenant_fkey',
+      [table.groupId, table.tenantId],
+      [groups.id, groups.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'group_members_membership_id_tenant_fkey',
       [table.membershipId, table.tenantId],

@@ -17,7 +17,6 @@ import { tenantPolicies } from '../../common/rls-policies';
 import { studentProfiles } from '../../user-profiles/student-profiles';
 import { academicYears } from '../academic-years';
 import { institutes } from '../institutes';
-import { sections } from '../sections';
 import { reportCards } from './report-cards';
 
 /**
@@ -30,14 +29,10 @@ export const reportCardInstances = pgTable(
   'report_card_instances',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    reportCardId: uuid('report_card_id')
-      .notNull()
-      .references(() => reportCards.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    reportCardId: uuid('report_card_id').notNull(),
     studentProfileId: uuid('student_profile_id').notNull(),
-    sectionId: uuid('section_id').references(() => sections.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (section_id): custom SQL, Drizzle cannot declare it.
+    sectionId: uuid('section_id'),
     academicYearId: uuid('academic_year_id').notNull(),
     status: reportCardStatus().default('DRAFT').notNull(),
     maxMarks: numeric('max_marks', { precision: 8, scale: 2, mode: 'number' }),
@@ -57,6 +52,13 @@ export const reportCardInstances = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'report_card_instances_report_card_id_tenant_fkey',
+      [table.reportCardId, table.tenantId],
+      [reportCards.id, reportCards.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'report_card_instances_student_profile_id_tenant_fkey',
       [table.studentProfileId, table.tenantId],

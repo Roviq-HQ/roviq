@@ -15,7 +15,6 @@ import { academicYears } from '../academic-years';
 import { institutes } from '../institutes';
 import { memberships } from '../memberships';
 import { sections } from '../sections';
-import { subjects } from '../subjects';
 
 /**
  * One row per (section, date, period) attendance session.
@@ -37,10 +36,8 @@ export const attendanceSessions = pgTable(
     /** Period / lecture slot number (1, 2, 3, …). NULL for whole-day DAILY mode. */
     period: integer('period'),
     /** Subject being taught in this period — optional for DAILY mode. */
-    subjectId: uuid('subject_id').references(() => subjects.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (subject_id): custom SQL, Drizzle cannot declare it.
+    subjectId: uuid('subject_id'),
     /** Teacher / staff membership who took this attendance session. */
     lecturerId: uuid('lecturer_id').notNull(),
     /**
@@ -51,6 +48,8 @@ export const attendanceSessions = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('attendance_sessions_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'attendance_sessions_section_id_tenant_fkey',
       [table.sectionId, table.tenantId],

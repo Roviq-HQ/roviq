@@ -24,9 +24,7 @@ export const attendanceEntries = pgTable(
   'attendance_entries',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    sessionId: uuid('session_id')
-      .notNull()
-      .references(() => attendanceSessions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    sessionId: uuid('session_id').notNull(),
     /** Student membership — the attendee. */
     studentId: uuid('student_id').notNull(),
     status: attendanceStatus('status').notNull(),
@@ -38,6 +36,13 @@ export const attendanceEntries = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'attendance_entries_session_id_tenant_fkey',
+      [table.sessionId, table.tenantId],
+      [attendanceSessions.id, attendanceSessions.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'attendance_entries_student_id_tenant_fkey',
       [table.studentId, table.tenantId],

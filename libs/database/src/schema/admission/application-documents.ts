@@ -1,7 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, foreignKey, index, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  foreignKey,
+  index,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { admissionApplications } from './admission-applications';
@@ -16,9 +25,7 @@ export const applicationDocuments = pgTable(
   'application_documents',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    applicationId: uuid('application_id')
-      .notNull()
-      .references(() => admissionApplications.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    applicationId: uuid('application_id').notNull(),
     /** Document type — same enum as user_documents.type (birth_certificate, aadhaar_card, etc.) */
     type: varchar('type', { length: 50 }).notNull(),
     /** Whether this document has been verified by an admin */
@@ -32,6 +39,15 @@ export const applicationDocuments = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('application_documents_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'application_documents_application_id_tenant_fkey',
+      [table.applicationId, table.tenantId],
+      [admissionApplications.id, admissionApplications.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

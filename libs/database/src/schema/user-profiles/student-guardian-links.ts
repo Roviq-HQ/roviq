@@ -28,9 +28,7 @@ export const studentGuardianLinks = pgTable(
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     studentProfileId: uuid('student_profile_id').notNull(),
-    guardianProfileId: uuid('guardian_profile_id')
-      .notNull()
-      .references(() => guardianProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    guardianProfileId: uuid('guardian_profile_id').notNull(),
 
     /** Relationship of the guardian to the student — pgEnum enforces membership. */
     relationship: guardianRelationship('relationship').notNull(),
@@ -54,6 +52,13 @@ export const studentGuardianLinks = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'student_guardian_links_guardian_profile_id_tenant_fkey',
+      [table.guardianProfileId, table.tenantId],
+      [guardianProfiles.id, guardianProfiles.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'student_guardian_links_student_profile_id_tenant_fkey',
       [table.studentProfileId, table.tenantId],

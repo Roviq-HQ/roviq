@@ -5,6 +5,7 @@ import {
   roviqAdmin,
   roviqApp,
   roviqReseller,
+  sameTenantForeignKey,
   trackingColumns,
 } from '@roviq/database';
 import { sql } from 'drizzle-orm';
@@ -28,9 +29,7 @@ export const payments = pgTable(
   'payments',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    invoiceId: uuid('invoice_id')
-      .notNull()
-      .references(() => invoices.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    invoiceId: uuid('invoice_id').notNull(),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => institutes.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -77,6 +76,13 @@ export const payments = pgTable(
     ...trackingColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'payments_invoice_id_tenant_fkey',
+      [table.invoiceId, table.tenantId],
+      [invoices.id, invoices.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     index('payments_invoice_id_idx').on(table.invoiceId),
     index('payments_tenant_id_idx').on(table.tenantId),
     index('payments_reseller_id_idx').on(table.resellerId),

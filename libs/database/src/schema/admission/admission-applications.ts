@@ -9,6 +9,7 @@ import {
   numeric,
   pgTable,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -35,7 +36,7 @@ export const admissionApplications = pgTable(
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     /** Nullable — NULL for direct applications that skip the enquiry step */
-    enquiryId: uuid('enquiry_id').references(() => enquiries.id),
+    enquiryId: uuid('enquiry_id'),
     academicYearId: uuid('academic_year_id').notNull(),
     standardId: uuid('standard_id').notNull(),
     /** Nullable until section is assigned during admission processing */
@@ -111,6 +112,13 @@ export const admissionApplications = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('admission_applications_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'admission_applications_enquiry_id_tenant_fkey',
+      [table.enquiryId, table.tenantId],
+      [enquiries.id, enquiries.tenantId],
+    ),
     sameTenantForeignKey(
       'admission_applications_academic_year_id_tenant_fkey',
       [table.academicYearId, table.tenantId],
