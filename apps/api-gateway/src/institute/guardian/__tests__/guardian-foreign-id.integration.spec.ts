@@ -28,12 +28,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:guardian-foreign-id';
@@ -132,6 +132,12 @@ describe('guardian: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: Fixture;
   let b: Fixture;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -277,7 +283,7 @@ describe('guardian: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+    const res = await request({ query, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -322,7 +328,7 @@ describe('guardian: another institute id (ROV-293)', () => {
   });
 
   it('getGuardian should refuse a guardian of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: GET,
       variables: { id: b.g1 },
       token: tokenA,
@@ -345,14 +351,16 @@ describe('guardian: another institute id (ROV-293)', () => {
   });
 
   it('listLinkedStudents should list its own guardian and nothing of another institute guardian', async () => {
-    const own = await gqlRequest<{ listLinkedStudents: { studentProfileId: string }[] }>(
-      result.httpServer,
-      { query: LINKED_STUDENTS, variables: { id: a.g2 }, token: tokenA },
-    );
-    const foreign = await gqlRequest<{ listLinkedStudents: { studentProfileId: string }[] }>(
-      result.httpServer,
-      { query: LINKED_STUDENTS, variables: { id: b.g2 }, token: tokenA },
-    );
+    const own = await request<{ listLinkedStudents: { studentProfileId: string }[] }>({
+      query: LINKED_STUDENTS,
+      variables: { id: a.g2 },
+      token: tokenA,
+    });
+    const foreign = await request<{ listLinkedStudents: { studentProfileId: string }[] }>({
+      query: LINKED_STUDENTS,
+      variables: { id: b.g2 },
+      token: tokenA,
+    });
 
     expect(own.errors).toBeUndefined();
     expect(own.data?.listLinkedStudents.map((row) => row.studentProfileId).sort()).toEqual(
@@ -363,10 +371,10 @@ describe('guardian: another institute id (ROV-293)', () => {
   });
 
   it('listStudentGuardians should list its own student and nothing of another institute student', async () => {
-    const own = await gqlRequest<{
+    const own = await request<{
       listStudentGuardians: { guardianProfileId: string; isPrimaryContact: boolean }[];
-    }>(result.httpServer, { query: STUDENT_GUARDIANS, variables: { id: a.s1 }, token: tokenA });
-    const foreign = await gqlRequest<{ listStudentGuardians: unknown[] }>(result.httpServer, {
+    }>({ query: STUDENT_GUARDIANS, variables: { id: a.s1 }, token: tokenA });
+    const foreign = await request<{ listStudentGuardians: unknown[] }>({
       query: STUDENT_GUARDIANS,
       variables: { id: b.s1 },
       token: tokenA,
@@ -407,7 +415,7 @@ describe('guardian: another institute id (ROV-293)', () => {
     });
 
     it('should link its own guardian to its own student as the primary contact', async () => {
-      const res = await gqlRequest<{ linkGuardianToStudent: { id: string } }>(result.httpServer, {
+      const res = await request<{ linkGuardianToStudent: { id: string } }>({
         query: LINK,
         variables: link(a.s2, a.g3),
         token: tokenA,
@@ -437,10 +445,11 @@ describe('guardian: another institute id (ROV-293)', () => {
     });
 
     it('should revoke its own guardian on its own student', async () => {
-      const res = await gqlRequest<{ revokeGuardianAccess: { canPickup: boolean } }>(
-        result.httpServer,
-        { query: REVOKE, variables: revoke(a.s2, a.g2), token: tokenA },
-      );
+      const res = await request<{ revokeGuardianAccess: { canPickup: boolean } }>({
+        query: REVOKE,
+        variables: revoke(a.s2, a.g2),
+        token: tokenA,
+      });
 
       expect(res.errors).toBeUndefined();
       expect(await linkRow(a.s2, a.g2)).toEqual([
@@ -494,10 +503,11 @@ describe('guardian: another institute id (ROV-293)', () => {
       // Revoked by the block above.
       expect(await revokedAt(a.s2, a.g2)).toBeInstanceOf(Date);
 
-      const res = await gqlRequest<{ restoreGuardianAccess: { accessRevokedAt: string | null } }>(
-        result.httpServer,
-        { query: RESTORE_ACCESS, variables: restore(a.s2, a.g2), token: tokenA },
-      );
+      const res = await request<{ restoreGuardianAccess: { accessRevokedAt: string | null } }>({
+        query: RESTORE_ACCESS,
+        variables: restore(a.s2, a.g2),
+        token: tokenA,
+      });
 
       expect(res.errors).toBeUndefined();
       expect(res.data?.restoreGuardianAccess.accessRevokedAt).toBeNull();
@@ -527,7 +537,7 @@ describe('guardian: another institute id (ROV-293)', () => {
     });
 
     it('should unlink its own primary guardian and make its own other guardian primary', async () => {
-      const res = await gqlRequest<{ unlinkGuardianFromStudent: boolean }>(result.httpServer, {
+      const res = await request<{ unlinkGuardianFromStudent: boolean }>({
         query: UNLINK,
         variables: unlink(a.s1, a.g1, a.g2),
         token: tokenA,

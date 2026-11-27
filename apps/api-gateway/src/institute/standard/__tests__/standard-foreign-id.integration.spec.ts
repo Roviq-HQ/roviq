@@ -16,12 +16,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:standard-foreign-id';
@@ -74,6 +74,12 @@ describe('standard: another institute id (ROV-293)', () => {
   let tokenA: string;
   let a: Structure;
   let b: Structure;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -139,7 +145,7 @@ describe('standard: another institute id (ROV-293)', () => {
   });
 
   it('standard should refuse a standard of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: STANDARD,
       variables: { id: b.standardId },
       token: tokenA,
@@ -150,12 +156,12 @@ describe('standard: another institute id (ROV-293)', () => {
   });
 
   it('standards should list its own year and nothing of another institute year', async () => {
-    const own = await gqlRequest<{ standards: { id: string }[] }>(result.httpServer, {
+    const own = await request<{ standards: { id: string }[] }>({
       query: STANDARDS,
       variables: { academicYearId: a.yearId },
       token: tokenA,
     });
-    const foreign = await gqlRequest<{ standards: { id: string }[] }>(result.httpServer, {
+    const foreign = await request<{ standards: { id: string }[] }>({
       query: STANDARDS,
       variables: { academicYearId: b.yearId },
       token: tokenA,
@@ -168,7 +174,7 @@ describe('standard: another institute id (ROV-293)', () => {
   });
 
   it('createStandard should create a standard in its own year', async () => {
-    const res = await gqlRequest<{ createStandard: { id: string } }>(result.httpServer, {
+    const res = await request<{ createStandard: { id: string } }>({
       query: CREATE,
       variables: { academicYearId: a.yearId },
       token: tokenA,
@@ -190,7 +196,7 @@ describe('standard: another institute id (ROV-293)', () => {
     const inForeignYearBefore = await standardsInForeignYear();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: CREATE,
       variables: { academicYearId: b.yearId },
       token: tokenA,
@@ -212,7 +218,7 @@ describe('standard: another institute id (ROV-293)', () => {
     const otherBefore = await standardsOf(instB.tenantId);
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { id: b.standardId },
       token: tokenA,

@@ -13,6 +13,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { isUntracedPath, serializeRedisCommand } from './redaction';
+import { ListedAttributesSpanExporter } from './span-fields';
 import type { TelemetryOptions } from './telemetry-lifecycle';
 
 export function createTelemetrySdk(endpoint: string, options: TelemetryOptions): NodeSDK {
@@ -22,10 +23,13 @@ export function createTelemetrySdk(endpoint: string, options: TelemetryOptions):
       root: new TraceIdRatioBasedSampler(isProduction ? 0.1 : 1.0),
     }),
     spanProcessors: [
-      new BatchSpanProcessor(new OTLPTraceExporter({ url: endpoint }), {
-        maxExportBatchSize: isProduction ? 200 : 50,
-        scheduledDelayMillis: isProduction ? 2000 : 1000,
-      }),
+      new BatchSpanProcessor(
+        new ListedAttributesSpanExporter(new OTLPTraceExporter({ url: endpoint })),
+        {
+          maxExportBatchSize: isProduction ? 200 : 50,
+          scheduledDelayMillis: isProduction ? 2000 : 1000,
+        },
+      ),
     ],
     metricReaders: [
       new PeriodicExportingMetricReader({

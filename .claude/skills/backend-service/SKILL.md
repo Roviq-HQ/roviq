@@ -33,7 +33,8 @@ A scope guard proves who the caller is, not which rows are theirs.
 - **A rule with a row condition must be applied to the row.** When a role holds the pair only with a condition (own leaves, linked children, assigned sections), the operation applies it (a `caslToSqlWhere` predicate in the query, or `ability.can(action, subject(type, row))` on the loaded row) and declares `@CheckAbility({ action, subject, rows: 'scoped' })`. Without the declaration `AbilityGuard` refuses that role. Every declared operation is listed in `apps/api-gateway/src/__tests__/row-scope-coverage.ts` with the spec that proves a row outside the condition is refused (`row-scope-coverage.spec.ts`).
 - **Authorize with `@CheckAbility({ action, subject })`** or `ability.can()`, never a role name. A new pair must be reachable by a role and every grant used (`ability-coverage.spec.ts`).
 - Do the checks and the write in **one transaction** where a check guards the write.
-- Every new or changed operation that takes an id gets an integration test where another institute's id is refused and nothing is written, and an entry in `apps/api-gateway/src/__tests__/foreign-id-coverage.ts` (the unit suite fails without it). A finding goes to the "Security Findings Log".
+- **A row that is not the caller's answers exactly like a row that does not exist.** Read it under the caller's wrapper; not visible means the entity's not-found code with the same message as for an unknown id (no "belongs to another institute", no `FORBIDDEN` for one and `NOT_FOUND` for the other). Refuse before any write, upload, workflow start or event, inside the one transaction.
+- Every new or changed operation that takes an id gets an integration test where another institute's id is refused, answers like an id of no row (`foreignIdRequests()`) and nothing is written, and an entry in `apps/api-gateway/src/__tests__/foreign-id-coverage.ts` (the unit suite fails without it). A finding goes to the "Security Findings Log".
 
 ## Resolvers, services, repositories
 
@@ -46,6 +47,7 @@ A scope guard proves who the caller is, not which rows are theirs.
 - Give `@Field`, `@InputType` and mutations a `description` when the name does not say it all: rules, formats, units (paise, epoch ms), limits. It is the API's only documentation.
 - Lists: cursor pagination, one query per page for any per-row extra (no N+1), sort columns from a whitelist.
 - Files: store `files.id`, return `FileRef`, attach with `FileService.verifyUploads` and `markFilesReady(tx, …)`. Never a URL column or a raw S3 call.
+- Logs: `new Logger(X.name)`; a structured field must be on `LOG_FIELDS` (`libs/backend/telemetry/src/log-fields.ts`) or it is dropped. Log ids, never a name, phone, e-mail, token, header or input object; pass an error as `{ err }`, not interpolated into the message.
 - Config through `ConfigService` (never `process.env`); a new variable goes in `.env.example`, the app's env validation, and `docs/deployment.md` when production needs it.
 - Redis keys from the `REDIS_KEYS` constants. A workflow id a client sends back is built with `tenantWorkflowId` and checked with `isTenantWorkflowId` before the handle is taken; a subscription outside `admin/` has a `filter` on the payload's institute or reseller; a `DataLoader` is request-scoped or `cache: false`; the storage client is called only from the files module (`pnpm check:store-keys`, `docs/architecture.md` → "Stores outside PostgreSQL").
 

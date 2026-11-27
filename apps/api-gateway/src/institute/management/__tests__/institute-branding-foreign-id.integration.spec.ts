@@ -10,12 +10,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { BRANDING_IMAGES } from '../branding-images';
 
@@ -34,6 +34,12 @@ describe('updateInstituteBranding: uploads of another institute (ROV-293)', () =
   let instA: TestInstitute;
   let instB: TestInstitute;
   let tokenA: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, [...foreignFiles.values()]],
+    specFile: __filename,
+  });
   const foreignFiles = new Map<string, string>();
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
@@ -101,7 +107,7 @@ describe('updateInstituteBranding: uploads of another institute (ROV-293)', () =
       files: await fileRows(),
     };
 
-    const res = await gqlRequest<{ updateInstituteBranding: { id: string } }>(result.httpServer, {
+    const res = await request<{ updateInstituteBranding: { id: string } }>({
       query: UPDATE_BRANDING,
       variables: { input: { [column]: fileId } },
       token: tokenA,

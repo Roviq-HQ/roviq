@@ -9,12 +9,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:holiday-foreign-id';
@@ -46,6 +46,12 @@ describe('holiday: another institute id (ROV-293)', () => {
   let instB: TestInstitute;
   let tokenA: string;
   let holidayB: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [holidayB],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -91,7 +97,7 @@ describe('holiday: another institute id (ROV-293)', () => {
   });
 
   it('holiday should refuse a holiday of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: HOLIDAY,
       variables: { id: holidayB },
       token: tokenA,
@@ -109,7 +115,7 @@ describe('holiday: another institute id (ROV-293)', () => {
     const ownBefore = await holidaysOf(instA.tenantId);
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { id: holidayB },
       token: tokenA,

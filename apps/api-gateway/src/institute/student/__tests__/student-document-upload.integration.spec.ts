@@ -47,6 +47,7 @@ import {
 import { eq, inArray, or } from 'drizzle-orm';
 import { of } from 'rxjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { EICAR_TEST_STRING, EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
 import {
@@ -235,10 +236,18 @@ describe('uploadStudentDocument (integration)', () => {
     });
   }
 
+  /** Profiles and uploads of another institute. */
+  const foreign: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => app.httpServer,
+    foreignIds: () => foreign,
+    specFile: __filename,
+  });
+
   const upload = (type: UserDocumentType, pageIds: string[], token: string) =>
-    gqlRequest<{
+    request<{
       uploadStudentDocument: { id: string; userId: string; type: string; files: { id: string }[] };
-    }>(app.httpServer, {
+    }>({
       query: UPLOAD,
       variables: { input: { studentProfileId, type, fileIds: pageIds } },
       token,
@@ -451,6 +460,7 @@ describe('uploadStudentDocument (integration)', () => {
     beforeAll(async () => {
       foreignTenant = await createTestInstitute(app.db);
       foreignStudent = await insertStudent(foreignTenant);
+      foreign.push(foreignStudent.profileId);
     });
 
     afterAll(async () => {
@@ -482,20 +492,17 @@ describe('uploadStudentDocument (integration)', () => {
       };
 
       for (const pageIds of [[page], [ownPage]]) {
-        const response = await gqlRequest<{ uploadStudentDocument: { id: string } }>(
-          app.httpServer,
-          {
-            query: UPLOAD,
-            variables: {
-              input: {
-                studentProfileId: foreignStudent.profileId,
-                type: 'BIRTH_CERTIFICATE',
-                fileIds: pageIds,
-              },
+        const response = await request<{ uploadStudentDocument: { id: string } }>({
+          query: UPLOAD,
+          variables: {
+            input: {
+              studentProfileId: foreignStudent.profileId,
+              type: 'BIRTH_CERTIFICATE',
+              fileIds: pageIds,
             },
-            token: adminToken,
           },
-        );
+          token: adminToken,
+        });
 
         expect(response.errors?.[0]?.extensions?.code).toBe(ErrorCode.STUDENT_NOT_FOUND);
         expect(response.data).toBeNull();
@@ -506,6 +513,7 @@ describe('uploadStudentDocument (integration)', () => {
 
     it('answers FILE_NOT_FOUND for a page another institute uploaded, writing nothing', async () => {
       const foreignPage = await createPendingFile(foreignTenant.userId, PDF, foreignStudent.userId);
+      foreign.push(foreignPage);
       const before = {
         documents: await documentsOf([foreignStudent.userId, studentUserId]),
         files: await fileRows([foreignPage]),

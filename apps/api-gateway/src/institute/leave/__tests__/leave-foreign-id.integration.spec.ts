@@ -19,12 +19,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { asc, eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
 import { FileScanner } from '../../../files/scan/file-scanner';
@@ -109,6 +109,12 @@ interface Fixture {
 
 describe('leave: another institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b, callerFileInB],
+    specFile: __filename,
+  });
   const storage = new FakeStorageClient();
   let instA: TestInstitute;
   let instB: TestInstitute;
@@ -216,7 +222,7 @@ describe('leave: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+    const res = await request({ query, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -259,7 +265,7 @@ describe('leave: another institute id (ROV-293)', () => {
   });
 
   it('leave should refuse a leave of another institute and return none of it', async () => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query: LEAVE,
       variables: { id: b.leaveId },
       token: tokenA,
@@ -270,12 +276,12 @@ describe('leave: another institute id (ROV-293)', () => {
   });
 
   it('leaves should list its own member and nothing of a member of another institute', async () => {
-    const own = await gqlRequest<{ leaves: unknown[] }>(result.httpServer, {
+    const own = await request<{ leaves: unknown[] }>({
       query: LEAVES,
       variables: { userId: instA.membershipId },
       token: tokenA,
     });
-    const foreign = await gqlRequest<{ leaves: unknown[] }>(result.httpServer, {
+    const foreign = await request<{ leaves: unknown[] }>({
       query: LEAVES,
       variables: { userId: instB.membershipId },
       token: tokenA,
@@ -290,7 +296,7 @@ describe('leave: another institute id (ROV-293)', () => {
   it('applyLeave should store a leave for its own member with its own attachment', async () => {
     const fileId = await asAdmin((tx) => addFile(tx, instA.tenantId, instA.userId));
 
-    const res = await gqlRequest<{ applyLeave: { id: string } }>(result.httpServer, {
+    const res = await request<{ applyLeave: { id: string } }>({
       query: APPLY,
       variables: { userId: instA.membershipId, fileIds: [fileId] },
       token: tokenA,
@@ -328,7 +334,7 @@ describe('leave: another institute id (ROV-293)', () => {
     const leaveId = await asAdmin((tx) => addLeave(tx, instA));
     const fileId = await asAdmin((tx) => addFile(tx, instA.tenantId, instA.userId));
 
-    const res = await gqlRequest<{ updateLeave: { id: string } }>(result.httpServer, {
+    const res = await request<{ updateLeave: { id: string } }>({
       query: UPDATE,
       variables: { id: leaveId, fileIds: [fileId] },
       token: tokenA,

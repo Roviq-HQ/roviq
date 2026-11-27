@@ -47,6 +47,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
+import { foreignIdRequests } from './foreign-id-requests';
 
 async function cleanupBillingForTenant(
   db: IntegrationAppResult['db'],
@@ -112,6 +113,14 @@ describe('Billing Integration', () => {
   let tenant: TestInstitute;
   let resellerToken: string;
   let instituteToken: string;
+
+  /** Invoices of an institute other than the caller's. */
+  const invoicesOfOthers: string[] = [];
+  const sameAsMissing = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => invoicesOfOthers,
+    specFile: __filename,
+  });
 
   beforeAll(async () => {
     // EE + encryption env must be set BEFORE AppModule boots so
@@ -830,8 +839,9 @@ describe('Billing Integration', () => {
             .where(inArray(payments.tenantId, [own.tenantId, other.tenantId])),
         }));
       const before = await stored();
+      invoicesOfOthers.push(invoiceB);
 
-      const res = await gqlRequest(result.httpServer, {
+      const res = await sameAsMissing({
         query: /* GraphQL */ `
           mutation InitiatePayment($invoiceId: ID!) {
             initiatePayment(invoiceId: $invoiceId) { gatewayOrderId }

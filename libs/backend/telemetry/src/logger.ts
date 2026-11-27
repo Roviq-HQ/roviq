@@ -1,4 +1,4 @@
-import pino from 'pino';
+import { createListedLogger } from './log-fields';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -11,7 +11,7 @@ const isProduction = process.env.NODE_ENV === 'production';
  * For standalone scripts (partition scheduler, migrations), call
  * `createLogger('script-name')` to get a child with the script context.
  */
-export const rootLogger = pino({
+export const rootLogger = createListedLogger({
   level: process.env.LOG_LEVEL ?? (isProduction ? 'info' : 'debug'),
   ...(isProduction ? {} : { transport: { target: 'pino-pretty', options: { colorize: true } } }),
 });

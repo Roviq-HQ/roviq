@@ -28,12 +28,12 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const ORIGIN = 'test:guardian-create-foreign-id';
@@ -53,6 +53,12 @@ describe('createGuardian: a student of another institute (ROV-293)', () => {
   let instB: TestInstitute;
   let tokenA: string;
   let foreignStudentId: string;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, foreignStudentId],
+    specFile: __filename,
+  });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(result.db, mkAdminCtx(ORIGIN), fn);
@@ -165,7 +171,7 @@ describe('createGuardian: a student of another institute (ROV-293)', () => {
     const otherBefore = await writtenIn(instB);
     const foreignBefore = await foreignStudent();
 
-    const res = await gqlRequest<{ createGuardian: { id: string } }>(result.httpServer, {
+    const res = await request<{ createGuardian: { id: string } }>({
       query: CREATE_GUARDIAN,
       variables: {
         input: {

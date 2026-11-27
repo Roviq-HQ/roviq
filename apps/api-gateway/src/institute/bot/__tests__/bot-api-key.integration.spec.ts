@@ -19,6 +19,7 @@ import {
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 
 const CREATE_BOT = /* GraphQL */ `
@@ -149,6 +150,12 @@ describe('bot operations: another institute id (ROV-293)', () => {
   let tokenA: string;
   let foreignBotId: string;
 
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [foreignBotId],
+    specFile: __filename,
+  });
+
   const tokenFor = (inst: TestInstitute) =>
     createInstituteToken({
       sub: inst.userId,
@@ -196,7 +203,7 @@ describe('bot operations: another institute id (ROV-293)', () => {
     const before = await botState(foreignBotId);
     const ownBefore = await botsOf(instA.tenantId);
 
-    const res = await gqlRequest<{ deleteBot: boolean }>(result.httpServer, {
+    const res = await request<{ deleteBot: boolean }>({
       query: DELETE_BOT,
       variables: { id: foreignBotId },
       token: tokenA,
@@ -219,7 +226,7 @@ describe('bot operations: another institute id (ROV-293)', () => {
     const ownBefore = await botsOf(instA.tenantId);
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { id: foreignBotId },
       token: tokenA,

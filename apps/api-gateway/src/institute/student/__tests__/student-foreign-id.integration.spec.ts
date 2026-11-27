@@ -28,13 +28,13 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { Connection } from '@temporalio/client';
 import { eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
 import { FileScanner } from '../../../files/scan/file-scanner';
@@ -161,6 +161,12 @@ interface Fixture {
 
 describe('student: another institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
+
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, b],
+    specFile: __filename,
+  });
   const storage = new FakeStorageClient();
   let instA: TestInstitute;
   let instB: TestInstitute;
@@ -411,7 +417,7 @@ describe('student: another institute id (ROV-293)', () => {
     const before = await snapshot();
     const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-    const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+    const res = await request({ query, variables, token: tokenA });
 
     expect(res.errors?.[0]?.extensions?.code).toBe(code);
     expect(res.data).toBeNull();
@@ -420,9 +426,9 @@ describe('student: another institute id (ROV-293)', () => {
   };
 
   const listIds = async (filter: Record<string, string>) => {
-    const res = await gqlRequest<{
+    const res = await request<{
       listStudents: { totalCount: number; edges: { node: { id: string } }[] };
-    }>(result.httpServer, { query: LIST, variables: { filter }, token: tokenA });
+    }>({ query: LIST, variables: { filter }, token: tokenA });
     expect(res.errors).toBeUndefined();
     return {
       totalCount: res.data?.listStudents.totalCount,
@@ -459,7 +465,7 @@ describe('student: another institute id (ROV-293)', () => {
     ['listStudentDocuments', DOCUMENTS],
     ['listStudentAcademics', ACADEMICS],
   ] as const)('%s should refuse a student of another institute and return none of it', async (_operation, query) => {
-    const res = await gqlRequest(result.httpServer, {
+    const res = await request({
       query,
       variables: { id: b.studentId },
       token: tokenA,
@@ -470,7 +476,7 @@ describe('student: another institute id (ROV-293)', () => {
   });
 
   it('listStudentAcademics should list the year records of its own student', async () => {
-    const own = await gqlRequest<{ listStudentAcademics: unknown[] }>(result.httpServer, {
+    const own = await request<{ listStudentAcademics: unknown[] }>({
       query: ACADEMICS,
       variables: { id: a.studentId },
       token: tokenA,

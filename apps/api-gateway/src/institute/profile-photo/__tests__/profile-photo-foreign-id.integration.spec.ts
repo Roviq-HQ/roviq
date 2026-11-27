@@ -25,13 +25,13 @@ import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
-  gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { asc, eq, inArray, or } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
 import { FileScanner } from '../../../files/scan/file-scanner';
@@ -82,6 +82,16 @@ interface Person {
 
 describe('profile photos: another institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
+
+  /** Files and profiles the caller's institute must not be able to use. */
+  const foreign: string[] = [];
+  /** People of the other institute: an upload about one of them is not the caller's to use. */
+  const otherPeople = new Set<string>();
+  const request = foreignIdRequests({
+    httpServer: () => result.httpServer,
+    foreignIds: () => [instB, foreign],
+    specFile: __filename,
+  });
   const storage = new FakeStorageClient();
   let instA: TestInstitute;
   let instB: TestInstitute;
@@ -118,6 +128,7 @@ describe('profile photos: another institute id (ROV-293)', () => {
         .returning({ id: files.id }),
     );
     assert(row);
+    if (uploadedBy !== instA.userId || otherPeople.has(subjectUserId)) foreign.push(row.id);
     return row.id;
   };
 
@@ -187,7 +198,7 @@ describe('profile photos: another institute id (ROV-293)', () => {
     ])('should refuse %s and change nothing', async (_label, fileId) => {
       const before = await stored();
 
-      const res = await gqlRequest<{ setMyProfilePhoto: boolean }>(result.httpServer, {
+      const res = await request<{ setMyProfilePhoto: boolean }>({
         query: SET_MY_PHOTO,
         variables: { fileId: fileId() },
         token: tokenA,
@@ -320,7 +331,7 @@ describe('profile photos: another institute id (ROV-293)', () => {
       const before = await snapshot();
       const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
-      const res = await gqlRequest(result.httpServer, { query, variables, token: tokenA });
+      const res = await request({ query, variables, token: tokenA });
 
       expect(res.errors?.[0]?.extensions?.code).toBe(code);
       expect(res.data).toBeNull();
@@ -331,6 +342,8 @@ describe('profile photos: another institute id (ROV-293)', () => {
     beforeAll(async () => {
       a = await addPerson(instA);
       b = await addPerson(instB);
+      foreign.push(b.profileId, b.photoId);
+      otherPeople.add(b.userId);
     });
 
     it(`should refuse a ${kind} of another institute and keep the picture it holds`, async () => {
@@ -366,7 +379,7 @@ describe('profile photos: another institute id (ROV-293)', () => {
     it(`should set the picture of its own ${kind} from its own upload`, async () => {
       const fileId = await pendingPhoto(a.userId, instA.userId);
 
-      const res = await gqlRequest(result.httpServer, {
+      const res = await request({
         query,
         variables: { id: a.profileId, fileId },
         token: tokenA,

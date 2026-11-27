@@ -45,6 +45,7 @@ import {
   type MockInstance,
   vi,
 } from 'vitest';
+import { foreignIdRequests } from '../../../__tests__/foreign-id-requests';
 import { AppModule } from '../../../app/app.module';
 import { IdentityService } from '../../../auth/identity.service';
 import { REDIS_KEYS } from '../../../auth/redis-keys';
@@ -173,8 +174,16 @@ describe('Sign-in details for staff and guardians (integration)', () => {
   let b: Institute;
   let teacherToken: string;
 
+  /** People of institute B that institute A asks about. */
+  const peopleOfB: string[] = [];
+  const request = foreignIdRequests({
+    httpServer: () => app.httpServer,
+    foreignIds: () => peopleOfB,
+    specFile: __filename,
+  });
+
   const gql = <T>(query: string, variables: Record<string, unknown>, token: string) =>
-    gqlRequest<T>(app.httpServer, { query, variables, token });
+    request<T>({ query, variables, token });
 
   const asAdmin = <T>(fn: (tx: DrizzleDB) => Promise<T>) =>
     withAdmin(app.db, mkAdminCtx(ORIGIN), fn);
@@ -391,6 +400,7 @@ describe('Sign-in details for staff and guardians (integration)', () => {
       const staffHash = await passwordHashOf(staff.person.userId);
       const guardianHash = await passwordHashOf(guardian.person.userId);
       const personIds = [staff.person.userId, guardian.person.userId];
+      peopleOfB.push(staff.person.id, guardian.person.id);
       const stored = () =>
         asAdmin(async (tx) => ({
           users: await tx.select().from(users).where(inArray(users.id, personIds)),
