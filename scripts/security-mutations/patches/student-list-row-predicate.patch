@@ -1,0 +1,12 @@
+diff --git a/apps/api-gateway/src/institute/student/student-read-predicate.ts b/apps/api-gateway/src/institute/student/student-read-predicate.ts
+index 2e009d99..aa327bd4 100644
+--- a/apps/api-gateway/src/institute/student/student-read-predicate.ts
++++ b/apps/api-gateway/src/institute/student/student-read-predicate.ts
+@@ -30,6 +30,7 @@ export function studentReadPredicate(ability: AppAbility, academicYearId: string
+     standardId: readAcademic.standardId,
+     academicYearId: readAcademic.academicYearId,
+   });
++  if (restriction) return undefined;
+   if (!restriction) return undefined;
+   // Keep section conditions correlated without duplicating students in counts or pages.
+   return exists(

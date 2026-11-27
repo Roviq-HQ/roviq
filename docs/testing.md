@@ -25,6 +25,9 @@ pnpm e2e:up                       # start the Docker e2e stack (stays running); 
 pnpm test:e2e:api                 # Vitest GraphQL tests against api-gateway:3004. All new E2E API tests go here.
 pnpm test:e2e:ui                  # Playwright UI tests across 3 portals plus cross-portal
 
+# Security mutation run (slow; not in the gate; see "Security mutation run")
+pnpm test:security-mutations      # weaken one security rule at a time, require a test to fail
+
 # Full pipeline
 pnpm test:all                     # unit + int + e2e:api + e2e:ui
 pnpm ci:check                     # lint/typecheck/test/e2e gate, run by .husky/pre-push (see "CI and pre-push")
@@ -117,6 +120,17 @@ Tested in `libs/database/src/__tests__/membership-insert-rule.integration.spec.t
 - A membership cannot move to another user or institute, and `users.origin_tenant_id` cannot change, for any role.
 - An institute stops reading a person's account tables once their membership is deleted.
 
+Tested in `libs/database/src/__tests__/row-policies-refuse-foreign-rows.integration.spec.ts`, for every table and every policy the catalog holds:
+
+- `roviq_app`, `roviq_reseller` and `roviq_user` cannot read, insert, change or delete a row that names another institute or reseller, and cannot turn a row of their own into one. Each table is tried on a copy in a scratch schema that carries the role's policies as the catalog defines them, so a new table is covered without a line of test code. The two policies that let a foreign row through are listed in the spec with their reason (the sign-in events an institute or reseller appends before it is known).
+
+Tested in `libs/database/src/__tests__/app-role-write-privileges.integration.spec.ts`, each attempted as the role:
+
+- Audit rows are inserted by the audit writer and the platform only.
+- A reseller creates no institute and changes only the group of its own institutes, to a group of its own.
+- An institute cannot change its own code.
+- A reseller that held the `deleted_at` column would still be refused by `institutes_delete_admin_only`.
+
 The E2E sections keep the numbering used when the suite was first written, which is one higher than the issue's from 16 on.
 
 CI runs the database and session specs as the named step **Auth Security Invariants** in the `test` job, before the full integration suite. The E2E spec runs in the `e2e-api` job.
@@ -179,6 +193,48 @@ An id typed as `String` in the schema gets a kind only when it is listed by hand
 - Subscriptions are not called.
 
 Set `TWO_INSTITUTE_REPORT=<file>` to write every call's result as JSON.
+
+## Security mutation run
+
+A security test that cannot fail proves nothing, and nobody notices until an audit. `pnpm test:security-mutations` (`scripts/security-mutations.ts`) weakens one security rule at a time, runs the specs that should refuse the result, and requires at least one test to fail. It is slow, so it is not part of `pnpm ci:check`: run it after a change to a row policy, a grant, a trigger, the ability guard or the response check, and before a release.
+
+| Group | What is weakened | Found from | Specs that must notice |
+|---|---|---|---|
+| `policies` | The `USING` or the `WITH CHECK` expression of one row policy of `roviq_app`, `roviq_reseller` or `roviq_user` passes every row | the catalog (`pg_policies`), up to two mutations per policy | `row-policies-refuse-foreign-rows.integration.spec.ts`, then the whole integration project |
+| `keys` | One foreign key that carries `tenant_id` is dropped | the catalog (`pg_constraint`) | `same-tenant-foreign-keys.integration.spec.ts` |
+| `rules` | One trigger is disabled, one CHECK is dropped, or one privilege is granted | `RULE_MUTATIONS` in `scripts/security-mutations/mutations.ts` | the database specs, then the whole integration project |
+| `code` | One check is taken out of the application code by a patch | `CODE_MUTATIONS`, each a file in `scripts/security-mutations/patches/` | the specs named beside the patch |
+
+`privilege-manifest.integration.spec.ts` compares every policy and grant with a text file, so it fails on any database mutation. It is left out of every database mutation except the one that names it: the run asks for a spec that attempts the forbidden statement, not for one that sees the catalog changed.
+
+```bash
+pnpm test:security-mutations                   # everything (about an hour)
+pnpm test:security-mutations --only rules      # one group: policies, keys, rules or code
+pnpm test:security-mutations --match sections  # mutations whose name contains the text
+pnpm test:security-mutations --list            # print the mutations and stop
+pnpm test:security-mutations --e2e             # also the patches that need the e2e stack (after pnpm e2e:up)
+pnpm test:security-mutations --report out.md   # also write the report to a file
+pnpm test:security-mutations --recover         # undo what a killed run left behind, and stop
+```
+
+The run first passes every spec with nothing weakened (`--no-baseline` skips this); a spec that fails there, and fails again alone, stops the run, because a failure would prove nothing. For the same reason a failure in the whole integration project counts only when that file fails again alone, in a fresh copy with the same mutation: a few files fail now and then when the whole project runs side by side. The report gives each mutation one of three verdicts, and the command exits 0 only when every one is `noticed`:
+
+- **noticed**: a test failed; the report names the first spec file.
+- **not noticed**: every spec passed. The rule has no test: write one that attempts what the weakened rule would allow, as the role.
+- **not applied**: the policy, trigger, constraint or code the mutation names is gone or changed. Update the list or the patch.
+
+What it touches, and how it is put back:
+
+- **`roviq_test` itself is never changed.** For the length of the run it is renamed to `roviq_test_original`, and every mutation gets a fresh copy of it under the name `roviq_test` (the specs find their database by that name). The copy is dropped after the mutation, and at the end the original gets its name back. Rows the specs leave behind go with the copies.
+- **Only this instance's test database.** The script refuses any database name but `roviq_test`, any host but this machine and any port but this instance's `DEV_POSTGRES_PORT`, before it connects. It needs the database to itself: it does not start while a push gate from the same checkout is running, and an integration run started in this checkout during the run would read a weakened copy.
+- **Patches are applied to the working tree** with `git apply` and taken out with `git apply --reverse`; uncommitted work in other lines of the same file is kept. The patch in flight is recorded in `node_modules/.cache/roviq-security-mutations/in-flight.json`.
+- **Ctrl-C puts everything back.** A run that was killed is undone by the next start, or by `pnpm test:security-mutations --recover`: the copy is dropped, the original renamed back, the patch taken out.
+
+Adding a mutation:
+
+- A new table, row policy or same-tenant foreign key needs nothing: the run finds it.
+- A new trigger, CHECK or withheld privilege gets a line in `RULE_MUTATIONS`.
+- A fixed security bug gets a patch that takes the fix out, once the fix is merged: edit the code, save `git diff -- <file>` as `patches/<rule>.patch`, undo the edit, and add a line to `CODE_MUTATIONS` with the spec that proves the fix. The file name says which rule the patch removes and nothing else.
 
 ## Docker Compose Files
 

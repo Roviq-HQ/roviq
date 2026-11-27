@@ -53,6 +53,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'ee/apps/api-gateway/src/billing/repositories/dashboard.repository.ts',
   'apps/api-gateway/src/auth/__tests__/own-account-impersonation.integration.spec.ts',
   'apps/api-gateway/src/__tests__/billing.integration.spec.ts',
+  'apps/api-gateway/src/__tests__/casl-enforcement.integration.spec.ts',
   'apps/api-gateway/src/__tests__/integration-app.integration.spec.ts',
   'apps/api-gateway/src/__tests__/people-restore.integration.spec.ts',
   'apps/api-gateway/src/__tests__/membership-ends-with-last-profile.integration.spec.ts',

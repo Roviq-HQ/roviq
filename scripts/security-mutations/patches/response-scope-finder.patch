@@ -1,0 +1,13 @@
+diff --git a/apps/api-gateway/src/common/response-scope/foreign-scope-finder.ts b/apps/api-gateway/src/common/response-scope/foreign-scope-finder.ts
+index 79728eac..bc844a01 100644
+--- a/apps/api-gateway/src/common/response-scope/foreign-scope-finder.ts
++++ b/apps/api-gateway/src/common/response-scope/foreign-scope-finder.ts
+@@ -68,7 +68,7 @@ export function findForeignScope(
+       const kind = KEY_KIND[key];
+       if (kind && typeof child === 'string') {
+         const own = expected[kind];
+-        if (own !== undefined && child.toLowerCase() !== own.toLowerCase()) {
++        if (own === undefined && child.toLowerCase() !== own) {
+           return { foreign: { kind, found: child }, truncated: false };
+         }
+         continue;

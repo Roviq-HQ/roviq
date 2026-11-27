@@ -1,0 +1,13 @@
+diff --git a/apps/api-gateway/src/common/response-scope/response-scope.plugin.ts b/apps/api-gateway/src/common/response-scope/response-scope.plugin.ts
+index 095096b3..292bc708 100644
+--- a/apps/api-gateway/src/common/response-scope/response-scope.plugin.ts
++++ b/apps/api-gateway/src/common/response-scope/response-scope.plugin.ts
+@@ -97,7 +97,7 @@ export class ResponseScopePlugin implements ApolloServerPlugin<GqlContext> {
+         },
+       }),
+       willSendResponse: async (requestContext) => {
+-        if (state.failed && this.mode === 'refuse') refuse(requestContext);
++        if (state.failed && this.mode === 'off') refuse(requestContext);
+       },
+     };
+   }

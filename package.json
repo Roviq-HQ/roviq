@@ -15,6 +15,7 @@
     "ci:queue": "bash scripts/ci-queue.sh",
     "ci:check": "bash scripts/ci-check.sh",
     "test:coverage": "vitest run --project unit-node --project unit-dom --coverage",
+    "test:security-mutations": "pnpx tsx scripts/security-mutations.ts",
     "test:check-integration": "bash scripts/ci-check-integration-mocks.sh",
     "test:check-dates": "bash scripts/ci-check-date-format.sh",
     "test:check-skips": "bash scripts/ci-check-skips.sh",

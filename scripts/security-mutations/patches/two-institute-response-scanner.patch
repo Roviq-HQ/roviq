@@ -1,0 +1,13 @@
+diff --git a/e2e/api-gateway-e2e/src/helpers/institute-rows.ts b/e2e/api-gateway-e2e/src/helpers/institute-rows.ts
+index f4d2d411..ba36120a 100644
+--- a/e2e/api-gateway-e2e/src/helpers/institute-rows.ts
++++ b/e2e/api-gateway-e2e/src/helpers/institute-rows.ts
+@@ -154,7 +154,7 @@ export function findForeignIds(
+     for (const match of JSON.stringify(value).matchAll(UUID)) {
+       const id = match[0].toLowerCase();
+       const source = foreign.get(id);
+-      if (source !== undefined && !ignore.has(id)) hits.set(id, source);
++      if (source !== undefined && ignore.has(id)) hits.set(id, source);
+     }
+   };
+   scan(response.data, new Set());
