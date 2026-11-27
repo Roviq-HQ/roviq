@@ -137,7 +137,7 @@ function createRepo() {
     findUserStatus: vi.fn().mockResolvedValue(null),
     findActiveMembershipsWithRole: vi.fn().mockResolvedValue([]),
     findInstitute: vi.fn().mockResolvedValue(null),
-    findInstituteResellerId: vi.fn().mockResolvedValue(null),
+    isInstituteOfReseller: vi.fn().mockResolvedValue(false),
     findExchangeRows: vi.fn().mockResolvedValue({
       targetUser: null,
       membership: null,
@@ -171,6 +171,10 @@ function arrangeStart(
   vi.mocked(repo.findUserStatus).mockResolvedValue(ACTIVE_TARGET);
   vi.mocked(repo.findActiveMembershipsWithRole).mockResolvedValue(memberships);
   vi.mocked(repo.findInstitute).mockResolvedValue(inst);
+  // The reseller-context read sees the institute only when it is the reseller's own.
+  vi.mocked(repo.isInstituteOfReseller).mockResolvedValue(
+    inst?.resellerId === resellerActor.resellerId,
+  );
 }
 
 function arrangeOtpRecipient(repo: Repo): void {
@@ -257,6 +261,7 @@ describe('ImpersonationService', () => {
 
     it('rejects when target user is not found', async () => {
       const { service, repo } = createSubject();
+      vi.mocked(repo.findActiveMembershipsWithRole).mockResolvedValue(targetMembership('student'));
       await expect(
         service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
@@ -265,6 +270,7 @@ describe('ImpersonationService', () => {
 
     it('rejects when target user is not ACTIVE', async () => {
       const { service, repo } = createSubject();
+      vi.mocked(repo.findActiveMembershipsWithRole).mockResolvedValue(targetMembership('student'));
       vi.mocked(repo.findUserStatus).mockResolvedValue({ id: 'tgt-1', status: 'SUSPENDED' });
       await expect(
         service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
@@ -361,10 +367,15 @@ describe('ImpersonationService', () => {
         targetMembership('student'),
         institute({ resellerId: 'reseller-B', requireImpersonationConsent: false }),
       );
+      vi.mocked(repo.hasActiveResellerMembership).mockResolvedValue(true);
 
       await expect(
         service.startImpersonation(resellerActor, 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
+      // Refused before anything about the target is read.
+      expect(repo.findUserStatus).not.toHaveBeenCalled();
+      expect(repo.findActiveMembershipsWithRole).not.toHaveBeenCalled();
+      expect(repo.findInstitute).not.toHaveBeenCalled();
       expect(redis.set).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
       expect(repo.createSession).not.toHaveBeenCalled();
@@ -588,7 +599,10 @@ describe('ImpersonationService', () => {
           'tenant-1',
           REASON_VALID,
         ),
-      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
+      // Refused before anything about the target is read.
+      expect(repo.findActiveMembershipsWithRole).not.toHaveBeenCalled();
+      expect(repo.findUserStatus).not.toHaveBeenCalled();
       expect(repo.createSession).not.toHaveBeenCalled();
     });
 
@@ -803,7 +817,7 @@ describe('ImpersonationService', () => {
         resellerActor,
         (repo) => {
           vi.mocked(repo.hasActiveResellerMembership).mockResolvedValue(true);
-          vi.mocked(repo.findInstituteResellerId).mockResolvedValue({ resellerId: 'reseller-B' });
+          vi.mocked(repo.isInstituteOfReseller).mockResolvedValue(false);
         },
       ],
     ])('opens no session with the right OTP when %s', async (_label, actor, arrangeRepo) => {
@@ -824,13 +838,13 @@ describe('ImpersonationService', () => {
       vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
       vi.mocked(redis.getdel).mockResolvedValue(JSON.stringify(pending));
       vi.mocked(repo.hasActiveResellerMembership).mockResolvedValue(true);
-      vi.mocked(repo.findInstituteResellerId).mockResolvedValue({ resellerId: 'reseller-1' });
+      vi.mocked(repo.isInstituteOfReseller).mockResolvedValue(true);
       vi.mocked(repo.createSession).mockResolvedValue('session-31');
 
       const result = await service.verifyOtp(resellerActor, 'request-1', '111111');
 
       expect(result).toEqual({ code: FIXED_UUID });
-      expect(repo.findInstituteResellerId).toHaveBeenCalledWith('tenant-1');
+      expect(repo.isInstituteOfReseller).toHaveBeenCalledWith(resellerActor, 'tenant-1');
       expect(redis.getdel).toHaveBeenCalledWith(KEY);
       expect(redis.del).toHaveBeenCalledWith(ATTEMPTS_KEY);
       // The attempt is reserved before the comparison.

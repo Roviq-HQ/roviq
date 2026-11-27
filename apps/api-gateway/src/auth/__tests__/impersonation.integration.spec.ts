@@ -45,6 +45,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../app/app.module';
 import { ImpersonationService } from '../impersonation.service';
+import { ImpersonationRepository } from '../repositories/impersonation.repository';
 
 const REASON = 'integration test — impersonation verification list';
 
@@ -497,38 +498,132 @@ describe('Impersonation (integration)', () => {
     });
   });
 
-  describe('reseller → institute', () => {
-    it('refuses a reseller whose token is for another reseller than the institute owner', async () => {
-      const otherReseller = await createTestReseller(result.db);
+  describe('reseller → institute, a target outside the reseller', () => {
+    const START = `
+      mutation($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
+        resellerStartImpersonation(
+          targetUserId: $targetUserId
+          targetTenantId: $targetTenantId
+          reason: $reason
+        ) { code requiresOtp sessionId }
+      }
+    `;
+
+    let reseller: TestReseller;
+    let owned: TestInstitute;
+    let ownedTeacher: TestTeacher;
+    let token: string;
+
+    beforeAll(async () => {
+      reseller = await createTestReseller(result.db);
+      owned = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      ownedTeacher = await createTestTeacher(result.db, owned.tenantId);
+      token = createResellerToken({
+        sub: reseller.userId,
+        resellerId: reseller.resellerId,
+        membershipId: reseller.membershipId,
+        roleId: reseller.roleId,
+      });
+    });
+
+    afterAll(async () => {
+      await cleanupTestTeacher(result.db, ownedTeacher);
+      await cleanupTestInstitute(result.db, owned);
+      await cleanupTestReseller(result.db, reseller);
+    });
+
+    async function start(targetUserId: string, targetTenantId: string) {
+      const response = await gqlRequest(result.httpServer, {
+        query: START,
+        variables: { targetUserId, targetTenantId, reason: REASON },
+        token,
+      });
+      expect(response.data).toBeNull();
+      const error = response.errors?.[0];
+      return { code: error?.extensions?.code, message: error?.message };
+    }
+
+    async function sessionsOpenedByReseller(): Promise<number> {
+      const rows = await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+        tx
+          .select({ id: impersonationSessions.id })
+          .from(impersonationSessions)
+          .where(eq(impersonationSessions.impersonatorId, reseller.userId)),
+      );
+      return rows.length;
+    }
+
+    it('gives one answer for every target the reseller may not impersonate, and writes nothing', async () => {
+      const repo = result.app.get(ImpersonationRepository);
+      const createSession = vi.spyOn(repo, 'createSession');
+      const findOtpReceiver = vi.spyOn(repo, 'findInstituteAdminUserId');
+      try {
+        const answers = [
+          // A member and the institute of another reseller.
+          await start(teacher.userId, tenant.tenantId),
+          // Its own institute's member, paired with another reseller's institute.
+          await start(ownedTeacher.userId, tenant.tenantId),
+          // Its own institute, with a person who is not a member of it.
+          await start(teacher.userId, owned.tenantId),
+          // Its own institute, with an id of no person.
+          await start(randomUUID(), owned.tenantId),
+          // Ids of no row.
+          await start(randomUUID(), randomUUID()),
+        ];
+
+        expect(new Set(answers.map((answer) => answer.code))).toEqual(
+          new Set(['IMPERSONATION_TARGET_INVALID']),
+        );
+        expect(new Set(answers.map((answer) => answer.message)).size).toBe(1);
+        expect(createSession).not.toHaveBeenCalled();
+        expect(findOtpReceiver).not.toHaveBeenCalled();
+        expect(await sessionsOpenedByReseller()).toBe(0);
+      } finally {
+        createSession.mockRestore();
+        findOtpReceiver.mockRestore();
+      }
+    });
+
+    it("reads nothing about the person when the institute is not the reseller's", async () => {
+      const repo = result.app.get(ImpersonationRepository);
+      const findUser = vi.spyOn(repo, 'findUserStatus');
+      const findMemberships = vi.spyOn(repo, 'findActiveMembershipsWithRole');
+      const findInstitute = vi.spyOn(repo, 'findInstitute');
+      try {
+        await start(teacher.userId, tenant.tenantId);
+        await start(ownedTeacher.userId, tenant.tenantId);
+        await start(randomUUID(), randomUUID());
+
+        expect(findUser).not.toHaveBeenCalled();
+        expect(findMemberships).not.toHaveBeenCalled();
+        expect(findInstitute).not.toHaveBeenCalled();
+      } finally {
+        findUser.mockRestore();
+        findMemberships.mockRestore();
+        findInstitute.mockRestore();
+      }
+    });
+
+    it('still asks for the code when the target is a member of its own institute', async () => {
+      const dispatch = vi
+        .spyOn(result.app.get(ImpersonationRepository), 'findInstituteAdminUserId')
+        .mockResolvedValue(null);
       try {
         const response = await gqlRequest(result.httpServer, {
-          query: `
-          mutation Start($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
-            resellerStartImpersonation(
-              targetUserId: $targetUserId
-              targetTenantId: $targetTenantId
-              reason: $reason
-            ) { code requiresOtp sessionId }
-          }
-        `,
+          query: START,
           variables: {
-            targetUserId: teacher.userId,
-            targetTenantId: tenant.tenantId,
+            targetUserId: ownedTeacher.userId,
+            targetTenantId: owned.tenantId,
             reason: REASON,
           },
-          token: createResellerToken({
-            sub: otherReseller.userId,
-            resellerId: otherReseller.resellerId,
-            membershipId: otherReseller.membershipId,
-            roleId: otherReseller.roleId,
-          }),
+          token,
         });
-
-        expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
-        expect(response.errors?.[0]?.message).toBe('Institute does not belong to your reseller');
-        expect(response.data).toBeNull();
+        // Past every target check: it stops only because this fixture has no one to send the code to.
+        expect(dispatch).toHaveBeenCalledWith(owned.tenantId);
+        expect(response.errors?.[0]?.extensions?.code).not.toBe('IMPERSONATION_TARGET_INVALID');
+        expect(response.errors?.[0]?.extensions?.code).not.toBe('FORBIDDEN');
       } finally {
-        await cleanupTestReseller(result.db, otherReseller);
+        dispatch.mockRestore();
       }
     });
   });

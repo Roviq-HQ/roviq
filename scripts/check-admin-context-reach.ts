@@ -67,8 +67,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
   'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findInstituteAdminUserId':
     'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findInstituteResellerId':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
   'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findPlatformRoleAbilities':
     'Code exchange (ROV-183): the user comes from the session row, never from the caller; decides only whether the token is view-only.',
   'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findPrimaryPhone':

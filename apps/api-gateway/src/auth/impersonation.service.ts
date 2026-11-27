@@ -117,6 +117,14 @@ function impersonatorRoleOf(
   return null;
 }
 
+/** One answer for every target a caller may not impersonate, whatever the reason. */
+function targetOutOfReach(): BusinessException {
+  return new BusinessException(
+    ErrorCode.IMPERSONATION_TARGET_INVALID,
+    'This person cannot be impersonated in this institute',
+  );
+}
+
 function otpMatches(expected: string, given: string): boolean {
   const a = Buffer.from(expected);
   const b = Buffer.from(given);
@@ -160,13 +168,16 @@ export class ImpersonationService {
       );
     }
 
-    const targetUser = await this.repo.findUserStatus(targetUserId);
-
-    if (!targetUser || targetUser.status !== 'ACTIVE') {
-      throw new BusinessException(
-        ErrorCode.IMPERSONATION_TARGET_INVALID,
-        'Target user not found or inactive',
-      );
+    // A reseller or institute caller learns nothing about a target outside its own
+    // institutes: the institute is settled first, and every refusal reads the same.
+    if (actor.scope === 'reseller') {
+      await this.assertActiveResellerMembership(actor);
+      if (!(await this.repo.isInstituteOfReseller(actor, targetTenantId))) {
+        throw targetOutOfReach();
+      }
+    }
+    if (actor.scope === 'institute' && actor.tenantId !== targetTenantId) {
+      throw targetOutOfReach();
     }
 
     // Every active membership the target holds here: the rank check must see
@@ -176,28 +187,16 @@ export class ImpersonationService {
       targetTenantId,
     );
     const targetMembership = targetMemberships[0];
+    const targetUser = targetMembership ? await this.repo.findUserStatus(targetUserId) : null;
 
-    if (!targetMembership) {
-      throw new BusinessException(
-        ErrorCode.IMPERSONATION_TARGET_INVALID,
-        'Target user has no active membership in the specified institute',
-      );
+    if (!targetMembership || targetUser?.status !== 'ACTIVE') {
+      throw targetOutOfReach();
     }
 
     const targetInstitute = await this.repo.findInstitute(targetTenantId);
 
     if (!targetInstitute) {
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Target institute not found');
-    }
-
-    if (actor.scope === 'reseller') {
-      if (targetInstitute.resellerId !== actor.resellerId) {
-        throw new BusinessException(
-          ErrorCode.FORBIDDEN,
-          'Institute does not belong to your reseller',
-        );
-      }
-      await this.assertActiveResellerMembership(actor);
     }
 
     if (actor.scope === 'institute') {
@@ -540,8 +539,7 @@ export class ImpersonationService {
     if (actor.scope !== 'reseller') return;
 
     await this.assertActiveResellerMembership(actor);
-    const institute = await this.repo.findInstituteResellerId(pending.tenantId);
-    if (institute?.resellerId !== actor.resellerId) {
+    if (!(await this.repo.isInstituteOfReseller(actor, pending.tenantId))) {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
         'Institute does not belong to your reseller',

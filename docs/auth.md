@@ -289,6 +289,16 @@ The flat impersonation resolver is gone. Each scope owns its own mutations and t
 
 Update any tooling, sequence diagrams, or audit-log filters that referred to the old flat names.
 
+### Who may be a target
+
+`startImpersonation` settles the institute before it reads anything about the person:
+
+- **Reseller**: the institute is read as the reseller (`withReseller`), so only one of its own institutes is found. The same read runs again when the OTP is verified.
+- **Institute**: the target institute is the caller's own.
+- **Platform**: any institute.
+
+The person must then hold an active membership in that institute and an active account. Every target that fails one of these answers `IMPERSONATION_TARGET_INVALID` with the same message, whatever the reason.
+
 ### OTP Gate (ROV-94)
 
 A new `institutes.require_impersonation_consent BOOLEAN NOT NULL DEFAULT false` column drives the OTP gate together with the impersonator's scope:

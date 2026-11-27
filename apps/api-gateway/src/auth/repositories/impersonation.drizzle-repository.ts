@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DefaultRoles } from '@roviq/common-types';
+import { DefaultRoles, type ResellerContext } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -15,6 +15,7 @@ import {
   userProfilesLive,
   usersLive,
   withAdmin,
+  withReseller,
 } from '@roviq/database';
 import { and, asc, desc, eq, gt, inArray, isNull, lte, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -89,15 +90,15 @@ export class ImpersonationDrizzleRepository extends ImpersonationRepository {
     return targetInstitute ?? null;
   }
 
-  async findInstituteResellerId(tenantId: string): Promise<{ resellerId: string } | null> {
-    const [institute] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+  async isInstituteOfReseller(reseller: ResellerContext, tenantId: string): Promise<boolean> {
+    const [institute] = await withReseller(this.db, reseller, (tx) =>
       tx
-        .select({ resellerId: institutesLive.resellerId })
+        .select({ id: institutesLive.id })
         .from(institutesLive)
         .where(eq(institutesLive.id, tenantId))
         .limit(1),
     );
-    return institute ?? null;
+    return institute !== undefined;
   }
 
   async findExchangeRows(params: {
