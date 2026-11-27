@@ -282,7 +282,7 @@ describe('Security Invariant E2E Tests', () => {
         { currentRefreshToken: teacher.refreshToken },
         impersonationToken,
       );
-      expect(logoutRes.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(logoutRes.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_OWN_ACCOUNT');
 
       const switchRes = await gql(
         SWITCH_MUTATION,
