@@ -3,7 +3,6 @@ import { DefaultRoles } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
-  memberships,
   mkInstituteCtx,
   rolesLive,
   staffProfiles,
@@ -14,6 +13,12 @@ import {
   withTenant,
 } from '@roviq/database';
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  decideMembershipEnd,
+  endMembership,
+  insertOrRestoreMembership,
+  restoreMembership,
+} from '../../../auth/membership-lifecycle';
 import {
   ensureTenantUserProfile,
   updateTenantUserProfile,
@@ -27,6 +32,7 @@ import type {
   CreateStaffData,
   CreateStaffResult,
   DeletedStaffRecord,
+  DeleteStaffResult,
   RestoreStaffResult,
   StaffListQuery,
   StaffProfileRow,
@@ -145,18 +151,13 @@ export class StaffDrizzleRepository extends StaffRepository {
     const { tenantId, actorId } = data;
     try {
       return await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-        const [membership] = await tx
-          .insert(memberships)
-          .values({
-            userId: data.userId,
-            tenantId,
-            roleId: data.roleId,
-            status: 'ACTIVE',
-            abilities: [],
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning({ id: memberships.id });
+        const membershipId = await insertOrRestoreMembership(tx, {
+          userId: data.userId,
+          tenantId,
+          roleId: data.roleId,
+          abilities: [],
+          actorId,
+        });
         await ensureTenantUserProfile(tx, {
           tenantId,
           userId: data.userId,
@@ -167,7 +168,7 @@ export class StaffDrizzleRepository extends StaffRepository {
         const values = {
           ...data.staff,
           userId: data.userId,
-          membershipId: membership.id,
+          membershipId,
           tenantId,
           createdBy: actorId,
           updatedBy: actorId,
@@ -255,18 +256,31 @@ export class StaffDrizzleRepository extends StaffRepository {
     id: string,
     actorId: string,
     dateOfLeaving: string,
-  ): Promise<StaffProfileRow | null> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .update(staffProfiles)
-        .set({
-          deletedAt: new Date(),
-          deletedBy: actorId,
-          dateOfLeaving,
-        })
+  ): Promise<DeleteStaffResult> {
+    return withTenant<DeleteStaffResult>(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const [profile] = await tx
+        .select({ membershipId: staffProfiles.membershipId })
+        .from(staffProfiles) // allow-base-read: FOR UPDATE needs the table, not the view
         .where(and(eq(staffProfiles.id, id), isNull(staffProfiles.deletedAt)))
+        .for('update');
+      if (!profile) return { kind: 'not_found' };
+
+      const decision = await decideMembershipEnd(tx, {
+        membershipId: profile.membershipId,
+        profileId: id,
+        actorId,
+      });
+      if (decision === 'own_membership' || decision === 'last_admin') return { kind: decision };
+
+      const [row] = await tx
+        .update(staffProfiles)
+        .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId, dateOfLeaving })
+        .where(eq(staffProfiles.id, id))
         .returning();
-      return rows[0] ?? null;
+      if (decision === 'end') {
+        await endMembership(tx, { membershipId: profile.membershipId, actorId });
+      }
+      return { kind: 'deleted', membershipEnded: decision === 'end', row };
     });
   }
 
@@ -296,13 +310,19 @@ export class StaffDrizzleRepository extends StaffRepository {
   async restore(tenantId: string, id: string, actorId: string): Promise<RestoreStaffResult> {
     try {
       return await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-        const rows = await tx
+        const [deleted] = await tx
+          .select({ membershipId: staffProfiles.membershipId })
+          .from(staffProfiles) // allow-base-read: restore looks up a trashed row
+          .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
+          .for('update');
+        if (!deleted) return 'not_found';
+        await tx
           .update(staffProfiles)
           // delete() stamps the leaving date, so restore has to clear it again.
           .set({ deletedAt: null, deletedBy: null, dateOfLeaving: null, updatedBy: actorId })
-          .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
-          .returning({ id: staffProfiles.id });
-        return rows.length > 0 ? 'restored' : 'not_found';
+          .where(eq(staffProfiles.id, id));
+        await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
+        return 'restored';
       });
     } catch (err) {
       if (uniqueViolationConstraint(err) === EMPLOYEE_ID_UNIQUE) return 'employee_id_taken';

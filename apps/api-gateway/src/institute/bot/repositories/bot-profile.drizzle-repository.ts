@@ -22,6 +22,7 @@ import {
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, eq, isNull } from 'drizzle-orm';
+import { insertOrRestoreMembership } from '../../../auth/membership-lifecycle';
 import { BotProfileRepository } from './bot-profile.repository';
 import type {
   BotProfileRecord,
@@ -218,19 +219,14 @@ export class BotProfileDrizzleRepository extends BotProfileRepository {
 
   async createBotMembership(data: CreateBotMembershipData): Promise<{ id: string }> {
     return withTenant(this.db, mkInstituteCtx(data.tenantId, 'service:bot'), async (tx) => {
-      const [created] = await tx
-        .insert(memberships)
-        .values({
-          userId: data.userId,
-          roleId: data.roleId,
-          tenantId: data.tenantId,
-          status: 'ACTIVE',
-          abilities: [],
-          createdBy: data.createdBy,
-          updatedBy: data.createdBy,
-        })
-        .returning({ id: memberships.id });
-      return created;
+      const id = await insertOrRestoreMembership(tx, {
+        userId: data.userId,
+        roleId: data.roleId,
+        tenantId: data.tenantId,
+        abilities: [],
+        actorId: data.createdBy,
+      });
+      return { id };
     });
   }
 

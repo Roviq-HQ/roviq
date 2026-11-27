@@ -1,4 +1,5 @@
 import type { AcademicStatus, AppAbility, UserDocumentType } from '@roviq/common-types';
+import type { DeleteProfileResult } from '../../../auth/membership-lifecycle';
 import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
 import type { AdmitStudentData, AdmitStudentResult } from './admit-student';
 import type {
@@ -79,7 +80,8 @@ export abstract class StudentRepository {
     id: string,
     leftStatuses: AcademicStatus[],
   ): Promise<boolean>;
-  abstract softDelete(tenantId: string, id: string): Promise<void>;
+  /** Deletes the student and, when it was their last profile, ends their membership. */
+  abstract softDelete(tenantId: string, id: string, actorId: string): Promise<DeleteProfileResult>;
   abstract listDeleted(tenantId: string): Promise<DeletedStudentRecord[]>;
   abstract restore(tenantId: string, id: string, actorId: string): Promise<RestoreStudentResult>;
 }

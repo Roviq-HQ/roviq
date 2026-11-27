@@ -42,6 +42,12 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 | `resendStaffSignInDetails` | Mutation | `Boolean` | `update Staff` |
 | `resendGuardianSignInDetails` | Mutation | `Boolean` | `update Guardian` |
 
+Deleting a staff member or a guardian also ends the person's membership of the institute when it
+was the last profile that used it, and restoring brings the same membership back. A caller
+cannot delete their own record this way (`CANNOT_REMOVE_OWN_MEMBERSHIP`), and the institute's
+only admin cannot be removed (`LAST_ADMIN_CANNOT_BE_REMOVED`). Rules: `docs/auth.md` →
+"Leaving an institute".
+
 `createStaffMember` writes the account first (the user and its phone in one transaction, then its
 profile), then the membership, the institute's profile copy and the staff profile in one institute
 transaction. Refusals in this order:

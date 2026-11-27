@@ -460,6 +460,24 @@ A mobile number is not a person: one parent's number is on several children, num
 | An institute's first admin is an account the platform or a reseller created. Its membership is written as the platform role, and only when the institute's `first_admin_user_id` is that user. | `IdentityService.createFirstAdminMembership`, called by the institute setup |
 | An institute reads the account tables (`users`, `phone_numbers`, `user_profiles`, the person's addresses, identifiers and documents, and user-level files) only for a person with a membership there that is not deleted. After a membership is deleted the institute keeps its own copy and nothing else. | The `*_app_select` policies of those tables and `filePolicies` (`AND m.deleted_at IS NULL`) |
 
+### Leaving an institute (ROV-382)
+
+A membership ends when the last profile that uses it is deleted, and comes back when a profile is restored.
+
+| Rule | Where it is enforced |
+| -- | -- |
+| Deleting a student, a staff member or a guardian also soft-deletes the membership the profile uses, in the same transaction, unless another live profile (student, staff, guardian or bot) uses the same membership. A member with no profile at all is never touched. | `decideMembershipEnd` and `endMembership` in `auth/membership-lifecycle.ts`, called by the three `softDelete` repository methods |
+| Restoring a profile restores the same membership row, so attendance, marks, leave and timetable rows that refer to it still do. | `restoreMembership`, called by the three `restore` repository methods |
+| A caller cannot delete a profile that would end their own membership (`CANNOT_REMOVE_OWN_MEMBERSHIP`). | `decideMembershipEnd`; CHECK `chk_membership_not_ended_by_self` (`deleted_by <> user_id`) |
+| An institute keeps at least one active member whose role allows `manage all` (`LAST_ADMIN_CANNOT_BE_REMOVED`). The platform role is exempt: it closes institutes. | `decideMembershipEnd`; trigger `memberships_keep_full_control_member`, which also covers a status change |
+| The refresh tokens opened with a membership are revoked (reason `ADMIN_REVOKED`) when it is deleted or stops being `ACTIVE`, whatever code changed it. A new session for it is refused. | Trigger `memberships_revoke_sessions`; `guard_refresh_token` |
+| An access token issued before the membership ended carries no ability: every operation behind `@CheckAbility` answers `FORBIDDEN` until the token expires. | `AbilityFactory.createForUser` |
+| The institute then reads nothing about the person from the account tables. The Deleted lists and the records that name a member (attendance, leave) read the institute's own copy. | The `*_app_select` policies above; `listDeleted` joins `tenant_user_profiles`; the name lookups in the attendance and leave repositories read `memberships` including ended rows |
+| A person who was removed returns by restore from the Deleted list: the same profile and the same membership. A membership has at most one profile of each kind, deleted ones included, so a second record of that kind for the same membership is refused by PostgreSQL. | Unique `membership_id` on `student_profiles`, `staff_profiles`, `guardian_profiles` and `bot_profiles` |
+| Every membership of an institute is inserted in one place. When the user held that role there before and the membership ended, the same row comes back (live, `ACTIVE`) instead of a second one, so the unique rule on (user, institute, role) holds and history keeps pointing at it. | `insertOrRestoreMembership` in `auth/membership-lifecycle.ts`, used by `IdentityService`, the student, staff, guardian and bot repositories and the admission workflow; `membership-insert-single-place.spec.ts` |
+
+A person with two roles in one institute has two memberships; each ends with its own last profile.
+
 Until a person can claim an account by OTP, a person in two institutes has two logins. Only the platform role can add an existing account to a second institute.
 
 ## CASL Authorization

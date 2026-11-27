@@ -50,6 +50,8 @@
   "errors": {
     "HAS_ACTIVE_ENROLLMENTS": "This student is enrolled in the current academic year. Mark them as left or transferred first.",
     "ADMISSION_NUMBER_TAKEN": "The admission number is now used by another student. Change that student's admission number, then restore.",
-    "LAST_GUARDIAN_CANNOT_BE_DELETED": "This is the only guardian of a student. Link another guardian to that student first."
+    "LAST_GUARDIAN_CANNOT_BE_DELETED": "This is the only guardian of a student. Link another guardian to that student first.",
+    "CANNOT_REMOVE_OWN_MEMBERSHIP": "You cannot delete your own record: it would end your access to this institute. Ask another admin to do it.",
+    "LAST_ADMIN_CANNOT_BE_REMOVED": "This person is the only admin of the institute. Make someone else an admin first, then delete this record."
   }
 }

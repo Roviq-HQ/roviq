@@ -249,8 +249,20 @@ export class GuardianService {
     }
 
     const deleted = await this.repo.softDelete(tenantId, id, actorId);
-    if (!deleted)
+    if (deleted.kind === 'not_found')
       throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
+    if (deleted.kind === 'own_membership') {
+      throw new BusinessException(
+        ErrorCode.CANNOT_REMOVE_OWN_MEMBERSHIP,
+        'You cannot delete your own record: it would end your access to this institute',
+      );
+    }
+    if (deleted.kind === 'last_admin') {
+      throw new BusinessException(
+        ErrorCode.LAST_ADMIN_CANNOT_BE_REMOVED,
+        'This person is the only member with full control of the institute',
+      );
+    }
 
     return true;
   }
@@ -261,7 +273,7 @@ export class GuardianService {
 
   async restore(id: string): Promise<boolean> {
     const restored = await this.repo.restore(this.tenantId, id, this.userId);
-    if (!restored) {
+    if (restored === 'not_found') {
       throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, 'Deleted guardian not found');
     }
     return true;

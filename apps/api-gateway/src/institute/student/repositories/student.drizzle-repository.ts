@@ -26,6 +26,12 @@ import {
 } from '@roviq/database';
 import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import {
+  type DeleteProfileResult,
+  decideMembershipEnd,
+  endMembership,
+  restoreMembership,
+} from '../../../auth/membership-lifecycle';
+import {
   type TenantUserProfileFields,
   updateTenantUserProfile,
 } from '../../../auth/tenant-user-profile';
@@ -297,10 +303,32 @@ export class StudentDrizzleRepository extends StudentRepository {
     return activeEnrollments.length > 0;
   }
 
-  async softDelete(tenantId: string, id: string): Promise<void> {
-    await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      await softDelete(tx, studentProfiles, id);
-    });
+  softDelete(tenantId: string, id: string, actorId: string): Promise<DeleteProfileResult> {
+    return withTenant<DeleteProfileResult>(
+      this.db,
+      mkInstituteCtx(tenantId, ORIGIN),
+      async (tx) => {
+        const [profile] = await tx
+          .select({ membershipId: studentProfiles.membershipId })
+          .from(studentProfiles) // allow-base-read: FOR UPDATE needs the table, not the view
+          .where(and(eq(studentProfiles.id, id), isNull(studentProfiles.deletedAt)))
+          .for('update');
+        if (!profile) return { kind: 'not_found' };
+
+        const decision = await decideMembershipEnd(tx, {
+          membershipId: profile.membershipId,
+          profileId: id,
+          actorId,
+        });
+        if (decision === 'own_membership' || decision === 'last_admin') return { kind: decision };
+
+        await softDelete(tx, studentProfiles, id);
+        if (decision === 'end') {
+          await endMembership(tx, { membershipId: profile.membershipId, actorId });
+        }
+        return { kind: 'deleted', membershipEnded: decision === 'end' };
+      },
+    );
   }
 
   listDeleted(tenantId: string): Promise<DeletedStudentRecord[]> {
@@ -332,7 +360,10 @@ export class StudentDrizzleRepository extends StudentRepository {
       mkInstituteCtx(tenantId, ORIGIN),
       async (tx) => {
         const [deleted] = await tx
-          .select({ admissionNumber: studentProfiles.admissionNumber })
+          .select({
+            admissionNumber: studentProfiles.admissionNumber,
+            membershipId: studentProfiles.membershipId,
+          })
           .from(studentProfiles) // allow-base-read: restore looks up a trashed row
           .where(and(eq(studentProfiles.id, id), isNotNull(studentProfiles.deletedAt)));
         if (!deleted) return { kind: 'not_found' };
@@ -352,6 +383,7 @@ export class StudentDrizzleRepository extends StudentRepository {
           .update(studentProfiles)
           .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
           .where(eq(studentProfiles.id, id));
+        await restoreMembership(tx, { membershipId: deleted.membershipId, actorId });
         return { kind: 'restored' };
       },
     ).catch(mapUniqueViolation(ADMISSION_NUMBER_TAKEN));
