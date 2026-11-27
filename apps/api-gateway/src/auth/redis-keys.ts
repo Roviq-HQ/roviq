@@ -7,6 +7,10 @@ export const REDIS_KEYS = {
   IMPERSONATION_SESSION: 'impersonation-session:',
   IMPERSONATION_OTP: 'impersonation-otp:',
   WS_TICKET: 'ws-ticket:',
+  /** A user's pending passkey registration challenge, keyed by user id. EX = challenge lifetime. */
+  WEBAUTHN_REGISTRATION: 'webauthn:reg:',
+  /** A pending passkey sign-in challenge, keyed by a random challenge id. EX = challenge lifetime. */
+  WEBAUTHN_AUTH: 'webauthn:auth:',
   /** Cached "may this reseller's staff use the API" answer, keyed by reseller id. */
   RESELLER_ACCESS: 'auth:reseller-access:',
   /** Cached "may this institute's members use the API" answer, keyed by institute id. */

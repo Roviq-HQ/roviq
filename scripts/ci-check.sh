@@ -400,6 +400,7 @@ launch gates bash -c 'set -e
   pnpm -s check:synthetic-context-usage
   pnpm -s check:admin-context-reach
   pnpm -s check:direct-nats-emit
+  pnpm -s check:store-keys
   pnpm -s check:service-db-access
   pnpm -s check:event-handlers
   pnpm -s check:docs

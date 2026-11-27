@@ -197,6 +197,19 @@ A last check after the guards, RLS and the ability rules, in case one of them is
 - Not checked: platform callers, an institute caller's `resellerId`, a reseller caller's `tenantId` (it reads many institutes), and subscriptions (graphql-ws does not pass through Apollo's request pipeline). A refused mutation has already committed its write, and its audit entry says it succeeded.
 - `FOREIGN_SCOPE_ALLOWED` (`response-scope.allowlist.ts`) names root operations that may carry a foreign id, each with its reason; the fields under such an operation are not checked either. Its one entry is `switchInstitute`, which answers with the caller's own session in the institute being switched to. An entry needs a security review.
 
+### Stores outside PostgreSQL
+
+Row security covers PostgreSQL only. Every other store is scoped by the name or the filter the code gives it, so each has one place that builds the name, and `pnpm check:store-keys` (`scripts/check-store-keys.ts`) keeps the code in that place. A file that is right as it is goes in the script's `STORE_KEY_ALLOWLIST` with its reason.
+
+| Store | Rule | Kept by |
+| -- | -- | -- |
+| Redis | A key is a named prefix plus an id the server holds: the user, institute, reseller, role or membership id from the token or the database, or a random secret the server issued (a WebSocket ticket, a passkey challenge). The gateway's prefixes are in `apps/api-gateway/src/auth/redis-keys.ts`, the notification service's in `libs/backend/redis/src/notification-keys.ts`; a library keeps its own constant (`casl:role:`, `entitlements:`). The role cache of an institute caller is keyed by role and institute. | The check refuses a Redis call whose key starts with typed text. |
+| Temporal | A client names a workflow in one operation only (`bulkImportProgress`). Such an id is built with `tenantWorkflowId(kind, tenantId, unique)` and checked with `isTenantWorkflowId` (`@roviq/temporal`) before the handle is taken; another institute's id answers not found. Every other workflow id is built by the server from a row it has just read, and no request carries it. | The check refuses `workflow.getHandle(` or `temporal.signal(` in a file that does not call `isTenantWorkflowId`. |
+| Object storage | A key is `institutes/{tenantId}/…`, `resellers/{resellerId}/…` or `users/{userId}/…` plus the purpose and the file's id (`storage-keys.ts`); the owner part comes from the token, never the request. A link is signed only from a `files` row read under the caller's context. Lifetimes are constants in `file.service.ts`. | The check refuses a storage client call outside `apps/api-gateway/src/files/`. |
+| NATS events | The publisher sets the `tenant-id` header from the request context, and a payload's `tenantId` is written by the service from its own context. A consumer parses the payload with its schema and never takes the institute from a value a client typed; an event a client causes (a notification seen) carries ids that the consumer looks up again. | `pnpm check:direct-nats-emit`, `pnpm check:event-handlers` |
+| GraphQL subscriptions | An institute or reseller subscription has a `filter` that compares the payload's institute or reseller with the token and refuses a payload that names none, or it listens on a topic built from the signed-in user's id. | The check refuses a `@Subscription` outside `admin/` without a `filter`. |
+| In-process loaders | A `DataLoader` lives in a request-scoped provider, or is created with `cache: false`. | The check refuses any other. |
+
 ### NestJS Build: @nx/js:tsc (not webpack)
 
 - NestJS apps use `@nx/js:tsc` executor for builds
