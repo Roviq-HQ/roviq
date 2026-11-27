@@ -48,6 +48,8 @@ export const subscriptions = pgTable(
     ...trackingColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('subscriptions_id_tenant_key').on(table.id, table.tenantId),
     index('subscriptions_tenant_id_idx').on(table.tenantId),
     index('subscriptions_plan_id_idx').on(table.planId),
     index('idx_subscriptions_reseller').on(table.resellerId, table.status),

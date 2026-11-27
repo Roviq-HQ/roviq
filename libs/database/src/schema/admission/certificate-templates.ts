@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, foreignKey, jsonb, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  foreignKey,
+  jsonb,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { tenantColumns } from '../common/columns';
 import { certificateTemplateType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
@@ -54,6 +63,8 @@ export const certificateTemplates = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('certificate_templates_id_tenant_key').on(table.id, table.tenantId),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

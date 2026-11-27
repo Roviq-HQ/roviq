@@ -108,11 +108,11 @@
     }
   },
   "certificates.other.template": {
-    "reviewedReason": "ROV-218 only dropped the deprecated enableRLS call from the table; columns, policies and behaviour unchanged",
+    "reviewedReason": "certificate_templates only gained a unique index on (id, tenant_id); the template field is stored and shown as before",
     "targets": {
       "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.getCertificateTemplateFields": "c5d678f40776bdb1",
       "apps/api-gateway/src/institute/certificate/repositories/certificate.drizzle-repository.ts#CertificateDrizzleRepository.listActiveTemplates": "3ddbb47a9c71edf4",
-      "libs/database/src/schema/admission/certificate-templates.ts#certificateTemplates": "ddb3d0f388796e8a"
+      "libs/database/src/schema/admission/certificate-templates.ts#certificateTemplates": "0b96fb7571870507"
     }
   },
   "certificates.tc.duplicateReason": {

@@ -47,6 +47,8 @@ export const timetables = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('timetables_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'timetables_academic_year_id_tenant_fkey',
       [table.academicYearId, table.tenantId],

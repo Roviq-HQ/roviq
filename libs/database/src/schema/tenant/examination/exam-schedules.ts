@@ -14,7 +14,6 @@ import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { assessmentComponent } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
-import { memberships } from '../memberships';
 import { sections } from '../sections';
 import { subjects } from '../subjects';
 import { exams } from './exams';
@@ -28,13 +27,9 @@ export const examSchedules = pgTable(
   'exam_schedules',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    examId: uuid('exam_id')
-      .notNull()
-      .references(() => exams.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    examId: uuid('exam_id').notNull(),
     sectionId: uuid('section_id').notNull(),
-    subjectId: uuid('subject_id')
-      .notNull()
-      .references(() => subjects.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    subjectId: uuid('subject_id').notNull(),
     component: assessmentComponent().default('THEORY').notNull(),
     examDate: date('exam_date'),
     startTime: time('start_time'),
@@ -42,13 +37,27 @@ export const examSchedules = pgTable(
     maxMarks: numeric('max_marks', { precision: 6, scale: 2, mode: 'number' }).notNull(),
     passMarks: numeric('pass_marks', { precision: 6, scale: 2, mode: 'number' }),
     room: text(),
-    invigilatorId: uuid('invigilator_id').references(() => memberships.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (invigilator_id): custom SQL, Drizzle cannot declare it.
+    invigilatorId: uuid('invigilator_id'),
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('exam_schedules_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'exam_schedules_subject_id_tenant_fkey',
+      [table.subjectId, table.tenantId],
+      [subjects.id, subjects.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'exam_schedules_exam_id_tenant_fkey',
+      [table.examId, table.tenantId],
+      [exams.id, exams.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'exam_schedules_section_id_tenant_fkey',
       [table.sectionId, table.tenantId],

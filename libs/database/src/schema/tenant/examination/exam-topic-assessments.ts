@@ -17,18 +17,28 @@ export const examTopicAssessments = pgTable(
   'exam_topic_assessments',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    examScheduleId: uuid('exam_schedule_id')
-      .notNull()
-      .references(() => examSchedules.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    examScheduleId: uuid('exam_schedule_id').notNull(),
     studentId: uuid('student_id').notNull(),
-    subjectTopicId: uuid('subject_topic_id')
-      .notNull()
-      .references(() => subjectTopics.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    subjectTopicId: uuid('subject_topic_id').notNull(),
     competencyLevel: competencyLevel('competency_level').notNull(),
     descriptor: text(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'exam_topic_assessments_subject_topic_id_tenant_fkey',
+      [table.subjectTopicId, table.tenantId],
+      [subjectTopics.id, subjectTopics.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'exam_topic_assessments_exam_schedule_id_tenant_fkey',
+      [table.examScheduleId, table.tenantId],
+      [examSchedules.id, examSchedules.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'exam_topic_assessments_student_id_tenant_fkey',
       [table.studentId, table.tenantId],

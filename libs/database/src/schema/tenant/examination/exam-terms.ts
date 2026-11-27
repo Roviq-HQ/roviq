@@ -33,6 +33,8 @@ export const examTerms = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('exam_terms_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'exam_terms_academic_year_id_tenant_fkey',
       [table.academicYearId, table.tenantId],

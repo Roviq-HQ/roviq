@@ -4,6 +4,7 @@ import {
   roviqAdmin,
   roviqApp,
   roviqReseller,
+  sameTenantForeignKey,
   trackingColumns,
 } from '@roviq/database';
 import { sql } from 'drizzle-orm';
@@ -30,9 +31,7 @@ export const invoices = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => institutes.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    subscriptionId: uuid('subscription_id')
-      .notNull()
-      .references(() => subscriptions.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    subscriptionId: uuid('subscription_id').notNull(),
     resellerId: uuid('reseller_id')
       .notNull()
       .references(() => resellers.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -55,6 +54,15 @@ export const invoices = pgTable(
     ...trackingColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('invoices_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'invoices_subscription_id_tenant_fkey',
+      [table.subscriptionId, table.tenantId],
+      [subscriptions.id, subscriptions.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     // Invoice lists are per institute or per reseller, newest first.
     index('idx_invoices_tenant').on(table.tenantId, table.createdAt.desc()),
     index('invoices_subscription_id_idx').on(table.subscriptionId),

@@ -116,6 +116,8 @@ export const enquiries = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('enquiries_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'enquiries_academic_year_id_tenant_fkey',
       [table.academicYearId, table.tenantId],

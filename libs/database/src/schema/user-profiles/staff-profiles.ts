@@ -77,6 +77,8 @@ export const staffProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('staff_profiles_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'staff_profiles_membership_id_tenant_fkey',
       [table.membershipId, table.tenantId],

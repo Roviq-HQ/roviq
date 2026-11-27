@@ -3,9 +3,11 @@
  * PostgreSQL refuses a row that names another institute's row, whichever role writes it.
  * Declare one with `sameTenantForeignKey()` (`libs/database/src/schema/common/columns.ts`).
  *
- * The keys not converted yet are listed below. The lists only shrink: an entry whose key is
- * gone or now carries `tenant_id` fails the check until it is removed.
+ * A key that cannot carry it is listed below with its reason. The list only shrinks: an entry
+ * whose key is gone or now carries `tenant_id` fails the check until it is removed.
  */
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { is } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 
@@ -18,70 +20,34 @@ export interface TenantKey {
   carriesTenant: boolean;
 }
 
-/**
- * Waiting for a later batch. Each is a plain reference today: the repository reads the
- * referenced row under the caller's context before it stores the id.
- */
-export const NOT_YET_CONVERTED: readonly KeyName[] = [
-  'admission_applications.enquiry_id -> enquiries',
-  'application_document_files.document_id -> application_documents',
-  'application_documents.application_id -> admission_applications',
-  'attendance_entries.session_id -> attendance_sessions',
-  'attendance_sessions.subject_id -> subjects',
-  'co_scholastic_areas.grading_scheme_id -> grading_schemes',
-  'co_scholastic_assessments.co_scholastic_area_id -> co_scholastic_areas',
-  'co_scholastic_assessments.exam_term_id -> exam_terms',
-  'consent_records.guardian_profile_id -> guardian_profiles',
-  'consent_records.privacy_notice_id -> privacy_notices',
-  'exam_marks.exam_schedule_id -> exam_schedules',
-  'exam_schedules.exam_id -> exams',
-  'exam_schedules.subject_id -> subjects',
-  'exam_topic_assessments.exam_schedule_id -> exam_schedules',
-  'exam_topic_assessments.subject_topic_id -> subject_topics',
-  'exams.exam_term_id -> exam_terms',
-  'exams.grading_scheme_id -> grading_schemes',
-  'grade_bands.grading_scheme_id -> grading_schemes',
-  'group_children.child_group_id -> groups',
-  'group_children.parent_group_id -> groups',
-  'group_members.group_id -> groups',
-  'group_rules.group_id -> groups',
-  'groups.parent_group_id -> groups',
-  'invoices.subscription_id -> subscriptions',
-  'issued_certificates.staff_profile_id -> staff_profiles',
-  'issued_certificates.template_id -> certificate_templates',
-  'leave_files.leave_id -> leaves',
-  'payments.invoice_id -> invoices',
-  'report_card_instances.report_card_id -> report_cards',
-  'report_cards.exam_term_id -> exam_terms',
-  'report_cards.grading_scheme_id -> grading_schemes',
-  'section_subjects.subject_id -> subjects',
-  'staff_qualifications.staff_profile_id -> staff_profiles',
-  'standard_subjects.subject_id -> subjects',
-  'student_guardian_links.guardian_profile_id -> guardian_profiles',
-  'subject_topics.subject_id -> subjects',
-  'tc_register.original_tc_id -> tc_register',
-  'timetable_day_overrides.period_id -> timetable_periods',
-  'timetable_day_overrides.subject_id -> subjects',
-  'timetable_day_overrides.timetable_id -> timetables',
-  'timetable_entries.period_id -> timetable_periods',
-  'timetable_entries.subject_id -> subjects',
-  'timetable_entries.timetable_id -> timetables',
-  'timetable_periods.timetable_id -> timetables',
-  'timetable_sections.timetable_id -> timetables',
-];
+export interface SetNullKey {
+  table: string;
+  column: string;
+  parent: string;
+}
 
 /**
  * `ON DELETE SET NULL` references. A key that carries `tenant_id` would set `tenant_id` to
  * NULL as well; PostgreSQL's `SET NULL (column)` form avoids that, and Drizzle cannot declare
- * it. They need custom SQL.
+ * it. So the schema declares no reference for these columns, and a custom SQL migration adds
+ * the key `<table>_<column>_tenant_fkey`. The check reads both: the schema must stay silent and
+ * a migration must hold the statement.
  */
-export const NEEDS_SET_NULL_COLUMN_LIST: readonly KeyName[] = [
-  'exam_schedules.invigilator_id -> memberships',
-  'leaves.decided_by -> memberships',
-  'report_card_instances.section_id -> sections',
-  'sections.class_teacher_id -> memberships',
-  'timetable_day_overrides.teacher_id -> memberships',
-  'timetable_entries.teacher_id -> memberships',
+export const SET_NULL_KEYS_IN_CUSTOM_SQL: readonly SetNullKey[] = [
+  { table: 'attendance_sessions', column: 'subject_id', parent: 'subjects' },
+  { table: 'co_scholastic_areas', column: 'grading_scheme_id', parent: 'grading_schemes' },
+  { table: 'exam_schedules', column: 'invigilator_id', parent: 'memberships' },
+  { table: 'exams', column: 'exam_term_id', parent: 'exam_terms' },
+  { table: 'exams', column: 'grading_scheme_id', parent: 'grading_schemes' },
+  { table: 'leaves', column: 'decided_by', parent: 'memberships' },
+  { table: 'report_card_instances', column: 'section_id', parent: 'sections' },
+  { table: 'report_cards', column: 'exam_term_id', parent: 'exam_terms' },
+  { table: 'report_cards', column: 'grading_scheme_id', parent: 'grading_schemes' },
+  { table: 'sections', column: 'class_teacher_id', parent: 'memberships' },
+  { table: 'timetable_day_overrides', column: 'subject_id', parent: 'subjects' },
+  { table: 'timetable_day_overrides', column: 'teacher_id', parent: 'memberships' },
+  { table: 'timetable_entries', column: 'subject_id', parent: 'subjects' },
+  { table: 'timetable_entries', column: 'teacher_id', parent: 'memberships' },
 ];
 
 /** Not convertible as they are, each with the reason. */
@@ -150,11 +116,61 @@ export function checkTenantKeys(keys: readonly TenantKey[], listed: readonly Key
   };
 }
 
-export const LISTED: readonly KeyName[] = [
-  ...NOT_YET_CONVERTED,
-  ...NEEDS_SET_NULL_COLUMN_LIST,
-  ...Object.keys(EXCLUDED),
-];
+export const LISTED: readonly KeyName[] = Object.keys(EXCLUDED);
+
+/** The statement a custom SQL migration must hold for a `SET NULL (column)` key. */
+export function setNullStatement(key: SetNullKey): string {
+  const name = `${key.table}_${key.column}_tenant_fkey`;
+  return (
+    `ALTER TABLE "${key.table}" ADD CONSTRAINT "${name}" FOREIGN KEY ("${key.column}","tenant_id") ` +
+    `REFERENCES "${key.parent}"("id","tenant_id") ON DELETE SET NULL ("${key.column}")`
+  );
+}
+
+/**
+ * Problems with the `SET NULL (column)` keys: the schema declares a reference for the column
+ * (drizzle-kit would then own a second key), the column is gone, or no migration adds the key.
+ */
+export function checkSetNullKeys(
+  tables: readonly PgTable[],
+  migrationsSql: string,
+  keys: readonly SetNullKey[] = SET_NULL_KEYS_IN_CUSTOM_SQL,
+): string[] {
+  const problems: string[] = [];
+  for (const key of keys) {
+    const label = `${key.table}.${key.column} -> ${key.parent}`;
+    const table = tables.find((candidate) => getTableConfig(candidate).name === key.table);
+    const config = table ? getTableConfig(table) : undefined;
+    if (!config?.columns.some((column) => column.name === key.column)) {
+      problems.push(`${label}: the column is not in the schema; remove the entry`);
+      continue;
+    }
+    const declared = config.foreignKeys.some((foreignKey) =>
+      foreignKey.reference().columns.some((column) => column.name === key.column),
+    );
+    if (declared) {
+      problems.push(
+        `${label}: the schema declares a reference; the custom SQL key is the only one`,
+      );
+    }
+    if (!migrationsSql.includes(setNullStatement(key))) {
+      problems.push(`${label}: no migration holds\n      ${setNullStatement(key)}`);
+    }
+    if (migrationsSql.includes(`DROP CONSTRAINT "${key.table}_${key.column}_tenant_fkey"`)) {
+      problems.push(`${label}: a migration drops the key`);
+    }
+  }
+  return problems;
+}
+
+function readMigrationsSql(): string {
+  const dir = join(__dirname, '..', 'libs', 'database', 'migrations');
+  return readdirSync(dir)
+    .map((folder) => join(dir, folder, 'migration.sql'))
+    .filter((file) => existsSync(file))
+    .map((file) => readFileSync(file, 'utf8'))
+    .join('\n');
+}
 
 async function main(): Promise<number> {
   const core = await import('../libs/database/src/schema');
@@ -169,17 +185,26 @@ async function main(): Promise<number> {
     return 0;
   }
   const { unlisted, stale } = checkTenantKeys(keys, LISTED);
-  if (unlisted.length === 0 && stale.length === 0) {
+  const setNull = checkSetNullKeys(tables, readMigrationsSql());
+  if (unlisted.length === 0 && stale.length === 0 && setNull.length === 0) {
     const converted = keys.filter((key) => key.carriesTenant).length;
     process.stdout.write(
-      `check:tenant-foreign-keys OK (${converted} keys carry tenant_id, ${LISTED.length} listed as not converted)\n`,
+      `check:tenant-foreign-keys OK (${converted} keys carry tenant_id in the schema, ${SET_NULL_KEYS_IN_CUSTOM_SQL.length} in custom SQL, ${LISTED.length} excluded with a reason)\n`,
     );
     return 0;
+  }
+  if (setNull.length > 0) {
+    process.stderr.write(
+      `check:tenant-foreign-keys: ${setNull.length} problem(s) with the SET NULL (column) keys:\n\n`,
+    );
+    for (const problem of setNull) process.stderr.write(`  ${problem}\n`);
+    process.stderr.write('\n');
   }
   if (unlisted.length > 0) {
     process.stderr.write(
       `check:tenant-foreign-keys: ${unlisted.length} foreign key(s) between two tenant tables do not include tenant_id.\n` +
-        'Declare each with sameTenantForeignKey() and give the referenced table a unique index on (id, tenant_id):\n\n',
+        'Declare each with sameTenantForeignKey() and give the referenced table a unique index on (id, tenant_id).\n' +
+        'An ON DELETE SET NULL reference goes in SET_NULL_KEYS_IN_CUSTOM_SQL with a custom SQL migration instead:\n\n',
     );
     for (const name of unlisted) process.stderr.write(`  ${name}\n`);
   }

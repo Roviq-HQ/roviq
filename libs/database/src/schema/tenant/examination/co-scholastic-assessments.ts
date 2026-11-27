@@ -15,19 +15,29 @@ export const coScholasticAssessments = pgTable(
   'co_scholastic_assessments',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    coScholasticAreaId: uuid('co_scholastic_area_id')
-      .notNull()
-      .references(() => coScholasticAreas.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    coScholasticAreaId: uuid('co_scholastic_area_id').notNull(),
     studentId: uuid('student_id').notNull(),
-    examTermId: uuid('exam_term_id')
-      .notNull()
-      .references(() => examTerms.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    examTermId: uuid('exam_term_id').notNull(),
     /** Grade label from the area's co-scholastic scheme, e.g. "A". */
     grade: text().notNull(),
     descriptor: text(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'co_scholastic_assessments_exam_term_id_tenant_fkey',
+      [table.examTermId, table.tenantId],
+      [examTerms.id, examTerms.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'co_scholastic_assessments_co_scholastic_area_id_tenant_fkey',
+      [table.coScholasticAreaId, table.tenantId],
+      [coScholasticAreas.id, coScholasticAreas.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'co_scholastic_assessments_student_id_tenant_fkey',
       [table.studentId, table.tenantId],

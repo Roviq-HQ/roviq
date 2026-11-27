@@ -5,8 +5,6 @@ import { reportCardStatus } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { academicYears } from '../academic-years';
 import { institutes } from '../institutes';
-import { examTerms } from './exam-terms';
-import { gradingSchemes } from './grading-schemes';
 
 /**
  * A report-card template/config. `examTermId` null = annual (rolls up terms).
@@ -18,16 +16,12 @@ export const reportCards = pgTable(
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     academicYearId: uuid('academic_year_id').notNull(),
     /** The term this card covers; null = annual aggregate across terms. */
-    examTermId: uuid('exam_term_id').references(() => examTerms.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (exam_term_id): custom SQL, Drizzle cannot declare it.
+    examTermId: uuid('exam_term_id'),
     name: i18nText('name').notNull(),
     /** Scheme used to render aggregate grade/GPA; null falls back to default. */
-    gradingSchemeId: uuid('grading_scheme_id').references(() => gradingSchemes.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (grading_scheme_id): custom SQL, Drizzle cannot declare it.
+    gradingSchemeId: uuid('grading_scheme_id'),
     includeAttendance: boolean('include_attendance').default(true).notNull(),
     includeCoScholastic: boolean('include_co_scholastic').default(true).notNull(),
     includeTopicWise: boolean('include_topic_wise').default(false).notNull(),
@@ -35,6 +29,8 @@ export const reportCards = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('report_cards_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'report_cards_academic_year_id_tenant_fkey',
       [table.academicYearId, table.tenantId],

@@ -33,13 +33,11 @@ export const issuedCertificates = pgTable(
   'issued_certificates',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    templateId: uuid('template_id')
-      .notNull()
-      .references(() => certificateTemplates.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    templateId: uuid('template_id').notNull(),
     /** Student receiving the certificate — NULL if issued to staff */
     studentProfileId: uuid('student_profile_id'),
     /** Staff member receiving the certificate — NULL if issued to student */
-    staffProfileId: uuid('staff_profile_id').references(() => staffProfiles.id),
+    staffProfileId: uuid('staff_profile_id'),
     /** Certificate serial number — unique per tenant (e.g., 'CERT/2025-26/BON/001') */
     serialNumber: varchar('serial_number', { length: 50 }).notNull(),
 
@@ -68,6 +66,18 @@ export const issuedCertificates = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'issued_certificates_template_id_tenant_fkey',
+      [table.templateId, table.tenantId],
+      [certificateTemplates.id, certificateTemplates.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'issued_certificates_staff_profile_id_tenant_fkey',
+      [table.staffProfileId, table.tenantId],
+      [staffProfiles.id, staffProfiles.tenantId],
+    ),
     sameTenantForeignKey(
       'issued_certificates_student_profile_id_tenant_fkey',
       [table.studentProfileId, table.tenantId],

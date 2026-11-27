@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
 import { gradingSchemes } from './grading-schemes';
@@ -25,9 +25,7 @@ export const gradeBands = pgTable(
   'grade_bands',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    gradingSchemeId: uuid('grading_scheme_id')
-      .notNull()
-      .references(() => gradingSchemes.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    gradingSchemeId: uuid('grading_scheme_id').notNull(),
     /** Grade label, e.g. "A1", "B2", "Pass". */
     grade: text().notNull(),
     /** Inclusive lower bound (0–100). Null for co-scholastic scales. */
@@ -45,6 +43,13 @@ export const gradeBands = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'grade_bands_grading_scheme_id_tenant_fkey',
+      [table.gradingSchemeId, table.tenantId],
+      [gradingSchemes.id, gradingSchemes.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

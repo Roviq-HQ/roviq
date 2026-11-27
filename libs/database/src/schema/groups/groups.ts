@@ -11,7 +11,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { domainGroupType, dynamicGroupStatus, groupMembershipType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
@@ -85,6 +85,8 @@ export const groups = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('groups_id_tenant_key').on(table.id, table.tenantId),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],
@@ -92,10 +94,11 @@ export const groups = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
     /** Self-referencing FK for group hierarchy */
-    foreignKey({
-      columns: [table.parentGroupId],
-      foreignColumns: [table.id],
-    }),
+    sameTenantForeignKey(
+      'groups_parent_group_id_tenant_fkey',
+      [table.parentGroupId, table.tenantId],
+      [table.id, table.tenantId],
+    ),
 
     /** Group name unique per tenant among non-deleted groups */
     uniqueIndex('idx_group_name_active')

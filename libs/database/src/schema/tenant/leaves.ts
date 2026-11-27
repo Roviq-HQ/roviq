@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { date, foreignKey, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { date, foreignKey, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { leaveStatus, leaveType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
@@ -27,13 +27,13 @@ export const leaves = pgTable(
     reason: text('reason').notNull(),
     status: leaveStatus('status').default('PENDING').notNull(),
     /** Membership who approved / rejected. Null until a decision is taken. */
-    decidedBy: uuid('decided_by').references(() => memberships.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    // Same-institute key with ON DELETE SET NULL (decided_by): custom SQL, Drizzle cannot declare it.
+    decidedBy: uuid('decided_by'),
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('leaves_id_tenant_key').on(table.id, table.tenantId),
     sameTenantForeignKey(
       'leaves_user_id_tenant_fkey',
       [table.userId, table.tenantId],

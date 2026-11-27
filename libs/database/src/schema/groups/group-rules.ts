@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { groups } from './groups';
@@ -18,9 +18,7 @@ export const groupRules = pgTable(
   'group_rules',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    groupId: uuid('group_id')
-      .notNull()
-      .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    groupId: uuid('group_id').notNull(),
     /** JsonLogic rule definition — evaluated against student/staff profile data */
     rule: jsonb('rule').notNull(),
     /**
@@ -35,6 +33,13 @@ export const groupRules = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'group_rules_group_id_tenant_fkey',
+      [table.groupId, table.tenantId],
+      [groups.id, groups.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

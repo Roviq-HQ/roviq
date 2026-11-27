@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { check, foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { groups } from './groups';
@@ -18,15 +18,25 @@ export const groupChildren = pgTable(
   'group_children',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    parentGroupId: uuid('parent_group_id')
-      .notNull()
-      .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    childGroupId: uuid('child_group_id')
-      .notNull()
-      .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    parentGroupId: uuid('parent_group_id').notNull(),
+    childGroupId: uuid('child_group_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'group_children_parent_group_id_tenant_fkey',
+      [table.parentGroupId, table.tenantId],
+      [groups.id, groups.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'group_children_child_group_id_tenant_fkey',
+      [table.childGroupId, table.tenantId],
+      [groups.id, groups.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     uniqueIndex('uq_group_child')
       .on(table.parentGroupId, table.childGroupId)
       .where(sql`${table.deletedAt} IS NULL`),

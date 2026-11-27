@@ -15,9 +15,7 @@ export const subjectTopics = pgTable(
   'subject_topics',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    subjectId: uuid('subject_id')
-      .notNull()
-      .references(() => subjects.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    subjectId: uuid('subject_id').notNull(),
     /** Optional standard scope; null = applies to the subject across standards. */
     standardId: uuid('standard_id'),
     name: i18nText('name').notNull(),
@@ -28,6 +26,15 @@ export const subjectTopics = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('subject_topics_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'subject_topics_subject_id_tenant_fkey',
+      [table.subjectId, table.tenantId],
+      [subjects.id, subjects.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'subject_topics_standard_id_tenant_fkey',
       [table.standardId, table.tenantId],
