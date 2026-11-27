@@ -1,5 +1,4 @@
 import type { AuthScope, AuthUser } from '@roviq/common-types';
-import { ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthResolver } from '../auth.resolver';
@@ -24,20 +23,5 @@ describe('account language ownership', () => {
     expect(await resolver.updateMyPreferredLocale({ locale: 'en' }, actor)).toBe('en');
     expect(service.getPreferredLocale).toHaveBeenCalledWith(actor);
     expect(service.updatePreferredLocale).toHaveBeenCalledWith(actor, 'en');
-  });
-
-  it('should refuse preference writes while impersonating', async () => {
-    const service = createMock<AuthService>();
-    const resolver = new AuthResolver(service);
-    const actor = createMock<AuthUser>({
-      userId: 'target-user',
-      scope: 'institute',
-      isImpersonated: true,
-    });
-
-    await expect(resolver.updateMyPreferredLocale({ locale: 'hi' }, actor)).rejects.toMatchObject({
-      code: ErrorCode.FORBIDDEN,
-    });
-    expect(service.updatePreferredLocale).not.toHaveBeenCalled();
   });
 });

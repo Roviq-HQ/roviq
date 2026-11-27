@@ -29,6 +29,7 @@ import type {
   VerifyEmailMutation,
   VerifyEmailMutationVariables,
 } from './email-verification.generated';
+import { OwnAccountNotice } from './own-account-notice';
 
 const { accountEmail } = testIds;
 
@@ -71,6 +72,8 @@ export function EmailVerification() {
   const { isImpersonated } = useAuth();
   const { data, loading, error, refetch } =
     useQuery<MyEmailVerificationQuery>(MY_EMAIL_VERIFICATION);
+  // The server refuses this card's query in a support session.
+  const ownerOnly = extractGraphQLErrorCode(error) === ErrorCode.IMPERSONATION_OWN_ACCOUNT;
   const [requestCode, { loading: sending }] = useMutation<RequestEmailVerificationMutation>(
     REQUEST_EMAIL_VERIFICATION,
   );
@@ -124,7 +127,8 @@ export function EmailVerification() {
       </CardHeader>
       <CardContent className="space-y-4">
         {loading && <Skeleton className="h-9 w-64" data-testid={accountEmail.loading} />}
-        {!loading && error && (
+        {!loading && ownerOnly && <OwnAccountNotice />}
+        {!loading && error && !ownerOnly && (
           <div className="flex items-center gap-3">
             <p className="text-sm text-destructive">{t('errors.loadFailed')}</p>
             <Button

@@ -1,10 +1,11 @@
 'use client';
 
 import type { PasskeyManagerLabels } from '@roviq/auth';
-import { createAuthMutations, PasskeyManager, PasswordChangeForm } from '@roviq/auth';
+import { createAuthMutations, PasskeyManager, PasswordChangeForm, useAuth } from '@roviq/auth';
 import { useFormatDate } from '@roviq/i18n';
 import { EmailVerification } from '@web/components/account/email-verification';
 import { LanguagePreference } from '@web/components/account/language-preference';
+import { OwnAccountNotice } from '@web/components/account/own-account-notice';
 import { DisplaySettingsCard } from '@web/components/display-settings/display-settings-dialog';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { usePasswordChangeLabels } from '@web/hooks/use-password-change-labels';
@@ -28,6 +29,7 @@ const passkeyMutations = {
 export default function AccountPage() {
   const t = useTranslations('account');
   const tAuth = useTranslations('auth');
+  const { isImpersonated } = useAuth();
   const errorLabels = useAuthErrorLabels();
   const { format } = useFormatDate();
   const formatDate = React.useCallback((d: string) => format(parseISO(d), 'PP'), [format]);
@@ -71,16 +73,22 @@ export default function AccountPage() {
       <div className="grid max-w-2xl gap-6">
         <LanguagePreference />
         <DisplaySettingsCard />
-        <EmailVerification />
-        <PasskeyManager
-          mutations={passkeyMutations}
-          labels={passkeyLabels}
-          formatDate={formatDate}
-        />
-        <PasswordChangeForm
-          labels={passwordChangeLabels}
-          onSuccess={() => toast.success(tAuth('passwordChange.successMessage'))}
-        />
+        {isImpersonated ? (
+          <OwnAccountNotice />
+        ) : (
+          <>
+            <EmailVerification />
+            <PasskeyManager
+              mutations={passkeyMutations}
+              labels={passkeyLabels}
+              formatDate={formatDate}
+            />
+            <PasswordChangeForm
+              labels={passwordChangeLabels}
+              onSuccess={() => toast.success(tAuth('passwordChange.successMessage'))}
+            />
+          </>
+        )}
       </div>
     </div>
   );

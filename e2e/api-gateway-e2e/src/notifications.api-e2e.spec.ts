@@ -191,7 +191,7 @@ describe('In-app notifications (E2E)', () => {
       { id: notification.id },
       impersonationToken,
     );
-    expect(asSupport.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    expect(asSupport.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_OWN_ACCOUNT');
     const ended = await gql(
       E2eNotificationEndImpersonationDocument,
       { sessionId: claimsOf(impersonationToken).impersonationSessionId },

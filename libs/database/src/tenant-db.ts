@@ -9,6 +9,7 @@ import type {
   SyntheticPlatformContext,
   SyntheticResellerContext,
 } from '@roviq/common-types';
+import { assertOwnSession } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import type { DrizzleDB } from './providers';
 
@@ -69,23 +70,36 @@ export async function withReseller<T>(
 }
 
 /**
+ * What an impersonation session may do with one `withUser()` call. `'PERSON_ONLY'` refuses it.
+ * `'IMPERSONATOR_MAY_READ'` lets it run in a read-only transaction: for the few reads the app
+ * needs to show the impersonated person's screens. Each such call site is listed, with its
+ * reason, in `own-account-access.ts` (`own-account-access.spec.ts`).
+ */
+export type OwnAccountAccess = 'PERSON_ONLY' | 'IMPERSONATOR_MAY_READ';
+
+/**
  * Execute a callback as the signed-in person: `ROLE roviq_user` + `app.current_user_id`.
  * Row security then limits every statement to that person's own account rows, in any scope.
  *
  * The context must come from a verified token. There is no `mk*Ctx` for it, and one made by
- * the other factories is refused by the type and again here.
+ * the other factories is refused by the type and again here. An impersonation session is
+ * refused with `IMPERSONATION_OWN_ACCOUNT` unless `access` lets it read, and then PostgreSQL
+ * refuses any write in the transaction.
  */
 export async function withUser<T>(
   db: DrizzleDB,
   ctx: SignedInUser,
+  access: OwnAccountAccess,
   callback: (tx: DrizzleDB) => Promise<T>,
 ): Promise<T> {
   if ('syntheticOrigin' in ctx || !ctx.userId) {
     throw new Error('withUser needs the user of a verified token');
   }
+  if (access !== 'IMPERSONATOR_MAY_READ') assertOwnSession(ctx);
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL ROLE roviq_user`);
     await tx.execute(sql`SELECT set_config('app.current_user_id', ${ctx.userId}, true)`);
+    if (ctx.isImpersonated) await tx.execute(sql`SET LOCAL transaction_read_only = on`);
     return callback(tx as DrizzleDB);
   });
 }

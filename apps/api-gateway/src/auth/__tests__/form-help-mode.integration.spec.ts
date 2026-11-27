@@ -184,7 +184,7 @@ describe('Form help mode (integration)', () => {
         variables: { mode: 'ICON_AND_HINT' },
         token: impersonationToken,
       });
-      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(res.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_OWN_ACCOUNT');
       expect(await storedMode(instituteA.userId)).toBe('ICON_ONLY');
     });
   });

@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   type AuthFailureReason,
+  assertOwnSession,
   BusinessException,
   ErrorCode,
   type SignedInUser,
@@ -107,6 +108,7 @@ export class PasskeyService {
     credential: RegistrationResponseJSON,
     name?: string,
   ): Promise<PasskeyInfo> {
+    assertOwnSession(user);
     const userId = user.userId;
     const challenge = await this.redis.get(`webauthn:reg:${userId}`);
     if (!challenge) {

@@ -493,7 +493,7 @@ describe('Impersonation (integration)', () => {
       expect(admin.claims.impersonationReadOnly).toBeUndefined();
       // Reaches the resolver, which has its own rule for this one mutation.
       const adminWrite = await gqlRequest(result.httpServer, { query: WRITE, token: admin.token });
-      expect(adminWrite.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(adminWrite.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_OWN_ACCOUNT');
     });
   });
 
@@ -694,7 +694,7 @@ describe('Impersonation (integration)', () => {
 
       // Reaches the resolver, which has its own rule for this one mutation.
       const write = await gqlRequest(result.httpServer, { query: WRITE, token: accessToken });
-      expect(write.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(write.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_OWN_ACCOUNT');
     });
   });
 

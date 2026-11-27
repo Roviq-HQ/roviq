@@ -21,7 +21,7 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
   }
 
   async findPasskeysByUserId(user: SignedInUser): Promise<AuthProviderRecord[]> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       return tx
         .select({
           id: authProvidersLive.id,
@@ -87,7 +87,7 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
   }
 
   async create(user: SignedInUser, data: CreatePasskeyData): Promise<AuthProviderRecord> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       const result = await tx
         .insert(authProviders)
         .values({
@@ -118,7 +118,7 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
   }
 
   async countOtherPasskeys(user: SignedInUser, excludeId: string): Promise<number> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       const result = await tx
         .select({ count: count() })
         .from(authProvidersLive)
@@ -135,7 +135,7 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
   }
 
   async deletePasskey(user: SignedInUser, id: string): Promise<number> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       const result = await tx
         .update(authProviders)
         .set({ deletedAt: new Date(), deletedBy: user.userId, updatedBy: user.userId })

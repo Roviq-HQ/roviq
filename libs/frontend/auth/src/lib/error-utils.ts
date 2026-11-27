@@ -97,6 +97,7 @@ export const AUTH_ERROR_CODES = [
   'PASSKEY_AUTHENTICATION_FAILED',
   'PASSKEY_NOT_FOUND',
   'PASSKEY_LAST_AUTH_METHOD',
+  'IMPERSONATION_OWN_ACCOUNT',
   'VALIDATION_FAILED',
   'TOO_MANY_REQUESTS',
 ] as const satisfies readonly ErrorCode[];
@@ -135,6 +136,8 @@ export const DEFAULT_AUTH_ERROR_LABELS: Record<AuthErrorKey, string> = {
   PASSKEY_NOT_FOUND: 'Passkey not found.',
   PASSKEY_LAST_AUTH_METHOD:
     'Cannot remove your only sign-in method. Add another passkey or a password first.',
+  IMPERSONATION_OWN_ACCOUNT:
+    'This belongs to the account’s owner and is not available in a support session. Nothing was changed.',
   VALIDATION_FAILED: 'Please check your input and try again.',
   TOO_MANY_REQUESTS: 'Too many requests. Please wait a moment and try again.',
   network: 'Could not reach the server. Check your connection and try again.',

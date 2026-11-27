@@ -170,7 +170,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
   }
 
   async findOwnActive(user: SignedInUser): Promise<OwnSessionRecord[]> {
-    return withUser(this.db, user, (tx) =>
+    return withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .select({
           id: refreshTokensLive.id,
@@ -198,7 +198,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
     id: string,
     reason: RefreshTokenRevokeReason,
   ): Promise<boolean> {
-    return withUser(this.db, user, async (tx) => {
+    return withUser(this.db, user, 'PERSON_ONLY', async (tx) => {
       const [session] = await tx
         .select({ id: refreshTokensLive.id })
         .from(refreshTokensLive)
@@ -232,7 +232,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
   }
 
   async revokeAllOwn(user: SignedInUser, reason: RefreshTokenRevokeReason): Promise<void> {
-    await withUser(this.db, user, (tx) =>
+    await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .update(refreshTokens)
         .set({ revokedAt: new Date(), revokedReason: reason })
@@ -245,7 +245,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
     currentTokenId: string,
     reason: RefreshTokenRevokeReason,
   ): Promise<void> {
-    await withUser(this.db, user, (tx) =>
+    await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .update(refreshTokens)
         .set({ revokedAt: new Date(), revokedReason: reason })

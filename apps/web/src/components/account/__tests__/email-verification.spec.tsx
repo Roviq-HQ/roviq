@@ -128,4 +128,28 @@ describe('EmailVerification', () => {
     expect(screen.queryByTestId(accountEmail.sendBtn)).not.toBeInTheDocument();
     authState.isImpersonated = false;
   });
+
+  it('shows the owner-only notice, not a load error, when the server refuses a support session', async () => {
+    renderCard([
+      {
+        request: { query: MyEmailVerificationDocument },
+        error: refusal('IMPERSONATION_OWN_ACCOUNT'),
+      },
+    ]);
+
+    expect(await screen.findByTestId(testIds.ownAccountNotice.notice)).toHaveTextContent(
+      messages.ownAccountNotice.title,
+    );
+    expect(screen.queryByTestId(accountEmail.retryBtn)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.errors.loadFailed)).not.toBeInTheDocument();
+  });
+
+  it('keeps the load error with a retry for any other failure', async () => {
+    renderCard([
+      { request: { query: MyEmailVerificationDocument }, error: refusal('INTERNAL_ERROR') },
+    ]);
+
+    expect(await screen.findByTestId(accountEmail.retryBtn)).toBeInTheDocument();
+    expect(screen.queryByTestId(testIds.ownAccountNotice.notice)).not.toBeInTheDocument();
+  });
 });

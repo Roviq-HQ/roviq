@@ -24,6 +24,9 @@ export interface UserRecord {
   tokenVersion: number;
 }
 
+/** What the app shell shows of the signed-in account. */
+export type OwnAccountName = Pick<UserRecord, 'username' | 'email'>;
+
 export interface InstituteInfo {
   id: string;
   name: I18nContent;

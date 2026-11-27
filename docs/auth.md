@@ -30,6 +30,7 @@ Auth failures carry a machine-readable `extensions.code` (see `docs/architecture
 | `SESSION_NOT_FOUND` | 403 | Session to revoke does not belong to the user |
 | `IMPERSONATION_ENDED` | 401 | Impersonation session ended, expired or revoked |
 | `IMPERSONATION_READ_ONLY` | 403 | A view-only impersonation session tried to change something |
+| `IMPERSONATION_OWN_ACCOUNT` | 403 | An impersonation session called an operation on the account itself (sessions, passkeys, password, email verification, profile, preferences, notifications, devices) |
 | `PASSKEY_CHALLENGE_EXPIRED` | 400 | WebAuthn challenge expired or already used |
 | `PASSKEY_VERIFICATION_FAILED` | 400 | Passkey registration response rejected |
 | `PASSKEY_AUTHENTICATION_FAILED` | 401 | Passkey sign-in rejected (unknown credential or bad signature — deliberately one code) |
@@ -112,7 +113,7 @@ A scope guard only proves the token's scope. Which rows the caller may touch is 
 
 ### Own-account operations run as the person
 
-An operation on the caller's own account runs under `withUser(db, user, fn)` in every scope. The wrapper switches to `roviq_user` and sets `app.current_user_id` from the verified token, so PostgreSQL returns and changes only that person's rows, whatever id the query names.
+An operation on the caller's own account runs under `withUser(db, user, access, fn)` in every scope. The wrapper switches to `roviq_user` and sets `app.current_user_id` from the verified token, so PostgreSQL returns and changes only that person's rows, whatever id the query names.
 
 | Table | `roviq_user` may |
 | -- | -- |
@@ -128,6 +129,23 @@ An operation on the caller's own account runs under `withUser(db, user, fn)` in 
 - A repository method that runs this way takes the `SignedInUser` as its first parameter, and the resolver passes `@CurrentUser()` through the service. There is no synthetic context for it.
 - Sign-in, token refresh and institute switch still read the account as the platform role (`UserRepository.findById`): no one is signed in yet, or the method serves both flows.
 - The profile picture and device tokens are not moved: the first also writes `files`, the second must retire a token that another person registered on the same device.
+
+#### During an impersonation session
+
+An account's sessions, devices, passkeys, password, email verification, profile and preferences belong to the person. An impersonation session, view-only or not, is refused all of them with `IMPERSONATION_OWN_ACCOUNT`. One rule decides it, `assertOwnSession(user)` in `@roviq/common-types`, and it is applied in two places:
+
+- **`withUser` applies it to every call.** The third argument states what an impersonation session may do there:
+
+| `access` | For the person | For an impersonation session |
+| -- | -- | -- |
+| `'PERSON_ONLY'` | runs | refused before any statement |
+| `'IMPERSONATOR_MAY_READ'` | runs, reads and writes | runs in a read-only transaction: PostgreSQL refuses a write |
+
+- **An operation that does anything before it reaches `withUser`** (a Redis counter, a challenge, a lookup under the platform role) calls `assertOwnSession(user)` first: `logout`, `revokeAllOtherSessions`, `changePassword`, `verifyPasskeyRegistration`, the email verification mutations, and the notification and device-token writes, which run under the institute and reseller roles.
+
+The call sites that let an impersonation session read are listed with their reasons in `apps/api-gateway/src/__tests__/own-account-access.ts`: the `me` query (sign-in name and email only), the saved language, the person's profile page, their groups, and a platform person's inbox. `own-account-access.spec.ts` fails when a call site passes its access in a variable, or lets an impersonator read without an entry. `myFormHelpMode` answers the default without reading the account.
+
+In the institute portal the account and sessions pages show a notice in place of the owner-only sections during an impersonation session (`OwnAccountNotice`), and the email card shows it when the server answers with the code.
 
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes

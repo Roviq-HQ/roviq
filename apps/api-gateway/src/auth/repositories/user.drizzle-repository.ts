@@ -10,7 +10,7 @@ import {
   withUser,
 } from '@roviq/database';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import type { UserRecord } from './types';
+import type { OwnAccountName, UserRecord } from './types';
 import { UserRepository } from './user.repository';
 
 const userSelect = {
@@ -32,7 +32,7 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async getPreferredLocale(user: SignedInUser): Promise<string | null> {
-    const [row] = await withUser(this.db, user, (tx) =>
+    const [row] = await withUser(this.db, user, 'IMPERSONATOR_MAY_READ', (tx) =>
       tx
         .select({ preferredLocale: usersLive.preferredLocale })
         .from(usersLive)
@@ -43,7 +43,7 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async updatePreferredLocale(user: SignedInUser, locale: string | null): Promise<void> {
-    await withUser(this.db, user, (tx) =>
+    await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .update(users)
         .set({ preferredLocale: locale, updatedBy: user.userId })
@@ -52,7 +52,7 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async getFormHelpMode(user: SignedInUser): Promise<FormHelpMode | null> {
-    const [row] = await withUser(this.db, user, (tx) =>
+    const [row] = await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .select({ formHelpMode: users.formHelpMode })
         .from(users) // allow-base-read: form_help_mode is read only by its owner and is not on users_live
@@ -63,7 +63,7 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async updateFormHelpMode(user: SignedInUser, mode: FormHelpMode): Promise<void> {
-    await withUser(this.db, user, (tx) =>
+    await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .update(users)
         .set({ formHelpMode: mode, updatedBy: user.userId })
@@ -72,11 +72,22 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async findOwn(user: SignedInUser): Promise<UserRecord | null> {
-    const [row] = await withUser(this.db, user, (tx) =>
+    const [row] = await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .select(userSelect)
         .from(users) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
         .where(and(eq(users.id, user.userId), isNull(users.deletedAt)))
+        .limit(1),
+    );
+    return row ?? null;
+  }
+
+  async findOwnName(user: SignedInUser): Promise<OwnAccountName | null> {
+    const [row] = await withUser(this.db, user, 'IMPERSONATOR_MAY_READ', (tx) =>
+      tx
+        .select({ username: usersLive.username, email: usersLive.email })
+        .from(usersLive)
+        .where(eq(usersLive.id, user.userId))
         .limit(1),
     );
     return row ?? null;
@@ -114,7 +125,7 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async updatePassword(user: SignedInUser, passwordHash: string): Promise<number> {
-    const [row] = await withUser(this.db, user, (tx) =>
+    const [row] = await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .update(users)
         .set({
@@ -132,7 +143,7 @@ export class UserDrizzleRepository extends UserRepository {
   }
 
   async markEmailVerified(user: SignedInUser): Promise<void> {
-    await withUser(this.db, user, (tx) =>
+    await withUser(this.db, user, 'PERSON_ONLY', (tx) =>
       tx
         .update(users)
         .set({ emailVerifiedAt: sql`now()`, updatedBy: user.userId })

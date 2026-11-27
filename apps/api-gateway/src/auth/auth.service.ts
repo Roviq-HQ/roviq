@@ -14,6 +14,7 @@ import type {
   SignedInUser,
 } from '@roviq/common-types';
 import {
+  assertOwnSession,
   BusinessException,
   DEFAULT_FORM_HELP_MODE,
   ErrorCode,
@@ -32,7 +33,7 @@ import { MembershipRepository } from './repositories/membership.repository';
 import { PlatformMembershipRepository } from './repositories/platform-membership.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { ResellerMembershipRepository } from './repositories/reseller-membership.repository';
-import type { RefreshTokenWithRelations, UserRecord } from './repositories/types';
+import type { OwnAccountName, RefreshTokenWithRelations, UserRecord } from './repositories/types';
 import { UserRepository } from './repositories/user.repository';
 import { recordTokenVersion } from './token-version-cache';
 
@@ -118,6 +119,7 @@ export class AuthService {
   }
 
   async updatePreferredLocale(user: SignedInUser, locale: string | null): Promise<string | null> {
+    assertOwnSession(user);
     await this.userRepo.updatePreferredLocale(user, locale);
     return locale;
   }
@@ -129,11 +131,7 @@ export class AuthService {
   }
 
   async updateFormHelpMode(user: SignedInUser, mode: FormHelpMode): Promise<FormHelpMode> {
-    if (user.isImpersonated)
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Cannot change account preferences while impersonating',
-      );
+    assertOwnSession(user);
     await this.userRepo.updateFormHelpMode(user, mode);
     return mode;
   }
@@ -609,9 +607,7 @@ export class AuthService {
   /** Ends the caller's current session only; other devices stay signed in. */
   async logout(current: AuthUser, currentRefreshToken: string, meta?: RequestMeta): Promise<void> {
     // The impersonator holds no session of the target; nothing here is theirs to end.
-    if (current.isImpersonated) {
-      throw new BusinessException(ErrorCode.FORBIDDEN, 'Cannot log out while impersonating');
-    }
+    assertOwnSession(current);
 
     // A token that is already revoked is not found: logging out twice succeeds.
     const session = await this.refreshTokenRepo.findByHash(this.hashToken(currentRefreshToken));
@@ -661,6 +657,7 @@ export class AuthService {
     currentRefreshToken: string,
     meta?: RequestMeta,
   ): Promise<void> {
+    assertOwnSession(user);
     const userId = user.userId;
     const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
     const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
@@ -684,8 +681,8 @@ export class AuthService {
   // ── User queries ───────────────────────────────────────
 
   /** The signed-in person's own account. */
-  async getOwnAccount(user: SignedInUser): Promise<UserRecord | null> {
-    return this.userRepo.findOwn(user);
+  getOwnAccountName(user: SignedInUser): Promise<OwnAccountName | null> {
+    return this.userRepo.findOwnName(user);
   }
 
   async verifyPassword(user: SignedInUser, password: string): Promise<boolean> {
@@ -714,6 +711,7 @@ export class AuthService {
     newPassword: string,
     meta?: RequestMeta,
   ): Promise<void> {
+    assertOwnSession(actor);
     const userId = actor.userId;
     if (currentPassword === newPassword) {
       throw new BusinessException(
