@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { isTenantWorkflowId, tenantWorkflowId } from '@roviq/temporal';
 import { Client, Connection } from '@temporalio/client';
 import { FileService } from '../../files/file.service';
 import { assertAdmissionClass } from './admission-class';
@@ -19,9 +20,7 @@ import type {
 
 const TASK_QUEUE = 'student-bulk-import';
 
-function workflowIdPrefix(tenantId: string): string {
-  return `bulk-student-import-${tenantId}-`;
-}
+const WORKFLOW_KIND = 'bulk-student-import';
 
 @Injectable()
 export class StudentBulkImportService {
@@ -64,7 +63,7 @@ export class StudentBulkImportService {
     const client = new Client({ connection });
 
     // Random, so an import's id cannot be guessed from when it started.
-    const workflowId = `${workflowIdPrefix(input.tenantId)}${randomUUID()}`;
+    const workflowId = tenantWorkflowId(WORKFLOW_KIND, input.tenantId, randomUUID());
 
     await client.workflow.start('BulkStudentImportWorkflow', {
       taskQueue: TASK_QUEUE,
@@ -85,7 +84,7 @@ export class StudentBulkImportService {
    */
   async getProgress(tenantId: string, workflowId: string): Promise<BulkImportProgress> {
     // A workflow id names its institute; another institute's import does not exist for the caller.
-    if (!workflowId.startsWith(workflowIdPrefix(tenantId))) {
+    if (!isTenantWorkflowId(workflowId, WORKFLOW_KIND, tenantId)) {
       throw new BusinessException(ErrorCode.NOT_FOUND, 'Import not found');
     }
     const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');

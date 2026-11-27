@@ -26,6 +26,7 @@ import { AuthService } from '../auth/auth.service';
 import { AuthEventService } from '../auth/auth-event.service';
 import type { InstituteLoginResult } from '../auth/dto/auth-payload';
 import type { RequestMeta } from '../auth/gql-context';
+import { REDIS_KEYS } from '../auth/redis-keys';
 import { UserRepository } from '../auth/repositories/user.repository';
 import type { PasskeyAuthOptions, PasskeyInfo } from './dto/passkey-info.model';
 import type { PasskeyProviderData } from './dto/passkey-provider-data';
@@ -98,7 +99,12 @@ export class PasskeyService {
       },
     });
 
-    await this.redis.set(`webauthn:reg:${userId}`, options.challenge, 'EX', CHALLENGE_TTL);
+    await this.redis.set(
+      `${REDIS_KEYS.WEBAUTHN_REGISTRATION}${userId}`,
+      options.challenge,
+      'EX',
+      CHALLENGE_TTL,
+    );
 
     return options;
   }
@@ -110,14 +116,14 @@ export class PasskeyService {
   ): Promise<PasskeyInfo> {
     assertOwnSession(user);
     const userId = user.userId;
-    const challenge = await this.redis.get(`webauthn:reg:${userId}`);
+    const challenge = await this.redis.get(`${REDIS_KEYS.WEBAUTHN_REGISTRATION}${userId}`);
     if (!challenge) {
       throw new BusinessException(
         ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
         'Challenge expired or not found',
       );
     }
-    await this.redis.del(`webauthn:reg:${userId}`);
+    await this.redis.del(`${REDIS_KEYS.WEBAUTHN_REGISTRATION}${userId}`);
 
     // simplewebauthn rejects (rather than returning verified=false) on a
     // challenge/origin/RP mismatch — a client fault, not a server error.
@@ -214,7 +220,7 @@ export class PasskeyService {
 
     const challengeId = randomUUID();
     await this.redis.set(
-      `webauthn:auth:${challengeId}`,
+      `${REDIS_KEYS.WEBAUTHN_AUTH}${challengeId}`,
       JSON.stringify({ challenge: options.challenge }),
       'EX',
       CHALLENGE_TTL,
@@ -231,14 +237,14 @@ export class PasskeyService {
     credential: AuthenticationResponseJSON,
     meta: RequestMeta,
   ): Promise<InstituteLoginResult> {
-    const stored = await this.redis.get(`webauthn:auth:${challengeId}`);
+    const stored = await this.redis.get(`${REDIS_KEYS.WEBAUTHN_AUTH}${challengeId}`);
     if (!stored) {
       throw new BusinessException(
         ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
         'Challenge expired or not found',
       );
     }
-    await this.redis.del(`webauthn:auth:${challengeId}`);
+    await this.redis.del(`${REDIS_KEYS.WEBAUTHN_AUTH}${challengeId}`);
 
     const { challenge } = JSON.parse(stored) as { challenge: string };
 

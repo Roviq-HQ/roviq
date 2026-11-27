@@ -47,7 +47,7 @@ A scope guard proves who the caller is, not which rows are theirs.
 - Lists: cursor pagination, one query per page for any per-row extra (no N+1), sort columns from a whitelist.
 - Files: store `files.id`, return `FileRef`, attach with `FileService.verifyUploads` and `markFilesReady(tx, …)`. Never a URL column or a raw S3 call.
 - Config through `ConfigService` (never `process.env`); a new variable goes in `.env.example`, the app's env validation, and `docs/deployment.md` when production needs it.
-- Redis keys from the `REDIS_KEYS` constants.
+- Redis keys from the `REDIS_KEYS` constants. A workflow id a client sends back is built with `tenantWorkflowId` and checked with `isTenantWorkflowId` before the handle is taken; a subscription outside `admin/` has a `filter` on the payload's institute or reseller; a `DataLoader` is request-scoped or `cache: false`; the storage client is called only from the files module (`pnpm check:store-keys`, `docs/architecture.md` → "Stores outside PostgreSQL").
 
 ## Errors
 

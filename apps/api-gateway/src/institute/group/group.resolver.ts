@@ -6,6 +6,7 @@ import GraphQLJSON from 'graphql-type-json';
 import { pubSub } from '../../common/pubsub';
 import { CreateGroupInput, GroupFilterInput, UpdateGroupInput } from './dto/create-group.input';
 import { GroupService } from './group.service';
+import { isOwnGroupResolution } from './group-subscription-filter';
 import {
   GroupMemberModel,
   GroupModel,
@@ -100,16 +101,7 @@ export class GroupResolver {
 
   @Subscription(() => GroupResolutionUpdate, {
     description: 'Real-time group resolution updates, filtered by groupId + tenant',
-    filter: (
-      payload: { groupMembershipResolved: { tenantId?: string; groupId: string } },
-      variables: { groupId: string },
-      context: { req: { user: import('@roviq/common-types').InstituteContext } },
-    ) => {
-      const p = payload.groupMembershipResolved;
-      const tenantMatch = !p.tenantId || p.tenantId === context.req.user.tenantId;
-      const groupMatch = p.groupId === variables.groupId;
-      return tenantMatch && groupMatch;
-    },
+    filter: isOwnGroupResolution,
   })
   @CheckAbility({ action: 'read', subject: 'Group' })
   groupMembershipResolved(@Args('groupId', { type: () => ID }) _groupId: string) {
