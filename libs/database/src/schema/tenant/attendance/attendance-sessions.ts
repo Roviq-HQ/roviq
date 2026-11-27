@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { tenantPolicies } from '../../common/rls-policies';
 import { academicYears } from '../academic-years';
 import { institutes } from '../institutes';
@@ -30,12 +30,8 @@ export const attendanceSessions = pgTable(
   'attendance_sessions',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    sectionId: uuid('section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    sectionId: uuid('section_id').notNull(),
+    academicYearId: uuid('academic_year_id').notNull(),
     /** Date attendance is being taken for (YYYY-MM-DD). */
     date: date('date').notNull(),
     /** Period / lecture slot number (1, 2, 3, …). NULL for whole-day DAILY mode. */
@@ -46,9 +42,7 @@ export const attendanceSessions = pgTable(
       onUpdate: 'cascade',
     }),
     /** Teacher / staff membership who took this attendance session. */
-    lecturerId: uuid('lecturer_id')
-      .notNull()
-      .references(() => memberships.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    lecturerId: uuid('lecturer_id').notNull(),
     /**
      * Set to true when another teacher is attempting to override a session.
      * Clients use this as a confirmation flag.
@@ -57,6 +51,27 @@ export const attendanceSessions = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'attendance_sessions_section_id_tenant_fkey',
+      [table.sectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'attendance_sessions_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'attendance_sessions_lecturer_id_tenant_fkey',
+      [table.lecturerId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

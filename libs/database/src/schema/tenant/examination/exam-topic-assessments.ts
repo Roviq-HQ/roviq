@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { competencyLevel } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
@@ -20,9 +20,7 @@ export const examTopicAssessments = pgTable(
     examScheduleId: uuid('exam_schedule_id')
       .notNull()
       .references(() => examSchedules.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => memberships.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    studentId: uuid('student_id').notNull(),
     subjectTopicId: uuid('subject_topic_id')
       .notNull()
       .references(() => subjectTopics.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -31,6 +29,13 @@ export const examTopicAssessments = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'exam_topic_assessments_student_id_tenant_fkey',
+      [table.studentId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

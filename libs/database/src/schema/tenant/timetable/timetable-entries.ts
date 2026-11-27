@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, integer, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { weekday } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
@@ -31,9 +31,7 @@ export const timetableEntries = pgTable(
     periodId: uuid('period_id')
       .notNull()
       .references(() => timetablePeriods.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    sectionId: uuid('section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    sectionId: uuid('section_id').notNull(),
     dayOfWeek: weekday('day_of_week').notNull(),
     splitIndex: integer('split_index').default(0).notNull(),
     /** Optional label for a class-split group, e.g. "Group A". Null = whole class. */
@@ -51,6 +49,13 @@ export const timetableEntries = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'timetable_entries_section_id_tenant_fkey',
+      [table.sectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

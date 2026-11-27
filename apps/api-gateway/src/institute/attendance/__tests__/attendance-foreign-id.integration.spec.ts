@@ -486,8 +486,8 @@ describe('attendance: another institute id (ROV-293)', () => {
     });
 
     it("both reports should name its own people and never join in another institute's (ROV-360)", async () => {
-      // A past date no other test reads. The entry pointing at B's student is a fixture the
-      // foreign key accepts; the joined names must still come only from A.
+      // A past date no other test reads. An entry cannot name B's student: the foreign key
+      // carries the institute. The joined names come only from A's own copies.
       const date = '2026-05-04';
       const own = await asAdmin(async (tx) => {
         const [student] = await tx
@@ -518,27 +518,34 @@ describe('attendance: another institute id (ROV-293)', () => {
             ...BY,
           })
           .returning({ id: attendanceSessions.id });
-        await tx.insert(attendanceEntries).values(
-          [a.studentId, b.studentId].map((studentId) => ({
+        await tx.insert(attendanceEntries).values({
+          tenantId: instA.tenantId,
+          sessionId: session.id,
+          studentId: a.studentId,
+          status: 'ABSENT' as const,
+          ...BY,
+        });
+        return { ...student, sessionId: session.id };
+      });
+      await expect(
+        asAdmin((tx) =>
+          tx.insert(attendanceEntries).values({
             tenantId: instA.tenantId,
-            sessionId: session.id,
-            studentId,
+            sessionId: own.sessionId,
+            studentId: b.studentId,
             status: 'ABSENT' as const,
             ...BY,
-          })),
-        );
-        return student;
+          }),
+        ),
+      ).rejects.toMatchObject({
+        cause: { code: '23503', constraint: 'attendance_entries_student_id_tenant_fkey' },
       });
       const named = {
         firstName: own.firstName,
         lastName: null,
         admissionNumber: own.admissionNumber,
       };
-      const unknown = { firstName: null, lastName: null, admissionNumber: null };
 
-      const byStudent = (x: { studentId: string }, y: { studentId: string }) =>
-        x.studentId.localeCompare(y.studentId);
-      // The report orders rows by membership id.
       expect(await query(NAMED_ABSENTEES, { date, sectionId: a.sectionId })).toEqual({
         attendanceAbsenteesReport: [
           {
@@ -547,13 +554,7 @@ describe('attendance: another institute id (ROV-293)', () => {
             studentLastName: null,
             admissionNumber: named.admissionNumber,
           },
-          {
-            studentId: b.studentId,
-            studentFirstName: null,
-            studentLastName: null,
-            admissionNumber: null,
-          },
-        ].sort(byStudent),
+        ],
       });
 
       expect(await query(NAMED_BREAKDOWN, { date, standardId: a.standardId })).toEqual({
@@ -561,10 +562,7 @@ describe('attendance: another institute id (ROV-293)', () => {
           {
             lecturerFirstName: { en: 'Kavita' },
             lecturerLastName: null,
-            absentees: expect.arrayContaining([
-              { studentId: a.studentId, ...named },
-              { studentId: b.studentId, ...unknown },
-            ]),
+            absentees: [{ studentId: a.studentId, ...named }],
           },
         ],
       });

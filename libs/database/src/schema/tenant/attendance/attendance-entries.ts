@@ -8,7 +8,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { attendanceMode, attendanceStatus } from '../../common/enums';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
@@ -28,9 +28,7 @@ export const attendanceEntries = pgTable(
       .notNull()
       .references(() => attendanceSessions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     /** Student membership — the attendee. */
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => memberships.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    studentId: uuid('student_id').notNull(),
     status: attendanceStatus('status').notNull(),
     mode: attendanceMode('mode').default('MANUAL').notNull(),
     /** Optional free-text note from the teacher. */
@@ -40,6 +38,13 @@ export const attendanceEntries = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'attendance_entries_student_id_tenant_fkey',
+      [table.studentId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

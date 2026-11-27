@@ -703,8 +703,16 @@ describe('Year-end promotion (integration)', () => {
       const next6B = await addSection(inst.tenantId, fixture.nextYearId, next6, { en: 'B' }, 2);
       const next6C = await addSection(inst.tenantId, fixture.nextYearId, next6, { en: 'C' }, 3);
       const next5B = await addSection(inst.tenantId, fixture.nextYearId, next5, { en: 'B' }, 2);
-      // RLS must hide it: it would win both on name and on display order.
-      await addSection(otherInst.tenantId, fixture.nextYearId, next6, { en: 'B', hi: 'बी' }, 0);
+      // Another institute cannot hold a section of this class: it would win both on name and
+      // on display order, and the foreign keys carry the institute.
+      await expect(
+        addSection(otherInst.tenantId, fixture.nextYearId, next6, { en: 'B', hi: 'बी' }, 0),
+      ).rejects.toMatchObject({
+        cause: {
+          code: '23503',
+          constraint: expect.stringMatching(/^sections_(standard|academic_year)_id_tenant_fkey$/),
+        },
+      });
       await moveToSection(fixture, 'inB', prevB);
       await moveToSection(fixture, 'detainedInB', prevB);
       await moveToSection(fixture, 'inLowerC', prevC);

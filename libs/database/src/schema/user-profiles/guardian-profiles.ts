@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { bigint, foreignKey, index, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { guardianEducationLevel } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
@@ -20,10 +20,7 @@ export const guardianProfiles = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    membershipId: uuid('membership_id')
-      .notNull()
-      .unique()
-      .references(() => memberships.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    membershipId: uuid('membership_id').notNull().unique(),
 
     occupation: varchar('occupation', { length: 100 }),
     /** Employer name */
@@ -49,6 +46,13 @@ export const guardianProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'guardian_profiles_membership_id_tenant_fkey',
+      [table.membershipId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

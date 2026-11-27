@@ -8,7 +8,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { groupMemberSource } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
@@ -30,9 +30,7 @@ export const groupMembers = pgTable(
     groupId: uuid('group_id')
       .notNull()
       .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    membershipId: uuid('membership_id')
-      .notNull()
-      .references(() => memberships.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    membershipId: uuid('membership_id').notNull(),
 
     /**
      * How this member was added to the group:
@@ -51,6 +49,13 @@ export const groupMembers = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'group_members_membership_id_tenant_fkey',
+      [table.membershipId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

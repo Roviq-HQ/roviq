@@ -12,7 +12,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { admissionApplicationStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from '../tenant/academic-years';
@@ -36,14 +36,10 @@ export const admissionApplications = pgTable(
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     /** Nullable — NULL for direct applications that skip the enquiry step */
     enquiryId: uuid('enquiry_id').references(() => enquiries.id),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    standardId: uuid('standard_id')
-      .notNull()
-      .references(() => standards.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
+    standardId: uuid('standard_id').notNull(),
     /** Nullable until section is assigned during admission processing */
-    sectionId: uuid('section_id').references(() => sections.id),
+    sectionId: uuid('section_id'),
 
     // ── Application form data ───────────────────────────
     /**
@@ -110,11 +106,35 @@ export const admissionApplications = pgTable(
 
     // ── Conversion to student ───────────────────────────
     /** FK to student_profiles — set after successful enrollment */
-    studentProfileId: uuid('student_profile_id').references(() => studentProfiles.id),
+    studentProfileId: uuid('student_profile_id'),
 
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'admission_applications_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'admission_applications_standard_id_tenant_fkey',
+      [table.standardId, table.tenantId],
+      [standards.id, standards.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'admission_applications_section_id_tenant_fkey',
+      [table.sectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    ),
+    sameTenantForeignKey(
+      'admission_applications_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    ),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

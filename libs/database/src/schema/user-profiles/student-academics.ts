@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, jsonb, pgTable, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { promotionStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from '../tenant/academic-years';
@@ -19,18 +19,10 @@ export const studentAcademics = pgTable(
   'student_academics',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    studentProfileId: uuid('student_profile_id')
-      .notNull()
-      .references(() => studentProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    standardId: uuid('standard_id')
-      .notNull()
-      .references(() => standards.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    sectionId: uuid('section_id')
-      .notNull()
-      .references(() => sections.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    studentProfileId: uuid('student_profile_id').notNull(),
+    academicYearId: uuid('academic_year_id').notNull(),
+    standardId: uuid('standard_id').notNull(),
+    sectionId: uuid('section_id').notNull(),
     /** Roll number within the section (institute-assigned) */
     rollNumber: varchar('roll_number', { length: 10 }),
     /** FK to houses table (future module) — for house system / inter-house competitions */
@@ -49,14 +41,46 @@ export const studentAcademics = pgTable(
      */
     promotionStatus: promotionStatus('promotion_status'),
     /** Standard the student was promoted to — NULL if pending, detained, or transferred */
-    promotedToStandardId: uuid('promoted_to_standard_id').references(() => standards.id, {
-      onDelete: 'restrict',
-      onUpdate: 'cascade',
-    }),
+    promotedToStandardId: uuid('promoted_to_standard_id'),
 
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'student_academics_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'student_academics_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'student_academics_standard_id_tenant_fkey',
+      [table.standardId, table.tenantId],
+      [standards.id, standards.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'student_academics_section_id_tenant_fkey',
+      [table.sectionId, table.tenantId],
+      [sections.id, sections.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'student_academics_promoted_to_standard_id_tenant_fkey',
+      [table.promotedToStandardId, table.tenantId],
+      [standards.id, standards.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

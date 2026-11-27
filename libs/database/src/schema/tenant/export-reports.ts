@@ -24,9 +24,7 @@ export const exportReports = pgTable(
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
     reportType: complianceReportType('report_type').notNull(),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
     status: exportReportStatus().default('PENDING').notNull(),
     /** Temporal workflow id; also keeps a retried request from starting a second run. */
     workflowId: text('workflow_id').notNull(),
@@ -52,7 +50,7 @@ export const exportReports = pgTable(
     })
       .onDelete('restrict')
       .onUpdate('cascade'),
-    // On top of the plain reference: the year must belong to the same institute as the export.
+    // The year must belong to the same institute as the export.
     foreignKey({
       columns: [table.academicYearId, table.tenantId],
       foreignColumns: [academicYears.id, academicYears.tenantId],

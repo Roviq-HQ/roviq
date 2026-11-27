@@ -14,7 +14,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tcStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -49,14 +49,10 @@ export const tcRegister = pgTable(
   'tc_register',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    studentProfileId: uuid('student_profile_id')
-      .notNull()
-      .references(() => studentProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    studentProfileId: uuid('student_profile_id').notNull(),
     /** TC serial number — e.g., 'TC/2025-26/001'. Unique per tenant. */
     tcSerialNumber: varchar('tc_serial_number', { length: 50 }).notNull(),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
 
     // ── Status workflow ─────────────────────────────────
     /**
@@ -125,13 +121,20 @@ export const tcRegister = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'tc_register_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],
     })
       .onDelete('restrict')
       .onUpdate('cascade'),
-    // On top of the plain reference: the year must belong to the same institute as the TC.
+    // The year must belong to the same institute as the TC.
     foreignKey({
       columns: [table.academicYearId, table.tenantId],
       foreignColumns: [academicYears.id, academicYears.tenantId],

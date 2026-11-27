@@ -13,7 +13,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import {
   academicStatus,
   admissionType,
@@ -60,10 +60,7 @@ export const studentProfiles = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    membershipId: uuid('membership_id')
-      .notNull()
-      .unique()
-      .references(() => memberships.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    membershipId: uuid('membership_id').notNull().unique(),
 
     // ── Admission ───────────────────────────────────────
     /** Institute-assigned admission number — unique per tenant among non-deleted students */
@@ -180,6 +177,15 @@ export const studentProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('student_profiles_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'student_profiles_membership_id_tenant_fkey',
+      [table.membershipId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

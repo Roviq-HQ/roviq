@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, integer, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { i18nText, tenantColumns } from '../../common/columns';
+import { i18nText, sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
 import { standards } from '../standards';
@@ -19,10 +19,7 @@ export const subjectTopics = pgTable(
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     /** Optional standard scope; null = applies to the subject across standards. */
-    standardId: uuid('standard_id').references(() => standards.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
+    standardId: uuid('standard_id'),
     name: i18nText('name').notNull(),
     code: text(),
     /** The expected learning outcome / competency statement. */
@@ -31,6 +28,13 @@ export const subjectTopics = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'subject_topics_standard_id_tenant_fkey',
+      [table.standardId, table.tenantId],
+      [standards.id, standards.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

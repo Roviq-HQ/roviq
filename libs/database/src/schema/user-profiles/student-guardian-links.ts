@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { guardianRelationship } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
@@ -27,9 +27,7 @@ export const studentGuardianLinks = pgTable(
   'student_guardian_links',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    studentProfileId: uuid('student_profile_id')
-      .notNull()
-      .references(() => studentProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    studentProfileId: uuid('student_profile_id').notNull(),
     guardianProfileId: uuid('guardian_profile_id')
       .notNull()
       .references(() => guardianProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -56,6 +54,13 @@ export const studentGuardianLinks = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'student_guardian_links_student_profile_id_tenant_fkey',
+      [table.studentProfileId, table.tenantId],
+      [studentProfiles.id, studentProfiles.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

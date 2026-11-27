@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { i18nText, tenantColumns } from '../common/columns';
+import { i18nText, sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { batchStatus, genderRestriction } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from './academic-years';
@@ -30,12 +30,8 @@ export const sections = pgTable(
   'sections',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    standardId: uuid('standard_id')
-      .notNull()
-      .references(() => standards.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    standardId: uuid('standard_id').notNull(),
+    academicYearId: uuid('academic_year_id').notNull(),
     name: i18nText('name').notNull(),
     displayLabel: text('display_label'),
     /** Stream for senior secondary (11-12). JSONB because NEP 2020 allows cross-stream combos */
@@ -59,6 +55,22 @@ export const sections = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('sections_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'sections_standard_id_tenant_fkey',
+      [table.standardId, table.tenantId],
+      [standards.id, standards.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    sameTenantForeignKey(
+      'sections_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     index('idx_sections_name_gin').using('gin', table.name),
     index('idx_sections_name_trgm').using(
       'gin',

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from './institutes';
 import { standards } from './standards';
@@ -13,12 +13,17 @@ export const standardSubjects = pgTable(
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    standardId: uuid('standard_id')
-      .notNull()
-      .references(() => standards.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    standardId: uuid('standard_id').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'standard_subjects_standard_id_tenant_fkey',
+      [table.standardId, table.tenantId],
+      [standards.id, standards.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

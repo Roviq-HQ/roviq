@@ -11,7 +11,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { employmentType, socialCategory } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
@@ -30,10 +30,7 @@ export const staffProfiles = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    membershipId: uuid('membership_id')
-      .notNull()
-      .unique()
-      .references(() => memberships.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    membershipId: uuid('membership_id').notNull().unique(),
 
     /** Institute-assigned staff/employee ID */
     employeeId: varchar('employee_id', { length: 30 }),
@@ -80,6 +77,13 @@ export const staffProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'staff_profiles_membership_id_tenant_fkey',
+      [table.membershipId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

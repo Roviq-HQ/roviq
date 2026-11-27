@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { tenantColumns } from '../../common/columns';
+import { sameTenantForeignKey, tenantColumns } from '../../common/columns';
 import { tenantPolicies } from '../../common/rls-policies';
 import { institutes } from '../institutes';
 import { memberships } from '../memberships';
@@ -28,9 +28,7 @@ export const examMarks = pgTable(
       .notNull()
       .references(() => examSchedules.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     /** The student's membership id (matches `student_academics` rosters). */
-    studentId: uuid('student_id')
-      .notNull()
-      .references(() => memberships.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    studentId: uuid('student_id').notNull(),
     obtainedMarks: numeric('obtained_marks', { precision: 6, scale: 2, mode: 'number' }),
     isAbsent: boolean('is_absent').default(false).notNull(),
     /** Exempted from this component (e.g. medical) — excluded from totals. */
@@ -39,6 +37,13 @@ export const examMarks = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantForeignKey(
+      'exam_marks_student_id_tenant_fkey',
+      [table.studentId, table.tenantId],
+      [memberships.id, memberships.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({ columns: [table.tenantId], foreignColumns: [institutes.id] })
       .onDelete('cascade')
       .onUpdate('cascade'),

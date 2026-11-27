@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { i18nText, tenantColumns } from '../common/columns';
+import { i18nText, sameTenantForeignKey, tenantColumns } from '../common/columns';
 import { educationLevel, nepStage } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { academicYears } from './academic-years';
@@ -19,9 +19,7 @@ export const standards = pgTable(
   'standards',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    academicYearId: uuid('academic_year_id')
-      .notNull()
-      .references(() => academicYears.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull(),
     name: i18nText('name').notNull(),
     numericOrder: integer('numeric_order').notNull(),
     level: educationLevel(),
@@ -35,6 +33,15 @@ export const standards = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    // The target of every same-institute foreign key to this table.
+    uniqueIndex('standards_id_tenant_key').on(table.id, table.tenantId),
+    sameTenantForeignKey(
+      'standards_academic_year_id_tenant_fkey',
+      [table.academicYearId, table.tenantId],
+      [academicYears.id, academicYears.tenantId],
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],
