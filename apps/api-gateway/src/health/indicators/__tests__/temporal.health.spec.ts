@@ -37,7 +37,10 @@ describe('TemporalHealthIndicator', () => {
     const result = await indicator.isHealthy();
 
     expect(result.temporal.status).toBe('up');
-    expect(Connection.lazy).toHaveBeenCalledWith({ address: 'temporal.test:7233' });
+    expect(Connection.lazy).toHaveBeenCalledWith({
+      address: 'temporal.test:7233',
+      interceptors: [],
+    });
     expect(check).toHaveBeenCalledTimes(1);
   });
 

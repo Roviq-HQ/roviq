@@ -38,7 +38,9 @@ export function createTelemetrySdk(endpoint: string, options: TelemetryOptions):
       }),
     ],
     // Explicit: left to the SDK default, logs go by HTTP to the gRPC endpoint and are lost.
-    logRecordProcessors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: endpoint }))],
+    logRecordProcessors: [
+      new BatchLogRecordProcessor({ exporter: new OTLPLogExporter({ url: endpoint }) }),
+    ],
     // The process and host detectors add the command line, the OS user and the pid to every record.
     autoDetectResources: false,
     resource: resourceFromAttributes({

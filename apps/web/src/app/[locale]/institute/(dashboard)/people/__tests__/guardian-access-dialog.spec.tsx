@@ -1,4 +1,6 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import type { RawRuleOf } from '@casl/ability';
+import type { AppAbility } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -35,7 +37,7 @@ function codeError(code: string) {
   return new CombinedGraphQLErrors({ errors: [{ message: 'refused', extensions: { code } }] });
 }
 
-function renderButton(revoked: boolean, abilityRules?: { action: string; subject: string }[]) {
+function renderButton(revoked: boolean, abilityRules?: RawRuleOf<AppAbility>[]) {
   return renderWithProviders(
     <GuardianAccessButton
       linkId="link-x"
