@@ -56,6 +56,7 @@ A scope guard proves who the caller is, not which rows are theirs.
 - `throw new BusinessException(ErrorCode.X, 'message')`. Codes and their HTTP status live in `libs/shared/common-types/src/lib/error-codes.ts`; add a new code there with a one-line comment.
 - The web app shows translated copy by `extensions.code`, never the message: a new code needs copy in `apps/web/messages/{en,hi}/error.json` (or the feature's namespace).
 - Refuse before writing, in a fixed order, and never spend a rate-limit slot or emit an event on a refused request.
+- Every handler call is counted by `RateLimitGuard`; an operation that signs in, changes a password, takes a one-time code, a passkey or starts impersonation also carries `@RateLimit('<bucket>')` (`docs/auth.md` → "Request limits").
 
 ## Status changes
 

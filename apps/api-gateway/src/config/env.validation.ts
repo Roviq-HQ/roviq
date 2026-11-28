@@ -88,6 +88,21 @@ const envSchema = z
     CLAMAV_PORT: z.coerce.number().optional(),
     // Results that carry another institute's or reseller's id; unset means refuse
     RESPONSE_SCOPE_CHECK: z.enum(['refuse', 'report', 'off']).optional(),
+    // Request limits (docs/auth.md → "Request limits"). Unset: the production defaults.
+    RATE_LIMIT_MULTIPLIER: z.coerce
+      .number({ error: 'RATE_LIMIT_MULTIPLIER — a positive number; 1 is the production value' })
+      .positive()
+      .optional(),
+    GRAPHQL_MAX_DEPTH: z.coerce.number().int().positive().optional(),
+    GRAPHQL_MAX_FIELDS: z.coerce.number().int().positive().optional(),
+    GRAPHQL_MAX_ROOT_FIELDS: z.coerce.number().int().positive().optional(),
+    // Reverse proxies in front of the API whose X-Forwarded-For is believed; unset or 0: none
+    TRUST_PROXY_HOPS: z.coerce
+      .number({ error: 'TRUST_PROXY_HOPS — how many reverse proxies stand in front of the API' })
+      .int()
+      .min(0)
+      .max(5)
+      .optional(),
 
     // Telemetry and OpenObserve (docs/deployment.md → "Telemetry and shutdown"). Unset endpoint: telemetry off.
     OTEL_EXPORTER_OTLP_ENDPOINT: z

@@ -100,7 +100,7 @@ Required on any provider:
   bucket keeps versions of its own: give it the same expiry, or erased files live on there.
 - **Backups**: replicate or back up the private bucket; the database alone cannot restore files.
 - **Credentials**: an access key limited to these two buckets (get, put, delete, list, copy).
-- `/api/health` reports storage down when either bucket is missing or unreachable.
+- `/api/health` answers 503 when either bucket is missing or unreachable; the gateway's log and the admin monitoring page name storage as the cause.
 
 Provider notes:
 
@@ -529,6 +529,12 @@ Transfer certificates and other certificates are rendered inside the api-gateway
   (`https://app.roviq.com`). It is printed in the QR code of every transfer certificate as
   `<url>/verify/tc/<token>`. A certificate printed with the wrong address cannot be fixed later.
 - The page `/verify/tc/<token>` and the `verifyTC` query are public on purpose.
+
+## Reverse proxy and request limits
+
+- **`TRUST_PROXY_HOPS`** on the api-gateway: the number of reverse proxies between the client and the API (1 for a single proxy; `docker/compose.staging.yaml` sets it). Without it the API records the proxy's address for every session, audit row and impersonation record, and counts every client's requests in one bucket. Set the real count and no more: each extra hop believes one more entry of `X-Forwarded-For`, which a client can write itself. The proxy must set `X-Forwarded-For` (append, not pass through a client's value as the only entry).
+- **Request limits** need nothing set: the defaults are the production values (`docs/auth.md` → "Request limits"). Leave `RATE_LIMIT_MULTIPLIER` unset. `GRAPHQL_MAX_DEPTH`, `GRAPHQL_MAX_FIELDS` and `GRAPHQL_MAX_ROOT_FIELDS` change the size limits of one operation.
+- **Health routes** (`/api/health`, `/api/health/ready`) answer a status only; an uptime check reads the status code.
 
 ## Redis
 

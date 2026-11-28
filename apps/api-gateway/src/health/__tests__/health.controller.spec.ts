@@ -1,7 +1,8 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { HealthCheckService } from '@nestjs/terminus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HealthController } from '../health.controller';
+import { HEALTH_ANSWER_TTL_MS, HealthController } from '../health.controller';
 import { NatsHealthIndicator } from '../indicators/nats.health';
 import { PostgresHealthIndicator } from '../indicators/postgres.health';
 import { RedisHealthIndicator } from '../indicators/redis.health';
@@ -48,17 +49,9 @@ describe('HealthController', () => {
     controller = new HealthController(mockHealth, postgres, redis, nats, temporal, storage);
   });
 
-  it('should report every platform dependency', async () => {
-    const result = await controller.check();
-
-    expect(result.status).toBe('ok');
-    expect(result.info).toEqual({
-      postgres: { status: 'up' },
-      redis: { status: 'up' },
-      nats: { status: 'up' },
-      temporal: { status: 'up' },
-      storage: { status: 'up' },
-    });
+  it('should answer only a status, with no dependency in it', async () => {
+    expect(await controller.check()).toEqual({ status: 'ok' });
+    expect(await controller.ready()).toEqual({ status: 'ok' });
   });
 
   it('should call each indicator exactly once per check', async () => {
@@ -71,14 +64,46 @@ describe('HealthController', () => {
   });
 
   it('should gate readiness only on the dependencies every request needs', async () => {
-    const result = await controller.ready();
+    await controller.ready();
 
-    expect(result.info).toEqual({
-      postgres: { status: 'up' },
-      redis: { status: 'up' },
-      nats: { status: 'up' },
-    });
+    for (const indicator of [postgres, redis, nats]) {
+      expect(indicator.isHealthy).toHaveBeenCalledTimes(1);
+    }
     expect(temporal.isHealthy).not.toHaveBeenCalled();
     expect(storage.isHealthy).not.toHaveBeenCalled();
+  });
+
+  it('should reuse an answer for a few seconds, so a flood of probes costs one round of checks', async () => {
+    await Promise.all([controller.check(), controller.check(), controller.check()]);
+    await controller.check();
+
+    expect(mockHealth.check).toHaveBeenCalledTimes(1);
+  });
+
+  it('should check again once the remembered answer is too old', async () => {
+    vi.useFakeTimers();
+    try {
+      await controller.check();
+      vi.advanceTimersByTime(HEALTH_ANSWER_TTL_MS + 1);
+      await controller.check();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(mockHealth.check).toHaveBeenCalledTimes(2);
+  });
+
+  it('should answer 503 with no detail when a dependency is down', async () => {
+    mockHealth.check.mockRejectedValue(
+      new ServiceUnavailableException({
+        status: 'error',
+        error: { redis: { status: 'down', message: 'connect ECONNREFUSED 10.0.0.5:6379' } },
+      }),
+    );
+
+    const failure = await controller.check().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ServiceUnavailableException);
+    expect((failure as ServiceUnavailableException).getResponse()).toEqual({ status: 'error' });
   });
 });

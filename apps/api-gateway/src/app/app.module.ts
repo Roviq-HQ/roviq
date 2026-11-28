@@ -4,7 +4,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { JwtModule } from '@nestjs/jwt';
-import { ThrottlerModule } from '@nestjs/throttler';
 import type { AuthUser } from '@roviq/common-types';
 import { EeModule } from '@roviq/ee-gateway';
 import { EventBusModule } from '@roviq/event-bus';
@@ -34,6 +33,10 @@ import { readFieldMiddleware } from '../casl/read-field.middleware';
 import { createGraphqlErrorFormatter } from '../common/filters/graphql-error.mapper';
 import { GraphqlExceptionFilter } from '../common/filters/graphql-exception.filter';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
+import { queryLimitsFrom, queryLimitsRule } from '../common/query-limits/query-limits';
+import { RATE_LIMITS, rateLimitsFrom } from '../common/rate-limit/rate-limit.buckets';
+import { RateLimitGuard } from '../common/rate-limit/rate-limit.guard';
+import { RateLimitStore } from '../common/rate-limit/rate-limit.store';
 import { ResponseScopePlugin } from '../common/response-scope/response-scope.plugin';
 import { ResponseScopeGauge } from '../common/response-scope/response-scope-gauge';
 import { validate } from '../config/env.validation';
@@ -46,9 +49,7 @@ import { NotificationInboxModule } from '../notification-inbox/notification-inbo
 import { PasskeyModule } from '../passkey/passkey.module';
 import { PublicVerificationModule } from '../public-verification/public-verification.module';
 import { ResellerModule } from '../reseller/reseller.module';
-import { AppController } from './app.controller';
 import { AppResolver } from './app.resolver';
-import { AppService } from './app.service';
 
 const wsLogger = new Logger('WsTicketAuth');
 const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
@@ -66,9 +67,6 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     // Bearer token itself (`JwtService.verify`) rather than reading
     // `req.user` — APP_GUARD runs before passport-jwt populates the user.
     JwtModule.register({}),
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 20 }],
-    }),
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       imports: [ConnectionTrackerModule],
@@ -86,6 +84,9 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
         }),
         playground: config.get('NODE_ENV') !== 'production',
         introspection: config.get('NODE_ENV') !== 'production',
+        // "Did you mean …?" spells out the schema; development keeps it for the developer.
+        hideSchemaDetailsFromClientErrors: config.get('NODE_ENV') === 'production',
+        validationRules: [queryLimitsRule(queryLimitsFrom(config))],
         subscriptions: {
           'graphql-ws': {
             path: '/api/graphql',
@@ -133,19 +134,29 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     PublicVerificationModule,
     EeModule.register(),
   ],
-  controllers: [AppController],
   providers: [
     CorrelationIdMiddleware,
     {
       provide: APP_FILTER,
       useClass: GraphqlExceptionFilter,
     },
-    AppService,
     AppResolver,
     DateOnlyScalar,
     DateTimeScalar,
     I18nTextScalar,
-    // First: a token whose sessions were ended must not reach any other check.
+    RateLimitStore,
+    {
+      provide: RATE_LIMITS,
+      inject: [ConfigService],
+      useFactory: rateLimitsFrom,
+    },
+    // First of all: counting a request costs one Redis command, and every later guard may
+    // cost a database read.
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+    // Then: a token whose sessions were ended must not reach any other check.
     {
       provide: APP_GUARD,
       useClass: TokenVersionGuard,

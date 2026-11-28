@@ -18,7 +18,7 @@ export const ErrorCode = {
   CONFLICT: 'CONFLICT',
   /** Business rule rejected the request and has no more specific code */
   UNPROCESSABLE_ENTITY: 'UNPROCESSABLE_ENTITY',
-  /** Rate limit hit (ThrottlerGuard) */
+  /** A request limit was reached (RateLimitGuard), or a per-feature resend limit */
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
   /** Unexpected server failure — details are logged, never sent to the client */
   INTERNAL_ERROR: 'INTERNAL_ERROR',

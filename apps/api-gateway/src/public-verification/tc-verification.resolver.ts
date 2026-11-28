@@ -1,5 +1,6 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { TcStatus } from '@roviq/common-types';
+import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import { TcVerificationModel } from './tc-verification.model';
 import { TcVerificationRepository } from './tc-verification.repository';
 
@@ -17,6 +18,7 @@ export class TcVerificationResolver {
     description:
       'Public check of a transfer certificate by the token in its QR code. Null when no TC has the token.',
   })
+  @RateLimit('publicLookup')
   async verifyTC(@Args('token') token: string): Promise<TcVerificationModel | null> {
     if (!TOKEN_SHAPE.test(token)) return null;
     const row = await this.verifications.findByToken(token);

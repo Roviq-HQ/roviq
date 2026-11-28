@@ -43,14 +43,15 @@ describe('HTTP request correlation', () => {
   });
 
   it.each([
-    '/',
-    '/api',
-    '/missing-route',
-    '/api/missing-route',
-  ])('should assign an ID on %s, including routes outside the API prefix', async (path) => {
+    ['/', 404],
+    ['/api', 404],
+    ['/api/health/ready', 200],
+    ['/missing-route', 404],
+    ['/api/missing-route', 404],
+  ])('should assign an ID on %s, including routes outside the API prefix', async (path, status) => {
     const response = await fetch(new URL(path, apiUrl));
 
-    expect(response.status).toBe(path === '/api' ? 200 : 404);
+    expect(response.status).toBe(status);
     expect(response.headers.get('x-correlation-id')).toMatch(uuid);
   });
 

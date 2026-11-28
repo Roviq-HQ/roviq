@@ -12,6 +12,7 @@ import type { AuthUser } from '@roviq/common-types';
 import { StartImpersonationResult } from '../../auth/dto/impersonation.dto';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ImpersonationService } from '../../auth/impersonation.service';
+import { RateLimit } from '../../common/rate-limit/rate-limit.decorator';
 
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver()
@@ -34,6 +35,7 @@ export class InstituteImpersonationResolver {
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
   @CheckAbility({ action: 'impersonate', subject: 'User' })
+  @RateLimit('impersonation')
   async impersonateUser(
     @Args('targetUserId') targetUserId: string,
     @Args('reason') reason: string,

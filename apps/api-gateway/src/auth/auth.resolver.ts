@@ -3,6 +3,7 @@ import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
 import { assertTenantContext, CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
 import type { AuthUser } from '@roviq/common-types';
+import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
@@ -19,6 +20,7 @@ export class AuthResolver {
 
   @NoAudit()
   @Mutation(() => AuthPayload)
+  @RateLimit('signIn')
   async adminLogin(
     @Args('username') username: string,
     @Args('password') password: string,
@@ -29,6 +31,7 @@ export class AuthResolver {
 
   @NoAudit()
   @Mutation(() => AuthPayload)
+  @RateLimit('signIn')
   async resellerLogin(
     @Args('username') username: string,
     @Args('password') password: string,
@@ -39,6 +42,7 @@ export class AuthResolver {
 
   @NoAudit()
   @Mutation(() => InstituteLoginResult)
+  @RateLimit('signIn')
   async instituteLogin(
     @Args('username') username: string,
     @Args('password') password: string,
@@ -51,6 +55,7 @@ export class AuthResolver {
 
   @NoAudit()
   @Mutation(() => AuthPayload)
+  @RateLimit('signIn')
   async selectInstitute(
     @Args('selectionToken') selectionToken: string,
     @Args('membershipId') membershipId: string,
@@ -64,6 +69,7 @@ export class AuthResolver {
   @NoAudit()
   @Mutation(() => AuthPayload)
   @UseGuards(GqlAuthGuard)
+  @RateLimit('signIn')
   async switchInstitute(
     @Args('membershipId') membershipId: string,
     @Args('currentRefreshToken') currentRefreshToken: string,
@@ -83,6 +89,7 @@ export class AuthResolver {
 
   @NoAudit()
   @Mutation(() => AuthPayload)
+  @RateLimit('refresh')
   async refreshToken(
     @Args('token') token: string,
     @Context() ctx: GqlContext,
@@ -163,6 +170,7 @@ export class AuthResolver {
   })
   @UseGuards(GqlAuthGuard)
   @AllowWhenPasswordChangeRequired()
+  @RateLimit('password')
   async changePassword(
     @Args() args: ChangePasswordArgs,
     @CurrentUser() user: AuthUser,
