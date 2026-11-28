@@ -63,6 +63,14 @@ describe('IdentityCryptoService', () => {
     expect(() => service.decrypt(encrypted)).toThrow();
   });
 
+  it('refuses a value whose authentication tag was cut short', () => {
+    const service = createService();
+    const sealed = service.encrypt('');
+    // IV and the first 4 bytes of the 16-byte tag: a shorter tag is far easier to guess.
+    const shortened = sealed.subarray(0, 12 + 4);
+    expect(() => service.decrypt(shortened)).toThrow();
+  });
+
   it('throws on wrong key length', () => {
     expect(() => createService('tooshort')).toThrow('64-character hex string');
   });

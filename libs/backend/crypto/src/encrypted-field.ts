@@ -24,7 +24,7 @@ function parseKey(hexKey: string, name: string): Buffer {
 /** AES-256-GCM; the result is `IV (12B) + authTag (16B) + ciphertext`. */
 function seal(key: Buffer, plaintext: string): Buffer {
   const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, key, iv);
+  const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), encrypted]);
 }
@@ -33,7 +33,8 @@ function open(key: Buffer, packed: Buffer): string {
   const iv = packed.subarray(0, IV_LENGTH);
   const authTag = packed.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
   const ciphertext = packed.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  // The tag length is fixed: without it Node accepts a tag cut down to 4 bytes.
+  const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   decipher.setAuthTag(authTag);
   return decipher.update(ciphertext, undefined, 'utf8') + decipher.final('utf8');
 }
