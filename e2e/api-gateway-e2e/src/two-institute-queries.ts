@@ -74,6 +74,7 @@ const KIND_BY_PATH: Record<string, Kind> = {
 
 /** Fixed values for required arguments that are not ids. */
 const VALUE_BY_PATH: Record<string, unknown> = {
+  'adminObservabilityMetrics.query': 'up',
   'adminSearchUsers.query': 'a',
   'bulkImportProgress.workflowId': 'two-institute-no-such-workflow',
   'entityAuditTimeline.entityType': 'Student',
