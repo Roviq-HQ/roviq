@@ -5,11 +5,12 @@ import {
   institutes,
   mkResellerCtx,
   SYSTEM_USER_ID,
+  uniqueViolationConstraint,
   withReseller,
 } from '@roviq/database';
 import { invoices, resellerInvoiceSequences, subscriptions } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, desc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lte, notInArray, type SQL, sql } from 'drizzle-orm';
 
 @Injectable()
 export class InvoiceRepository {
@@ -54,6 +55,50 @@ export class InvoiceRepository {
     return withReseller(this.db, mkResellerCtx(resellerId, 'repository:invoice'), async (tx) => {
       const [invoice] = await tx.insert(invoices).values(data).returning();
       return invoice;
+    });
+  }
+
+  /**
+   * Inserts an invoice, or reports that its subscription already has a live invoice for the
+   * same period (the unique index `invoices_subscription_period_key`).
+   */
+  async createForPeriod(
+    resellerId: string,
+    data: typeof invoices.$inferInsert,
+  ): Promise<{ kind: 'ok'; invoice: typeof invoices.$inferSelect } | { kind: 'period_billed' }> {
+    try {
+      return { kind: 'ok', invoice: await this.create(resellerId, data) };
+    } catch (err) {
+      if (uniqueViolationConstraint(err) === 'invoices_subscription_period_key') {
+        return { kind: 'period_billed' };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Whether the subscription already has an invoice for the period that starts at
+   * `periodStart` and is neither cancelled nor refunded (the rule of the unique index
+   * `invoices_subscription_period_key`).
+   */
+  async hasLiveInvoiceForPeriod(
+    resellerId: string,
+    subscriptionId: string,
+    periodStart: Date,
+  ): Promise<boolean> {
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:invoice'), async (tx) => {
+      const [row] = await tx
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.subscriptionId, subscriptionId),
+            eq(invoices.periodStart, periodStart),
+            notInArray(invoices.status, ['CANCELLED', 'REFUNDED']),
+          ),
+        )
+        .limit(1);
+      return row !== undefined;
     });
   }
 

@@ -153,9 +153,11 @@ export class AttendanceService {
     studentId: string,
   ): Promise<void> {
     if (!(await this.repo.isStudentInSession(session, studentId))) {
+      // One answer for a student of another section, of another institute, an id that is not
+      // a membership (a student profile id) and an id of no row.
       throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Student is not enrolled in this attendance session section',
+        ErrorCode.STUDENT_NOT_FOUND,
+        "No student with this membership id is enrolled in the session's section",
       );
     }
   }

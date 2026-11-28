@@ -129,6 +129,8 @@ Guard enforcement order: `GqlAuthGuard` → `InstituteScopeGuard` (or `PlatformS
 
 ## 6. Operational notes
 
+**The student id is a membership id.** `markAttendance` and `bulkMarkAttendance` take the student's membership id in the institute, not the student profile id. An id that is not a membership enrolled in the session's section (another section's student, another institute's, a profile id, an id of no row) answers `STUDENT_NOT_FOUND`, the same for all four, and nothing is written.
+
 **Same-day-only edit window.** `markAttendance` and `bulkMarkAttendance` refuse to update an entry whose parent session is older than today with `ATTENDANCE_EDIT_WINDOW_CLOSED`. The window is evaluated against the session's `date` — not the entry's `markedAt`. This is a business-rule guard, not an RLS concern.
 
 **Admin override.** Both mutations accept `overridePastDay: boolean` + `overrideReason: string` arguments. When the override flag is `true`, the service still verifies the caller has `manage` on `Attendance` (so a class_teacher cannot self-elevate) before allowing the update. Overrides emit distinct audit events — `ATTENDANCE_ENTRY.past_day_edited` for singles and `ATTENDANCE_SESSION.past_day_bulk_edited` for bulks — so the audit pipeline surfaces them separately from normal marks.

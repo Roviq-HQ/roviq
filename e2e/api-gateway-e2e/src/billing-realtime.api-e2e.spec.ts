@@ -26,7 +26,7 @@ const CANCEL_SUB = `mutation($input: CancelSubscriptionInput!) { cancelSubscript
 const ASSIGN_PLAN = `mutation($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id } } }`;
 const PAUSE_SUB = `mutation($input: PauseSubscriptionInput!) { pauseSubscription(input: $input) { id status } }`;
 const RESUME_SUB = `mutation($subscriptionId: ID!) { resumeSubscription(subscriptionId: $subscriptionId) { id status } }`;
-const GENERATE_INVOICE = `mutation($input: GenerateInvoiceInput!) { generateInvoice(input: $input) { id totalAmount } }`;
+const INVOICES_OF_INSTITUTE = `query($instituteId: ID) { invoices(instituteId: $instituteId, first: 100) { id totalAmount subscriptionId } }`;
 const RECORD_MANUAL = `mutation($invoiceId: ID!, $input: ManualPaymentInput!) { recordManualPayment(invoiceId: $invoiceId, input: $input) { id status } }`;
 const VERIFY_UPI = `mutation($paymentId: ID!) { verifyUpiPayment(paymentId: $paymentId) { id verificationStatus } }`;
 const SUBMIT_UPI = `mutation($input: SubmitUpiProofInput!) { submitUpiProof(input: $input) { id } }`;
@@ -66,13 +66,56 @@ describe('Billing realtime E2E', () => {
     return res.data;
   }
 
+  /**
+   * Gives institute 1 a fresh subscription on a new paid plan, which bills its first period,
+   * and returns that invoice. A subscription has one live invoice per period, so every test
+   * that needs a new invoice gets a new subscription; `subscriptionId` follows the latest.
+   */
   async function newInvoice() {
-    const data = await ok<{ generateInvoice: { id: string; totalAmount: string } }>(
-      GENERATE_INVOICE,
-      { input: { tenantId: tenant1, subscriptionId } },
+    const subs = await ok<{ subscriptions: { id: string; status: string; tenantId: string }[] }>(
+      LIST_SUBS,
+      {},
       resellerToken,
     );
-    return data.generateInvoice;
+    const live = subs.subscriptions.find(
+      (s) => s.tenantId === tenant1 && s.status !== 'CANCELLED' && s.status !== 'EXPIRED',
+    );
+    if (live) await ok(CANCEL_SUB, { input: { subscriptionId: live.id } }, resellerToken);
+
+    const suffix = randomUUID().slice(0, 8);
+    const plan = await ok<{ createSubscriptionPlan: { id: string } }>(
+      CREATE_PLAN,
+      {
+        input: {
+          name: { en: `Vitest Realtime Plan ${suffix}` },
+          description: { en: 'Created by billing-realtime.api-e2e.spec.ts' },
+          amount: '100000',
+          currency: 'INR',
+          interval: 'MONTHLY',
+          entitlements: {
+            maxStudents: 50,
+            maxStaff: 5,
+            maxStorageMb: 512,
+            auditLogRetentionDays: 30,
+            features: [],
+          },
+          code: `VRT-${suffix.toUpperCase()}`,
+        },
+      },
+      resellerToken,
+    );
+    const assigned = await ok<{ assignPlanToInstitute: { subscription: { id: string } } }>(
+      ASSIGN_PLAN,
+      { input: { tenantId: tenant1, planId: plan.createSubscriptionPlan.id } },
+      resellerToken,
+    );
+    subscriptionId = assigned.assignPlanToInstitute.subscription.id;
+    const billed = await ok<{
+      invoices: { id: string; totalAmount: string; subscriptionId: string }[];
+    }>(INVOICES_OF_INSTITUTE, { instituteId: tenant1 }, resellerToken);
+    const invoice = billed.invoices.find((row) => row.subscriptionId === subscriptionId);
+    assert(invoice);
+    return invoice;
   }
 
   beforeAll(async () => {

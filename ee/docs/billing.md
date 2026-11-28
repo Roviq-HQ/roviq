@@ -123,6 +123,7 @@ All state changes emit NATS events via `ClientProxy`:
 - **One default gateway per reseller.** Online orders go to the default config. Saving a config as default clears the previous one in the same transaction, and the partial unique index `gwc_reseller_default_key` enforces it. `UPI_DIRECT` cannot be the default: a bare UPI address cannot take an online order.
 - **Cash collector.** `recordManualPayment` stores the reseller staff member who records a cash payment as `collected_by_id`. `collected_by_id` and `verified_by_id` reference `reseller_memberships`.
 - **Refunds are per payment.** `issueRefund` takes a payment id; `invoicePayments(invoiceId)` lists an invoice's payments for the reseller. A partly refunded payment can be refunded again up to what is left.
+- **One live invoice per subscription and billing period.** The unique index `invoices_subscription_period_key` on `(subscription_id, period_start)` covers every invoice that is not `CANCELLED` or `REFUNDED`, so a cancelled or refunded invoice frees its period. `generateInvoice` answers `INVOICE_PERIOD_ALREADY_BILLED` for a period that has one, before it takes a number from the reseller's sequence; assigning a paid plan bills the first period itself. Invoice numbers are counted per reseller (`uq_invoice_number_reseller`), so two resellers can hold the same number.
 
 ## Realtime
 

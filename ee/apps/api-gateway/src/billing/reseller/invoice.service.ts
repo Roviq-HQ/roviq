@@ -12,6 +12,13 @@ const GST_SAC_CODE = '998393';
 /** Invoice due in 15 days from issue */
 const DUE_DAYS = 15;
 
+function periodAlreadyBilled(): never {
+  billingError(
+    'INVOICE_PERIOD_ALREADY_BILLED',
+    'This subscription already has an invoice for this billing period',
+  );
+}
+
 @Injectable()
 export class InvoiceService {
   constructor(
@@ -38,6 +45,17 @@ export class InvoiceService {
   ) {
     const { userId } = getRequestContext();
     const now = new Date();
+
+    // Refused before a number is taken from the reseller's sequence.
+    if (
+      await this.invoiceRepo.hasLiveInvoiceForPeriod(
+        resellerId,
+        input.subscriptionId,
+        input.periodStart,
+      )
+    ) {
+      periodAlreadyBilled();
+    }
 
     // Build line items
     const lineItems: InvoiceLineItem[] = [];
@@ -80,7 +98,7 @@ export class InvoiceService {
     // Due date = issued + 15 days
     const dueAt = new Date(now.getTime() + DUE_DAYS * 86_400_000);
 
-    const invoice = await this.invoiceRepo.create(resellerId, {
+    const created = await this.invoiceRepo.createForPeriod(resellerId, {
       tenantId: input.tenantId,
       subscriptionId: input.subscriptionId,
       resellerId,
@@ -100,6 +118,9 @@ export class InvoiceService {
       createdBy: userId,
       updatedBy: userId,
     });
+    // The unique index is what holds when two requests bill the same period at once.
+    if (created.kind === 'period_billed') periodAlreadyBilled();
+    const invoice = created.invoice;
 
     this.eventBus.emit(EVENT_PATTERNS.BILLING.invoice.generated, {
       invoiceId: invoice.id,

@@ -44,7 +44,10 @@ export class ResellerSettingsResolver {
       : Promise.resolve(null);
   }
 
-  @Query(() => ResellerProfileModel, { description: "The signed-in reseller's own record" })
+  @Query(() => ResellerProfileModel, {
+    description:
+      "The record of the reseller the caller works for: its name, registration, contact, address and branding. Not the caller's own account. Needs `read` on `Reseller`, which the full admin role holds; other team roles do not read it.",
+  })
   @CheckAbility({ action: 'read', subject: 'Reseller' })
   async resellerMyProfile(@CurrentUser() user: AuthUser) {
     assertResellerContext(user);

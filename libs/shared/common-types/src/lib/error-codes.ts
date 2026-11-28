@@ -460,6 +460,8 @@ export const ErrorCode = {
   INVOICE_ALREADY_PAID: 'INVOICE_ALREADY_PAID',
   /** Invoice status does not allow payment (draft, cancelled, refunded) */
   INVOICE_NOT_PAYABLE: 'INVOICE_NOT_PAYABLE',
+  /** The subscription already has an invoice for this billing period that is not cancelled or refunded */
+  INVOICE_PERIOD_ALREADY_BILLED: 'INVOICE_PERIOD_ALREADY_BILLED',
   /** Payment gateway signature or status check failed */
   PAYMENT_VERIFICATION_FAILED: 'PAYMENT_VERIFICATION_FAILED',
   /** Payment gateway returned an error */
@@ -698,6 +700,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SUBSCRIPTION_TERMINAL: HttpStatus.UNPROCESSABLE_ENTITY,
   INVOICE_ALREADY_PAID: HttpStatus.CONFLICT,
   INVOICE_NOT_PAYABLE: HttpStatus.UNPROCESSABLE_ENTITY,
+  INVOICE_PERIOD_ALREADY_BILLED: HttpStatus.CONFLICT,
   PAYMENT_VERIFICATION_FAILED: HttpStatus.UNPROCESSABLE_ENTITY,
   GATEWAY_ERROR: HttpStatus.BAD_GATEWAY,
   REFUND_EXCEEDS_PAID: HttpStatus.UNPROCESSABLE_ENTITY,

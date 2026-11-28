@@ -72,6 +72,13 @@ export const invoices = pgTable(
       .on(table.status)
       .where(sql`${table.status} IN ('SENT', 'OVERDUE')`),
     uniqueIndex('uq_invoice_number_reseller').on(table.resellerId, table.invoiceNumber),
+    // One live invoice per subscription and billing period. A cancelled or refunded invoice
+    // frees its period, so the period can be billed again.
+    uniqueIndex('invoices_subscription_period_key')
+      .on(table.subscriptionId, table.periodStart)
+      .where(
+        sql`${table.periodStart} IS NOT NULL AND ${table.status} NOT IN ('CANCELLED', 'REFUNDED')`,
+      ),
     // App: read own institute's invoices
     pgPolicy('inv_app_read', {
       for: 'select',

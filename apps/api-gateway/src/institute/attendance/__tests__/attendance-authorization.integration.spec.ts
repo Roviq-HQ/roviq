@@ -669,7 +669,7 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
     it('rejects marking a student from another section into an assigned session', async () => {
       expect(
         await errorCodes(teacher, mark, { s: ids.sessionA, st: studentB.membershipId }),
-      ).toEqual(['FORBIDDEN']);
+      ).toEqual(['STUDENT_NOT_FOUND']);
       expect(await storedStatus(ids.sessionA, studentB)).toEqual([]);
     });
 

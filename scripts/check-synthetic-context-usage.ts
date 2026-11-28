@@ -67,6 +67,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/tenant-user-profile-isolation.integration.spec.ts',
   // ROV-293: foreign-id fixtures (rows of a second institute or reseller) and their read-back.
   'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/__tests__/billing-invoice-period.integration.spec.ts',
   'apps/api-gateway/src/audit/__tests__/audit-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',

@@ -21,7 +21,10 @@ export class MarkAttendanceInput {
   sessionId!: string;
 
   @IsUUID()
-  @Field(() => ID, { description: 'Student membership id.' })
+  @Field(() => ID, {
+    description:
+      "The student's membership id in this institute (`membershipId` of the student), not the student profile id. The student must be enrolled in the session's section.",
+  })
   studentId!: string;
 
   @IsEnum(AttendanceStatus)
@@ -43,7 +46,10 @@ export class MarkAttendanceInput {
 @InputType()
 export class MarkAttendanceItem {
   @IsUUID()
-  @Field(() => ID)
+  @Field(() => ID, {
+    description:
+      "The student's membership id in this institute (`membershipId` of the student), not the student profile id. The student must be enrolled in the session's section.",
+  })
   studentId!: string;
 
   @IsEnum(AttendanceStatus)

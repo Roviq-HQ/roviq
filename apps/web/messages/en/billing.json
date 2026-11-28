@@ -462,6 +462,7 @@
     "SUBSCRIPTION_TERMINAL": "This subscription has ended and cannot be changed.",
     "INVOICE_ALREADY_PAID": "This invoice is already paid.",
     "INVOICE_NOT_PAYABLE": "This action is not possible for the current state of the invoice or payment.",
+    "INVOICE_PERIOD_ALREADY_BILLED": "This subscription already has an invoice for its current billing period, so no new one was created. To bill the period again, cancel that invoice first.",
     "PAYMENT_VERIFICATION_FAILED": "The payment could not be verified.",
     "PAYMENT_GATEWAY_NOT_CONFIGURED": "No payment gateway is set up for this action. Add one under Gateway configs.",
     "GATEWAY_ERROR": "The payment gateway returned an error. Please try again later.",
