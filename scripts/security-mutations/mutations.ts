@@ -98,6 +98,10 @@ export const RULE_MUTATIONS: DatabaseMutation[] = [
   grant('INSERT', 'impersonation_sessions', 'roviq_app'),
   grant('DELETE', 'files', 'roviq_reseller'),
   grant('UPDATE', 'resellers', 'roviq_reseller', ['status']),
+  // What a reseller reads about a person.
+  grant('SELECT', 'student_profiles', 'roviq_reseller'),
+  grant('SELECT', 'phone_numbers', 'roviq_reseller'),
+  grant('SELECT', 'user_profiles', 'roviq_reseller', ['date_of_birth']),
 ];
 
 const code = (

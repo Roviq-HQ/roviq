@@ -238,14 +238,17 @@ describe('ROV-156: guardian_profiles', () => {
     });
   });
 
-  it('roviq_reseller: SELECT succeeds, INSERT fails (read-only)', async () => {
+  it('roviq_reseller: SELECT and INSERT are both refused', async () => {
     await inTransaction(async (client) => {
       // Switch to roviq_reseller
       await client.query(`SET LOCAL ROLE roviq_reseller`);
 
-      // SELECT should not error (may return 0 rows without reseller context)
-      const selectRes = await client.query(`SELECT id FROM guardian_profiles LIMIT 1`);
-      expect(selectRes.rows).toBeDefined();
+      // The reseller role holds no privilege on a guardian's profile (ROV-392).
+      await client.query('SAVEPOINT read_attempt');
+      await expect(client.query(`SELECT id FROM guardian_profiles LIMIT 1`)).rejects.toThrow(
+        /permission denied for table guardian_profiles/,
+      );
+      await client.query('ROLLBACK TO SAVEPOINT read_attempt');
 
       // INSERT should fail
       const err = await client

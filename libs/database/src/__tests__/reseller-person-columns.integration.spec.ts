@@ -1,9 +1,10 @@
 /**
- * A reseller reads its institutes' people, but not a person's caste, religion, disability or
- * identity numbers (ROV-391). The reseller role holds column privileges that leave those
- * columns out; this spec attempts each read as the role.
+ * A reseller reads about a person only what its own screens show: the account (`users`), and
+ * the name, picture and search text of the account profile (ROV-391, ROV-392). The reseller
+ * role holds no privilege on the other person tables and a column list on `user_profiles`;
+ * this spec attempts each read as the role.
  *
- * PostgreSQL checks a column privilege before it looks at any row, so no fixture is needed.
+ * PostgreSQL checks a privilege before it looks at any row, so no fixture is needed.
  */
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -13,39 +14,87 @@ import { TEST_POOLER_URL } from './test-helpers';
 const NOBODY = '00000000-0000-0000-0000-00000000dead';
 const DENIED = /permission denied/;
 
-/** Table → the columns the reseller role may not read, and one it may. */
-const WITHHELD: ReadonlyArray<{ table: string; columns: string[]; readable: string }> = [
-  {
-    table: 'student_profiles',
-    columns: [
-      'social_category',
-      'caste',
-      'is_minority',
-      'minority_type',
-      'is_cwsn',
-      'cwsn_type',
-      'medical_info',
-    ],
-    readable: 'admission_number',
-  },
-  { table: 'tenant_user_profiles', columns: ['religion'], readable: 'first_name' },
-  { table: 'user_profiles', columns: ['religion'], readable: 'first_name' },
-  {
-    table: 'user_identifiers',
-    columns: ['value_encrypted', 'value_hash', 'value_plain', 'value_masked'],
-    readable: 'type',
-  },
-  { table: 'enquiries', columns: ['special_needs'], readable: 'student_name' },
-  { table: 'admission_applications', columns: ['form_data'], readable: 'status' },
-  {
-    table: 'staff_profiles',
-    columns: ['social_category', 'is_disabled', 'disability_type'],
-    readable: 'employee_id',
-  },
-  { table: 'guardian_profiles', columns: ['annual_income'], readable: 'occupation' },
-];
+/** Person tables no reseller code reads: the role holds no privilege on them at all. */
+const CLOSED_TABLES = [
+  // A person's details.
+  'tenant_user_profiles',
+  'user_addresses',
+  'user_documents',
+  'user_document_files',
+  'user_identifiers',
+  'phone_numbers',
+  // A person's place in an institute.
+  'student_profiles',
+  'staff_profiles',
+  'staff_qualifications',
+  'guardian_profiles',
+  'student_guardian_links',
+  // Admission.
+  'enquiries',
+  'admission_applications',
+  'application_documents',
+  'application_document_files',
+  // A person's records in an institute.
+  'student_academics',
+  'attendance_entries',
+  'exam_marks',
+  'co_scholastic_assessments',
+  'report_card_instances',
+  'issued_certificates',
+  'tc_register',
+  'leaves',
+  'leave_files',
+  'consent_records',
+] as const;
 
-const CASES = WITHHELD.flatMap(({ table, columns }) => columns.map((column) => [table, column]));
+/** The closed tables that have no `*_live` view. */
+const CLOSED_WITHOUT_VIEW: ReadonlySet<string> = new Set(['consent_records']);
+
+/** The columns of `user_profiles` the reseller role may read, and those it may not. */
+const PROFILE_READABLE = [
+  'id',
+  'user_id',
+  'first_name',
+  'last_name',
+  'profile_image_file_id',
+  'search_vector',
+  'deleted_at',
+] as const;
+const PROFILE_WITHHELD = [
+  'gender',
+  'date_of_birth',
+  'blood_group',
+  'religion',
+  'nationality',
+  'mother_tongue',
+  'cover_image_url',
+  'created_at',
+  'updated_at',
+  'created_by',
+  'updated_by',
+  'deleted_by',
+  'version',
+] as const;
+
+/** What an institute still reads about its own people: sensitive columns of each kind. */
+const INSTITUTE_READS: ReadonlyArray<[table: string, column: string]> = [
+  ['student_profiles', 'caste'],
+  ['student_profiles', 'medical_info'],
+  ['staff_profiles', 'disability_type'],
+  ['guardian_profiles', 'annual_income'],
+  ['tenant_user_profiles', 'religion'],
+  ['tenant_user_profiles', 'date_of_birth'],
+  ['user_profiles', 'religion'],
+  ['user_profiles', 'blood_group'],
+  ['user_identifiers', 'value_masked'],
+  ['user_addresses', 'line1'],
+  ['user_documents', 'reference_number'],
+  ['phone_numbers', 'number'],
+  ['enquiries', 'parent_phone'],
+  ['admission_applications', 'form_data'],
+  ['student_academics', 'roll_number'],
+  ['leaves', 'reason'],
+];
 
 let pool: pg.Pool;
 
@@ -57,46 +106,90 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe('what a reseller may read about a person', () => {
-  it.each(CASES)('should refuse reading %s.%s', async (table, column) => {
+describe('person tables a reseller does not read', () => {
+  it.each(CLOSED_TABLES)('should refuse counting the rows of %s', async (table) => {
     await inRolledBackTx(pool, async (client) => {
       await asReseller(client, NOBODY);
-      await expectRefused(client, DENIED, `SELECT ${column} FROM ${table}`);
+      await expectRefused(client, DENIED, `SELECT count(*) FROM ${table}`);
     });
   });
 
-  it.each(CASES)('should refuse filtering %s by %s', async (table, column) => {
-    await inRolledBackTx(pool, async (client) => {
-      await asReseller(client, NOBODY);
-      await expectRefused(client, DENIED, `SELECT id FROM ${table} WHERE ${column} IS NOT NULL`);
-    });
-  });
-
-  it.each(
-    WITHHELD.map(({ table }) => [table]),
-  )('should refuse reading the whole row of %s, also through its view', async (table) => {
+  it.each(CLOSED_TABLES)('should refuse reading a row of %s', async (table) => {
     await inRolledBackTx(pool, async (client) => {
       await asReseller(client, NOBODY);
       await expectRefused(client, DENIED, `SELECT * FROM ${table}`);
-      await expectRefused(client, DENIED, `SELECT id FROM ${table}_live`);
     });
   });
 
   it.each(
-    WITHHELD.map(({ table, readable }) => [table, readable]),
-  )('should still let it read %s.%s', async (table, readable) => {
+    CLOSED_TABLES.filter((table) => !CLOSED_WITHOUT_VIEW.has(table)),
+  )('should refuse reading %s through its view', async (table) => {
+    await inRolledBackTx(pool, async (client) => {
+      await asReseller(client, NOBODY);
+      await expectRefused(client, DENIED, `SELECT count(*) FROM ${table}_live`);
+    });
+  });
+});
+
+describe('what a reseller may read of an account profile', () => {
+  it.each(PROFILE_WITHHELD)('should refuse reading user_profiles.%s', async (column) => {
+    await inRolledBackTx(pool, async (client) => {
+      await asReseller(client, NOBODY);
+      await expectRefused(client, DENIED, `SELECT ${column} FROM user_profiles`);
+    });
+  });
+
+  it.each(PROFILE_WITHHELD)('should refuse filtering user_profiles by %s', async (column) => {
+    await inRolledBackTx(pool, async (client) => {
+      await asReseller(client, NOBODY);
+      await expectRefused(
+        client,
+        DENIED,
+        `SELECT id FROM user_profiles WHERE ${column} IS NOT NULL`,
+      );
+    });
+  });
+
+  it('should refuse reading the whole row, also through the view', async () => {
+    await inRolledBackTx(pool, async (client) => {
+      await asReseller(client, NOBODY);
+      await expectRefused(client, DENIED, 'SELECT * FROM user_profiles');
+      await expectRefused(client, DENIED, 'SELECT id FROM user_profiles_live');
+    });
+  });
+
+  it('should still let it read the name, the picture and the search text', async () => {
     await inRolledBackTx(pool, async (client) => {
       await asReseller(client, NOBODY);
       const res = await client.query(
-        `SELECT id, ${readable} FROM ${table} WHERE deleted_at IS NULL`,
+        `SELECT ${PROFILE_READABLE.join(', ')} FROM user_profiles WHERE deleted_at IS NULL`,
       );
+      expect(res.rows).toEqual([]);
+    });
+  });
+
+  it('should hold exactly the listed columns of user_profiles', async () => {
+    const { rows } = await pool.query<{ column_name: string }>(
+      // The catalog, not information_schema: that view lists only what the login role may use.
+      `SELECT attname AS column_name FROM pg_attribute
+        WHERE attrelid = 'public.user_profiles'::regclass AND attnum > 0 AND NOT attisdropped
+          AND has_column_privilege('roviq_reseller', attrelid, attnum, 'SELECT')
+        ORDER BY attname`,
+    );
+    expect(rows.map((row) => row.column_name)).toEqual([...PROFILE_READABLE].sort());
+  });
+
+  it('should still let it read the account through its view', async () => {
+    await inRolledBackTx(pool, async (client) => {
+      await asReseller(client, NOBODY);
+      const res = await client.query('SELECT id, username, email, status FROM users_live');
       expect(res.rows).toEqual([]);
     });
   });
 });
 
 describe('what an institute may read about its own people', () => {
-  it.each(CASES)('should still let it read %s.%s', async (table, column) => {
+  it.each(INSTITUTE_READS)('should still let it read %s.%s', async (table, column) => {
     await inRolledBackTx(pool, async (client) => {
       await asInstitute(client, NOBODY);
       const res = await client.query(`SELECT ${column} FROM ${table}_live`);
