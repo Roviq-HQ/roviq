@@ -9,7 +9,14 @@
 -- that no caller can put another table in front of the real one. The owner must bypass row
 -- security (a superuser does); where it does not, both functions refuse the statement.
 
--- On the referencing table. Arguments: the referencing column, the referenced table.
+--
+-- "None" means no institute and no other owner either. A referenced row that belongs to a
+-- reseller (`reseller_id` set) may be named only by an institute of that reseller. A key may
+-- also name the one `scope` its referenced rows must have: a membership's role is an
+-- institute role, never a platform or reseller one.
+
+-- On the referencing table. Arguments: the referencing column, the referenced table and,
+-- optionally, the `scope` the referenced row must have.
 CREATE OR REPLACE FUNCTION public.check_same_tenant_or_none() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public', 'pg_temp'
@@ -20,6 +27,10 @@ DECLARE
   old_reference uuid;
   old_tenant uuid;
   referenced_tenant uuid;
+  referenced_reseller uuid;
+  referenced_scope text;
+  refusal text;
+  matched bigint;
 BEGIN
   EXECUTE format('SELECT ($1).%I, ($1).tenant_id', TG_ARGV[0]) INTO reference, own_tenant USING NEW;
   IF reference IS NULL THEN
@@ -39,13 +50,31 @@ BEGIN
   END IF;
   -- The lock a foreign key takes: the referenced row cannot change institute before this
   -- transaction ends. The table is read, not its live view: a deleted row still has an owner.
-  EXECUTE format('SELECT tenant_id FROM %s WHERE id = $1 FOR KEY SHARE', TG_ARGV[1]::regclass)
-    INTO referenced_tenant USING reference;
+  -- `to_jsonb` reads a column the table may not have: a table without `reseller_id` or
+  -- `scope` gives NULL for it.
+  EXECUTE format(
+    'SELECT t.tenant_id, (to_jsonb(t) ->> ''reseller_id'')::uuid, to_jsonb(t) ->> ''scope''
+       FROM %s t WHERE t.id = $1 FOR KEY SHARE', TG_ARGV[1]::regclass)
+    INTO referenced_tenant, referenced_reseller, referenced_scope USING reference;
+  GET DIAGNOSTICS matched = ROW_COUNT;
+  IF matched = 0 THEN
+    -- The one-column foreign key reports a row that does not exist.
+    RETURN NULL;
+  END IF;
   IF referenced_tenant IS NOT NULL AND referenced_tenant IS DISTINCT FROM own_tenant THEN
+    refusal := 'belongs to another tenant';
+  ELSIF TG_NARGS > 2 AND referenced_scope IS DISTINCT FROM TG_ARGV[2] THEN
+    refusal := format('is not of scope "%s"', TG_ARGV[2]);
+  ELSIF referenced_tenant IS NULL AND referenced_reseller IS NOT NULL AND own_tenant IS NOT NULL
+        AND referenced_reseller IS DISTINCT FROM
+            (SELECT reseller_id FROM institutes WHERE id = own_tenant) THEN
+    refusal := 'belongs to another reseller';
+  END IF;
+  IF refusal IS NOT NULL THEN
     RAISE EXCEPTION 'insert or update on table "%" violates same-tenant rule "%"', TG_TABLE_NAME, TG_NAME
       USING ERRCODE = 'foreign_key_violation',
-            DETAIL = format('Key (%s) names a row of table "%s" that belongs to another tenant.',
-                            TG_ARGV[0], TG_ARGV[1]),
+            DETAIL = format('Key (%s) names a row of table "%s" that %s.',
+                            TG_ARGV[0], TG_ARGV[1], refusal),
             TABLE = TG_TABLE_NAME,
             COLUMN = TG_ARGV[0],
             CONSTRAINT = TG_NAME;
@@ -105,6 +134,12 @@ END
 $$;
 --> statement-breakpoint
 
+-- Trigger functions are run by triggers only.
+REVOKE ALL ON FUNCTION public.check_same_tenant_or_none() FROM PUBLIC;
+--> statement-breakpoint
+REVOKE ALL ON FUNCTION public.keep_referenced_tenant() FROM PUBLIC;
+--> statement-breakpoint
+
 -- Rows that already break the rule are reported, not changed: the migration stops and names
 -- each key with its count.
 DO $$
@@ -159,7 +194,7 @@ CREATE TRIGGER "issued_certificates_pdf_file_id_tenant_or_none" AFTER INSERT OR 
 --> statement-breakpoint
 CREATE TRIGGER "leave_files_file_id_tenant_or_none" AFTER INSERT OR UPDATE ON "leave_files" FOR EACH ROW EXECUTE FUNCTION check_same_tenant_or_none('file_id', 'files');
 --> statement-breakpoint
-CREATE TRIGGER "memberships_role_id_tenant_or_none" AFTER INSERT OR UPDATE ON "memberships" FOR EACH ROW EXECUTE FUNCTION check_same_tenant_or_none('role_id', 'roles');
+CREATE TRIGGER "memberships_role_id_tenant_or_none" AFTER INSERT OR UPDATE ON "memberships" FOR EACH ROW EXECUTE FUNCTION check_same_tenant_or_none('role_id', 'roles', 'institute');
 --> statement-breakpoint
 CREATE TRIGGER "notification_deliveries_notification_id_tenant_or_none" AFTER INSERT OR UPDATE ON "notification_deliveries" FOR EACH ROW EXECUTE FUNCTION check_same_tenant_or_none('notification_id', 'notifications');
 --> statement-breakpoint

@@ -412,6 +412,8 @@ const TENANT_OR_NONE_KEYS: readonly (readonly [string, string, string])[] = [
 ];
 
 const orNoneRule = (table: string, column: string): string => `${table}_${column}_tenant_or_none`;
+/** A membership's role is an institute role: for that key a row of no institute is refused too. */
+const acceptsRowOfNone = (table: string): boolean => table !== 'memberships';
 const orNoneKey = (table: string, column: string): string => `${orNoneRule(table, column)}_fkey`;
 const keepRule = (parent: string): string => `${parent}_keep_referenced_tenant`;
 
@@ -688,6 +690,13 @@ async function copyWithOrNoneRule(
      VALUES ($1, $2), ($3, $4), ($5, NULL)`,
     [ids.own, own.tenantId, ids.other, other.tenantId, ids.none],
   );
+  if (parent === 'roles') {
+    // As the table's own check has it: a role with an institute is an institute role.
+    await client.query(
+      `UPDATE same_tenant_key_scratch.parent
+          SET scope = CASE WHEN tenant_id IS NULL THEN 'platform' ELSE 'institute' END`,
+    );
+  }
 
   const key = await client.query<{ definition: string }>(
     `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
@@ -716,7 +725,7 @@ async function copyWithOrNoneRule(
   };
   const check = await trigger(table, orNoneRule(table, column));
   expect(check).toContain(`ON public.${table} `);
-  expect(check).toContain(`check_same_tenant_or_none('${column}', '${parent}')`);
+  expect(check).toContain(`check_same_tenant_or_none('${column}', '${parent}'`);
   await client.query(
     check
       .replace(`ON public.${table} `, 'ON same_tenant_key_scratch.copy ')
@@ -879,7 +888,13 @@ describe('references to a table whose rows may belong to no institute', () => {
       await client.query('ROLLBACK TO SAVEPOINT attempt');
 
       await client.query(insert, [own.tenantId, ids.own]);
-      await client.query(insert, [own.tenantId, ids.none]);
+      if (acceptsRowOfNone(table)) {
+        await client.query(insert, [own.tenantId, ids.none]);
+      } else {
+        await client.query('SAVEPOINT attempt');
+        await expect(client.query(insert, [own.tenantId, ids.none])).rejects.toMatchObject(refusal);
+        await client.query('ROLLBACK TO SAVEPOINT attempt');
+      }
       // A reference that is not set is not checked.
       await client.query(insert, [own.tenantId, null]);
 
@@ -888,7 +903,7 @@ describe('references to a table whose rows may belong to no institute', () => {
       await expect(
         client.query(
           `UPDATE same_tenant_key_scratch.copy SET ${column} = $1 WHERE ${column} = $2`,
-          [ids.other, ids.none],
+          [ids.other, ids.own],
         ),
       ).rejects.toMatchObject(refusal);
       await client.query('ROLLBACK TO SAVEPOINT attempt');
@@ -912,10 +927,10 @@ describe('references to a table whose rows may belong to no institute', () => {
     await inScratchTx(async (client) => {
       const ids = await copyWithOrNoneRule(client, table, column, parent);
       await client.query('SET LOCAL ROLE roviq_admin');
-      await client.query(insert, [own.tenantId, ids.none]);
-      await client.query(insert, [own.tenantId, ids.own]);
+      const named = acceptsRowOfNone(table) ? [ids.none, ids.own] : [ids.own];
+      for (const id of named) await client.query(insert, [own.tenantId, id]);
 
-      for (const id of [ids.none, ids.own]) {
+      for (const id of named) {
         await client.query('SAVEPOINT attempt');
         await expect(client.query(move, [other.tenantId, id])).rejects.toMatchObject(refusal);
         await client.query('ROLLBACK TO SAVEPOINT attempt');
@@ -925,6 +940,54 @@ describe('references to a table whose rows may belong to no institute', () => {
       expect((await client.query(move, [own.tenantId, ids.none])).rowCount).toBe(1);
       expect((await client.query(move, [null, ids.own])).rowCount).toBe(1);
       expect((await client.query(move, [own.tenantId, ids.other])).rowCount).toBe(1);
+    });
+  });
+
+  it('accepts a reseller’s file only from an institute of that reseller', async () => {
+    const insert =
+      'INSERT INTO same_tenant_key_scratch.copy (tenant_id, logo_file_id) VALUES ($1, $2)';
+    const refusal = { code: '23503', constraint: orNoneRule('institute_branding', 'logo_file_id') };
+    await inScratchTx(async (client) => {
+      const ids = await copyWithOrNoneRule(client, 'institute_branding', 'logo_file_id', 'files');
+      const reseller = await client.query<{ reseller_id: string }>(
+        'SELECT reseller_id FROM institutes WHERE id = $1',
+        [own.tenantId],
+      );
+      const setOwner = 'UPDATE same_tenant_key_scratch.parent SET reseller_id = $1 WHERE id = $2';
+      await client.query(setOwner, [randomUUID(), ids.none]);
+      await client.query('SET LOCAL ROLE roviq_admin');
+      await client.query('SAVEPOINT attempt');
+      await expect(client.query(insert, [own.tenantId, ids.none])).rejects.toMatchObject(refusal);
+      await client.query('ROLLBACK TO SAVEPOINT attempt');
+
+      await client.query('RESET ROLE');
+      await client.query(setOwner, [reseller.rows[0].reseller_id, ids.none]);
+      await client.query('SET LOCAL ROLE roviq_admin');
+      await client.query(insert, [own.tenantId, ids.none]);
+    });
+  });
+
+  it('refuses a platform or reseller role for a membership, on the real tables', async () => {
+    await inScratchTx(async (client) => {
+      const { rows } = await client.query<{ id: string; scope: string }>(
+        `SELECT DISTINCT ON (scope) id, scope FROM roles
+          WHERE scope IN ('platform', 'reseller') AND deleted_at IS NULL ORDER BY scope, id`,
+      );
+      expect(rows.map((row) => row.scope)).toEqual(['platform', 'reseller']);
+      await client.query('SET LOCAL ROLE roviq_admin');
+      for (const role of rows) {
+        await client.query('SAVEPOINT attempt');
+        await expect(
+          client.query('UPDATE memberships SET role_id = $1 WHERE tenant_id = $2', [
+            role.id,
+            own.tenantId,
+          ]),
+        ).rejects.toMatchObject({
+          code: '23503',
+          constraint: orNoneRule('memberships', 'role_id'),
+        });
+        await client.query('ROLLBACK TO SAVEPOINT attempt');
+      }
     });
   });
 

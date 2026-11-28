@@ -101,7 +101,8 @@ export const orNoneTriggerName = (key: Pick<TenantKey, 'table' | 'column'>): str
 export function orNoneStatements(key: Pick<TenantKey, 'table' | 'column' | 'parent'>): string[] {
   return [
     `CREATE TRIGGER "${orNoneTriggerName(key)}" AFTER INSERT OR UPDATE ON "${key.table}" ` +
-      `FOR EACH ROW EXECUTE FUNCTION check_same_tenant_or_none('${key.column}', '${key.parent}');`,
+      // No closing bracket: a key may add the scope its referenced rows must have.
+      `FOR EACH ROW EXECUTE FUNCTION check_same_tenant_or_none('${key.column}', '${key.parent}'`,
     `CREATE TRIGGER "${key.parent}_keep_referenced_tenant" BEFORE UPDATE ON "${key.parent}" ` +
       'FOR EACH ROW WHEN (OLD.tenant_id IS DISTINCT FROM NEW.tenant_id) ' +
       'EXECUTE FUNCTION keep_referenced_tenant();',
