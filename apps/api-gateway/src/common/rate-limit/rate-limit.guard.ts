@@ -11,6 +11,7 @@ import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { readRequestTokenClaims } from '../../auth/middleware/request-token-claims';
+import { clientAddressKey } from './client-address-key';
 import { RATE_LIMITS, type RateLimitBucket, type RateLimits } from './rate-limit.buckets';
 import { RATE_LIMIT_KEY } from './rate-limit.decorator';
 import { RateLimitStore, type RateLimitSubject } from './rate-limit.store';
@@ -55,7 +56,9 @@ export class RateLimitGuard implements CanActivate {
 
     const request = this.requestOf(context);
     const subjects = this.subjectsOf(context, request);
-    const named = marked ?? (request?.originalUrl?.startsWith(WEBHOOK_PATH) ? 'webhook' : null);
+    // Express matches routes without regard to case, so the path is compared the same way.
+    const isWebhook = request?.originalUrl?.toLowerCase().startsWith(WEBHOOK_PATH) ?? false;
+    const named = marked ?? (isWebhook ? 'webhook' : null);
 
     for (const subject of subjects) {
       await this.count(subject.kind === 'address' ? 'general' : 'user', subject);
@@ -76,7 +79,7 @@ export class RateLimitGuard implements CanActivate {
     request: RequestLike | undefined,
   ): RateLimitSubject[] {
     const subjects: RateLimitSubject[] = [];
-    if (request?.ip) subjects.push({ kind: 'address', id: request.ip });
+    if (request?.ip) subjects.push({ kind: 'address', id: clientAddressKey(request.ip) });
     const claims = readRequestTokenClaims(
       context,
       this.jwtService,

@@ -30,6 +30,7 @@ describe('measureOperation', () => {
       depth: 3,
       fields: 4,
       rootFields: 2,
+      tooLargeToMeasure: false,
       introspection: false,
     });
   });
@@ -61,6 +62,23 @@ describe('measureOperation', () => {
       fragment B on T { y ...A }
     `);
     expect(size.fields).toBe(3);
+  });
+
+  it('should stop counting a document whose fragments only spread each other, and call it too large', () => {
+    // 30 levels, two spreads each: over a thousand million expansions if walked to the end,
+    // and only one field at the bottom.
+    const levels = Array.from(
+      { length: 30 },
+      (_, level) => `fragment F${level} on Query { ...F${level + 1} ...F${level + 1} }`,
+    );
+    const source = `{ ...F0 } ${levels.join(' ')} fragment F30 on Query { a }`;
+
+    const started = performance.now();
+    const size = sizeOf(source);
+
+    expect(size.tooLargeToMeasure).toBe(true);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(limitExceeded(size, DEFAULT_QUERY_LIMITS)).toMatch(/more than 100000 selections/);
   });
 
   it('should recognise an operation that only introspects', () => {

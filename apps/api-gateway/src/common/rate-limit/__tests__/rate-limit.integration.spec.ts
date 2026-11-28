@@ -13,7 +13,6 @@ import {
   type GqlResponse,
   type IntegrationAppResult,
   type TestInstitute,
-  waitForCondition,
 } from '@roviq/testing/integration';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -148,10 +147,10 @@ describe('request limits (integration)', () => {
       }
       expect(codeOf(await send(address, REFRESH))).toBe('TOO_MANY_REQUESTS');
 
-      await waitForCondition(
-        async () => codeOf(await send(address, REFRESH)) !== 'TOO_MANY_REQUESTS',
-        { timeoutMs: 4000, intervalMs: 100 },
-      );
+      // One request after the one-second window: polling would itself fill the address's
+      // general bucket and be refused for that instead.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      expect(codeOf(await send(address, REFRESH))).not.toBe('TOO_MANY_REQUESTS');
     });
   });
 

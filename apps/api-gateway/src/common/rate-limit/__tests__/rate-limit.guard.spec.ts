@@ -21,6 +21,9 @@ function httpContext(
   if (marked !== undefined) Reflect.defineMetadata(RATE_LIMIT_KEY, marked, handler);
   return createMock<ExecutionContext>({
     getType: () => 'http',
+    // An HTTP handler's arguments are (req, res, next): there is no GraphQL context among them.
+    getArgs: () => [],
+    getArgByIndex: () => undefined,
     getHandler: () => handler,
     getClass: () => class Controller {},
     switchToHttp: () => ({ getRequest: () => ({ headers: {}, ...request }) }),

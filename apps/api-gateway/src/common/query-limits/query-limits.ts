@@ -39,6 +39,8 @@ export interface OperationSize {
   depth: number;
   fields: number;
   rootFields: number;
+  /** Counting stopped at the ceiling: the document is larger than anything worth measuring. */
+  tooLargeToMeasure: boolean;
   /** Every root field is `__schema`, `__type` or `__typename`. */
   introspection: boolean;
 }
@@ -48,9 +50,15 @@ type FragmentLookup = (name: string) => FragmentDefinitionNode | null | undefine
 interface Tally {
   depth: number;
   fields: number;
+  /** Every selection looked at: fields, inline fragments and fragment spreads. */
+  visits: number;
 }
 
-/** A field count no real operation reaches: counting stops there, so a hostile document costs little to refuse. */
+/**
+ * A number of selections no real operation reaches: counting stops there, so a hostile
+ * document costs little to refuse. Spreads count too: fragments that only spread other
+ * fragments double the work at every level without adding one field.
+ */
 const COUNT_CEILING = 100_000;
 
 function walk(
@@ -62,7 +70,8 @@ function walk(
   roots: string[] | null,
 ): void {
   for (const selection of set.selections) {
-    if (tally.fields > COUNT_CEILING) return;
+    tally.visits += 1;
+    if (tally.visits > COUNT_CEILING) return;
     if (selection.kind === Kind.FIELD) {
       tally.fields += 1;
       tally.depth = Math.max(tally.depth, depth);
@@ -89,19 +98,23 @@ export function measureOperation(
   operation: OperationDefinitionNode,
   fragment: FragmentLookup,
 ): OperationSize {
-  const tally: Tally = { depth: 0, fields: 0 };
+  const tally: Tally = { depth: 0, fields: 0, visits: 0 };
   const roots: string[] = [];
   walk(operation.selectionSet, 1, fragment, new Set(), tally, roots);
   return {
     depth: tally.depth,
     fields: tally.fields,
     rootFields: roots.length,
+    tooLargeToMeasure: tally.visits > COUNT_CEILING,
     introspection: roots.length > 0 && roots.every((name) => name.startsWith('__')),
   };
 }
 
 /** The limit an operation of this size goes over, as the message the caller gets; null when it fits. */
 export function limitExceeded(size: OperationSize, limits: QueryLimits): string | null {
+  if (size.tooLargeToMeasure) {
+    return `Query has more than ${COUNT_CEILING} selections once its fragments are expanded`;
+  }
   if (size.introspection) return null;
   if (size.depth > limits.maxDepth) {
     return `Query is ${size.depth} levels deep; the limit is ${limits.maxDepth}`;
@@ -110,8 +123,7 @@ export function limitExceeded(size: OperationSize, limits: QueryLimits): string 
     return `Query selects ${size.rootFields} fields at the root; the limit is ${limits.maxRootFields}`;
   }
   if (size.fields > limits.maxFields) {
-    const counted = size.fields > COUNT_CEILING ? `more than ${COUNT_CEILING}` : `${size.fields}`;
-    return `Query selects ${counted} fields; the limit is ${limits.maxFields}`;
+    return `Query selects ${size.fields} fields; the limit is ${limits.maxFields}`;
   }
   return null;
 }
