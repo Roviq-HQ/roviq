@@ -673,11 +673,20 @@ describe('notification pipeline (integration)', () => {
         (await deliveriesFor(guardian.userId)).filter((d) => d.channel === 'WHATSAPP');
       const before = (await whatsappRows()).length;
 
-      // Another institute cannot hold a row for this pair: the foreign key carries the institute.
+      // Another institute cannot hold a row for this pair: both profile keys carry the institute.
+      // PostgreSQL names whichever of the two it checks first, which follows the order the
+      // keys were created in, not anything the product decides.
       await expect(recordConsent(true, foreignInstitute.tenantId)).rejects.toMatchObject({
         code: '23503',
-        constraint: 'consent_records_student_profile_id_tenant_fkey',
+        constraint: expect.stringMatching(
+          /^consent_records_(guardian|student)_profile_id_tenant_fkey$/,
+        ),
       });
+      const stored = await superPool.query(
+        'SELECT 1 FROM consent_records WHERE tenant_id = $1 AND student_profile_id = $2',
+        [foreignInstitute.tenantId, studentProfileId],
+      );
+      expect(stored.rowCount).toBe(0);
       expect(await send('WHATSAPP', aboutStudent())).toEqual(blocked);
       // Other channels are not gated by this consent.
       expect((await send('EMAIL', aboutStudent())).status).toBe('SENT');

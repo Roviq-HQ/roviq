@@ -5,9 +5,10 @@
  */
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { holdPlatformSenderLock, PLATFORM_SENDER_LOCK_WAIT_MS } from '../platform-sender-lock';
 import { SEED_IDS } from '../seed/ids';
 import { asInstitute, asReseller, become, expectRefused, inRolledBackTx } from './role-helpers';
-import { TEST_POOLER_URL } from './test-helpers';
+import { TEST_POOLER_URL, TEST_SUPERUSER_URL } from './test-helpers';
 
 const SYSTEM = '00000000-0000-0000-0000-000000000000';
 const DENIED = /permission denied/;
@@ -49,12 +50,18 @@ async function removePlatformSenders(client: pg.PoolClient): Promise<void> {
   );
 }
 
-beforeAll(() => {
+let releaseLock: (() => Promise<void>) | undefined;
+
+// Two tests here create a platform sender. They roll it back, but while the transaction is
+// open the unique index still collides with a platform sender another spec file commits.
+beforeAll(async () => {
+  releaseLock = await holdPlatformSenderLock(TEST_SUPERUSER_URL);
   pool = new pg.Pool({ connectionString: TEST_POOLER_URL, max: 2 });
-});
+}, PLATFORM_SENDER_LOCK_WAIT_MS);
 
 afterAll(async () => {
-  await pool.end();
+  await pool?.end();
+  await releaseLock?.();
 });
 
 describe('messaging tables: row-level security is forced', () => {

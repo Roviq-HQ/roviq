@@ -1,5 +1,6 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, TransactionRollbackError } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
+import type { DrizzleDB } from '../../providers';
 import {
   institutes,
   roles,
@@ -29,6 +30,31 @@ describe('Seed tier idempotency + cumulative chaining', () => {
     await pool.end();
   });
 
+  /**
+   * Runs a test that removes or changes a seeded row in a transaction that is rolled back.
+   * Other spec files read the same seeded rows in parallel; a committed delete, even one the
+   * seed puts back a moment later, makes those rows vanish under them.
+   *
+   * `seed` runs first, inside the transaction, so that this transaction takes the seed's row
+   * locks in the seed's own order before it holds the row the test changes. Changing the row
+   * first and seeding after takes them in the opposite order to a seed running in another
+   * spec file, and the two deadlock.
+   */
+  async function withoutTouchingSharedRows(
+    seed: (tx: DrizzleDB) => Promise<void>,
+    fn: (tx: DrizzleDB) => Promise<void>,
+  ): Promise<void> {
+    try {
+      await db.transaction(async (tx) => {
+        await seed(tx as DrizzleDB);
+        await fn(tx as DrizzleDB);
+        tx.rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof TransactionRollbackError)) throw error;
+    }
+  }
+
   it('seedEssential x3 → still exactly one system user', async () => {
     await seedEssential(db);
     await seedEssential(db);
@@ -38,16 +64,21 @@ describe('Seed tier idempotency + cumulative chaining', () => {
   });
 
   it('seedEssential repairs a missing system role after the system user exists', async () => {
-    await seedEssential(db);
-    await db.delete(roles).where(eq(roles.id, SEED_IDS.ROLE_PLATFORM_SUPPORT));
+    await withoutTouchingSharedRows(seedEssential, async (tx) => {
+      const removed = await tx
+        .delete(roles)
+        .where(eq(roles.id, SEED_IDS.ROLE_PLATFORM_SUPPORT))
+        .returning({ id: roles.id });
+      expect(removed).toHaveLength(1);
 
-    await seedEssential(db);
+      await seedEssential(tx);
 
-    const rows = await db
-      .select({ id: roles.id })
-      .from(roles)
-      .where(eq(roles.id, SEED_IDS.ROLE_PLATFORM_SUPPORT));
-    expect(rows).toHaveLength(1);
+      const rows = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(eq(roles.id, SEED_IDS.ROLE_PLATFORM_SUPPORT));
+      expect(rows).toHaveLength(1);
+    });
   });
 
   it('seedDemo invokes seedEssential — system user exists after seedDemo only', async () => {
@@ -57,16 +88,21 @@ describe('Seed tier idempotency + cumulative chaining', () => {
   });
 
   it('seedDemo repairs the teacher staff profile when the institute sentinel already exists', async () => {
-    await seedDemo(db);
-    await db.delete(staffProfiles).where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_1));
+    await withoutTouchingSharedRows(seedDemo, async (tx) => {
+      const removed = await tx
+        .delete(staffProfiles)
+        .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_1))
+        .returning({ id: staffProfiles.id });
+      expect(removed).toHaveLength(1);
 
-    await seedDemo(db);
+      await seedDemo(tx);
 
-    const rows = await db
-      .select({ id: staffProfiles.id })
-      .from(staffProfiles)
-      .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_1));
-    expect(rows).toHaveLength(1);
+      const rows = await tx
+        .select({ id: staffProfiles.id })
+        .from(staffProfiles)
+        .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_1));
+      expect(rows).toHaveLength(1);
+    });
   });
 
   it('seedE2e invokes seedDemo — institute1 exists after seedE2e only', async () => {
@@ -106,39 +142,47 @@ describe('Seed tier idempotency + cumulative chaining', () => {
       eq(tenantSequences.tenantId, SEED_IDS.INSTITUTE_1),
       eq(tenantSequences.sequenceName, 'adm_no:N-'),
     );
-    const [original] = await db
-      .select({ value: tenantSequences.currentValue })
-      .from(tenantSequences)
-      .where(nursery);
-    try {
-      await db.update(tenantSequences).set({ currentValue: 50n }).where(nursery);
-      await seedE2e(db);
-      const [after] = await db
+    await withoutTouchingSharedRows(seedE2e, async (tx) => {
+      const raised = await tx
+        .update(tenantSequences)
+        .set({ currentValue: 50n })
+        .where(nursery)
+        .returning({ name: tenantSequences.sequenceName });
+      expect(raised).toHaveLength(1);
+      await seedE2e(tx);
+      const [after] = await tx
         .select({ value: tenantSequences.currentValue })
         .from(tenantSequences)
         .where(nursery);
       expect(after.value).toBe(50n);
-    } finally {
-      await db.update(tenantSequences).set({ currentValue: original.value }).where(nursery);
-    }
+    });
   });
 
   it('seedE2e repairs missing e2e fixtures when student rows already exist', async () => {
-    await seedE2e(db);
-    await db.delete(staffProfiles).where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_2));
-    await db.delete(studentGuardianLinks).where(eq(studentGuardianLinks.id, SEED_IDS.LINK_G2_S3));
+    await withoutTouchingSharedRows(seedE2e, async (tx) => {
+      const staffRemoved = await tx
+        .delete(staffProfiles)
+        .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_2))
+        .returning({ id: staffProfiles.id });
+      const linkRemoved = await tx
+        .delete(studentGuardianLinks)
+        .where(eq(studentGuardianLinks.id, SEED_IDS.LINK_G2_S3))
+        .returning({ id: studentGuardianLinks.id });
+      expect(staffRemoved).toHaveLength(1);
+      expect(linkRemoved).toHaveLength(1);
 
-    await seedE2e(db);
+      await seedE2e(tx);
 
-    const staffRows = await db
-      .select({ id: staffProfiles.id })
-      .from(staffProfiles)
-      .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_2));
-    const linkRows = await db
-      .select({ id: studentGuardianLinks.id })
-      .from(studentGuardianLinks)
-      .where(eq(studentGuardianLinks.id, SEED_IDS.LINK_G2_S3));
-    expect(staffRows).toHaveLength(1);
-    expect(linkRows).toHaveLength(1);
+      const staffRows = await tx
+        .select({ id: staffProfiles.id })
+        .from(staffProfiles)
+        .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_2));
+      const linkRows = await tx
+        .select({ id: studentGuardianLinks.id })
+        .from(studentGuardianLinks)
+        .where(eq(studentGuardianLinks.id, SEED_IDS.LINK_G2_S3));
+      expect(staffRows).toHaveLength(1);
+      expect(linkRows).toHaveLength(1);
+    });
   });
 });

@@ -17,6 +17,7 @@ export {
   type UniqueViolationErrors,
   uniqueViolationConstraint,
 } from './pg-errors';
+export { holdPlatformSenderLock, PLATFORM_SENDER_LOCK_WAIT_MS } from './platform-sender-lock';
 export { createDrizzleDb, DRIZZLE_DB, type DrizzleDB } from './providers';
 export {
   provisionResellerSystemRoles,

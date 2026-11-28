@@ -7,9 +7,13 @@ const PLATFORM_SENDER_LOCK = 319_001;
 export const PLATFORM_SENDER_LOCK_WAIT_MS = 180_000;
 
 /**
- * Only one live platform messaging sender may exist, and spec files run in parallel against
- * one database. A spec that creates one holds this lock from `beforeAll` to `afterAll`, and
- * removes its sender before releasing. Returns the release function.
+ * Test support. Only one live platform messaging sender may exist, and spec files run in
+ * parallel against one database. A spec that creates one, also inside a transaction it rolls
+ * back, holds this lock from `beforeAll` to `afterAll`, and removes its sender before
+ * releasing. Returns the release function.
+ *
+ * It lives in this library so that this library's own specs can take it: the testing library
+ * depends on this one, not the other way round.
  */
 export async function holdPlatformSenderLock(
   connectionString: string,
