@@ -9,6 +9,11 @@
 # it. The API answers on 127.0.0.1:$STAGING_RESTORE_API_PORT (default 13999). Remove the drill,
 # volumes included, with: staging-restore.sh --remove <backup folder> [project]
 #
+# An encrypted backup (`*.gpg` files) is decrypted with the private key in the keyring of the
+# user who runs the drill, or with the key file named by STAGING_BACKUP_PRIVATE_KEY_FILE, which
+# is read into a keyring that is removed when the script ends. The private key does not live
+# on the staging host: bring it for the drill and take it away again.
+#
 # A backup taken with an external store holds no objects, and the drill restores and starts the
 # databases only: apps started here would share the live buckets, and the restored file
 # sweeper could delete objects the live stack still uses.
@@ -38,7 +43,7 @@ REL="$RELEASES_DIR/$SHA"
 if [[ "$REMOVE" == true ]]; then
     docker rm -f "$TARGET-api-port" >/dev/null 2>&1 || true
     STAGING_PROJECT="$TARGET" STAGING_PROXY_NETWORK="$TARGET-net" \
-        STAGING_METRICS_PORT=13998 STAGING_WORKFLOWS_PORT=13997 stg_compose "$REL" down -v
+        STAGING_METRICS_PORT=13998 stg_compose "$REL" down -v
     docker network rm "$TARGET-net" >/dev/null 2>&1 || true
     log "Removed $TARGET"
     exit 0
@@ -49,6 +54,22 @@ if docker volume ls -q --filter "label=com.docker.compose.project=$TARGET" | gre
     exit 1
 fi
 
+if [[ -n "${STAGING_BACKUP_PRIVATE_KEY_FILE:-}" ]]; then
+    GNUPGHOME="$(mktemp -d)"
+    export GNUPGHOME
+    trap 'rm -rf "$GNUPGHOME"' EXIT
+    gpg --batch --quiet --no-tty --import "$STAGING_BACKUP_PRIVATE_KEY_FILE"
+fi
+# Writes one file of the backup to stdout, decrypting it when the backup is encrypted.
+backup_file() {
+    if [[ -f "$BACKUP/$1.gpg" ]]; then
+        gpg --batch --quiet --no-tty --decrypt "$BACKUP/$1.gpg"
+    else
+        cat "$BACKUP/$1"
+    fi
+}
+has_backup_file() { [[ -f "$BACKUP/$1.gpg" || -f "$BACKUP/$1" ]]; }
+
 START="$(date +%s)"
 export STAGING_PROJECT="$TARGET"
 export STAGING_PROXY_NETWORK="$TARGET-net"
@@ -56,18 +77,17 @@ docker network inspect "$STAGING_PROXY_NETWORK" >/dev/null 2>&1 ||
     docker network create --internal "$STAGING_PROXY_NETWORK" >/dev/null
 # Host-only ports must not clash with the running stack.
 export STAGING_METRICS_PORT="${STAGING_RESTORE_METRICS_PORT:-13998}"
-export STAGING_WORKFLOWS_PORT="${STAGING_RESTORE_WORKFLOWS_PORT:-13997}"
 
 if ! external_store; then
-    [[ -f "$BACKUP/objects.tar.gz" ]] || {
+    has_backup_file objects.tar.gz || {
         echo "$BACKUP holds no object archive (taken with an external store)" >&2
         exit 1
     }
     log "Restoring the object store into $TARGET"
     docker volume create --label "com.docker.compose.project=$TARGET" \
         --label com.docker.compose.volume=roviq-objects "${TARGET}_roviq-objects" >/dev/null
-    docker run --rm -v "${TARGET}_roviq-objects:/data" -v "$BACKUP:/in:ro" \
-        postgres:18-alpine tar -C /data -xzf /in/objects.tar.gz
+    backup_file objects.tar.gz |
+        docker run --rm -i -v "${TARGET}_roviq-objects:/data" postgres:18-alpine tar -C /data -xzf -
 fi
 
 log "Starting a fresh database"
@@ -76,13 +96,16 @@ stg_compose "$REL" up -d --wait postgres
 log "Restoring the database roles"
 # Roles belong to the cluster, not the dump; policies name them. Roles that init-db.sh already
 # created report "already exists", which is expected.
-stg_compose "$REL" exec -T postgres psql -q -U roviq -d postgres <"$BACKUP/roles.sql" >/dev/null 2>&1 || true
+backup_file roles.sql |
+    stg_compose "$REL" exec -T postgres psql -q -U roviq -d postgres >/dev/null 2>&1 || true
 
 log "Restoring the databases"
-stg_compose "$REL" exec -T postgres pg_restore -U roviq -d roviq --exit-on-error <"$BACKUP/roviq.dump"
+backup_file roviq.dump |
+    stg_compose "$REL" exec -T postgres pg_restore -U roviq -d roviq --exit-on-error
 for db in temporal temporal_visibility; do
     stg_compose "$REL" exec -T postgres createdb -U roviq "$db"
-    stg_compose "$REL" exec -T postgres pg_restore -U roviq -d "$db" --exit-on-error <"$BACKUP/$db.dump"
+    backup_file "$db.dump" |
+        stg_compose "$REL" exec -T postgres pg_restore -U roviq -d "$db" --exit-on-error
 done
 printf '%s\n' '\getenv pw POSTGRES_POOLER_PASSWORD' "ALTER ROLE roviq_pooler PASSWORD :'pw';" \
     '\getenv aw POSTGRES_AUDIT_WRITER_PASSWORD' "ALTER ROLE roviq_audit_writer PASSWORD :'aw';" |
@@ -99,7 +122,7 @@ fi
 stg_compose "$REL" up -d "${APP_SERVICES[@]}"
 
 API_PORT="${STAGING_RESTORE_API_PORT:-13999}"
-docker run -d --rm --name "$TARGET-api-port" --network "${TARGET}_roviq-net" \
+docker run -d --rm --name "$TARGET-api-port" --network "${TARGET}_backplane" \
     -p "127.0.0.1:$API_PORT:3000" alpine/socat TCP-LISTEN:3000,fork,reuseaddr TCP:api-gateway:3000 >/dev/null
 
 for _ in $(seq 1 60); do

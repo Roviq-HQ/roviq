@@ -15,6 +15,7 @@ import { jetstream } from '@nats-io/jetstream';
 import { headers as natsHeaders } from '@nats-io/nats-core';
 import { connect, type NatsConnection } from '@nats-io/transport-node';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { natsServerOptions } from '../../../libs/backend/nats-jetstream/src/nats-url';
 import { expect, test } from '../../shared/console-guardian';
 import { E2E_USERS } from '../../shared/seed-fixtures';
 
@@ -23,7 +24,8 @@ const { dlq } = testIds;
 // e2e NATS publishes on its own host port (4223 for instance 0). Pin to it
 // and ignore the ambient NATS_URL, which points at the dev-infra JetStream.
 const NATS_URL =
-  process.env.E2E_NATS_URL ?? `nats://localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
+  process.env.E2E_NATS_URL ??
+  `nats://gateway:roviq_nats_gateway_dev@localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
 const API_URL =
   process.env.API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 
@@ -142,7 +144,7 @@ test.describe('Admin Observability — Dead Letter Queue (ROV-19)', () => {
 
   test.beforeAll(async () => {
     token = await platformToken();
-    nc = await connect({ servers: NATS_URL, timeout: 5_000 });
+    nc = await connect({ ...natsServerOptions(NATS_URL), timeout: 5_000 });
     js = jetstream(nc);
   });
 

@@ -54,6 +54,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "roviq_redis_dev"]
+    environment:
+      REDISCLI_AUTH: roviq_redis_dev
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -62,7 +65,13 @@ services:
 
   nats:
     image: nats:2.10-alpine
-    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    command: ["-c", "/etc/nats/nats.conf"]
+    environment:
+      NATS_MONITOR: 0.0.0.0:8222
+      NATS_GATEWAY_PASSWORD: roviq_nats_gateway_dev
+      NATS_NOTIFICATIONS_PASSWORD: roviq_nats_notifications_dev
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf:ro
     # Host ports offset off dev infra (compose.infra.yaml NATS owns 4222/8222)
     # so the e2e stack coexists with a running dev stack — same convention as
     # postgres (5435 vs dev 5434) and api-gateway (3004 vs dev 3005). The
@@ -98,13 +107,28 @@ services:
   # institute setup, bulk student import, and compliance export workflows.
   # Internal-only (no host port exposure) — api-gateway reaches it via
   # `temporal:7233` on the Docker network.
+  temporal-db:
+    image: postgres:18-alpine
+    entrypoint: ["/temporal-db.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: roviq
+      PGPASSWORD: roviq_dev
+      TEMPORAL_DB_PASSWORD: roviq_temporal_dev
+    volumes:
+      - ./temporal-db.sh:/temporal-db.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   temporal:
     image: temporalio/auto-setup:latest
     environment:
       DB: postgres12
       DB_PORT: 5432
-      POSTGRES_USER: roviq
-      POSTGRES_PWD: roviq_dev
+      POSTGRES_USER: roviq_temporal
+      POSTGRES_PWD: roviq_temporal_dev
+      SKIP_DB_CREATE: "true"
       POSTGRES_SEEDS: postgres
       # auto-setup runs four services, each with its own pool that keeps maxIdleConns open;
       # the 20/20 + 10/10 defaults held ~50 of Postgres's 100 slots while idle.
@@ -113,8 +137,8 @@ services:
       SQL_VIS_MAX_CONNS: 5
       SQL_VIS_MAX_IDLE_CONNS: 1
     depends_on:
-      postgres:
-        condition: service_healthy
+      temporal-db:
+        condition: service_completed_successfully
     healthcheck:
       # auto-setup provisions namespaces asynchronously — use the Temporal
       # CLI against the container's own hostname (the server binds to that
@@ -156,7 +180,7 @@ services:
       DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
       # Override host-side REDIS_URL from .env so db-reset can flush the
       # Redis-backed lockout cache (auth rate-limit) on test reset.
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:roviq_redis_dev@redis:6379
       S3_ENDPOINT: http://object-storage:9000
       # storage:init allows browser uploads from these origins (the e2e web app, not the dev one).
       ALLOWED_ORIGINS: "http://localhost:${E2E_WEB_PORT:-4201},http://admin.localhost:${E2E_WEB_PORT:-4201},http://reseller.localhost:${E2E_WEB_PORT:-4201}"
@@ -206,8 +230,8 @@ services:
       DATABASE_URL_AUDIT: postgresql://roviq_audit_writer:roviq_audit_writer_dev@postgres:5432/roviq_test
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
       # Override service URLs to use Docker network hostnames
-      NATS_URL: nats://nats:4222
-      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://gateway:roviq_nats_gateway_dev@nats:4222
+      REDIS_URL: redis://:roviq_redis_dev@redis:6379
       NOTIFICATION_SERVICE_URL: http://notification-service:3002
       TEMPORAL_ADDRESS: temporal:7233
       S3_ENDPOINT: http://object-storage:9000
@@ -280,8 +304,8 @@ services:
       - ../.e2e/dist:${E2E_WORKSPACE}/dist
     environment:
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://:roviq_redis_dev@redis:6379
+      NATS_URL: nats://notifications:roviq_nats_notifications_dev@nats:4222
       # env_file carries the host instance's port; in-network callers use 3002.
       NOTIFICATION_SERVICE_PORT: "3002"
       NODE_ENV: test

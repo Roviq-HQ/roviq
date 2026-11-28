@@ -9,6 +9,7 @@ import { ClientNats } from '@nestjs/microservices';
 import { requestContext } from '@roviq/request-context';
 import { Observable, ReplaySubject } from 'rxjs';
 import { RESILIENT_NATS_OPTIONS } from '../connection-options';
+import { natsServerOptions } from '../nats-url';
 
 /**
  * NestJS custom transport client that publishes events via JetStream
@@ -35,6 +36,8 @@ export class JetStreamClient extends ClientNats {
       servers: 'nats://localhost:4222',
       ...RESILIENT_NATS_OPTIONS,
       ...options,
+      // A URL may carry the service's user and password; the client takes them as options.
+      ...(options.servers && natsServerOptions(options.servers)),
     });
   }
 

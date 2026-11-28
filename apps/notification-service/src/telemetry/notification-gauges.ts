@@ -15,7 +15,7 @@ import {
   type ObservableGauge,
   type ObservableResult,
 } from '@opentelemetry/api';
-import { STREAMS } from '@roviq/nats-jetstream';
+import { natsServerOptions, STREAMS } from '@roviq/nats-jetstream';
 import { NotificationWorkerService } from '../workflows/notification.worker';
 import { NOTIFICATION_METRIC_LABELS as L, NOTIFICATION_INSTRUMENTS } from './notification-metrics';
 
@@ -127,7 +127,7 @@ export class NotificationGauges implements OnModuleInit, OnModuleDestroy, OnAppl
   };
 
   private manager(): Promise<JetStreamManager> {
-    this.nc ??= connect({ servers: this.config.getOrThrow<string>('NATS_URL') });
+    this.nc ??= connect(natsServerOptions(this.config.getOrThrow<string>('NATS_URL')));
     this.jsm ??= this.nc.then((nc) => jetstreamManager(nc));
     return this.jsm;
   }

@@ -16,6 +16,7 @@ export type {
   RetryOptions,
   StreamConfig,
 } from './interfaces/jetstream.options';
+export { type NatsServerOptions, natsServerOptions } from './nats-url';
 export { connectJetStreamMicroservice } from './server/connect';
 export { deadLetterErrorText } from './server/error-text';
 export { DeserializationError, HandlerTimeoutError } from './server/errors';

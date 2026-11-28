@@ -18,9 +18,15 @@ import {
 } from '@nats-io/jetstream';
 import { connect } from '@nats-io/transport-node';
 import type { StreamConfig } from '../libs/backend/nats-jetstream/src/interfaces/jetstream.options';
+import { natsServerOptions } from '../libs/backend/nats-jetstream/src/nats-url';
 import { STREAMS } from '../libs/backend/nats-jetstream/src/streams/stream.config';
 
-const NATS_URL = process.env.NATS_URL ?? `nats://localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
+const NATS_URL =
+  process.env.NATS_URL ??
+  `nats://gateway:roviq_nats_gateway_dev@localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
+
+// The address without the user and password, for messages.
+const SERVER = String(natsServerOptions(NATS_URL).servers);
 
 const RETENTION_MAP: Record<StreamConfig['retention'], RetentionPolicy> = {
   workqueue: RetentionPolicy.Workqueue,
@@ -130,12 +136,12 @@ async function findOrphans(jsm: JetStreamManager): Promise<Drift[]> {
 function reportDrifts(drifts: Drift[]): void {
   if (drifts.length === 0) {
     console.log(
-      `check:jetstream-drift — ${Object.keys(STREAMS).length} streams in source, all match deployed at ${NATS_URL}.`,
+      `check:jetstream-drift — ${Object.keys(STREAMS).length} streams in source, all match deployed at ${SERVER}.`,
     );
     return;
   }
 
-  console.error(`check:jetstream-drift — ${drifts.length} drift(s) detected at ${NATS_URL}:\n`);
+  console.error(`check:jetstream-drift — ${drifts.length} drift(s) detected at ${SERVER}:\n`);
   for (const d of drifts) {
     console.error(`  ${d.stream}.${d.field}`);
     console.error(`    source:   ${d.source}`);
@@ -150,7 +156,7 @@ function reportDrifts(drifts: Drift[]): void {
 }
 
 async function main(): Promise<void> {
-  const nc = await connect({ servers: NATS_URL, timeout: 5_000 });
+  const nc = await connect({ ...natsServerOptions(NATS_URL), timeout: 5_000 });
   try {
     const jsm = await jetstreamManager(nc);
     const drifts: Drift[] = [];

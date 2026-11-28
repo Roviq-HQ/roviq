@@ -18,6 +18,10 @@ services:
   redis:
     image: redis:7-alpine
     ports: ["${DEV_REDIS_PORT:-6379}:6379"]
+    # Development password, the same in every dev and e2e stack (REDIS_URL in .env.example).
+    command: ["redis-server", "--requirepass", "roviq_redis_dev"]
+    environment:
+      REDISCLI_AUTH: roviq_redis_dev
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,9 +35,16 @@ services:
     ports:
       - "${DEV_NATS_PORT:-4222}:4222"
       - "${DEV_NATS_MONITOR_PORT:-8222}:8222"
-    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    # Users and JetStream come from the shared config; development passwords (NATS_URL in
+    # .env.example uses the gateway's).
+    command: ["-c", "/etc/nats/nats.conf"]
+    environment:
+      NATS_MONITOR: 0.0.0.0:8222
+      NATS_GATEWAY_PASSWORD: roviq_nats_gateway_dev
+      NATS_NOTIFICATIONS_PASSWORD: roviq_nats_notifications_dev
     volumes:
       - nats_data:/data
+      - ./nats.conf:/etc/nats/nats.conf:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
       interval: 5s
@@ -75,6 +86,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # Temporal's own database role and its two databases (docker/temporal-db.sh); runs to the end
+  # before Temporal starts.
+  temporal-db:
+    image: postgres:18-alpine
+    entrypoint: ["/temporal-db.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: roviq
+      PGPASSWORD: roviq_dev
+      TEMPORAL_DB_PASSWORD: roviq_temporal_dev
+    volumes:
+      - ./temporal-db.sh:/temporal-db.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   temporal:
     image: temporalio/auto-setup:latest
     ports:
@@ -82,8 +109,10 @@ services:
     environment:
       DB: postgres12
       DB_PORT: 5432
-      POSTGRES_USER: roviq
-      POSTGRES_PWD: roviq_dev
+      # Its own role, which owns only Temporal's two databases; temporal-db creates both.
+      POSTGRES_USER: roviq_temporal
+      POSTGRES_PWD: roviq_temporal_dev
+      SKIP_DB_CREATE: "true"
       POSTGRES_SEEDS: postgres
       # auto-setup runs four services, each with its own pool that keeps maxIdleConns open;
       # the 20/20 + 10/10 defaults held ~50 of Postgres's 100 slots while idle.
@@ -92,8 +121,8 @@ services:
       SQL_VIS_MAX_CONNS: 5
       SQL_VIS_MAX_IDLE_CONNS: 1
     depends_on:
-      postgres:
-        condition: service_healthy
+      temporal-db:
+        condition: service_completed_successfully
 
   temporal-ui:
     image: temporalio/ui:latest

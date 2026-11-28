@@ -29,6 +29,7 @@ export function noDeliveryLimits(): [SenderRateLimiter, ProviderBreaker] {
  */
 export function testRedis(): Redis {
   const url =
-    process.env.REDIS_TEST_URL ?? `redis://localhost:${process.env.DEV_REDIS_PORT ?? '6379'}/15`;
+    process.env.REDIS_TEST_URL ??
+    `redis://:roviq_redis_dev@localhost:${process.env.DEV_REDIS_PORT ?? '6379'}/15`;
   return new Redis(url, { maxRetriesPerRequest: 1 });
 }

@@ -41,8 +41,8 @@
     "DATABASE_URL_TEST": "postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test",
     "DATABASE_URL_TEST_MIGRATE": "postgresql://roviq:roviq_dev@postgres:5432/roviq_test",
     "DATABASE_URL_AUDIT": "postgresql://roviq_audit_writer:roviq_audit_writer_dev@postgres:5432/roviq",
-    "REDIS_URL": "redis://redis:6379",
-    "NATS_URL": "nats://nats:4222",
+    "REDIS_URL": "redis://:roviq_redis_dev@redis:6379",
+    "NATS_URL": "nats://gateway:roviq_nats_gateway_dev@nats:4222",
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true"

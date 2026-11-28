@@ -28,6 +28,7 @@ import type {
   JetStreamServerOptions,
   ResolvedConsumerConfig,
 } from '../interfaces/jetstream.options';
+import { natsServerOptions } from '../nats-url';
 import { assertDriftRecreateAllowed } from '../streams/drift-gate';
 import { DEFAULT_DLQ_STREAM } from '../streams/stream.config';
 import { ensureStreams } from '../streams/stream.manager';
@@ -115,7 +116,7 @@ export class JetStreamServer extends ServerNats {
    */
   override createNatsClient(): Promise<NatsConnection> {
     return connect({
-      servers: this.jsOptions.servers,
+      ...natsServerOptions(this.jsOptions.servers),
       ...RESILIENT_NATS_OPTIONS,
     });
   }

@@ -6,7 +6,7 @@
 #
 # No container publishes a port to the network. The web app, the API, object storage and the
 # mail catcher join the proxy's external network under the aliases below; everything else stays
-# on the stack's own network. Settings and secrets come from the env file (docs/deployment.md →
+# on the stack's own networks (compose.app.yaml → "Networks by need"). Settings and secrets come from the env file (docs/deployment.md →
 # "Staging" lists them); none has a default here.
 
 x-logging: &logging
@@ -36,12 +36,18 @@ services:
   redis:
     restart: unless-stopped
     logging: *logging
+    command: !override ["redis-server", "--requirepass", "${REDIS_PASSWORD:?}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
     volumes:
       - roviq-redis:/data
 
   nats:
     restart: unless-stopped
     logging: *logging
+    environment:
+      NATS_GATEWAY_PASSWORD: ${NATS_GATEWAY_PASSWORD:?}
+      NATS_NOTIFICATIONS_PASSWORD: ${NATS_NOTIFICATIONS_PASSWORD:?}
     volumes:
       - roviq-nats:/data
 
@@ -55,7 +61,7 @@ services:
     volumes:
       - roviq-objects:/data
     networks:
-      roviq-net: {}
+      backplane: {}
       proxy:
         aliases: [roviq-lab-storage]
 
@@ -65,18 +71,25 @@ services:
     # Reached from the host only, for the people who run the stack.
     ports: ["127.0.0.1:${STAGING_METRICS_PORT:?}:5080"]
 
+  temporal-db:
+    logging: *logging
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:?}
+
   temporal:
     image: temporalio/auto-setup:1.29.3
     restart: unless-stopped
     logging: *logging
     environment:
-      POSTGRES_PWD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:?}
 
+  # Not published: reach it with `docker compose exec`-style tooling or a tunnel
+  # (docs/deployment.md → "Staging").
   temporal-ui:
     image: temporalio/ui:2.56.4
     restart: unless-stopped
     logging: *logging
-    ports: ["127.0.0.1:${STAGING_WORKFLOWS_PORT:?}:8080"]
 
   mailpit:
     image: axllent/mailpit:v1.33.1
@@ -85,8 +98,12 @@ services:
     # Its own sign-in: other containers on the proxy's network reach it without the proxy.
     environment:
       MP_UI_AUTH: ${STAGING_MAIL_UI_AUTH:?}
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 256m
     networks:
-      roviq-net: {}
+      backplane: {}
       proxy:
         aliases: [roviq-lab-mail]
 
@@ -96,6 +113,7 @@ services:
     # One-shot jobs: migrations, the essential seed, buckets, the first admin.
     environment:
       DATABASE_URL_MIGRATE: postgresql://roviq:${POSTGRES_PASSWORD:?}@postgres:5432/roviq
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
       ROVIQ_EE: "true"
       S3_ENDPOINT: http://object-storage:9000
       S3_REGION: us-east-1
@@ -120,8 +138,8 @@ services:
       DATABASE_URL: *app-db
       # The audit and dead-letter consumers: INSERT into audit_logs and dlq_messages only.
       DATABASE_URL_AUDIT: postgresql://roviq_audit_writer:${POSTGRES_AUDIT_WRITER_PASSWORD:?}@postgres:5432/roviq
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+      NATS_URL: nats://gateway:${NATS_GATEWAY_PASSWORD:?}@nats:4222
       TEMPORAL_ADDRESS: temporal:7233
       API_GATEWAY_PORT: "3000"
       # One reverse proxy stands in front of the API: its X-Forwarded-For names the client.
@@ -162,7 +180,8 @@ services:
       STUDENT_IMPORT_WORKER_ENABLED: "true"
       TC_ISSUANCE_WORKER_ENABLED: "true"
     networks:
-      roviq-net: {}
+      backplane: {}
+      workflow: {}
       proxy:
         aliases: [roviq-lab-api]
 
@@ -184,8 +203,8 @@ services:
       S3_PUBLIC_BASE_URL: ${S3_PUBLIC_ENDPOINT:?}/roviq-public
     volumes:
       - ${STAGING_CA_CERT:?}:/run/staging-ca.pem:ro
-    networks:
-      roviq-net: {}
+    # The proxy's network only: nothing inside the stack is reachable from the web server.
+    networks: !override
       proxy:
         aliases: [roviq-lab-web]
 
@@ -200,8 +219,8 @@ services:
     environment: !override
       <<: *otel
       DATABASE_URL: *app-db
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+      NATS_URL: nats://notifications:${NATS_NOTIFICATIONS_PASSWORD:?}@nats:4222
       TEMPORAL_ADDRESS: temporal:7233
       NOTIFICATION_SERVICE_PORT: "3002"
       NOTIFICATION_WORKER_ENABLED: "true"

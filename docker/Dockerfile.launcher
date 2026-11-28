@@ -11,6 +11,8 @@ COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/ /usr/local/lib/doc
 COPY docker/compose.app.yaml /app/compose.yaml
 COPY docker/launcher/entrypoint.sh /app/entrypoint.sh
 COPY docker/init-db.sh /app/init-db.sh
+COPY docker/nats.conf /app/nats.conf
+COPY docker/temporal-db.sh /app/temporal-db.sh
 
 WORKDIR /app
 RUN chmod +x /app/entrypoint.sh

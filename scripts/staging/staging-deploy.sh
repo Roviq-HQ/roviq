@@ -18,6 +18,10 @@ REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 : "${STAGING_WEB_HOSTS:?}" "${STAGING_API_URL:?}" "${STAGING_CA_CERT:?}" "${INSTITUTE_PORTAL_URL:?}"
 : "${STAGING_ADMIN_USERNAME:?}" "${STAGING_ADMIN_EMAIL:?}" "${POSTGRES_POOLER_PASSWORD:?}"
 : "${POSTGRES_AUDIT_WRITER_PASSWORD:?}"
+# Checked here, before anything is stopped: the internal services' credentials and the key
+# backups are encrypted to.
+: "${REDIS_PASSWORD:?}" "${NATS_GATEWAY_PASSWORD:?}" "${NATS_NOTIFICATIONS_PASSWORD:?}"
+: "${TEMPORAL_DB_PASSWORD:?}" "${STAGING_BACKUP_PUBLIC_KEY:?}"
 
 REF="${1:?usage: staging-deploy.sh <commit, branch or tag>}"
 
@@ -49,6 +53,9 @@ if external_store && [[ -n "$PREVIOUS" && "$PREVIOUS" != "$SHA" ]] &&
     log "STAGING_OBJECT_STORE=in-stack first, then switch to external."
     exit 1
 fi
+
+# The new release's compose files must render with this env file before the old one is stopped.
+stg_compose "$REL" config --quiet
 
 # ── 2. Build the images ──────────────────────────────────────
 build() {

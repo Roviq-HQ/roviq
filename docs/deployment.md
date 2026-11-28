@@ -559,6 +559,26 @@ Redis is on the request path for access control, not only for caching:
 
 Plan Redis availability with that in mind; a Redis outage blocks every signed-in request.
 
+## Internal services
+
+Redis, NATS and Temporal are reached only by the stack's own containers, and each asks who is calling:
+
+- **Redis** needs a password: `REDIS_URL=redis://:<password>@redis:6379`. One password for both backend apps: they share key names through the `REDIS_KEYS` registry, so per-app ACL users would need a key prefix per app first.
+- **NATS** has one user per service (`docker/nats.conf`): `gateway` for the api-gateway and `notifications` for the notification service. The user and password go in the URL, `NATS_URL=nats://gateway:<password>@nats:4222`; `natsServerOptions()` from `@roviq/nats-jetstream` splits them out, because the NATS client reads no credentials from a URL. A password must hold at least one letter: the server reads an all-digit value in its config as a number and refuses to start. Both users may use every subject: each app creates streams and consumers at start, so subject permissions need a consumer-by-consumer list first.
+- **Temporal** has no client sign-in in this setup (the server offers mutual TLS or a signed-token authorizer, not a password). It sits on a network that only its clients join, and it connects to PostgreSQL as its own role, `roviq_temporal`, which owns the `temporal` and `temporal_visibility` databases and nothing else. `docker/temporal-db.sh` creates that role and hands the two databases to it before Temporal starts, on every start. The workflow console has no sign-in of its own and publishes no port.
+- **NATS monitoring** (`:8222`) has no sign-in; outside the development stacks it listens inside the NATS container only, for the health check.
+
+`pnpm check:internal-service-auth` (in the pre-push gate, after the e2e stack is up) connects to the e2e Redis and NATS without credentials and expects a refusal, and signs in to PostgreSQL as `roviq_temporal` and expects to read nothing of the application's tables.
+
+The stack's networks follow the same rule (`docker/compose.app.yaml` → "Networks by need"): `backplane` for the data services, Temporal and the two backend apps, and `workflow` for Temporal and its console, which therefore reaches nothing else. The web app joins neither: it reaches the API through the API's public address. There are two, not one per service, because a Docker host has a limited number of network address ranges; a host that runs many stacks may need `default-address-pools` in the Docker daemon's configuration before a stack with more networks starts.
+
+## Containers and images
+
+- The three apps run as an unprivileged user with every Linux capability dropped, `no-new-privileges`, a read-only root file system and `/tmp` in memory; PDF generation is the only thing that writes, and it writes there. Each has a memory, CPU and process limit and a health check (`docker/compose.app.yaml`). The limits are starting values: watch them on the first real load.
+- PostgreSQL and Redis keep the few capabilities their entrypoints need to hand the data folder to their own user; the other infrastructure containers drop all of them.
+- The api-gateway and notification-service images are built from a production-only install (`pnpm install --prod`, stage `prod-deps` in `docker/Dockerfile.backend`): no test runner, bundler, type checker or browser. A package an app loads at run time must therefore be in `dependencies`, not `devDependencies`. The migrator image keeps the full install: it runs `drizzle-kit` and TypeScript scripts, as a one-shot job with no open port.
+- The Node base image is pinned by digest in both Dockerfiles (`NODE_IMAGE`); the comment beside it says how to move it. GitHub workflow actions are pinned by commit, with the tag in a comment.
+
 ## Impersonation OTP delivery
 
 Reseller impersonation (and platform impersonation into an institute that requires consent) sends a 6-digit code to the institute admin's primary phone through the notification service (`NOTIFICATION.auth.security`). An institute whose admin has no primary phone cannot be impersonated by a reseller: the request is refused with `IMPERSONATION_CONSENT_UNAVAILABLE`. Make sure institute admins have a primary phone on file, and that the notification service's SMS channel is configured.
@@ -570,11 +590,11 @@ shares with other sites (ROV-337). The repository holds what does not depend on 
 
 | File | What it does |
 |---|---|
-| `docker/compose.staging.yaml` | Override of `docker/compose.app.yaml`: no published port (the metrics store and the workflow console are bound to `127.0.0.1`), pinned infrastructure images, bounded logs, persistent volumes for the object store and NATS, a mail catcher with its own sign-in, and the web app, the API, object storage and the mail catcher on the proxy's external network as `roviq-lab-web`, `roviq-lab-api`, `roviq-lab-storage` and `roviq-lab-mail` |
+| `docker/compose.staging.yaml` | Override of `docker/compose.app.yaml`: no published port (the metrics store is bound to `127.0.0.1`; the workflow console publishes none), pinned infrastructure images, bounded logs, persistent volumes for the object store and NATS, a mail catcher with its own sign-in, and the web app, the API, object storage and the mail catcher on the proxy's external network as `roviq-lab-web`, `roviq-lab-api`, `roviq-lab-storage` and `roviq-lab-mail` |
 | `docker/compose.staging-external-store.yaml` | Added after `compose.staging.yaml` when `STAGING_OBJECT_STORE=external`: the in-stack object store is not started and the gateway and the migrator take every `S3_*` value from the env file |
 | `scripts/staging/staging-deploy.sh <ref>` | Exports the commit with `git archive`, builds its four images (tagged with the commit), backs up, starts the infrastructure, sets the runtime role's password, runs `pnpm storage:check` against an external store (before the migration, so a failing store changes nothing), `drizzle-kit migrate`, the essential seed, `pnpm storage:init` (in-stack store only) and `pnpm admin:create`, starts the apps and checks the API health and the three portals through their public names. A failure after the migration starts the previous release's apps again |
-| `scripts/staging/staging-backup.sh` | Stops the apps, dumps the `roviq`, `temporal` and `temporal_visibility` databases and the roles, archives the in-stack object store (an external store keeps its own versions and is not copied), writes a manifest of the release, the object store mode and its image ids, starts the apps again, and removes backups older than `STAGING_BACKUP_KEEP_DAYS` |
-| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill). The store mode comes from the backup's manifest, not the env file; a backup taken with an external store is restored as databases only: apps started there would share the live buckets, and the restored file sweeper could delete objects the live stack still uses |
+| `scripts/staging/staging-backup.sh` | While the apps run, dumps the `roviq`, `temporal` and `temporal_visibility` databases and the roles and archives the in-stack object store (an external store keeps its own versions and is not copied), each encrypted to the OpenPGP public key file named by `STAGING_BACKUP_PUBLIC_KEY`; writes a manifest of the release, the object store mode and its image ids; removes backups older than `STAGING_BACKUP_KEEP_DAYS`. Each dump is one consistent snapshot of its database; the dumps are taken one after another, so across databases they can differ by a few seconds of changes. With `--keep-stopped` (the deploy, before it migrates) the apps are stopped first and the set is exact |
+| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill). An encrypted backup is decrypted with the private key in the keyring of whoever runs the drill, or with the key file named by `STAGING_BACKUP_PRIVATE_KEY_FILE`; a backup from before encryption is read as it is. The store mode comes from the backup's manifest, not the env file; a backup taken with an external store is restored as databases only: apps started there would share the live buckets, and the restored file sweeper could delete objects the live stack still uses |
 | `scripts/create-platform-admin.ts` (`pnpm admin:create`) | Creates the first platform admin on a database that has only the essential seed, with a random password that must be changed at first sign-in; does nothing once a platform admin exists |
 
 Every script reads the env file named by `STAGING_ENV_FILE`. Besides the app secrets, it sets
@@ -582,7 +602,20 @@ Every script reads the env file named by `STAGING_ENV_FILE`. Besides the app sec
 first admin's password file), `STAGING_IMAGE_PREFIX`, `STAGING_PROXY_NETWORK`, `STAGING_CA_CERT`
 (the certificate authority of the proxy's certificate, trusted by the web app's server side),
 `STAGING_API_URL`, `STAGING_WEB_HOSTS`, `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_EMAIL`,
-`STAGING_MAIL_UI_AUTH`, `STAGING_METRICS_PORT` and `STAGING_WORKFLOWS_PORT`.
+`STAGING_MAIL_UI_AUTH`, `STAGING_METRICS_PORT`, the credentials of the internal services
+(`REDIS_PASSWORD`, `NATS_GATEWAY_PASSWORD`, `NATS_NOTIFICATIONS_PASSWORD`, `TEMPORAL_DB_PASSWORD`;
+see "Internal services") and `STAGING_BACKUP_PUBLIC_KEY`. The deploy script checks that these are
+set, and that the new release's compose files render, before it stops anything.
+
+**Backups and their key.** The private half of the backup key is not on the staging host: a copy
+of the backup folder is useless without it, and so is the host's own copy. Keep the private key
+where the restore drill can borrow it, and copy each backup folder to another machine: nothing in
+the repository does that copy. The manifest is the one file left readable; it holds the release,
+the time and image ids.
+
+**The workflow console** (`temporal-ui`) publishes no port. To use it, forward a port for the
+session (`docker run --rm --network <project>_workflow -p 127.0.0.1:<port>:8080 alpine/socat
+TCP-LISTEN:8080,fork TCP:temporal-ui:8080`) or put it behind the reverse proxy with a sign-in.
 `STAGING_OBJECT_STORE` is `in-stack` (the default: RustFS in the stack) or `external`; with
 `external` the env file also holds all eight `S3_*` values of the store, whose buckets are set up as
 in "Object storage" above. To switch a running staging stack to an external store:
