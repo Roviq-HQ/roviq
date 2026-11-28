@@ -23,6 +23,9 @@ const INSTITUTE_TOKEN_KEY = `__e2e_session__${INSTITUTE_SESSION_KEY}`;
 // The page fixture moves captured tokens back into sessionStorage on load, so the
 // prefixed localStorage copy only exists before the first navigation.
 async function instituteAccessToken(page: Page): Promise<string | null> {
+  // A cleanup hook can run while the test's last navigation is still under way, and a script
+  // evaluated in a page that is being replaced is thrown away with it.
+  await page.waitForLoadState('domcontentloaded');
   return page.evaluate(
     ([sessionKey, capturedKey]) =>
       window.sessionStorage.getItem(sessionKey) ?? window.localStorage.getItem(capturedKey),
