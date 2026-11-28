@@ -16,7 +16,9 @@ export class TemporalHealthIndicator implements OnApplicationShutdown {
   ) {
     const address = config.get<string>('TEMPORAL_ADDRESS');
     // Lazy: the gRPC channel opens on the first check and is reused by every later one.
-    this.connection = address ? Connection.lazy({ address }) : null;
+    // No interceptors: a probe is asked once. The client's default retries on a timer, and a
+    // retry left over when the app closes this connection throws where nothing can catch it.
+    this.connection = address ? Connection.lazy({ address, interceptors: [] }) : null;
   }
 
   probe(): Promise<ProbeResult> {
