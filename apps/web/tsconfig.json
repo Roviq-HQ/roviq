@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "preserve",
+    "rootDir": "../..",
 
     "strict": true,
     "noEmit": true,

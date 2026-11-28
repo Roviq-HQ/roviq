@@ -282,14 +282,58 @@ then pin the culprit in `package.json` and re-run `deps:update`.
 - **A PR-based workflow.** No bot opens PRs. Bumps land on your current
   branch. Use normal git discipline (branch off main, don't bump on
   feature branches with unrelated work).
-- **A vulnerability scanner.** We don't subscribe to GHSA / Snyk feeds.
-  For CVE response you want `pnpm audit` or Dependabot security alerts
-  on top of this workflow.
+- **A vulnerability scanner.** The scripts above do not read advisories;
+  `pnpm check:audit` does (see "Security advisories" below).
 - **A lockfile maintainer.** No equivalent of Renovate's weekly lockfile
   maintenance job. Run `pnpm install` periodically to catch lockfile
   drift.
 - **Cross-repo.** Each repo has its own `scripts/deps-*.ts`. Copy the
   three scripts + the lib file to bootstrap a new repo.
+
+## Security advisories
+
+`pnpm check:audit` ([scripts/check-audit.ts](../scripts/check-audit.ts)) runs in the pre-push
+gate. It reads `pnpm audit --prod`: the packages under `dependencies` in the root
+`package.json` and everything they pull in. Development tools under `devDependencies` are left
+out. It fails when:
+
+- a high or critical advisory is reported and its id is not in `AUDIT_ALLOWLIST`;
+- an allowlist entry is past its `reviewBy` date, names another package, or its advisory is no
+  longer reported;
+- `pnpm.overrides` in `package.json` has an entry without its reason in `OVERRIDE_REASONS`, or a
+  reason names an override that is gone (`package.json` cannot hold comments, so the reasons
+  live in the script).
+
+The check needs the npm registry. When `pnpm audit` cannot read the advisory list (offline, the
+registry down) the check fails with that message; it never passes without a report. Run it
+again once the registry answers.
+
+Moderate and low advisories do not fail the check. Read them with `pnpm audit --prod` and
+handle them in the same order when a fix is cheap.
+
+### What to do with a new advisory
+
+Work out the facts first: the dependency path (`pnpm why <package>`), whether the package is
+loaded at run time (an import in the app, or a parent that requires it), and whether the
+advisory's code path is reached by how the app uses the parent. Write "unknown" when the
+advisory does not say enough; do not assume a path is unreachable. Then, in this order:
+
+1. **Remove** the dependency when nothing uses it. A parent's optional or unwanted peer is
+   removed with an override set to `"-"` (`"parent>package": "-"`).
+2. **Upgrade the direct dependency** to a fixed version within its major.
+3. **Upgrade the parent** that pulls the vulnerable package. When the parent's own range
+   already allows a fixed version, only the lockfile is stale: add a temporary override
+   (`"package@1": "^1.2.3"`), run `pnpm install`, remove the override and run `pnpm install`
+   again. The fixed version stays in the lockfile because the parent's range allows it.
+4. **Override** the transitive version (`"parent>package": "^x.y.z"`) only when the parent has
+   no fixed release in its major. Add the reason with the advisory id to `OVERRIDE_REASONS`.
+5. **Allowlist** only what cannot be fixed without a framework major or an owner decision: an
+   entry in `AUDIT_ALLOWLIST` with the package, the reason (the code path and why it is or is
+   not reached) and a `reviewBy` date at most three months ahead.
+
+A major version of a framework (NestJS, Next.js, Drizzle, Apollo, React) is not bumped to clear
+an advisory without the owner's decision. After each change run `pnpm install` and read the
+lockfile diff: it should change only the packages you meant to change.
 
 ## File reference
 
@@ -297,4 +341,5 @@ then pin the culprit in `package.json` and re-run `deps:update`.
 - [scripts/deps-check.ts](../scripts/deps-check.ts) — display-only CLI
 - [scripts/deps-update.ts](../scripts/deps-update.ts) — minors/patches apply loop
 - [scripts/deps-upgrade.ts](../scripts/deps-upgrade.ts) — major upgrade loop via Claude Code
+- [scripts/check-audit.ts](../scripts/check-audit.ts) — the advisory gate, its allowlist and the override reasons
 - [package.json](../package.json) — `deps:check` / `deps:update` / `deps:upgrade` scripts

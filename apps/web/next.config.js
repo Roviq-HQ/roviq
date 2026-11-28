@@ -29,6 +29,8 @@ const nextConfig = {
   nx: {},
   output: process.env.STANDALONE === 'true' ? 'standalone' : undefined,
   headers,
+  // Otherwise `next dev` writes an AGENTS.md into apps/web on every start.
+  agentRules: false,
   experimental: {
     globalNotFound: true,
     // Persist Turbopack's computation graph (SWC transforms, RSC outputs,

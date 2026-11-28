@@ -6,7 +6,7 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "peerDependencies": {
-    "@nestjs/common": "^11.0.0",
+    "@nestjs/common": "^11.2.12",
     "@nestjs/config": "^4.0.0"
   }
 }

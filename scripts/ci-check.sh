@@ -403,6 +403,7 @@ launch gates bash -c 'set -e
   pnpm -s check:direct-nats-emit
   pnpm -s check:store-keys
   pnpm -s check:log-messages
+  pnpm -s check:audit
   pnpm -s check:service-db-access
   pnpm -s check:event-handlers
   pnpm -s check:docs
