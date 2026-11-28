@@ -522,7 +522,7 @@ describe('AttendanceService (unit)', () => {
       repo.isStudentInSession.mockResolvedValue(false);
 
       await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toMatchObject({
-        code: ErrorCode.FORBIDDEN,
+        code: ErrorCode.STUDENT_NOT_FOUND,
       });
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
@@ -545,7 +545,7 @@ describe('AttendanceService (unit)', () => {
           PRESENT_ONLY,
           TEACHER,
         ),
-      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      ).rejects.toMatchObject({ code: ErrorCode.STUDENT_NOT_FOUND });
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
   });

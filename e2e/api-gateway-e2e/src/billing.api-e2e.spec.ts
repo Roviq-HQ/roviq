@@ -147,6 +147,32 @@ const ISSUE_REFUND = `
   }
 `;
 
+// Assigning a paid plan bills its first period, so a fresh subscription already has its invoice.
+const INVOICES_WITH_SUBSCRIPTION = `
+  query($instituteId: ID) {
+    invoices(instituteId: $instituteId, first: 100) {
+      id
+      invoiceNumber
+      totalAmount
+      status
+      subscriptionId
+    }
+  }
+`;
+
+async function billedInvoice(token: string, tenantId: string, subscriptionId: string) {
+  const res = await gql<{
+    invoices: (Pick<InvoiceModel, 'id' | 'invoiceNumber' | 'totalAmount' | 'status'> & {
+      subscriptionId: string;
+    })[];
+  }>(INVOICES_WITH_SUBSCRIPTION, { instituteId: tenantId }, token);
+  expect(res.errors).toBeUndefined();
+  const own = res.data?.invoices.filter((invoice) => invoice.subscriptionId === subscriptionId);
+  expect(own).toHaveLength(1);
+  assert(own?.[0]);
+  return own[0];
+}
+
 const LIST_INVOICES = `
   query Invoices($instituteId: ID, $first: Int) {
     invoices(instituteId: $instituteId, first: $first) {
@@ -612,7 +638,7 @@ describe('Billing E2E', () => {
   // -------------------------------------------------------------------------
 
   describe('Invoices and payments', () => {
-    it('should generate an invoice for a fresh subscription (hurl 10)', async () => {
+    it('should bill a fresh subscription once: assigning creates its invoice and generateInvoice refuses a second (hurl 10)', async () => {
       await cancelExistingSubscription(resellerToken, tenant1);
       const plan = await createPlan(resellerToken, {
         name: 'Vitest Invoice Plan',
@@ -620,17 +646,16 @@ describe('Billing E2E', () => {
       });
       const { subscription } = await assignPlan(resellerToken, tenant1, plan.id);
 
-      const res = await gql<{
-        generateInvoice: Pick<InvoiceModel, 'id' | 'invoiceNumber' | 'totalAmount' | 'status'>;
-      }>(
+      const invoice = await billedInvoice(resellerToken, tenant1, subscription.id);
+
+      const again = await gql(
         GENERATE_INVOICE,
         { input: { tenantId: tenant1, subscriptionId: subscription.id } },
         resellerToken,
       );
+      expect(again.errors?.[0]?.extensions?.code).toBe('INVOICE_PERIOD_ALREADY_BILLED');
+      await billedInvoice(resellerToken, tenant1, subscription.id);
 
-      expect(res.errors).toBeUndefined();
-      assert(res.data);
-      const invoice = res.data.generateInvoice;
       expect(invoice.id).toBeTruthy();
       expect(invoice.invoiceNumber).toBeTruthy();
       // GraphQLBigInt's TS contract is `string | number` — graphql-scalars
@@ -650,14 +675,7 @@ describe('Billing E2E', () => {
       });
       const { subscription } = await assignPlan(resellerToken, tenant2, plan.id);
 
-      const invoiceRes = await gql<{ generateInvoice: InvoiceModel }>(
-        GENERATE_INVOICE,
-        { input: { tenantId: tenant2, subscriptionId: subscription.id } },
-        resellerToken,
-      );
-      expect(invoiceRes.errors).toBeUndefined();
-      assert(invoiceRes.data);
-      const invoice = invoiceRes.data.generateInvoice;
+      const invoice = await billedInvoice(resellerToken, tenant2, subscription.id);
 
       const recordRes = await gql<{ recordManualPayment: InvoiceModel }>(
         RECORD_MANUAL_PAYMENT,

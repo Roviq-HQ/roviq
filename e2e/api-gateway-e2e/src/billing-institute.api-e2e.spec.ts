@@ -65,6 +65,7 @@ const LIST_SUBS = `query { subscriptions(first: 100) { id status tenantId planId
 const CANCEL_SUB = `mutation($input: CancelSubscriptionInput!) { cancelSubscription(input: $input) { id } }`;
 const ASSIGN_PLAN = `mutation($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id planId status } } }`;
 const CHANGE_PLAN = `mutation($input: ChangePlanInput!) { changePlan(input: $input) { id status planId tenantId } }`;
+const INVOICES_OF_INSTITUTE = `query($instituteId: ID) { invoices(instituteId: $instituteId, first: 100) { ${INVOICE_FIELDS} subscriptionId } }`;
 const GENERATE_INVOICE = `mutation($input: GenerateInvoiceInput!) { generateInvoice(input: $input) { ${INVOICE_FIELDS} } }`;
 const RECORD_MANUAL = `mutation($invoiceId: ID!, $input: ManualPaymentInput!) { recordManualPayment(invoiceId: $invoiceId, input: $input) { ${INVOICE_FIELDS} } }`;
 const ISSUE_REFUND = `mutation($paymentId: ID!, $input: RefundInput!) { issueRefund(paymentId: $paymentId, input: $input) { id } }`;
@@ -104,7 +105,7 @@ describe('Billing institute flows E2E', () => {
   const gatewayConfigIds: string[] = [];
   let defaultGatewayBefore: string | null = null;
 
-  async function createPlan(amount: number) {
+  async function createPlan(amount: number, trialDays = 0) {
     const suffix = randomUUID().slice(0, 8);
     const res = await gql<{ createSubscriptionPlan: { id: string } }>(
       CREATE_PLAN,
@@ -113,6 +114,7 @@ describe('Billing institute flows E2E', () => {
           name: { en: `Vitest Inst Plan ${suffix}` },
           description: { en: 'Created by billing-institute.api-e2e.spec.ts' },
           amount: String(amount),
+          trialDays,
           currency: 'INR',
           interval: 'MONTHLY',
           entitlements: {
@@ -145,10 +147,13 @@ describe('Billing institute flows E2E', () => {
     await gql(CANCEL_SUB, { input: { subscriptionId: live.id } }, resellerToken);
   }
 
-  /** Replaces the institute's subscription with a fresh one on a new paid plan. */
-  async function freshSubscription(tenantId: string, amount = planAmountPaise) {
+  /**
+   * Replaces the institute's subscription with a fresh one on a new paid plan. Assigning a paid
+   * plan bills its first period; with `trialDays` the subscription starts unbilled.
+   */
+  async function freshSubscription(tenantId: string, amount = planAmountPaise, trialDays = 0) {
     await cancelExistingSubscription(tenantId);
-    const planId = await createPlan(amount);
+    const planId = await createPlan(amount, trialDays);
     const res = await gql<{
       assignPlanToInstitute: { subscription: { id: string; planId: string; status: string } };
     }>(ASSIGN_PLAN, { input: { tenantId, planId } }, resellerToken);
@@ -157,15 +162,44 @@ describe('Billing institute flows E2E', () => {
     return { subscriptionId: res.data.assignPlanToInstitute.subscription.id, planId };
   }
 
-  async function newInvoice(tenantId: string, subscriptionId: string) {
-    const res = await gql<{ generateInvoice: InvoiceNode }>(
-      GENERATE_INVOICE,
-      { input: { tenantId, subscriptionId } },
+  const handedOut = new Set<string>();
+
+  /** The live invoice of the subscription's current period, when it has been billed. */
+  async function billedInvoice(tenantId: string, subscriptionId: string) {
+    const res = await gql<{ invoices: (InvoiceNode & { subscriptionId: string })[] }>(
+      INVOICES_OF_INSTITUTE,
+      { instituteId: tenantId },
       resellerToken,
     );
     expect(res.errors).toBeUndefined();
-    assert(res.data);
-    return res.data.generateInvoice;
+    return res.data?.invoices.find((invoice) => invoice.subscriptionId === subscriptionId);
+  }
+
+  /**
+   * An invoice no test has used yet. A subscription has one live invoice per billing period:
+   * the one its assignment created, or for an unbilled (trial) subscription the one
+   * `generateInvoice` creates. A second invoice therefore comes from a fresh subscription.
+   */
+  async function newInvoice(tenantId: string, subscriptionId: string): Promise<InvoiceNode> {
+    let invoice = await billedInvoice(tenantId, subscriptionId);
+    if (!invoice) {
+      const res = await gql<{ generateInvoice: InvoiceNode }>(
+        GENERATE_INVOICE,
+        { input: { tenantId, subscriptionId } },
+        resellerToken,
+      );
+      expect(res.errors).toBeUndefined();
+      assert(res.data);
+      handedOut.add(res.data.generateInvoice.id);
+      return res.data.generateInvoice;
+    }
+    if (handedOut.has(invoice.id)) {
+      const fresh = await freshSubscription(tenantId);
+      invoice = await billedInvoice(tenantId, fresh.subscriptionId);
+    }
+    assert(invoice);
+    handedOut.add(invoice.id);
+    return invoice;
   }
 
   async function myInvoice(id: string, token = instituteToken) {
@@ -505,7 +539,8 @@ describe('Billing institute flows E2E', () => {
 
   describe('changePlan', () => {
     it('moves the subscription to the new plan and bills the new plan amount', async () => {
-      const { subscriptionId, planId } = await freshSubscription(tenant1, 100_000);
+      // On trial, so the period is not billed yet and the invoice below is its first.
+      const { subscriptionId, planId } = await freshSubscription(tenant1, 100_000, 7);
       const newPlanId = await createPlan(250_000);
 
       const res = await gql<{
@@ -514,7 +549,7 @@ describe('Billing institute flows E2E', () => {
       expect(res.errors).toBeUndefined();
       assert(res.data);
       expect(res.data.changePlan.id).toBe(subscriptionId);
-      expect(res.data.changePlan.status).toBe('ACTIVE');
+      expect(res.data.changePlan.status).toBe('TRIALING');
       expect(res.data.changePlan.tenantId).toBe(tenant1);
       expect(res.data.changePlan.planId).toBe(newPlanId);
       expect(res.data.changePlan.planId).not.toBe(planId);

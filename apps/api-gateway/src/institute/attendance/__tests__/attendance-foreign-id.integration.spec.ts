@@ -709,12 +709,26 @@ describe('attendance: another institute id (ROV-293)', () => {
       );
     });
 
-    // FORBIDDEN, as for an own student outside the session's section: nothing of B shows.
+    // The same answer as for an own student outside the session's section: nothing of B shows.
     it('should refuse a student of another institute and write nothing', async () => {
       await refusesAndWritesNothing(
         MARK,
         { sessionId: a.sessionId, studentId: b.studentId },
-        ErrorCode.FORBIDDEN,
+        ErrorCode.STUDENT_NOT_FOUND,
+      );
+    });
+
+    it('should answer "student not found" for a student profile id given where the membership id belongs', async () => {
+      const [profile] = await asAdmin((tx) =>
+        tx
+          .select({ id: studentProfiles.id })
+          .from(studentProfiles)
+          .where(eq(studentProfiles.membershipId, a.studentId)),
+      );
+      await refusesAndWritesNothing(
+        MARK,
+        { sessionId: a.sessionId, studentId: profile.id },
+        ErrorCode.STUDENT_NOT_FOUND,
       );
     });
   });
@@ -737,7 +751,7 @@ describe('attendance: another institute id (ROV-293)', () => {
       await refusesAndWritesNothing(
         BULK_MARK,
         { sessionId: a.sessionId, entries: entries() },
-        ErrorCode.FORBIDDEN,
+        ErrorCode.STUDENT_NOT_FOUND,
       );
     });
   });

@@ -213,9 +213,9 @@
     }
   },
   "instituteSettings.config.attendanceType": {
-    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
+    "reviewedReason": "only the refusal for a student who is not in the session's section changed (now STUDENT_NOT_FOUND); how attendance is recorded per day or per period is unchanged",
     "targets": {
-      "apps/api-gateway/src/institute/attendance/attendance.service.ts": "56b47cbfc21bd9c0",
+      "apps/api-gateway/src/institute/attendance/attendance.service.ts": "1e8ab72fa0ea1898",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/config-display.tsx": "0d2100322767a143"
     }
   },

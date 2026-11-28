@@ -4282,7 +4282,9 @@ input MarkAttendanceInput {
   sessionId: ID!
   status: AttendanceStatus!
 
-  """Student membership id."""
+  """
+  The student's membership id in this institute (`membershipId` of the student), not the student profile id. The student must be enrolled in the session's section.
+  """
   studentId: ID!
 }
 
@@ -4290,6 +4292,10 @@ input MarkAttendanceItem {
   mode: AttendanceMode = MANUAL
   remarks: String
   status: AttendanceStatus!
+
+  """
+  The student's membership id in this institute (`membershipId` of the student), not the student profile id. The student must be enrolled in the session's section.
+  """
   studentId: ID!
 }
 
@@ -6097,7 +6103,9 @@ type Query {
   """List users with memberships in institutes belonging to this reseller"""
   resellerListUsers(filter: ResellerListUsersFilterInput): ResellerUserConnection!
 
-  """The signed-in reseller's own record"""
+  """
+  The record of the reseller the caller works for: its name, registration, contact, address and branding. Not the caller's own account. Needs `read` on `Reseller`, which the full admin role holds; other team roles do not read it.
+  """
   resellerMyProfile: ResellerProfileModel!
 
   """Fetch a section by id."""

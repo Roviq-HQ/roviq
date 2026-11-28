@@ -12,9 +12,16 @@ const TEST_CTX: import('@roviq/request-context').RequestContext = {
 };
 
 function createMockInvoiceRepo() {
+  const create = vi.fn();
   return {
     nextInvoiceNumber: vi.fn(),
-    create: vi.fn(),
+    create,
+    // No invoice for the period yet, and the insert goes through `create`.
+    hasLiveInvoiceForPeriod: vi.fn().mockResolvedValue(false),
+    createForPeriod: vi.fn(async (resellerId: string, data: Record<string, unknown>) => ({
+      kind: 'ok' as const,
+      invoice: await create(resellerId, data),
+    })),
     findById: vi.fn(),
     updateStatus: vi.fn(),
     findByResellerId: vi.fn(),
@@ -46,6 +53,45 @@ describe('InvoiceService', () => {
   });
 
   describe('generateInvoice', () => {
+    const input = {
+      tenantId: 'tenant-1',
+      subscriptionId: 'sub-1',
+      planName: 'Pro',
+      planAmountPaise: 100000n,
+      periodStart: new Date('2026-01-01'),
+      periodEnd: new Date('2026-02-01'),
+    };
+
+    it('should refuse a period that already has a live invoice, before taking a number', () =>
+      requestContext.run(TEST_CTX, async () => {
+        repo.hasLiveInvoiceForPeriod.mockResolvedValue(true);
+
+        await expect(service.generateInvoice('reseller-1', 'RVQ', input)).rejects.toMatchObject({
+          code: 'INVOICE_PERIOD_ALREADY_BILLED',
+        });
+
+        expect(repo.hasLiveInvoiceForPeriod).toHaveBeenCalledWith(
+          'reseller-1',
+          'sub-1',
+          input.periodStart,
+        );
+        expect(repo.nextInvoiceNumber).not.toHaveBeenCalled();
+        expect(repo.createForPeriod).not.toHaveBeenCalled();
+        expect(eventBus.emit).not.toHaveBeenCalled();
+      }));
+
+    it('should refuse when another request billed the period first, and emit nothing', () =>
+      requestContext.run(TEST_CTX, async () => {
+        repo.nextInvoiceNumber.mockResolvedValue('RVQ-2026-00009');
+        repo.createForPeriod.mockResolvedValue({ kind: 'period_billed' });
+
+        await expect(service.generateInvoice('reseller-1', 'RVQ', input)).rejects.toMatchObject({
+          code: 'INVOICE_PERIOD_ALREADY_BILLED',
+        });
+
+        expect(eventBus.emit).not.toHaveBeenCalled();
+      }));
+
     it('should generate invoice with 18% GST and correct amounts', () =>
       requestContext.run(TEST_CTX, async () => {
         repo.nextInvoiceNumber.mockResolvedValue('RVQ-2026-00001');
