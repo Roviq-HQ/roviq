@@ -290,11 +290,20 @@ describe('ROV-279: a reseller reads only its institutes and its team', () => {
     });
   });
 
-  it("should show phone numbers of its institutes' members and its team only", async () => {
+  it('should refuse reading phone numbers, also of its own institutes and team', async () => {
     await withWorld(async (client, w) => {
       await asReseller(client, w.a.resellerId);
-      expect(await visiblePhoneOwners(client, 'phone_numbers_live', everyone(w))).toEqual(
-        sorted([w.a.memberUserId, w.a.staffUserId]),
+      await expectRefused(
+        client,
+        /permission denied for table phone_numbers/,
+        'SELECT user_id FROM phone_numbers WHERE user_id = $1',
+        [w.a.memberUserId],
+      );
+      await expectRefused(
+        client,
+        /permission denied for table phone_numbers/,
+        'SELECT user_id FROM phone_numbers_live WHERE user_id = $1',
+        [w.a.staffUserId],
       );
     });
   });

@@ -81,11 +81,32 @@ const USER_GROUPS_TABLES = [
 ];
 
 // Keyed by user, not tenant: a row is visible only where its user holds a membership.
-const USER_SCOPED_TABLES: { name: string; table: PgTable; userId: PgColumn }[] = [
-  { name: 'user_profiles', table: userProfiles, userId: userProfiles.userId },
-  { name: 'user_identifiers', table: userIdentifiers, userId: userIdentifiers.userId },
-  { name: 'user_documents', table: userDocuments, userId: userDocuments.userId },
-  { name: 'user_addresses', table: userAddresses, userId: userAddresses.userId },
+// `resellerReads`: the reseller role reads the names in `user_profiles` and nothing of the others.
+const USER_SCOPED_TABLES: {
+  name: string;
+  table: PgTable;
+  userId: PgColumn;
+  resellerReads: boolean;
+}[] = [
+  { name: 'user_profiles', table: userProfiles, userId: userProfiles.userId, resellerReads: true },
+  {
+    name: 'user_identifiers',
+    table: userIdentifiers,
+    userId: userIdentifiers.userId,
+    resellerReads: false,
+  },
+  {
+    name: 'user_documents',
+    table: userDocuments,
+    userId: userDocuments.userId,
+    resellerReads: false,
+  },
+  {
+    name: 'user_addresses',
+    table: userAddresses,
+    userId: userAddresses.userId,
+    resellerReads: false,
+  },
 ];
 
 const PERF_STUDENTS = 2000;
@@ -507,7 +528,7 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
     );
   });
 
-  describe.each(USER_SCOPED_TABLES)('$name personal data', ({ table, userId }) => {
+  describe.each(USER_SCOPED_TABLES)('$name personal data', ({ table, userId, resellerReads }) => {
     const ownersIn = (tx: DrizzleDB) =>
       tx
         .select({ userId })
@@ -527,18 +548,31 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       ).rejects.toMatchObject({ cause: { code: '42501' } });
     });
 
-    it('reseller reads rows of its own institutes only', async () => {
-      const own = await withReseller(app.db, mkResellerCtx(RESELLER_DIRECT_ID, CTX), ownersIn);
-      expect(own.map((row) => row.userId).sort()).toEqual(
-        [student.userId, foreignStudent.userId].sort(),
-      );
-      const other = await withReseller(
-        app.db,
-        mkResellerCtx(otherReseller.resellerId, CTX),
-        ownersIn,
-      );
-      expect(other).toEqual([]);
-    });
+    // One of the two is registered for a table, so none shows as skipped.
+    if (resellerReads) {
+      it('reseller reads rows of its own institutes only', async () => {
+        const own = await withReseller(app.db, mkResellerCtx(RESELLER_DIRECT_ID, CTX), ownersIn);
+        expect(own.map((row) => row.userId).sort()).toEqual(
+          [student.userId, foreignStudent.userId].sort(),
+        );
+        const other = await withReseller(
+          app.db,
+          mkResellerCtx(otherReseller.resellerId, CTX),
+          ownersIn,
+        );
+        expect(other).toEqual([]);
+      });
+    } else {
+      it('reseller reads no row, not even of its own institutes', async () => {
+        // The reseller role holds no privilege on these details of a person (ROV-392).
+        await expect(
+          withReseller(app.db, mkResellerCtx(RESELLER_DIRECT_ID, CTX), ownersIn),
+        ).rejects.toMatchObject({ cause: { code: '42501' } });
+        await expect(
+          withReseller(app.db, mkResellerCtx(otherReseller.resellerId, CTX), ownersIn),
+        ).rejects.toMatchObject({ cause: { code: '42501' } });
+      });
+    }
   });
 
   it(`resolves a 5-dimension group rule over ${PERF_STUDENTS} students within ${PERF_BUDGET_MS}ms`, async () => {

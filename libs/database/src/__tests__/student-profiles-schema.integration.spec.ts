@@ -249,7 +249,7 @@ describe('ROV-153: student_profiles', () => {
     });
   });
 
-  it('roviq_reseller → SELECT succeeds, INSERT fails (read-only)', async () => {
+  it('roviq_reseller → SELECT and INSERT are both refused', async () => {
     await inTransaction(async (client) => {
       // Insert as superuser first
       const testUser = await createTestUser(client, 'eeeeeeee-5000-0001-0007-000000000001');
@@ -276,10 +276,13 @@ describe('ROV-153: student_profiles', () => {
         await client.query(`SELECT set_config('app.current_reseller_id', $1, true)`, [resellerId]);
       }
 
-      // SELECT should return rows (reseller can read their institutes)
-      const selectRes = await client.query(`SELECT id FROM student_profiles`);
-      // May return 0 if reseller context doesn't match, but should not error
-      expect(selectRes.rows).toBeDefined();
+      // The reseller role holds no privilege on a student's profile, also of its own
+      // institutes (ROV-392).
+      await client.query('SAVEPOINT read_attempt');
+      await expect(client.query(`SELECT id FROM student_profiles`)).rejects.toThrow(
+        /permission denied for table student_profiles/,
+      );
+      await client.query('ROLLBACK TO SAVEPOINT read_attempt');
 
       // INSERT should fail (permission denied — reseller is read-only)
       const memId2 = 'eeeeeeee-5015-0001-0001-000000000001';
