@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   checkSetNullKeys,
   checkTenantKeys,
-  EXCLUDED,
-  LISTED,
+  orNoneKeyName,
+  orNoneStatements,
   SET_NULL_KEYS_IN_CUSTOM_SQL,
   setNullStatement,
   tenantKeysOf,
@@ -29,43 +29,92 @@ const children = pgTable(
   ],
 );
 
+/** Rows of `optional` may belong to no institute; rows of `strict` always belong to one. */
+const strict = pgTable('strict', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+});
+const optional = pgTable('optional', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id') });
+
+const referencing = (name: string | undefined, parent: typeof strict | typeof optional) =>
+  pgTable(
+    'referencing',
+    { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull(), refId: uuid('ref_id') },
+    (table) => [foreignKey({ name, columns: [table.refId], foreignColumns: [parent.id] })],
+  );
+
 describe('tenantKeysOf', () => {
   it('should list keys between two tenant tables and say which carry tenant_id', () => {
-    expect(tenantKeysOf([parents, shared, children])).toEqual([
+    expect(
+      tenantKeysOf([parents, shared, children]).map(({ name, carriesTenant }) => ({
+        name,
+        carriesTenant,
+      })),
+    ).toEqual([
       { name: 'children.plain_id -> parents', carriesTenant: false },
       { name: 'children.scoped_id -> parents', carriesTenant: true },
     ]);
   });
+
+  it('should say whether the referenced table may hold rows of no institute', () => {
+    const [toStrict] = tenantKeysOf([strict, referencing(undefined, strict)]);
+    const [toOptional] = tenantKeysOf([optional, referencing(undefined, optional)]);
+    expect(toStrict).toMatchObject({ parent: 'strict', parentTenantOptional: false });
+    expect(toOptional).toMatchObject({
+      table: 'referencing',
+      column: 'ref_id',
+      parent: 'optional',
+      parentTenantOptional: true,
+    });
+  });
 });
 
 describe('checkTenantKeys', () => {
-  const keys = tenantKeysOf([parents, shared, children]);
+  const key = { table: 'referencing', column: 'ref_id', parent: 'optional' };
+  const declared = tenantKeysOf([optional, referencing(orNoneKeyName(key), optional)]);
+  const statements = orNoneStatements(key).join('\n');
 
-  it('should report a key without tenant_id that no list names', () => {
-    expect(checkTenantKeys(keys, [])).toEqual({
-      unlisted: ['children.plain_id -> parents'],
-      stale: [],
-    });
+  it('should pass a key that carries tenant_id', () => {
+    const carrying = tenantKeysOf([parents, shared, children]).filter((k) => k.carriesTenant);
+    expect(checkTenantKeys(carrying, '')).toEqual([]);
   });
 
-  it('should pass when the key is listed', () => {
-    expect(checkTenantKeys(keys, ['children.plain_id -> parents'])).toEqual({
-      unlisted: [],
-      stale: [],
-    });
+  it('should pass a one-column key declared with the helper when a migration adds both triggers', () => {
+    expect(checkTenantKeys(declared, statements)).toEqual([]);
   });
 
-  it('should report a listed key that already carries tenant_id or is gone', () => {
-    expect(
-      checkTenantKeys(keys, [
-        'children.plain_id -> parents',
-        'children.scoped_id -> parents',
-        'children.removed_id -> parents',
-      ]),
-    ).toEqual({
-      unlisted: [],
-      stale: ['children.removed_id -> parents', 'children.scoped_id -> parents'],
-    });
+  it('should refuse a one-column key to a table whose rows always belong to an institute', () => {
+    const keys = tenantKeysOf([strict, referencing(orNoneKeyName(key), strict)]);
+    const problems = checkTenantKeys(keys, statements);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('sameTenantForeignKey()');
+  });
+
+  it('should refuse a one-column key that was not declared with the helper', () => {
+    const keys = tenantKeysOf([optional, referencing(undefined, optional)]);
+    const problems = checkTenantKeys(keys, statements);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('sameTenantOrNoneForeignKey(');
+  });
+
+  it('should report each trigger no migration adds', () => {
+    const [onReferencing, onReferenced] = orNoneStatements(key);
+    expect(checkTenantKeys(declared, '')).toHaveLength(2);
+    expect(checkTenantKeys(declared, onReferencing)).toEqual([
+      `referencing.ref_id -> optional: no migration holds\n      ${onReferenced}`,
+    ]);
+    expect(checkTenantKeys(declared, onReferenced)).toEqual([
+      `referencing.ref_id -> optional: no migration holds\n      ${onReferencing}`,
+    ]);
+  });
+
+  it('should report a trigger a later migration drops', () => {
+    for (const dropped of [
+      'DROP TRIGGER "referencing_ref_id_tenant_or_none" ON "referencing";',
+      'DROP TRIGGER IF EXISTS optional_keep_referenced_tenant ON optional;',
+    ]) {
+      expect(checkTenantKeys(declared, `${statements}\n${dropped}`)).toHaveLength(1);
+    }
   });
 });
 
@@ -109,14 +158,8 @@ describe('checkSetNullKeys', () => {
 });
 
 describe('the lists', () => {
-  it('should name each key once', () => {
-    expect(new Set(LISTED).size).toBe(LISTED.length);
-    expect(LISTED).toHaveLength(Object.keys(EXCLUDED).length);
+  it('should name each SET NULL key once', () => {
     const setNull = SET_NULL_KEYS_IN_CUSTOM_SQL.map((key) => `${key.table}.${key.column}`);
     expect(new Set(setNull).size).toBe(setNull.length);
-  });
-
-  it('should give a reason for every excluded key', () => {
-    for (const reason of Object.values(EXCLUDED)) expect(reason.length).toBeGreaterThan(10);
   });
 });

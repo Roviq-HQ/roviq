@@ -10,6 +10,10 @@
  * The referenced rows are real rows of two institutes, or, for a referenced table the spec
  * has no rows of, two rows in a copy of it. The first test ties the lists to the catalog: a
  * key that carries `tenant_id` and is not listed fails it.
+ *
+ * A reference to a table whose rows may belong to no institute (a system role, a platform
+ * sender, a person's file) is one column wide and held by two triggers (ROV-393); the last
+ * block attempts each of those the same way.
  */
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
@@ -385,6 +389,32 @@ const SET_NULL_KEYS: readonly (readonly [string, string, string, string])[] = [
   ['timetable_entries', 'teacher_id', 'memberships', 'timetable_entries_teacher_id_tenant_fkey'],
 ];
 
+/**
+ * References to a table whose rows may belong to no institute (ROV-393). The key is one column;
+ * the trigger `<table>_<column>_tenant_or_none` refuses a referenced row of another institute,
+ * and `<referenced>_keep_referenced_tenant` refuses moving a referenced row to an institute
+ * while another institute's row names it.
+ */
+const TENANT_OR_NONE_KEYS: readonly (readonly [string, string, string])[] = [
+  ['application_document_files', 'file_id', 'files'],
+  ['export_reports', 'file_id', 'files'],
+  ['institute_branding', 'cover_image_file_id', 'files'],
+  ['institute_branding', 'favicon_file_id', 'files'],
+  ['institute_branding', 'logo_file_id', 'files'],
+  ['issued_certificates', 'pdf_file_id', 'files'],
+  ['leave_files', 'file_id', 'files'],
+  ['memberships', 'role_id', 'roles'],
+  ['notification_deliveries', 'notification_id', 'notifications'],
+  ['notification_deliveries', 'sender_id', 'messaging_senders'],
+  ['staff_qualifications', 'certificate_file_id', 'files'],
+  ['tc_register', 'pdf_file_id', 'files'],
+  ['tenant_user_profiles', 'profile_image_file_id', 'files'],
+];
+
+const orNoneRule = (table: string, column: string): string => `${table}_${column}_tenant_or_none`;
+const orNoneKey = (table: string, column: string): string => `${orNoneRule(table, column)}_fkey`;
+const keepRule = (parent: string): string => `${parent}_keep_referenced_tenant`;
+
 type Parent = 'academic_years' | 'memberships' | 'sections' | 'standards' | 'student_profiles';
 
 /** One institute with a row of every referenced table. */
@@ -611,6 +641,97 @@ async function copyWithKeyToCopiedParent(
   return ids;
 }
 
+/** The ids of the three rows in the copied referenced table: one per institute, one of none. */
+interface CopiedOrNoneParent extends CopiedParent {
+  none: string;
+}
+
+/**
+ * Copies of `table` and `parent` that carry the same-tenant-or-none rule exactly as the
+ * catalog holds it on the real tables: the one-column key, the trigger on the referencing
+ * table and the trigger on the referenced one, each redirected to the copies. A rule that is
+ * missing or disabled on the real table fails here.
+ */
+async function copyWithOrNoneRule(
+  client: pg.PoolClient,
+  table: string,
+  column: string,
+  parent: string,
+): Promise<CopiedOrNoneParent> {
+  await client.query('CREATE SCHEMA same_tenant_key_scratch');
+  for (const [copy, source] of [
+    ['copy', table],
+    ['parent', parent],
+  ]) {
+    await client.query(
+      `CREATE TABLE same_tenant_key_scratch.${copy} (LIKE public.${source} INCLUDING DEFAULTS)`,
+    );
+    await client.query(
+      `DO $do$
+       DECLARE item record;
+       BEGIN
+         FOR item IN
+           SELECT attname FROM pg_attribute
+            WHERE attrelid = 'same_tenant_key_scratch.${copy}'::regclass AND attnum > 0 AND attnotnull
+         LOOP
+           EXECUTE format(
+             'ALTER TABLE same_tenant_key_scratch.${copy} ALTER COLUMN %I DROP NOT NULL', item.attname);
+         END LOOP;
+       END
+       $do$`,
+    );
+  }
+  await client.query('CREATE UNIQUE INDEX ON same_tenant_key_scratch.parent (id)');
+  const ids = { own: randomUUID(), other: randomUUID(), none: randomUUID() };
+  await client.query(
+    `INSERT INTO same_tenant_key_scratch.parent (id, tenant_id)
+     VALUES ($1, $2), ($3, $4), ($5, NULL)`,
+    [ids.own, own.tenantId, ids.other, other.tenantId, ids.none],
+  );
+
+  const key = await client.query<{ definition: string }>(
+    `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+      WHERE conrelid = $1::regclass AND conname = $2 AND contype = 'f' AND convalidated`,
+    [`public.${table}`, orNoneKey(table, column)],
+  );
+  expect(key.rows).toHaveLength(1);
+  const references = `REFERENCES ${parent}(id)`;
+  expect(key.rows[0].definition).toContain(references);
+  await client.query(
+    `ALTER TABLE same_tenant_key_scratch.copy ADD CONSTRAINT "${orNoneKey(table, column)}" ${key.rows[0].definition.replace(
+      references,
+      'REFERENCES same_tenant_key_scratch.parent(id)',
+    )}`,
+  );
+
+  // 'O': the trigger fires for every role's statements. A disabled one is not copied.
+  const trigger = async (onTable: string, name: string): Promise<string> => {
+    const { rows } = await client.query<{ definition: string }>(
+      `SELECT pg_get_triggerdef(oid) AS definition FROM pg_trigger
+        WHERE tgrelid = $1::regclass AND tgname = $2 AND tgenabled = 'O'`,
+      [`public.${onTable}`, name],
+    );
+    expect(rows, `enabled trigger ${name} on ${onTable}`).toHaveLength(1);
+    return rows[0].definition;
+  };
+  const check = await trigger(table, orNoneRule(table, column));
+  expect(check).toContain(`ON public.${table} `);
+  expect(check).toContain(`check_same_tenant_or_none('${column}', '${parent}')`);
+  await client.query(
+    check
+      .replace(`ON public.${table} `, 'ON same_tenant_key_scratch.copy ')
+      .replace(`'${column}', '${parent}'`, `'${column}', 'same_tenant_key_scratch.parent'`),
+  );
+  const keep = await trigger(parent, keepRule(parent));
+  expect(keep).toContain(`ON public.${parent} `);
+  await client.query(keep.replace(`ON public.${parent} `, 'ON same_tenant_key_scratch.parent '));
+
+  await client.query('GRANT USAGE ON SCHEMA same_tenant_key_scratch TO roviq_admin');
+  await client.query('GRANT SELECT, INSERT, UPDATE ON same_tenant_key_scratch.copy TO roviq_admin');
+  await client.query('GRANT SELECT, UPDATE ON same_tenant_key_scratch.parent TO roviq_admin');
+  return ids;
+}
+
 /** Runs `fn` in a transaction that is always rolled back; a lock that cannot be had is tried again. */
 async function inScratchTx(fn: (client: pg.PoolClient) => Promise<void>): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
@@ -719,6 +840,126 @@ describe('foreign keys between tenant tables', () => {
         `SELECT tenant_id AS tenant, ${column} AS reference FROM same_tenant_key_scratch.copy`,
       );
       expect(rows).toEqual([{ tenant: own.tenantId, reference: null }]);
+    });
+  });
+});
+
+describe('references to a table whose rows may belong to no institute', () => {
+  it('lists every one-column key from a tenant table to a tenant table, so each one is attempted below', async () => {
+    const { rows } = await pool.query<{ key: string }>(`
+      SELECT format('%s.%s -> %s (%s)', child.relname, att.attname, parent.relname, con.conname) AS key
+        FROM pg_constraint con
+        JOIN pg_class child ON child.oid = con.conrelid
+        JOIN pg_class parent ON parent.oid = con.confrelid
+        JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = con.conkey[1]
+       WHERE con.contype = 'f' AND con.connamespace = 'public'::regnamespace
+         AND cardinality(con.conkey) = 1 AND con.conparentid = 0
+         AND EXISTS (SELECT 1 FROM pg_attribute a
+                      WHERE a.attrelid = con.conrelid AND a.attname = 'tenant_id' AND NOT a.attisdropped)
+         AND EXISTS (SELECT 1 FROM pg_attribute a
+                      WHERE a.attrelid = con.confrelid AND a.attname = 'tenant_id' AND NOT a.attisdropped)
+       ORDER BY 1`);
+    const listed = TENANT_OR_NONE_KEYS.map(
+      ([table, column, parent]) => `${table}.${column} -> ${parent} (${orNoneKey(table, column)})`,
+    ).sort();
+    expect(rows.map((row) => row.key)).toEqual(listed);
+  });
+
+  it.each(
+    TENANT_OR_NONE_KEYS,
+  )('%s.%s accepts a %s row of its own institute or of none, and refuses another institute’s', async (table, column, parent) => {
+    const insert = `INSERT INTO same_tenant_key_scratch.copy (tenant_id, ${column}) VALUES ($1, $2)`;
+    const refusal = { code: '23503', constraint: orNoneRule(table, column) };
+    await inScratchTx(async (client) => {
+      const ids = await copyWithOrNoneRule(client, table, column, parent);
+      await client.query('SET LOCAL ROLE roviq_admin');
+
+      await client.query('SAVEPOINT attempt');
+      await expect(client.query(insert, [own.tenantId, ids.other])).rejects.toMatchObject(refusal);
+      await client.query('ROLLBACK TO SAVEPOINT attempt');
+
+      await client.query(insert, [own.tenantId, ids.own]);
+      await client.query(insert, [own.tenantId, ids.none]);
+      // A reference that is not set is not checked.
+      await client.query(insert, [own.tenantId, null]);
+
+      // Pointing an accepted row at the other institute's row, or moving it there, is refused too.
+      await client.query('SAVEPOINT attempt');
+      await expect(
+        client.query(
+          `UPDATE same_tenant_key_scratch.copy SET ${column} = $1 WHERE ${column} = $2`,
+          [ids.other, ids.none],
+        ),
+      ).rejects.toMatchObject(refusal);
+      await client.query('ROLLBACK TO SAVEPOINT attempt');
+      await client.query('SAVEPOINT attempt');
+      await expect(
+        client.query(
+          `UPDATE same_tenant_key_scratch.copy SET tenant_id = $1 WHERE ${column} = $2`,
+          [other.tenantId, ids.own],
+        ),
+      ).rejects.toMatchObject(refusal);
+      await client.query('ROLLBACK TO SAVEPOINT attempt');
+    });
+  });
+
+  it.each(
+    TENANT_OR_NONE_KEYS,
+  )('%s.%s: the %s row it names cannot be moved to another institute', async (table, column, parent) => {
+    const insert = `INSERT INTO same_tenant_key_scratch.copy (tenant_id, ${column}) VALUES ($1, $2)`;
+    const move = 'UPDATE same_tenant_key_scratch.parent SET tenant_id = $1 WHERE id = $2';
+    const refusal = { code: '23503', constraint: keepRule(parent) };
+    await inScratchTx(async (client) => {
+      const ids = await copyWithOrNoneRule(client, table, column, parent);
+      await client.query('SET LOCAL ROLE roviq_admin');
+      await client.query(insert, [own.tenantId, ids.none]);
+      await client.query(insert, [own.tenantId, ids.own]);
+
+      for (const id of [ids.none, ids.own]) {
+        await client.query('SAVEPOINT attempt');
+        await expect(client.query(move, [other.tenantId, id])).rejects.toMatchObject(refusal);
+        await client.query('ROLLBACK TO SAVEPOINT attempt');
+      }
+
+      // To the institute that names it, or to none, it may move; so may a row nobody names.
+      expect((await client.query(move, [own.tenantId, ids.none])).rowCount).toBe(1);
+      expect((await client.query(move, [null, ids.own])).rowCount).toBe(1);
+      expect((await client.query(move, [own.tenantId, ids.other])).rowCount).toBe(1);
+    });
+  });
+
+  it('refuses every checked statement when the rule’s owner cannot read every row', async () => {
+    const [table, column, parent] = TENANT_OR_NONE_KEYS[0];
+    const insert = `INSERT INTO same_tenant_key_scratch.copy (tenant_id, ${column}) VALUES ($1, $2)`;
+    await inScratchTx(async (client) => {
+      const ids = await copyWithOrNoneRule(client, table, column, parent);
+      // An owner that row security applies to: it would see no row and let anything through.
+      for (const fn of ['check_same_tenant_or_none', 'keep_referenced_tenant']) {
+        await client.query(`ALTER FUNCTION public.${fn}() OWNER TO roviq_admin`);
+      }
+      for (const scratch of ['copy', 'parent']) {
+        await client.query(
+          `ALTER TABLE same_tenant_key_scratch.${scratch} ENABLE ROW LEVEL SECURITY`,
+        );
+        await client.query(
+          `CREATE POLICY everyone ON same_tenant_key_scratch.${scratch} USING (true) WITH CHECK (true)`,
+        );
+      }
+      await client.query('SET LOCAL ROLE roviq_admin');
+
+      await client.query('SAVEPOINT attempt');
+      await expect(client.query(insert, [own.tenantId, ids.own])).rejects.toMatchObject({
+        code: '55000',
+      });
+      await client.query('ROLLBACK TO SAVEPOINT attempt');
+      await client.query('SAVEPOINT attempt');
+      await expect(
+        client.query('UPDATE same_tenant_key_scratch.parent SET tenant_id = $1 WHERE id = $2', [
+          own.tenantId,
+          ids.none,
+        ]),
+      ).rejects.toMatchObject({ code: '55000' });
+      await client.query('ROLLBACK TO SAVEPOINT attempt');
     });
   });
 });

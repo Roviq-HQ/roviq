@@ -11,7 +11,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { i18nText, tenantColumns } from '../common/columns';
+import { i18nText, sameTenantOrNoneForeignKey, tenantColumns } from '../common/columns';
 import { gender } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -46,10 +46,7 @@ export const tenantUserProfiles = pgTable(
     motherTongue: varchar('mother_tongue', { length: 50 }),
 
     /** The picture this institute holds of the person (`files`, purpose PROFILE_PHOTO). */
-    profileImageFileId: uuid('profile_image_file_id').references(() => files.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    profileImageFileId: uuid('profile_image_file_id'),
 
     // Same expression as user_profiles.search_vector; needs i18n_text_to_string().
     searchVector: tsvector('search_vector').generatedAlwaysAs(
@@ -59,6 +56,13 @@ export const tenantUserProfiles = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantOrNoneForeignKey(
+      'tenant_user_profiles_profile_image_file_id_tenant_or_none_fkey',
+      table.profileImageFileId,
+      files.id,
+    )
+      .onDelete('set null')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

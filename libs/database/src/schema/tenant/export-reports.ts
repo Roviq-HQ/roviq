@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantOrNoneForeignKey, tenantColumns } from '../common/columns';
 import { complianceReportType, exportReportStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -28,10 +28,7 @@ export const exportReports = pgTable(
     status: exportReportStatus().default('PENDING').notNull(),
     /** Temporal workflow id; also keeps a retried request from starting a second run. */
     workflowId: text('workflow_id').notNull(),
-    fileId: uuid('file_id').references(() => files.id, {
-      onDelete: 'restrict',
-      onUpdate: 'cascade',
-    }),
+    fileId: uuid('file_id'),
     rowCount: integer('row_count'),
     /** An `ErrorCode` value, never free text: it is shown to the requester. */
     errorCode: text('error_code'),
@@ -44,6 +41,9 @@ export const exportReports = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantOrNoneForeignKey('export_reports_file_id_tenant_or_none_fkey', table.fileId, files.id)
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

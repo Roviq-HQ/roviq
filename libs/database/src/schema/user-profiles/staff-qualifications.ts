@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { foreignKey, index, integer, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
-import { sameTenantForeignKey, tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, sameTenantOrNoneForeignKey, tenantColumns } from '../common/columns';
 import { qualificationType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -35,14 +35,18 @@ export const staffQualifications = pgTable(
     /** Grade or percentage — e.g., '85%', 'First Division', 'A+' */
     gradePercentage: varchar('grade_percentage', { length: 20 }),
     /** Scan of the certificate, if one was uploaded */
-    certificateFileId: uuid('certificate_file_id').references(() => files.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
+    certificateFileId: uuid('certificate_file_id'),
 
     ...tenantColumns,
   },
   (table) => [
+    sameTenantOrNoneForeignKey(
+      'staff_qualifications_certificate_file_id_tenant_or_none_fkey',
+      table.certificateFileId,
+      files.id,
+    )
+      .onDelete('set null')
+      .onUpdate('cascade'),
     sameTenantForeignKey(
       'staff_qualifications_staff_profile_id_tenant_fkey',
       [table.staffProfileId, table.tenantId],

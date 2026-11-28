@@ -2,7 +2,7 @@ import type { AbilityRule } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import { check, foreignKey, index, jsonb, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantColumns } from '../common/columns';
+import { sameTenantOrNoneForeignKey, tenantColumns } from '../common/columns';
 import { membershipStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from './institutes';
@@ -15,14 +15,15 @@ export const memberships = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    roleId: uuid('role_id')
-      .notNull()
-      .references(() => roles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    roleId: uuid('role_id').notNull(),
     abilities: jsonb().$type<AbilityRule[]>().default([]),
     status: membershipStatus().default('ACTIVE').notNull(),
     ...tenantColumns,
   },
   (table) => [
+    sameTenantOrNoneForeignKey('memberships_role_id_tenant_or_none_fkey', table.roleId, roles.id)
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     // The target of every same-institute foreign key to this table.
     uniqueIndex('memberships_id_tenant_key').on(table.id, table.tenantId),
     foreignKey({
