@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   Client,
   Connection,
+  defaultGrpcRetryOptions,
+  makeGrpcRetryInterceptor,
   type Workflow,
   WorkflowExecutionAlreadyStartedError,
   WorkflowIdReusePolicy,
@@ -19,17 +21,44 @@ import {
 export class TemporalClientService implements OnApplicationShutdown {
   private readonly connection: Connection;
   private readonly client: Client;
+  private closing = false;
+  private readonly underWay = new Set<Promise<unknown>>();
 
   constructor(config: ConfigService) {
+    const retry = defaultGrpcRetryOptions();
     this.connection = Connection.lazy({
       address: config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233'),
+      // The client's own retries, which stop once the app is shutting down.
+      interceptors: [
+        makeGrpcRetryInterceptor({
+          ...retry,
+          retryableDecider: (attempt, status) =>
+            !this.closing && retry.retryableDecider(attempt, status),
+        }),
+      ],
     });
     this.client = new Client({ connection: this.connection });
   }
 
+  /**
+   * Runs one client call so that shutdown can wait for it. A call the server does not answer
+   * retries on a timer; a retry that fires after the connection closed throws from that timer,
+   * where nothing can catch it. Shutdown therefore stops further retries, waits for the calls
+   * under way to end, and only then closes.
+   */
+  private call<T>(fn: () => Promise<T>): Promise<T> {
+    const running = fn();
+    this.underWay.add(running);
+    const done = (): void => {
+      this.underWay.delete(running);
+    };
+    running.then(done, done);
+    return running;
+  }
+
   /** Starts a workflow by its registered type name and returns its run id. */
   async startWorkflow(workflowType: string, options: WorkflowStartOptions): Promise<string> {
-    const handle = await this.client.workflow.start(workflowType, options);
+    const handle = await this.call(() => this.client.workflow.start(workflowType, options));
     return handle.firstExecutionRunId;
   }
 
@@ -40,10 +69,12 @@ export class TemporalClientService implements OnApplicationShutdown {
    */
   async startWorkflowOnce(workflowType: string, options: WorkflowStartOptions): Promise<boolean> {
     try {
-      await this.client.workflow.start(workflowType, {
-        ...options,
-        workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
-      });
+      await this.call(() =>
+        this.client.workflow.start(workflowType, {
+          ...options,
+          workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+        }),
+      );
       return true;
     } catch (err) {
       if (err instanceof WorkflowExecutionAlreadyStartedError) return false;
@@ -56,9 +87,8 @@ export class TemporalClientService implements OnApplicationShutdown {
     workflowType: string,
     options: WorkflowSignalWithStartOptionsWithArgs<[unknown]> & { args: unknown[] },
   ): Promise<string> {
-    const handle = await this.client.workflow.signalWithStart<Workflow, [unknown]>(
-      workflowType,
-      options,
+    const handle = await this.call(() =>
+      this.client.workflow.signalWithStart<Workflow, [unknown]>(workflowType, options),
     );
     return handle.signaledRunId;
   }
@@ -69,7 +99,7 @@ export class TemporalClientService implements OnApplicationShutdown {
    */
   async signal(workflowId: string, signalName: string, args: unknown[]): Promise<boolean> {
     try {
-      await this.client.workflow.getHandle(workflowId).signal(signalName, ...args);
+      await this.call(() => this.client.workflow.getHandle(workflowId).signal(signalName, ...args));
       return true;
     } catch (err) {
       if (err instanceof WorkflowNotFoundError) return false;
@@ -79,6 +109,8 @@ export class TemporalClientService implements OnApplicationShutdown {
 
   // After HTTP and the JetStream microservice stopped: their handlers start workflows.
   async onApplicationShutdown(): Promise<void> {
+    this.closing = true;
+    await Promise.allSettled([...this.underWay]);
     await this.connection.close();
   }
 }

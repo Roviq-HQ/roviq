@@ -1043,3 +1043,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Measured:** with `--maxWorkers=16` the slowest boot under the same outside load was 3.7 s against 7.4 s, and that run was shorter (93 s against 111 s); on a quieter machine the bounded run was longer (69 s against 58 s).
 - **Fix:** the integration project's `hookTimeout` is 30 s, the same as its `testTimeout` (`vitest.config.ts`). The hook's work is legitimately up to 9 s on a shared machine, and the 10 s default left no margin; a normal run is not slowed. A worker bound was not adopted: it helps only when the machine is shared and costs time when it is not.
 - **Lesson:** a hook timeout with no failed assertion, in files that differ from run to run, is load. Check `uptime` and what the other checkouts are running before reading the test.
+
+## 2026-11-28 — diagnosed and fixed: "Channel has been shut down" after every integration test passed (ROV-397)
+
+- **Symptom:** the pre-push `int` step exited non-zero with all 2646 tests passed and one "Unhandled error: Channel has been shut down", attributed to whichever spec file was running, from a timer in the Temporal client's gRPC retry.
+- **Cause:** no Temporal server runs for the integration project, so a workflow start is answered "unavailable" and the client retries on a timer for up to ten attempts. `TemporalClientService` closed its connection at shutdown while such a retry was scheduled; the retry then called a closed channel, which throws from the timer where nothing can catch it. Cancelling the call does not help: between attempts there is no call to cancel.
+- **Fix:** at shutdown the service stops further retries (its retry decider answers no), waits for the calls under way to end, and then closes the connection (`libs/backend/temporal/src/temporal-client.service.ts`, `temporal-client-shutdown.spec.ts`).
+- **Lesson:** an "unhandled error" with every test green is a timer that outlived its owner. Find who scheduled it; do not close a client under its own retries.
