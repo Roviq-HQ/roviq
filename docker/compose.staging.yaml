@@ -179,9 +179,9 @@ services:
       # Server-side requests reach the API through its public name, whose certificate is signed
       # by the stack's own certificate authority.
       NODE_EXTRA_CA_CERTS: /run/staging-ca.pem
-      OPENOBSERVE_URL: http://openobserve:5080
-      OPENOBSERVE_USER: ${OPENOBSERVE_USER:?}
-      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:?}
+      # The file store origins the browser may load from and upload to (content security policy).
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_ENDPOINT:?}/roviq-public
     volumes:
       - ${STAGING_CA_CERT:?}:/run/staging-ca.pem:ro
     networks:

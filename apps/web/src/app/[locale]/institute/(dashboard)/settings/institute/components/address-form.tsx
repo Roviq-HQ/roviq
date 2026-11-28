@@ -28,6 +28,7 @@ import { addressHelp } from '@web/help/institute-settings/address.help';
 import { Check, ChevronsUpDown, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
+import { PIN_CODE_LOOKUP_URL } from '../../../../../../../security/external-origins';
 
 const { instituteSettings } = testIds;
 // The TanStack `useAppForm()` return type has many contravariant slots that
@@ -65,7 +66,7 @@ async function lookupPincode(
   signal: AbortSignal,
 ): Promise<PincodeLookupResult | null> {
   try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`, {
+    const res = await fetch(`${PIN_CODE_LOOKUP_URL}/${pin}`, {
       signal,
       // Public, anonymous endpoint — no credentials.
       credentials: 'omit',

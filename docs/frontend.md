@@ -11,7 +11,7 @@
 
 ## Portals
 
-One Next.js app (`apps/web`) serves three portals. `middleware.ts` picks the portal from the host name.
+One Next.js app (`apps/web`) serves three portals. `middleware.ts` picks the portal from the host name. A host serves its own portal only: a path of another portal (`/en/admin/…` on the institute host) answers the 404 page.
 
 > Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
 
@@ -22,6 +22,27 @@ One Next.js app (`apps/web`) serves three portals. `middleware.ts` picks the por
 | Institute | http://localhost:4200 | `app/[locale]/institute/` | Institute staff, students and guardians |
 
 The portals share components from `@roviq/ui`, auth from `@roviq/auth` and i18n from `@roviq/i18n`.
+
+## Content security policy
+
+Every page answers with a `Content-Security-Policy` header. `apps/web/src/middleware.ts` builds it per response, because it carries a fresh nonce; `apps/web/src/security/content-security-policy.ts` holds the rules.
+
+| Directive | Allowed | Why |
+|---|---|---|
+| `script-src` | this origin, the response's nonce; `'unsafe-eval'` in `next dev` only | Script files come from the app's own build. An inline script runs only with the nonce: Next.js puts it on its own, and the portal layouts pass it to the theme script. React and Turbopack use `eval` in development. |
+| `style-src` | this origin, `'unsafe-inline'` | React writes `style` attributes for the UI components (positions, sizes, colours), and the toast and theme libraries add `<style>` elements from script. Neither can carry a nonce. |
+| `img-src`, `media-src` | this origin, `data:`, `blob:`, the file store | Uploaded files, previews of a file being uploaded. |
+| `connect-src` | this origin, the API over HTTP and WebSocket, the file store, the services in `external-origins.ts` (the PIN code directory); the push service when web push is configured | GraphQL, live updates, uploads to a presigned link, the address forms' PIN lookup. |
+| `frame-src`, `worker-src` | this origin, `blob:` | A generated PDF is shown from a blob URL. |
+| `object-src`, `frame-ancestors` | none | No plugins; the app is never framed. |
+| `base-uri`, `form-action` | this origin | |
+
+- **Origins come from configuration**, never a host typed into the policy: the API from `NEXT_PUBLIC_API_URL` (and `NEXT_PUBLIC_WS_URL` when set), the file store from `S3_PUBLIC_ENDPOINT` and `S3_PUBLIC_BASE_URL`, read by the web server when it starts.
+- **A third-party service the browser calls** has its address in `apps/web/src/security/external-origins.ts`, and the call site imports it from there, so the policy and the call cannot drift apart.
+- **A new origin** (an analytics script, a map, a payment widget) is a change to `content-security-policy.ts` with its reason in the table above and a case in `content-security-policy.spec.ts`. A blocked load shows in the browser console as "violates the following Content Security Policy directive".
+- **An inline `<script>` of our own** takes the nonce from the `x-nonce` request header (`(await headers()).get('x-nonce')` in a server component). Never `dangerouslySetInnerHTML` with a script, and never an inline event handler attribute: both are blocked.
+- **Every page renders per request.** A nonce cannot be put into a page built ahead of time, so the portal layouts read the request headers and no page is static.
+- The other response headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, and `Strict-Transport-Security` in production) are in `apps/web/security-headers.js`.
 
 ## Error messages
 

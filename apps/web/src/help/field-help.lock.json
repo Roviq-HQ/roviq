@@ -66,18 +66,18 @@
     }
   },
   "adminInstitutes.new.group": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e",
       "libs/database/src/schema/tenant/institute-groups.ts": "a978cdf4e353eb8d"
     }
   },
   "adminInstitutes.new.reseller": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394"
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e"
     }
   },
   "admission.convert.academicYear": {
@@ -273,54 +273,54 @@
     }
   },
   "institutes.new.board": {
-    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts": "2b888ab09d1c614d",
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts": "71cc76155e2b82b2",
       "apps/api-gateway/src/institute/management/seed/institute-setup.service.ts#InstituteSetupService.seedAcademicStructure": "2e5846c3e3429e45",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43"
     }
   },
   "institutes.new.code": {
-    "reviewedReason": "only row policies and their comments changed in the institutes schema file; the create form stores this field as before",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
       "libs/database/src/schema/tenant/institutes.ts": "b77db775bd16fb13"
     }
   },
   "institutes.new.firstAdmin": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43"
     }
   },
   "institutes.new.structureFramework": {
-    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
       "libs/shared/common-types/src/lib/enums/institute.ts": "38613559a9bfc4a5"
     }
   },
   "institutes.new.type": {
-    "reviewedReason": "only row policies and their comments changed in the institutes schema file; the create form stores this field as before",
+    "reviewedReason": "only the PIN lookup address moved to a constant; field behaviour unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
       "apps/api-gateway/src/institute/academic-year/academic-year.service.ts": "0f4990b980d1fccc",
       "apps/api-gateway/src/institute/management/seed/institute-setup.service.ts#InstituteSetupService.seedAcademicStructure": "2e5846c3e3429e45",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
-      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "e6f4c8236c6f094e",
       "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
       "libs/database/src/schema/tenant/institutes.ts": "b77db775bd16fb13",
       "libs/shared/common-types/src/lib/enums/institute.ts": "38613559a9bfc4a5"

@@ -192,9 +192,9 @@ services:
       PORT: 4200
       NEXT_PUBLIC_API_URL: http://localhost:3000
       NEXT_PUBLIC_WS_URL: ws://localhost:3000
-      OPENOBSERVE_URL: http://openobserve:5080
-      OPENOBSERVE_USER: ${OPENOBSERVE_USER:?OPENOBSERVE_USER must be set}
-      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:?OPENOBSERVE_PASSWORD must be set}
+      # The file store origins the browser may load from and upload to (content security policy).
+      S3_PUBLIC_ENDPOINT: http://localhost:9002
+      S3_PUBLIC_BASE_URL: http://localhost:9002/roviq-public
     depends_on:
       api-gateway:
         condition: service_started

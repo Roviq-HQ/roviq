@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 
 const REQUEST_TIMEOUT_MS = 3_000;
+// A search reads a time range of a stream; the pages that show it poll, they do not block.
+const SEARCH_TIMEOUT_MS = 8_000;
 const MICROS_PER_MS = 1_000;
 
 /** Instant-vector sample. */
@@ -129,6 +131,43 @@ export class OpenObserveClient {
     }));
   }
 
+  /**
+   * One PromQL call, answered as the store sent it: the Prometheus envelope, also when its
+   * status is `error` (a query the store refuses is the caller's to show).
+   */
+  prometheus(endpoint: 'query' | 'query_range', params: Record<string, string>): Promise<unknown> {
+    return this.fetchJson(endpoint, `/api/${this.org}/prometheus/api/v1/${endpoint}`, params, {
+      acceptClientError: true,
+    });
+  }
+
+  /** One SQL search on the logs or traces stream. `sql` is built from validated input only. */
+  search(args: {
+    type: 'logs' | 'traces';
+    sql: string;
+    sinceSeconds: number;
+    size: number;
+  }): Promise<unknown> {
+    const endUs = Date.now() * MICROS_PER_MS;
+    return this.fetchJson(
+      `${args.type} search`,
+      `/api/${this.org}/_search`,
+      { type: args.type },
+      {
+        json: {
+          query: {
+            sql: args.sql,
+            start_time: endUs - args.sinceSeconds * 1_000_000,
+            end_time: endUs,
+            from: 0,
+            size: args.size,
+          },
+        },
+        timeoutMs: SEARCH_TIMEOUT_MS,
+      },
+    );
+  }
+
   /** Enabled alerts whose last evaluation fired; one failed detail read fails the whole call. */
   async alerts(): Promise<FiringAlert[]> {
     const list = parse(
@@ -179,6 +218,7 @@ export class OpenObserveClient {
     label: string,
     path: string,
     params: Record<string, string> = {},
+    options: { json?: unknown; timeoutMs?: number; acceptClientError?: boolean } = {},
   ): Promise<unknown> {
     if (!this.authorization) {
       throw new OpenObserveUnavailableError('OpenObserve credentials are not configured');
@@ -189,13 +229,19 @@ export class OpenObserveClient {
     let res: Response;
     try {
       res = await fetch(url, {
-        headers: { authorization: this.authorization },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        method: options.json === undefined ? 'GET' : 'POST',
+        headers: {
+          authorization: this.authorization,
+          ...(options.json === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body: options.json === undefined ? undefined : JSON.stringify(options.json),
+        signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
       });
     } catch (cause) {
       throw new OpenObserveUnavailableError(`OpenObserve ${label} request failed`, { cause });
     }
-    if (!res.ok) {
+    const clientError = res.status >= 400 && res.status < 500;
+    if (!res.ok && !(options.acceptClientError && clientError)) {
       throw new OpenObserveUnavailableError(`OpenObserve ${label} returned HTTP ${res.status}`);
     }
     try {

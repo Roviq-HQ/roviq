@@ -61,6 +61,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useFormDraft } from '../../../../../../hooks/use-form-draft';
+import { PIN_CODE_LOOKUP_URL } from '../../../../../../security/external-origins';
 import { InstituteGroupCombobox } from '../_components/institute-group-combobox';
 import { ResellerCombobox } from '../_components/reseller-combobox';
 import { useCreateInstitute } from '../use-institutes';
@@ -182,7 +183,7 @@ async function lookupIndianPin(
   signal: AbortSignal,
 ): Promise<PostalLookupResult | null> {
   try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`, { signal });
+    const res = await fetch(`${PIN_CODE_LOOKUP_URL}/${pin}`, { signal });
     if (!res.ok) return null;
     const body: unknown = await res.json();
     if (!Array.isArray(body) || body.length === 0) return null;

@@ -5681,6 +5681,65 @@ type Query {
   adminNotificationHealth: NotificationHealth!
 
   """
+  Platform admin: alert rules that are firing, as `{ status, data: { alerts: [{ labels, annotations, state, activeAt }] } }`.
+  """
+  adminObservabilityAlerts: JSON!
+
+  """
+  Platform admin: recent log lines from the telemetry store, newest first, as `{ hits: [{ _timestamp, severity, service_name, body }] }`.
+  """
+  adminObservabilityLogs(
+    """Default 50, at most 500."""
+    limit: Int
+
+    """
+    Service names to keep (letters, digits, dot, dash, underscore). Empty: all.
+    """
+    services: [String!]
+
+    """How far back to read, in seconds. Default 3600, at most 30 days."""
+    sinceSeconds: Int
+  ): JSON!
+
+  """
+  Platform admin: one PromQL query against the telemetry store; answers the Prometheus response envelope `{ status, data }`.
+  """
+  adminObservabilityMetrics(
+    """Range end, unix seconds. Default now."""
+    end: Int
+
+    """`query` (instant) or `query_range` (default)."""
+    endpoint: String
+
+    """PromQL expression."""
+    query: String!
+
+    """
+    Range start, unix seconds. Default one hour ago; at most 30 days before `end`.
+    """
+    start: Int
+
+    """Seconds between points of a range query. Default 30, from 5 to 86400."""
+    step: Int
+  ): JSON!
+
+  """
+  Platform admin: recent root spans, newest first, as `{ hits: [{ _timestamp, trace_id, service_name, operation_name, duration }] }`.
+  """
+  adminObservabilityTraces(
+    """Default 20, at most 100."""
+    limit: Int
+
+    """
+    Service names to keep (letters, digits, dot, dash, underscore). Empty: all.
+    """
+    services: [String!]
+
+    """How far back to read, in seconds. Default 3600, at most 30 days."""
+    sinceSeconds: Int
+  ): JSON!
+
+  """
   Platform admin: one reseller's billing summary (MRR, subscriptions, overdue)
   """
   adminResellerBillingDashboard(resellerId: ID!): BillingDashboardModel!

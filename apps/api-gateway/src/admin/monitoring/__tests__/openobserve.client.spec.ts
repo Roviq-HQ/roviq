@@ -306,4 +306,45 @@ describe('OpenObserveClient', () => {
       await expect(clientWith(BASE).query('up')).rejects.toThrow(OpenObserveUnavailableError);
     });
   });
+  describe('raw reads for the observability pages', () => {
+    it('should POST a search with the SQL, the window in microseconds and the page size', async () => {
+      const fetchMock = stubFetchJson({ hits: [{ body: 'line' }] });
+
+      const body = await clientWith(BASE).search({
+        type: 'logs',
+        sql: 'SELECT body FROM "default"',
+        sinceSeconds: 60,
+        size: 7,
+      });
+
+      expect(body).toEqual({ hits: [{ body: 'line' }] });
+      const url = requestedUrl(fetchMock);
+      expect(url.pathname).toBe('/api/default/_search');
+      expect(url.searchParams.get('type')).toBe('logs');
+      const [, init] = fetchMock.mock.calls[0] ?? [];
+      expect(init?.method).toBe('POST');
+      const sent = JSON.parse(String(init?.body));
+      expect(sent.query).toMatchObject({ sql: 'SELECT body FROM "default"', from: 0, size: 7 });
+      expect(sent.query.end_time - sent.query.start_time).toBe(60 * 1_000_000);
+      // Microseconds since the epoch: sixteen digits today.
+      expect(String(sent.query.end_time)).toHaveLength(16);
+    });
+
+    it('should answer the Prometheus envelope as sent, also for a query the store refuses', async () => {
+      stubFetchJson({ status: 'error', error: 'parse error' }, 400);
+
+      expect(await clientWith(BASE).prometheus('query', { query: 'up(' })).toEqual({
+        status: 'error',
+        error: 'parse error',
+      });
+    });
+
+    it('should fail a raw read when the store answers a server error', async () => {
+      stubFetchJson({}, 503);
+
+      await expect(clientWith(BASE).prometheus('query', { query: 'up' })).rejects.toThrow(
+        OpenObserveUnavailableError,
+      );
+    });
+  });
 });
