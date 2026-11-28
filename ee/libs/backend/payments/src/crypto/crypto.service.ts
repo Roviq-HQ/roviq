@@ -26,7 +26,7 @@ export class CryptoService {
   /** Encrypt a JSON-serializable value. Returns `iv:tag:ciphertext` hex string. */
   encrypt(plaintext: unknown): string {
     const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(ALGORITHM, this.key, iv);
+    const cipher = createCipheriv(ALGORITHM, this.key, iv, { authTagLength: TAG_LENGTH });
     const json = JSON.stringify(plaintext);
     const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
@@ -48,7 +48,7 @@ export class CryptoService {
       throw new Error('Invalid auth tag length');
     }
 
-    const decipher = createDecipheriv(ALGORITHM, this.key, iv);
+    const decipher = createDecipheriv(ALGORITHM, this.key, iv, { authTagLength: TAG_LENGTH });
     decipher.setAuthTag(tag);
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return JSON.parse(decrypted.toString('utf8')) as T;
