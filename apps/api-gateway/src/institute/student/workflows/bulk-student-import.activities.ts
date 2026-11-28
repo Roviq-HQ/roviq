@@ -467,7 +467,7 @@ async function discardAccount(ctx: InsertRowContext, userId: string, rowNumber: 
       logger.warn(`Row ${rowNumber}: kept account ${userId}: it is in use`);
     }
   } catch (error) {
-    logger.error(`Row ${rowNumber}: could not remove account ${userId}`, error);
+    logger.error({ err: error }, `Row ${rowNumber}: could not remove account ${userId}`);
   }
 }
 
@@ -521,7 +521,7 @@ async function insertSingleRow(
   }
 
   logger.log(
-    `Row ${row.rowNumber}: Created student "${row.firstName}" (admission: ${admitted.admissionNumber})`,
+    `Row ${row.rowNumber}: Created student ${admitted.studentProfileId} (admission: ${admitted.admissionNumber})`,
   );
   ctx.emitEvent(EVENT_PATTERNS.STUDENT.admitted, {
     tenantId: ctx.tenantId,
@@ -550,7 +550,7 @@ export function createBulkStudentImportActivities(
   function emitEvent(pattern: EventPattern, data: unknown): void {
     if (!natsClient) return;
     natsClient.emit(pattern, data).subscribe({
-      error: (err) => logger.warn(`Failed to emit ${pattern}: ${err}`),
+      error: (err) => logger.warn({ err }, `Failed to emit ${pattern}`),
     });
   }
 
@@ -658,8 +658,7 @@ export function createBulkStudentImportActivities(
             skipped++;
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          logger.error(`Row ${row.rowNumber}: Insert failed — ${message}`);
+          logger.error({ err: error }, `Row ${row.rowNumber}: Insert failed`);
           errors.push(rowFailure(row.rowNumber, error));
         }
       }

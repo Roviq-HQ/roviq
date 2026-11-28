@@ -15,7 +15,7 @@ const logger = new Logger('RedisModule');
       useFactory: (config: ConfigService) => {
         const client = new Redis(config.getOrThrow<string>('REDIS_URL'));
         client.on('error', (err) => {
-          logger.error('Redis connection error', err);
+          logger.error({ err }, 'Redis connection error');
         });
         return client;
       },

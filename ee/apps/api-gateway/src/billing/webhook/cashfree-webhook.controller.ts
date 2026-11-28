@@ -62,10 +62,7 @@ export class CashfreeWebhookController {
       return res.json({ status: 'ok' });
     } catch (error) {
       const err = error as Error;
-      this.logger.error(
-        `Cashfree webhook failed for reseller ${resellerId}: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error({ err }, `Cashfree webhook failed for reseller ${resellerId}`);
       return res.status(400).json({ error: 'Webhook processing failed' });
     }
   }

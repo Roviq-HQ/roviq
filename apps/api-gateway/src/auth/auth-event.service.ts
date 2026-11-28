@@ -76,7 +76,7 @@ export class AuthEventService {
         metadata: event.metadata ?? {},
       });
     } catch (error) {
-      this.logger.warn(`Failed to emit auth event [${event.type}]: ${error}`);
+      this.logger.warn({ err: error }, `Failed to emit auth event [${event.type}]`);
     }
   }
 }

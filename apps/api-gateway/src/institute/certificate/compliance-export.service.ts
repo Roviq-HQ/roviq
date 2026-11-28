@@ -167,10 +167,7 @@ export class ComplianceExportService {
       });
     } catch (err) {
       // The row exists; leaving it PENDING would show a progress bar that never ends.
-      this.logger.error(
-        `Compliance export ${report.id} could not be started`,
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error({ err }, `Compliance export ${report.id} could not be started`);
       await this.repo.markFailed(ctx, {
         id: report.id,
         from: 'PENDING',

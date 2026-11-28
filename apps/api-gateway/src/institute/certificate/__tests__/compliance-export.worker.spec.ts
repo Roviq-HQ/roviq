@@ -121,8 +121,8 @@ describe('ComplianceExportWorkerService', () => {
 
     expect(error).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledWith(
+      { err: new Error('temporal unreachable') },
       'Compliance export worker failed to start',
-      expect.stringContaining('temporal unreachable'),
     );
     expect(poolEnd).toHaveBeenCalledTimes(1);
   });
@@ -149,8 +149,8 @@ describe('ComplianceExportWorkerService', () => {
     worker.onModuleInit();
     await vi.waitFor(() =>
       expect(error).toHaveBeenCalledWith(
+        { err: new Error('worker crashed') },
         'Compliance export worker stopped with an error',
-        expect.stringContaining('worker crashed'),
       ),
     );
     await vi.waitFor(() => expect(poolEnd).toHaveBeenCalledTimes(1));

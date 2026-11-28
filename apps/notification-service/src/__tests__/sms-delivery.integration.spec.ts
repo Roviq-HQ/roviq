@@ -34,6 +34,7 @@ import { MessagingTemplateDrizzleRepository } from '../repositories/messaging-te
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
+import { captureLog } from './captured-log';
 import { noDeliveryLimits } from './delivery-limits';
 
 const AUTH_KEY = `spec-key-${randomUUID()}`;
@@ -277,6 +278,30 @@ describe('SMS delivery through the provider adapter (integration)', () => {
       ['FAILED', 'SMS_INVALID_NUMBER', SMS_HTTP_PROVIDER, null],
     ]);
     await expectNoCodeStored();
+  });
+
+  it('should log a refused and a failed-over send without the phone number or the code', async () => {
+    const log = captureLog();
+    try {
+      provider.answers.push({
+        status: 200,
+        body: { type: 'error', message: `Invalid mobile ${PHONE} for ${CODE}` },
+      });
+      await sender.attempt(attempt(() => REGISTERED));
+      // Unreachable first provider: the log adapter takes the message and writes a line.
+      provider.answers.push({ status: 503, body: { type: 'error', message: `${PHONE} ${CODE}` } });
+      await failover.attempt(attempt(() => REGISTERED));
+    } finally {
+      log.stop();
+    }
+
+    const written = log.lines.join('');
+    expect(log.lines.length).toBeGreaterThan(0);
+    expect(written).toContain(user.userId);
+    expect(written).not.toContain(PHONE);
+    expect(written).not.toContain(PHONE.slice(3));
+    expect(written).not.toContain(CODE);
+    expect(written).not.toContain('dropped_fields');
   });
 
   it('should record a value that does not fit as FAILED without calling the provider', async () => {

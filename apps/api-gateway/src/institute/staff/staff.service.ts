@@ -165,7 +165,10 @@ export class StaffService {
         this.logger.warn(`Kept account ${userId} of a failed staff create: it is in use`);
       }
     } catch (error) {
-      this.logger.error(`Could not remove account ${userId} of a failed staff create`, error);
+      this.logger.error(
+        { err: error },
+        `Could not remove account ${userId} of a failed staff create`,
+      );
     }
   }
 

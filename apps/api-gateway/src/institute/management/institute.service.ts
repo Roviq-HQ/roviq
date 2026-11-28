@@ -138,7 +138,7 @@ export class InstituteService {
         actorId: getRequestContext().userId,
       })
       .catch((err) => {
-        this.logger.error(`Setup failed for institute ${record.id}`, err);
+        this.logger.error({ err }, `Setup failed for institute ${record.id}`);
       });
 
     // Spread the full record so the `adminInstituteCreated` /

@@ -98,7 +98,7 @@ export class TenantAnalyticsService {
       };
     } catch (err) {
       if (!(err instanceof OpenObserveUnavailableError)) throw err;
-      this.logger.warn(`Tenant API metrics omitted: ${err.message}`);
+      this.logger.warn({ err }, 'Tenant API metrics omitted');
       return null;
     }
   }

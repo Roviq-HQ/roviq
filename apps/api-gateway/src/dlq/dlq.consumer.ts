@@ -129,13 +129,13 @@ export class DlqConsumer implements OnModuleInit, OnModuleDestroy {
           msg.ack();
         } catch (err) {
           // Do not ack — defer for redelivery so the message is never lost.
-          this.logger.error(`Failed to persist DLQ message (seq ${msg.seq})`, err);
+          this.logger.error({ err }, `Failed to persist DLQ message (seq ${msg.seq})`);
           msg.nak(NAK_DELAY_MS);
         }
       }
     } catch (err) {
       if (!(err instanceof Error && err.message.includes('closed'))) {
-        this.logger.error('DLQ consumer error', err);
+        this.logger.error({ err }, 'DLQ consumer error');
       }
     }
   }

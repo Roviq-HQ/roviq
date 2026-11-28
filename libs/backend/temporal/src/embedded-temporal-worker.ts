@@ -154,6 +154,6 @@ export abstract class EmbeddedTemporalWorker implements OnModuleInit, OnModuleDe
   }
 
   private logError(message: string, err: unknown): void {
-    this.logger.error(message, err instanceof Error ? err.stack : String(err));
+    this.logger.error({ err }, message);
   }
 }

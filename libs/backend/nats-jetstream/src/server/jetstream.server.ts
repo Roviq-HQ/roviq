@@ -307,7 +307,8 @@ export class JetStreamServer extends ServerNats {
       void this.consumeLoop(pattern, messages, chain, config);
     } catch (err) {
       this.logger.error(
-        `Failed to start consumer "${config.durable}" on stream "${config.stream}": ${err instanceof Error ? err.message : String(err)}`,
+        { err },
+        `Failed to start consumer "${config.durable}" on stream "${config.stream}"`,
       );
     }
   }
@@ -401,7 +402,7 @@ export class JetStreamServer extends ServerNats {
       `Failed to deserialize message on "${msg.subject}": ${err instanceof Error ? err.message : String(err)}`,
       err,
     );
-    this.logger.error(error.message);
+    this.logger.error({ err: error }, `Failed to deserialize message on "${msg.subject}"`);
 
     try {
       await publishToDlq(
@@ -415,9 +416,7 @@ export class JetStreamServer extends ServerNats {
       );
       msg.term('deserialization_error');
     } catch (dlqErr) {
-      this.logger.error(
-        `Failed to publish deserialization error to DLQ: ${dlqErr instanceof Error ? dlqErr.message : String(dlqErr)}`,
-      );
+      this.logger.error({ err: dlqErr }, 'Failed to publish deserialization error to DLQ');
       msg.nak(60_000);
     }
   }
@@ -484,8 +483,8 @@ export class JetStreamServer extends ServerNats {
     const delay = this.nakDelay(ctx, deliveryCount);
     const next = exhausted ? 'sending to DLQ' : `nak with ${delay}ms delay`;
     this.logger.error(
-      `Handler failed for "${pattern}" (delivery ${deliveryCount}/${config.maxDeliver}), ${next}: ${errorText}`,
-      err instanceof Error ? err.stack : undefined,
+      { err },
+      `Handler failed for "${pattern}" (delivery ${deliveryCount}/${config.maxDeliver}), ${next}`,
     );
 
     if (exhausted) {
@@ -518,9 +517,7 @@ export class JetStreamServer extends ServerNats {
       );
       msg.term('max_retries_exhausted');
     } catch (dlqErr) {
-      this.logger.error(
-        `Failed to publish to DLQ after max retries: ${dlqErr instanceof Error ? dlqErr.message : String(dlqErr)}`,
-      );
+      this.logger.error({ err: dlqErr }, 'Failed to publish to DLQ after max retries');
       msg.nak(60_000);
     }
   }
@@ -572,9 +569,7 @@ export class JetStreamServer extends ServerNats {
         messages.stop();
         this.logger.log(`Consumer "${durable}" stopped`);
       } catch (err) {
-        this.logger.error(
-          `Error stopping consumer "${durable}": ${err instanceof Error ? err.message : String(err)}`,
-        );
+        this.logger.error({ err }, `Error stopping consumer "${durable}"`);
       }
     }
     this.consumers.clear();

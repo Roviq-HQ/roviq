@@ -113,7 +113,7 @@ export class LoginLockoutService {
           },
         })
         .catch((err) => {
-          this.logger.warn(`Failed to emit ACCOUNT_LOCKED auth event: ${String(err)}`);
+          this.logger.warn({ err }, 'Failed to emit ACCOUNT_LOCKED auth event');
         });
 
       return { locked: true, remainingAttempts: 0 };

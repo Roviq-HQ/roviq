@@ -592,8 +592,8 @@ describe('BillingService', () => {
         await expect(service.cancelSubscription('sub-1')).rejects.toThrow(BadGatewayException);
         expect(repo.updateSubscription).not.toHaveBeenCalled();
         expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Payment gateway error: Network error'),
-          undefined,
+          { err: new PaymentGatewayError('Network error', 'RAZORPAY') },
+          'Payment gateway error',
         );
       }));
   });
@@ -681,8 +681,8 @@ describe('BillingService', () => {
         await expect(service.pauseSubscription('sub-1')).rejects.toThrow(BadGatewayException);
         expect(repo.updateSubscription).not.toHaveBeenCalled();
         expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Payment gateway error: Network error'),
-          undefined,
+          { err: new PaymentGatewayError('Network error', 'RAZORPAY') },
+          'Payment gateway error',
         );
       }));
   });
@@ -770,8 +770,8 @@ describe('BillingService', () => {
         await expect(service.resumeSubscription('sub-1')).rejects.toThrow(BadGatewayException);
         expect(repo.updateSubscription).not.toHaveBeenCalled();
         expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Payment gateway error: Network error'),
-          undefined,
+          { err: new PaymentGatewayError('Network error', 'RAZORPAY') },
+          'Payment gateway error',
         );
       }));
   });

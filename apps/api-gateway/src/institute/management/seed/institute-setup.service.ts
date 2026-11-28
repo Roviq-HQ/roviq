@@ -68,7 +68,7 @@ export class InstituteSetupService {
       await this.updateSetupStatus(instituteId, 'COMPLETED', actorId);
       this.logger.log(`Setup completed for institute ${instituteId}`);
     } catch (error) {
-      this.logger.error(`Setup failed for institute ${instituteId}`, error);
+      this.logger.error({ err: error }, `Setup failed for institute ${instituteId}`);
       await this.updateSetupStatus(instituteId, 'FAILED', actorId);
       throw error;
     }

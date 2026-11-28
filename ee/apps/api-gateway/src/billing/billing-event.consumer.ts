@@ -34,9 +34,7 @@ export class BillingEventConsumer implements OnModuleInit {
             .where(eq(institutes.id, tenantId));
         })
           .then(() => this.logger.log(`Institute ${tenantId} suspended (${event})`))
-          .catch((err) =>
-            this.logger.error(`Failed to suspend ${tenantId}`, (err as Error).message),
-          );
+          .catch((err) => this.logger.error({ err }, `Failed to suspend ${tenantId}`));
       });
     }
 
@@ -61,9 +59,7 @@ export class BillingEventConsumer implements OnModuleInit {
             .where(eq(institutes.id, tenantId));
           this.logger.log(`Institute ${tenantId} reactivated`);
         }
-      }).catch((err) =>
-        this.logger.error(`Failed to reactivate ${tenantId}`, (err as Error).message),
-      );
+      }).catch((err) => this.logger.error({ err }, `Failed to reactivate ${tenantId}`));
     });
 
     // subscription.paused → log

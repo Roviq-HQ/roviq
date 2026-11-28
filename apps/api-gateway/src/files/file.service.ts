@@ -266,7 +266,7 @@ export class FileService {
     };
     // A failed audit publish must not turn the refusal into a server error.
     await this.audit.emit(entry).catch((err: unknown) => {
-      this.logger.error(`Audit entry for quarantined file ${file.id} was not published`, err);
+      this.logger.error({ err }, `Audit entry for quarantined file ${file.id} was not published`);
     });
   }
 
@@ -423,7 +423,7 @@ export class FileService {
       return await this.scanner.scan(bytes);
     } catch (err) {
       if (!(err instanceof ScannerUnavailableError)) throw err;
-      this.logger.error(`File ${file.id} could not be scanned: ${err.message}`);
+      this.logger.error({ err }, `File ${file.id} could not be scanned`);
       throw new BusinessException(
         ErrorCode.FILE_SCAN_UNAVAILABLE,
         'The file could not be checked for malware right now. Try again in a moment.',
@@ -454,7 +454,7 @@ export class FileService {
       processed = await this.images.process(original, policy);
     } catch (err) {
       if (!(err instanceof InvalidImageError)) throw err;
-      this.logger.warn(`Image ${file.id} was refused: ${err.message}`);
+      this.logger.warn({ err }, `Image ${file.id} was refused`);
       return IMAGE_INVALID;
     }
 

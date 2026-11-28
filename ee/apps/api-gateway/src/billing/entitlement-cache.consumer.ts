@@ -27,7 +27,9 @@ export class EntitlementCacheConsumer implements OnModuleInit {
       this.redis
         .del(`${CACHE_PREFIX}${tenantId}`)
         .then(() => this.logger.debug(`Entitlement cache dropped for ${tenantId}`))
-        .catch((err) => this.logger.warn(`Failed to drop entitlement cache for ${tenantId}`, err));
+        .catch((err) =>
+          this.logger.warn({ err }, `Failed to drop entitlement cache for ${tenantId}`),
+        );
     });
   }
 }

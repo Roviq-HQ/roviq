@@ -52,8 +52,8 @@ export class FileSweeperWorkerService extends EmbeddedTemporalWorker {
       await this.ensureSchedule(address);
     } catch (err) {
       this.logger.error(
+        { err },
         `File sweeper schedule ${FILE_SWEEPER_SCHEDULE_ID} could not be created or updated`,
-        err instanceof Error ? err.stack : String(err),
       );
     }
   }

@@ -291,7 +291,7 @@ export class CertificatePdfService {
       return webp ? await sharp(webp).png().toBuffer() : null;
     } catch (error) {
       // A certificate without its logo is still valid; one that cannot be issued is not.
-      this.logger.warn(`Institute logo could not be read for the PDF: ${String(error)}`);
+      this.logger.warn({ err: error }, 'Institute logo could not be read for the PDF');
       return null;
     }
   }

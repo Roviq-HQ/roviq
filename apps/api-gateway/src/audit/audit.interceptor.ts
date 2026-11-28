@@ -142,10 +142,7 @@ export class AuditInterceptor implements NestInterceptor {
             })
             .catch((err) => {
               this.errorCounter.add(1, { error_type: 'publish_failure' });
-              this.logger.error(
-                `Failed to emit audit event for ${info.fieldName}`,
-                err instanceof Error ? err.stack : String(err),
-              );
+              this.logger.error({ err }, `Failed to emit audit event for ${info.fieldName}`);
             });
         },
       }),
@@ -176,8 +173,8 @@ export class AuditInterceptor implements NestInterceptor {
           .catch((auditErr) => {
             this.errorCounter.add(1, { error_type: 'publish_failure' });
             this.logger.error(
+              { err: auditErr },
               `Failed to emit audit.error for ${info.fieldName}`,
-              auditErr instanceof Error ? auditErr.stack : String(auditErr),
             );
           });
 

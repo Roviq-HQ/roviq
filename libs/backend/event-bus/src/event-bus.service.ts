@@ -52,7 +52,7 @@ export class EventBusService {
             'event_bus.emit.failed': true,
             'event_bus.subject': pattern,
             'event_bus.subject_prefix': subjectPrefix,
-            err: (err as Error)?.message ?? String(err),
+            err,
           },
           `Failed to emit ${pattern}`,
         );

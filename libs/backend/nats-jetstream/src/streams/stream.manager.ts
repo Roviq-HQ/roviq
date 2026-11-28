@@ -75,7 +75,10 @@ export async function ensureStreams(nc: NatsConnection, streams: StreamConfig[])
       await jsm.streams.update(stream.name, { subjects: [...stream.subjects] });
       logger.log(`Stream "${stream.name}" updated (subject list refreshed)`);
     } catch (updateErr) {
-      logger.error(`Failed to update stream "${stream.name}" after drift check`, updateErr);
+      logger.error(
+        { err: updateErr },
+        `Failed to update stream "${stream.name}" after drift check`,
+      );
       throw updateErr;
     }
   }

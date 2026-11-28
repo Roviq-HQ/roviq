@@ -86,8 +86,8 @@ describe('shutdownGracefully', () => {
 
     expect(calls).toEqual(['server.close', 'app.close', 'exit:1']);
     expect(logger.error).toHaveBeenCalledWith(
+      { err: new Error('pool already ended') },
       'Shutdown failed while closing the HTTP server and microservices',
-      expect.stringContaining('pool already ended'),
     );
   });
 
@@ -102,8 +102,8 @@ describe('shutdownGracefully', () => {
 
     expect(calls).toEqual(['server.close', 'app.close', 'exit:0']);
     expect(logger.error).toHaveBeenCalledWith(
+      { err: new Error('14 UNAVAILABLE: connect ECONNREFUSED') },
       'Telemetry flush failed',
-      '14 UNAVAILABLE: connect ECONNREFUSED',
     );
   });
 

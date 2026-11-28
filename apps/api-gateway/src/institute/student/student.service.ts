@@ -575,7 +575,7 @@ export class StudentService {
       }
     } catch (error) {
       // The admission's own error is the one the caller must see.
-      this.logger.error(`Could not remove account ${userId} of a failed admission`, error);
+      this.logger.error({ err: error }, `Could not remove account ${userId} of a failed admission`);
     }
   }
 

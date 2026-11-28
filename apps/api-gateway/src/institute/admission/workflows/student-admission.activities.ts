@@ -66,7 +66,7 @@ export function createStudentAdmissionActivities(
         logger.warn(`Kept account ${userId} of a failed admission: it is in use`);
       }
     } catch (error) {
-      logger.error(`Could not remove account ${userId} of a failed admission`, error);
+      logger.error({ err: error }, `Could not remove account ${userId} of a failed admission`);
     }
   }
 
