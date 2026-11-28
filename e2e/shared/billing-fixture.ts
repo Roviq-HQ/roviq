@@ -120,7 +120,7 @@ export async function ensureBillingFixture(request: APIRequestContext): Promise<
   };
 }
 
-/** A fresh invoice for the first institute, fully paid in cash, so a refund can be issued on it. */
+/** The fixture's invoice, fully paid in cash, so a refund can be issued on it. */
 export async function createPaidInvoice(
   request: APIRequestContext,
   fixture: BillingFixture,
@@ -152,23 +152,24 @@ export async function createPaidInvoice(
   );
   const token = login.resellerLogin.accessToken;
 
-  const created = await call<{
-    generateInvoice: { id: string; invoiceNumber: string; totalAmount: string | number };
-  }>(
-    'mutation($input: GenerateInvoiceInput!) { generateInvoice(input: $input) { id invoiceNumber totalAmount } }',
-    { input: { tenantId: SEED.INSTITUTE_1.id, subscriptionId: fixture.subscriptionId } },
-    token,
-  );
-  await call(
-    'mutation($invoiceId: ID!, $input: ManualPaymentInput!) { recordManualPayment(invoiceId: $invoiceId, input: $input) { id } }',
-    {
-      invoiceId: created.generateInvoice.id,
-      input: { method: 'CASH', amountPaise: String(created.generateInvoice.totalAmount) },
-    },
-    token,
-  );
-  return {
-    invoiceId: created.generateInvoice.id,
-    invoiceNumber: created.generateInvoice.invoiceNumber,
-  };
+  // A subscription has one live invoice per period, so the fixture's own invoice is the one paid.
+  const listed = await call<{
+    invoices: Array<{
+      id: string;
+      status: string;
+      totalAmount: string | number;
+      paidAmount: string | number;
+    }>;
+  }>('query { invoices(first: 100) { id status totalAmount paidAmount } }', {}, token);
+  const invoice = listed.invoices.find((i) => i.id === fixture.invoiceId);
+  if (!invoice) throw new Error(`Billing fixture invoice ${fixture.invoiceId} is not listed`);
+  const due = BigInt(invoice.totalAmount) - BigInt(invoice.paidAmount);
+  if (due > 0n) {
+    await call(
+      'mutation($invoiceId: ID!, $input: ManualPaymentInput!) { recordManualPayment(invoiceId: $invoiceId, input: $input) { id } }',
+      { invoiceId: fixture.invoiceId, input: { method: 'CASH', amountPaise: String(due) } },
+      token,
+    );
+  }
+  return { invoiceId: fixture.invoiceId, invoiceNumber: fixture.invoiceNumber };
 }
