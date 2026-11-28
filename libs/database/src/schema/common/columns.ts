@@ -50,3 +50,16 @@ export const sameTenantForeignKey = (
   columns: [reference: AnyPgColumn, tenantId: AnyPgColumn],
   foreignColumns: [id: AnyPgColumn, tenantId: AnyPgColumn],
 ) => foreignKey({ name, columns, foreignColumns });
+
+/**
+ * A reference to a table whose rows may belong to no institute (`tenant_id` NULL: a system
+ * role, a platform sender, a person's file). The key cannot carry `tenant_id`, so a trigger
+ * holds the rule instead: the referenced row belongs to the referencing row's institute, or
+ * to none. The trigger is custom SQL, in the same change as the key
+ * (`pnpm check:tenant-foreign-keys` prints the statement).
+ */
+export const sameTenantOrNoneForeignKey = (
+  name: string,
+  column: AnyPgColumn,
+  foreignId: AnyPgColumn,
+) => foreignKey({ name, columns: [column], foreignColumns: [foreignId] });

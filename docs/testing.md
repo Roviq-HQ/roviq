@@ -201,7 +201,7 @@ A security test that cannot fail proves nothing, and nobody notices until an aud
 | Group | What is weakened | Found from | Specs that must notice |
 |---|---|---|---|
 | `policies` | The `USING` or the `WITH CHECK` expression of one row policy of `roviq_app`, `roviq_reseller` or `roviq_user` passes every row | the catalog (`pg_policies`), up to two mutations per policy | `row-policies-refuse-foreign-rows.integration.spec.ts`, then the whole integration project |
-| `keys` | One foreign key that carries `tenant_id` is dropped | the catalog (`pg_constraint`) | `same-tenant-foreign-keys.integration.spec.ts` |
+| `keys` | One foreign key that carries `tenant_id` is dropped, or one trigger of the same-tenant-or-none rule is disabled | the catalog (`pg_constraint`, `pg_trigger`) | `same-tenant-foreign-keys.integration.spec.ts` |
 | `rules` | One trigger is disabled, one CHECK is dropped, or one privilege is granted | `RULE_MUTATIONS` in `scripts/security-mutations/mutations.ts` | the database specs, then the whole integration project |
 | `code` | One check is taken out of the application code by a patch | `CODE_MUTATIONS`, each a file in `scripts/security-mutations/patches/` | the specs named beside the patch |
 

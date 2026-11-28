@@ -14,7 +14,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { sameTenantForeignKey, tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, sameTenantOrNoneForeignKey, tenantColumns } from '../common/columns';
 import { tcStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -102,7 +102,7 @@ export const tcRegister = pgTable(
 
     // ── Digital ─────────────────────────────────────────
     /** The rendered PDF (purpose TC_PDF); NULL until issue has rendered it. */
-    pdfFileId: uuid('pdf_file_id').references(() => files.id, { onDelete: 'restrict' }),
+    pdfFileId: uuid('pdf_file_id'),
     /** Opaque token in the QR code; the public page looks the TC up by it. Set on issue. */
     verificationToken: text('verification_token'),
     /** Whether the TC has been counter-signed by DEO (required for inter-district transfers in Haryana) */
@@ -121,6 +121,11 @@ export const tcRegister = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantOrNoneForeignKey(
+      'tc_register_pdf_file_id_tenant_or_none_fkey',
+      table.pdfFileId,
+      files.id,
+    ).onDelete('restrict'),
     sameTenantForeignKey(
       'tc_register_student_profile_id_tenant_fkey',
       [table.studentProfileId, table.tenantId],

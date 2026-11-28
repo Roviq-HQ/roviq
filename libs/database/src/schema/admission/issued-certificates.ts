@@ -11,7 +11,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { sameTenantForeignKey, tenantColumns } from '../common/columns';
+import { sameTenantForeignKey, sameTenantOrNoneForeignKey, tenantColumns } from '../common/columns';
 import { certificateStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
 import { files } from '../storage/files';
@@ -55,7 +55,7 @@ export const issuedCertificates = pgTable(
     /** Populated template fields frozen at issuance time */
     certificateData: jsonb('certificate_data').notNull(),
     /** The rendered PDF (purpose CERTIFICATE_PDF); NULL until issue has rendered it. */
-    pdfFileId: uuid('pdf_file_id').references(() => files.id, { onDelete: 'restrict' }),
+    pdfFileId: uuid('pdf_file_id'),
     issuedDate: date('issued_date'),
     issuedBy: uuid('issued_by').references(() => users.id),
     /** Purpose for which the certificate was requested */
@@ -66,6 +66,11 @@ export const issuedCertificates = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    sameTenantOrNoneForeignKey(
+      'issued_certificates_pdf_file_id_tenant_or_none_fkey',
+      table.pdfFileId,
+      files.id,
+    ).onDelete('restrict'),
     sameTenantForeignKey(
       'issued_certificates_template_id_tenant_fkey',
       [table.templateId, table.tenantId],

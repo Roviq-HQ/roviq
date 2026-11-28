@@ -208,7 +208,10 @@ async function policyMutations(client: Client): Promise<DatabaseMutation[]> {
   ]);
 }
 
-/** One mutation per foreign key that carries `tenant_id`: the key is dropped. */
+/**
+ * One mutation per foreign key that carries `tenant_id` (the key is dropped) and per trigger of
+ * the same-tenant-or-none rule (the trigger is disabled).
+ */
 async function keyMutations(client: Client): Promise<DatabaseMutation[]> {
   const { rows } = await client.query<{ relname: string; conname: string }>(
     `SELECT c.relname, o.conname
@@ -222,14 +225,40 @@ async function keyMutations(client: Client): Promise<DatabaseMutation[]> {
                        AND a.attname = 'tenant_id')
       ORDER BY 1, 2`,
   );
-  return rows.map((row) => ({
-    type: 'database',
-    name: `foreign key ${row.conname} dropped`,
-    group: 'keys',
-    changes: [{ kind: 'constraint-drop', table: row.relname, constraint: row.conname }],
-    specs: [FOREIGN_KEY_SPEC],
-    thenWholeProject: false,
-  }));
+  // A reference to a table whose rows may belong to no institute is held by two triggers
+  // instead: one on the referencing table, one on the referenced table.
+  const rules = await client.query<{ relname: string; tgname: string }>(
+    `SELECT c.relname, t.tgname
+       FROM pg_trigger t
+       JOIN pg_class c ON c.oid = t.tgrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       JOIN pg_proc p ON p.oid = t.tgfoid
+      WHERE n.nspname = 'public' AND NOT t.tgisinternal AND NOT c.relispartition
+        AND p.proname IN ('check_same_tenant_or_none', 'keep_referenced_tenant')
+      ORDER BY 1, 2`,
+  );
+  return [
+    ...rows.map(
+      (row): DatabaseMutation => ({
+        type: 'database',
+        name: `foreign key ${row.conname} dropped`,
+        group: 'keys',
+        changes: [{ kind: 'constraint-drop', table: row.relname, constraint: row.conname }],
+        specs: [FOREIGN_KEY_SPEC],
+        thenWholeProject: false,
+      }),
+    ),
+    ...rules.rows.map(
+      (row): DatabaseMutation => ({
+        type: 'database',
+        name: `same-tenant-or-none trigger ${row.tgname} off`,
+        group: 'keys',
+        changes: [{ kind: 'trigger-off', table: row.relname, trigger: row.tgname }],
+        specs: [FOREIGN_KEY_SPEC],
+        thenWholeProject: false,
+      }),
+    ),
+  ];
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
+import { sameTenantOrNoneForeignKey } from '../common/columns';
 import { notificationChannel, notificationDeliveryStatus } from '../common/enums';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
@@ -38,10 +39,7 @@ export const notificationDeliveries = pgTable(
       onUpdate: 'cascade',
     }),
     /** NULL for a message with no in-app copy (a verification code, a welcome message). */
-    notificationId: uuid('notification_id').references(() => notifications.id, {
-      onDelete: 'cascade',
-      onUpdate: 'cascade',
-    }),
+    notificationId: uuid('notification_id'),
     recipientUserId: uuid('recipient_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -56,16 +54,27 @@ export const notificationDeliveries = pgTable(
     /** The delivery flow (workflow id) the attempt belongs to; a delivery report is signalled to it. */
     flowId: text('flow_id'),
     /** The WhatsApp sender the attempt went through; NULL on other channels and on skips before one is chosen. */
-    senderId: uuid('sender_id').references(() => messagingSenders.id, {
-      onDelete: 'restrict',
-      onUpdate: 'cascade',
-    }),
+    senderId: uuid('sender_id'),
     /** The provider's price class of the template sent (a `MessageTemplateCategory`); usage is counted by it. */
     templateCategory: text('template_category'),
     attempt: integer().default(1).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    sameTenantOrNoneForeignKey(
+      'notification_deliveries_sender_id_tenant_or_none_fkey',
+      table.senderId,
+      messagingSenders.id,
+    )
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    sameTenantOrNoneForeignKey(
+      'notification_deliveries_notification_id_tenant_or_none_fkey',
+      table.notificationId,
+      notifications.id,
+    )
+      .onDelete('cascade')
+      .onUpdate('cascade'),
     check(
       'chk_notification_deliveries_scope',
       sql`CASE "scope"
