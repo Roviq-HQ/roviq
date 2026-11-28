@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 }
 
 async function flushTestRedis(): Promise<void> {
-  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
+  const redisUrl = process.env.REDIS_URL ?? 'redis://:roviq_redis_dev@localhost:6379';
   const redis = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
   try {
     await redis.connect();

@@ -1,10 +1,12 @@
-ARG NODE_VERSION=24
+# node:24-slim, pinned by digest so a rebuild gets the image that was tested. To move it:
+#   docker buildx imagetools inspect node:24-slim
+ARG NODE_IMAGE=node:24-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530
 
 # ── Toolchain: Node + system packages, no source, no dependencies ──
 # Use slim (Debian) instead of alpine — @temporalio/core-bridge requires glibc,
 # which is incompatible with Alpine's musl libc.
 # See: https://github.com/temporalio/sdk-typescript/issues/1271
-FROM node:${NODE_VERSION}-slim AS toolchain
+FROM ${NODE_IMAGE} AS toolchain
 WORKDIR /app
 
 # ca-certificates: TLS in slim images (Temporal SDK requirement)
@@ -34,8 +36,8 @@ RUN cd /tmp/pm && corepack install && rm -rf /tmp/pm \
   && mkdir -p "$HOME" && chmod 1777 "$HOME" \
   && chmod -R a+rwX /opt/corepack
 
-# ── Base: install dependencies ───────────────────────────────
-FROM toolchain AS base
+# ── Manifest: the lockfile and the dependency fields, nothing installed ──
+FROM toolchain AS manifest
 ENV COREPACK_HOME="/app/.corepack"
 
 # Copy only the lockfile first — it changes only when deps change.
@@ -56,6 +58,14 @@ RUN node -e " \
   && rm tmp-package.json \
   && corepack install
 
+# ── Production dependencies: what the two apps load at run time ──
+# No devDependencies: no test runner, bundler, type checker or browser in a production image.
+FROM manifest AS prod-deps
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod
+
+# ── Base: every dependency, for building and for the tools images ──
+FROM manifest AS base
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
@@ -119,13 +129,13 @@ RUN --mount=type=cache,id=nx-build-cache,target=/app/.nx/cache \
     pnpm nx run-many -t build -p api-gateway notification-service --parallel=3
 
 # ── Production: api-gateway ──────────────────────────────────
-FROM node:${NODE_VERSION}-slim AS api-gateway
+FROM ${NODE_IMAGE} AS api-gateway
 
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=build /app/dist/apps/api-gateway ./dist
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist/libs ./node_modules/@roviq
 COPY --from=build /app/package.json ./
 
@@ -137,13 +147,13 @@ CMD ["node", "--require", "./node_modules/@roviq/telemetry/src/init-telemetry.js
 # ── Production: notification-service ─────────────────────────
 # Mirrors the api-gateway stage. The dist/libs → node_modules/@roviq copy
 # replaces the runtime symlink dance previously inlined in compose.e2e.yaml.
-FROM node:${NODE_VERSION}-slim AS notification-service
+FROM ${NODE_IMAGE} AS notification-service
 
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=build /app/dist/apps/notification-service ./dist
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist/libs ./node_modules/@roviq
 COPY --from=build /app/package.json ./
 

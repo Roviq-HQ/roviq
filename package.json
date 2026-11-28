@@ -33,6 +33,7 @@
     "check:admin-context-reach": "pnpx tsx scripts/check-admin-context-reach.ts",
     "check:direct-nats-emit": "pnpx tsx scripts/check-direct-nats-emit.ts",
     "check:store-keys": "pnpx tsx scripts/check-store-keys.ts",
+    "check:internal-service-auth": ". scripts/instance-env.sh && pnpx tsx scripts/check-internal-service-auth.ts",
     "check:log-messages": "pnpx tsx scripts/check-log-messages.ts",
     "check:audit": "pnpx tsx scripts/check-audit.ts",
     "check:service-db-access": "pnpx tsx scripts/check-service-db-access.ts",

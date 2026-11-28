@@ -1,7 +1,25 @@
+# Settings every container gets unless it says otherwise: no new privileges, a process limit.
+x-contained: &contained
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 512
+
+# The three apps run as an unprivileged user and write only to /tmp.
+x-app-contained: &app-contained
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs: ["/tmp"]
+  pids_limit: 512
+
 services:
   postgres:
     image: postgres:18-alpine
-    networks: [roviq-net]
+    <<: *contained
+    # What the image's entrypoint needs to hand the data folder to the postgres user.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    mem_limit: 2g
+    networks: [backplane]
     environment:
       POSTGRES_USER: roviq
       POSTGRES_PASSWORD: roviq_dev
@@ -19,7 +37,16 @@ services:
 
   redis:
     image: redis:7-alpine
-    networks: [roviq-net]
+    <<: *contained
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
+    mem_limit: 512m
+    networks: [backplane]
+    # Every client signs in. The default is the development password; an override that holds
+    # real data sets REDIS_PASSWORD (compose.staging.yaml requires it).
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-roviq_redis_dev}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:-roviq_redis_dev}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -28,17 +55,32 @@ services:
 
   nats:
     image: nats:2.10-alpine
-    networks: [roviq-net]
-    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    <<: *contained
+    cap_drop: [ALL]
+    mem_limit: 512m
+    networks: [backplane]
+    # One user per service (docker/nats.conf). Monitoring answers inside the container only,
+    # for the health check below.
+    command: ["-c", "/etc/nats/nats.conf"]
+    environment:
+      NATS_MONITOR: 127.0.0.1:8222
+      NATS_GATEWAY_PASSWORD: ${NATS_GATEWAY_PASSWORD:-roviq_nats_gateway_dev}
+      NATS_NOTIFICATIONS_PASSWORD: ${NATS_NOTIFICATIONS_PASSWORD:-roviq_nats_notifications_dev}
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
+      # 127.0.0.1, not localhost: monitoring listens on IPv4 only.
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:8222/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
 
   object-storage:
     image: rustfs/rustfs:1.0.6
-    networks: [roviq-net]
+    <<: *contained
+    cap_drop: [ALL]
+    mem_limit: 1g
+    networks: [backplane]
     # Published so the browser can reach presigned URLs. Create the buckets once with `pnpm storage:init`.
     ports: ["9002:9000"]
     command: /data
@@ -58,7 +100,7 @@ services:
   # start downloads the signature database, so allow it a few minutes to become healthy.
   # clamav:
   #   image: clamav/clamav:1.4
-  #   networks: [roviq-net]
+  #   networks: [backplane]
   #   volumes:
   #     - clamav-db:/var/lib/clamav
   #   healthcheck:
@@ -72,7 +114,8 @@ services:
   # port: the UI and the API are reachable on the private network only.
   openobserve:
     image: openobserve/openobserve:v1.1.2
-    networks: [roviq-net]
+    <<: *contained
+    networks: [backplane]
     environment:
       ZO_ROOT_USER_EMAIL: ${OPENOBSERVE_USER:?OPENOBSERVE_USER must be set}
       ZO_ROOT_USER_PASSWORD: ${OPENOBSERVE_PASSWORD:?OPENOBSERVE_PASSWORD must be set}
@@ -99,14 +142,37 @@ services:
     volumes:
       - roviq-openobserve:/data
 
+  # Temporal's own database role and its two databases (docker/temporal-db.sh); runs to the end
+  # before Temporal starts, on every start.
+  temporal-db:
+    image: postgres:18-alpine
+    <<: *contained
+    cap_drop: [ALL]
+    networks: [backplane]
+    entrypoint: ["/temporal-db.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: roviq
+      PGPASSWORD: roviq_dev
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:-roviq_temporal_dev}
+    volumes:
+      - ./temporal-db.sh:/temporal-db.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   temporal:
     image: temporalio/auto-setup:latest
-    networks: [roviq-net]
+    <<: *contained
+    cap_drop: [ALL]
+    mem_limit: 1g
+    networks: [backplane, workflow]
     environment:
       DB: postgres12
       DB_PORT: 5432
-      POSTGRES_USER: roviq
-      POSTGRES_PWD: roviq_dev
+      POSTGRES_USER: roviq_temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:-roviq_temporal_dev}
+      SKIP_DB_CREATE: "true"
       POSTGRES_SEEDS: postgres
       # auto-setup runs four services, each with its own pool that keeps maxIdleConns open;
       # the 20/20 + 10/10 defaults held ~50 of Postgres's 100 slots while idle.
@@ -115,31 +181,46 @@ services:
       SQL_VIS_MAX_CONNS: 5
       SQL_VIS_MAX_IDLE_CONNS: 1
     depends_on:
-      postgres:
-        condition: service_healthy
+      temporal-db:
+        condition: service_completed_successfully
 
+  # No published port: the UI has no sign-in of its own. Reach it through a tunnel or a proxy
+  # that asks for one (docs/deployment.md → "Staging").
   temporal-ui:
     image: temporalio/ui:latest
-    networks: [roviq-net]
+    <<: *contained
+    cap_drop: [ALL]
+    mem_limit: 256m
+    networks: [workflow]
     environment:
       TEMPORAL_ADDRESS: temporal:7233
 
   migrator:
     image: ghcr.io/roviq-hq/migrator:${ROVIQ_VERSION:-latest}
-    networks: [roviq-net]
+    <<: *contained
+    cap_drop: [ALL]
+    networks: [backplane]
     profiles: ["tools"]
     environment:
       # Migrator runs as superuser — schema changes require it.
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://:${REDIS_PASSWORD:-roviq_redis_dev}@redis:6379
     depends_on:
       postgres:
         condition: service_healthy
 
   api-gateway:
     image: ghcr.io/roviq-hq/api-gateway:${ROVIQ_VERSION:-latest}
-    networks: [roviq-net]
+    <<: *app-contained
+    mem_limit: 1536m
+    cpus: 2
+    networks: [backplane, workflow]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
     ports: ["3000:3000"]
     environment:
       # Four-role model: runtime connects via roviq_pooler (LOGIN, NOINHERIT).
@@ -147,8 +228,8 @@ services:
       # withTenant/withReseller/withAdmin wrappers.
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://:${REDIS_PASSWORD:-roviq_redis_dev}@redis:6379
+      NATS_URL: nats://gateway:${NATS_GATEWAY_PASSWORD:-roviq_nats_gateway_dev}@nats:4222
       # Local values. The image runs with NODE_ENV=production, which refuses plain-http browser
       # storage and an unset MESSAGING_ENCRYPTION_KEY, so this file boots the gateway only under an
       # override that sets them (compose.staging.yaml; docs/deployment.md → "Object storage").
@@ -184,9 +265,19 @@ services:
       nats:
         condition: service_healthy
 
+  # Talks to the API through its public name, so it joins no internal network.
   web:
     image: ghcr.io/roviq-hq/web:${ROVIQ_VERSION:-latest}
-    networks: [roviq-net]
+    <<: *app-contained
+    mem_limit: 768m
+    cpus: 1
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4200/').then((r)=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     ports: ["4200:4200"]
     environment:
       PORT: 4200
@@ -201,13 +292,22 @@ services:
 
   notification-service:
     image: ghcr.io/roviq-hq/notification-service:${ROVIQ_VERSION:-latest}
-    networks: [roviq-net]
+    <<: *app-contained
+    mem_limit: 768m
+    cpus: 1
+    networks: [backplane, workflow]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     ports: ["3002:3002"]
     environment:
       # Four-role model: runtime connects via roviq_pooler.
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq
-      REDIS_URL: redis://redis:6379
-      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://:${REDIS_PASSWORD:-roviq_redis_dev}@redis:6379
+      NATS_URL: nats://notifications:${NATS_NOTIFICATIONS_PASSWORD:-roviq_nats_notifications_dev}@nats:4222
       NOTIFICATION_SERVICE_PORT: 3002
       OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5081
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?OTEL_EXPORTER_OTLP_HEADERS must be set}
@@ -220,8 +320,16 @@ services:
       nats:
         condition: service_healthy
 
+# Networks by need. A service joins only the ones it uses. Two inside the stack, not one per
+# service: a Docker host has a limited number of network address ranges.
 networks:
-  roviq-net:
+  # PostgreSQL, Redis, NATS, object storage, the mail catcher, telemetry, Temporal and the two
+  # backend apps. Every service on it asks for credentials, bar Temporal's own port.
+  backplane:
+  # Temporal's console reaches Temporal here and nothing else.
+  workflow:
+  # The web app's own: it reaches the API through the API's public address.
+  edge:
 
 volumes:
   # clamav-db:

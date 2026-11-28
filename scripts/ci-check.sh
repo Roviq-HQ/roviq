@@ -374,7 +374,8 @@ launch lint pnpm -s lint
 # drift becomes the obvious fix.
 (( run_e2e )) && launch e2e bash -c 'set -e
   if (( RUN_E2E_API )); then
-    NATS_URL="nats://localhost:$E2E_NATS_PORT" pnpm -s check:jetstream-drift
+    NATS_URL="nats://gateway:roviq_nats_gateway_dev@localhost:$E2E_NATS_PORT" pnpm -s check:jetstream-drift
+    pnpm -s check:internal-service-auth
     pnpm -s nx run api-gateway-e2e:test-e2e
   fi
   if (( RUN_E2E_UI )); then

@@ -85,13 +85,15 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | Service | Port | Purpose |
 |---------|------|---------|
 | PostgreSQL 18 | 5434 | Primary database with RLS |
-| Redis 7 | 6379 | CASL ability caching |
-| NATS 2.10 | 4222 (client), 8222 (monitoring) | Inter-service messaging (JetStream) |
+| Redis 7 | 6379 | Access markers, sessions, codes, caches; needs the dev password |
+| NATS 2.10 | 4222 (client), 8222 (monitoring) | Inter-service messaging (JetStream); needs a user |
 | Object storage (RustFS) | 9002 (API), 9003 (console), 9004 (e2e API) | S3-compatible object storage |
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
 | Mailpit | 1025 (SMTP), 8025 (web/API), 8026 (e2e API) | Catches every email the notification service sends in dev and e2e |
 | OpenObserve v1.1.2 | 5080 (UI and API), 5081 (OTLP gRPC) | Logs, metrics, traces, dashboards and alerts in one container. Off by default: see [Observability](#observability) |
+
+Redis and NATS ask for credentials in every stack. The development values are fixed and public (`docker/compose.infra.yaml`, `docker/nats.conf`) and already in `.env.example`: `REDIS_URL=redis://:roviq_redis_dev@…` and `NATS_URL=nats://gateway:roviq_nats_gateway_dev@…`. A checkout whose `.env` was made before that needs those two lines updated (the ports stay as they are) and its `redis` and `nats` containers recreated, which Tilt does when the compose file changes. Temporal connects to PostgreSQL as its own role; the `temporal-db` resource creates it and hands over Temporal's databases on every start. The isolated `nats-test` broker for transport tests keeps no credentials: it holds nothing but the streams a test creates.
 
 ### Object storage
 
@@ -283,8 +285,8 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | DATABASE_URL | Application runtime (roviq_pooler, which assumes roviq_app, roviq_reseller or roviq_admin per request) |
 | DATABASE_URL_AUDIT | Audit and dead-letter consumers (roviq_audit_writer, insert only) |
 | DATABASE_URL_MIGRATE | Migrations, seeds and test fixtures only (roviq owner, schema changes) |
-| REDIS_URL | Redis for CASL caching |
-| NATS_URL | NATS JetStream server |
+| REDIS_URL | Redis, with its password: `redis://:<password>@host:port` (the dev stack's is in `.env.example`) |
+| NATS_URL | NATS JetStream server, with the service's user and password: `nats://<user>:<password>@host:port` |
 | JWT_SECRET | Access token signing |
 | JWT_REFRESH_SECRET | Refresh token signing (must differ from JWT_SECRET) |
 | JWT_EXPIRATION | Access token TTL (e.g. 15m) |

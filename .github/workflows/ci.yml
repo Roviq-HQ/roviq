@@ -8,6 +8,10 @@ on:
   # Manual runs include the Playwright job (see e2e-ui).
   workflow_dispatch:
 
+# The jobs read the repository and nothing else.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -17,11 +21,11 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
       - name: Check integration tests use real DB
@@ -56,11 +60,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm codegen
       - run: pnpm run typecheck
@@ -79,8 +83,8 @@ jobs:
       DATABASE_URL_AUDIT: postgresql://roviq_audit_writer:roviq_audit_writer_dev@localhost:5432/roviq_test
       DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
       DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-      REDIS_URL: redis://localhost:6379
-      NATS_URL: nats://localhost:4222
+      REDIS_URL: redis://:roviq_redis_dev@localhost:6379
+      NATS_URL: nats://gateway:roviq_nats_gateway_dev@localhost:4222
       NATS_TEST_URL: nats://localhost:4224
       JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
       JWT_REFRESH_SECRET: ${{ secrets.CI_JWT_REFRESH_SECRET }}
@@ -126,30 +130,36 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
     # NATS is started manually as a step (not a service) so we can pass `-js`
     # to enable JetStream. GitHub Actions `services:` does not support
     # overriding the container CMD, and the default nats:2.10-alpine entrypoint
     # runs without JetStream — which breaks the stream-config integration test.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
+      # Started as steps, not services: `services:` cannot pass the password or the config file.
+      - name: Start Redis
+        run: |
+          docker run -d --name ci-redis -p 6379:6379 -e REDISCLI_AUTH=roviq_redis_dev \
+            redis:7-alpine redis-server --requirepass roviq_redis_dev
+          for i in $(seq 1 30); do
+            if docker exec ci-redis redis-cli ping | grep -q PONG; then exit 0; fi
+            sleep 1
+          done
+          docker logs ci-redis
+          exit 1
       - name: Start NATS with JetStream
         run: |
           docker run -d --name ci-nats -p 4222:4222 -p 8222:8222 \
-            nats:2.10-alpine -js -m 8222
+            -v "$PWD/docker/nats.conf:/etc/nats/nats.conf:ro" \
+            -e NATS_MONITOR=0.0.0.0:8222 \
+            -e NATS_GATEWAY_PASSWORD=roviq_nats_gateway_dev \
+            -e NATS_NOTIFICATIONS_PASSWORD=roviq_nats_notifications_dev \
+            nats:2.10-alpine -c /etc/nats/nats.conf
           # Wait for JetStream to come up (varz endpoint reports `jetstream`).
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8222/varz | grep -q '"jetstream"'; then
@@ -175,9 +185,9 @@ jobs:
           echo "Transport JetStream failed to come up within 30s"
           docker logs ci-nats-transport
           exit 1
-      - uses: pnpm/action-setup@v4
-      - uses: nrwl/nx-set-shas@v4
-      - uses: actions/cache@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: nrwl/nx-set-shas@3e9ad7370203c1e93d109be57f3b72eb0eb511b1 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           # Nx ignores .nx/cache without its index, a SQLite file in
           # workspace-data named after /etc/machine-id.
@@ -230,15 +240,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: pnpm/action-setup@v4
-      - uses: nrwl/nx-set-shas@v4
-      - uses: actions/cache@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: nrwl/nx-set-shas@3e9ad7370203c1e93d109be57f3b72eb0eb511b1 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           # Nx ignores .nx/cache without its index, a SQLite file in
           # workspace-data named after /etc/machine-id.
@@ -270,20 +280,20 @@ jobs:
     needs: [lint]
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - run: pnpm install --frozen-lockfile
       - name: Provision .env for docker compose
         run: cp .env.example .env
       - name: Restore e2e Nx cache (api-gateway + notification-service builds)
         # workspace-data holds Nx's cache index (machine.db); the cache folder
         # alone is ignored and every task rebuilds.
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             .e2e/nx/cache
@@ -337,8 +347,11 @@ jobs:
         env:
           # e2e NATS publishes on host 4223 (offset off dev's 4222) — see
           # docker/compose.e2e.yaml.
-          NATS_URL: nats://localhost:4223
+          NATS_URL: nats://gateway:roviq_nats_gateway_dev@localhost:4223
         run: pnpm check:jetstream-drift
+      - name: Check the internal services ask for credentials
+        timeout-minutes: 2
+        run: pnpm check:internal-service-auth
       - name: Vitest E2E API tests
         # The stack is already up, seeded and healthy; `pnpm test:e2e:api`
         # would start and re-seed it a second time.
@@ -365,20 +378,20 @@ jobs:
     needs: [lint]
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - run: pnpm install --frozen-lockfile
       - name: Provision .env for docker compose
         run: cp .env.example .env
       - name: Restore e2e Nx cache (api-gateway + notification-service builds)
         # workspace-data holds Nx's cache index (machine.db); the cache folder
         # alone is ignored and every task rebuilds.
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             .e2e/nx/cache
@@ -415,7 +428,7 @@ jobs:
           NEXT_PUBLIC_WS_URL: ws://localhost:3004
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report
           path: e2e/*/playwright-report/

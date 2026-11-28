@@ -1,9 +1,11 @@
-ARG NODE_VERSION=24
+# node:24-slim, pinned by digest so a rebuild gets the image that was tested. To move it:
+#   docker buildx imagetools inspect node:24-slim
+ARG NODE_IMAGE=node:24-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530
 
 # ── Base: install dependencies ───────────────────────────────
 # Use slim (Debian) for parity with Dockerfile.backend, even though @temporalio/core-bridge
 # is not used by web. corepack-managed pnpm reads version from packageManager field.
-FROM node:${NODE_VERSION}-slim AS base
+FROM ${NODE_IMAGE} AS base
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -55,7 +57,7 @@ ARG NEXT_PUBLIC_FIREBASE_VAPID_KEY
 RUN pnpm nx run web:build --skip-nx-cache
 
 # ── Production: web ───────────────────────────────────────────
-FROM node:${NODE_VERSION}-slim AS web
+FROM ${NODE_IMAGE} AS web
 
 WORKDIR /app
 ENV NODE_ENV=production

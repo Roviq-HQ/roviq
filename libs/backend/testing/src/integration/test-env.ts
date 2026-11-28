@@ -54,8 +54,8 @@ export function setupTestEnv(): void {
 
   // External services — connections are mocked in createIntegrationApp(), but
   // the env vars must still parse cleanly through env.validation.ts.
-  setIfMissing('REDIS_URL', 'redis://localhost:6379');
-  setIfMissing('NATS_URL', 'nats://localhost:4222');
+  setIfMissing('REDIS_URL', 'redis://:roviq_redis_dev@localhost:6379');
+  setIfMissing('NATS_URL', 'nats://gateway:roviq_nats_gateway_dev@localhost:4222');
 
   // Auth — token factories sign with the same JWT_SECRET the JwtStrategy
   // reads. This default MUST stay in sync with the fallback in

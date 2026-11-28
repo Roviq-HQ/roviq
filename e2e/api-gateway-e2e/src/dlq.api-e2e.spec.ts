@@ -19,6 +19,7 @@ import { headers as natsHeaders } from '@nats-io/nats-core';
 import { connect, type NatsConnection } from '@nats-io/transport-node';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { natsServerOptions } from '../../../libs/backend/nats-jetstream/src/nats-url';
 
 import { loginAsPlatformAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
@@ -29,7 +30,8 @@ import { gql } from './helpers/gql-client';
 // points at the dev-infra NATS: publishing there would land on a
 // different JetStream and the e2e api-gateway's dlq-reader would never see it.
 const NATS_URL =
-  process.env.E2E_NATS_URL ?? `nats://localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
+  process.env.E2E_NATS_URL ??
+  `nats://gateway:roviq_nats_gateway_dev@localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
 
 // Superuser connection used ONLY to delete the platform rows this suite seeds
 // (no GraphQL delete exists for dlq_messages). Mirrors the e2e vitest env.
@@ -143,7 +145,7 @@ describe('DLQ reader E2E (ROV-19)', () => {
 
   beforeAll(async () => {
     ({ accessToken: adminToken } = await loginAsPlatformAdmin());
-    nc = await connect({ servers: NATS_URL, timeout: 5_000 });
+    nc = await connect({ ...natsServerOptions(NATS_URL), timeout: 5_000 });
     js = jetstream(nc);
     cleanupPool = new pg.Pool({ connectionString: DB_URL, max: 2 });
   });
