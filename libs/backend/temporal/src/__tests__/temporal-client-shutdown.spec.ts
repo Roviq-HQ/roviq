@@ -1,4 +1,4 @@
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TemporalClientService } from '../temporal-client.service';
 
@@ -21,7 +21,7 @@ describe('TemporalClientService shutdown', () => {
   });
 
   it('should end a call that is still retrying, and leave no retry behind to fail later', async () => {
-    const config = { get: () => NO_SERVER } as unknown as ConfigService;
+    const config = new ConfigService({ TEMPORAL_ADDRESS: NO_SERVER });
     const service = new TemporalClientService(config);
     const pending = service
       .startWorkflow('NoSuchWorkflow', { taskQueue: 'none', workflowId: 'shutdown-spec' })
