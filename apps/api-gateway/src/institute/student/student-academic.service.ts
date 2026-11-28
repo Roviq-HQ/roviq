@@ -355,9 +355,7 @@ export class StudentAcademicService {
           `Section at hard maximum capacity (${currentStrength}/${norms.hardMax}). Provide override_reason to proceed.`,
         );
       }
-      this.logger.warn(
-        `Capacity override: ${currentStrength}/${norms.hardMax}. Reason: ${overrideReason}`,
-      );
+      this.logger.warn(`Capacity override: ${currentStrength}/${norms.hardMax}`);
     }
   }
 }

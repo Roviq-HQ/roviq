@@ -203,7 +203,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
       }
     } catch (err) {
       if (!(err instanceof Error && err.message.includes('closed'))) {
-        this.logger.error('Audit consumer error', err);
+        this.logger.error({ err }, 'Audit consumer error');
       }
     }
   }

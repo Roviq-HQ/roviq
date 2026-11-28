@@ -83,10 +83,7 @@ export class JetStreamClient extends ClientNats {
     cold$.subscribe({
       next: (v) => subject.next(v),
       error: (err) => {
-        this.logger.error(
-          `JetStream publish failed [${JSON.stringify(pattern)}]`,
-          err instanceof Error ? err.message : String(err),
-        );
+        this.logger.error({ err }, `JetStream publish failed [${JSON.stringify(pattern)}]`);
         subject.error(err);
       },
       complete: () => subject.complete(),

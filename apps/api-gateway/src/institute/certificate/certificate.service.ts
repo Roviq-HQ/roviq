@@ -120,7 +120,7 @@ export class CertificateService {
       });
       this.logger.log(`TC workflow started: ${tc.id}`);
     } catch (err) {
-      this.logger.warn(`Temporal workflow failed to start for TC ${tc.id}: ${err}`);
+      this.logger.warn({ err }, `Temporal workflow failed to start for TC ${tc.id}`);
     }
 
     return this.getTCDetails(ctx, tc.id);
@@ -220,7 +220,7 @@ export class CertificateService {
     try {
       await this.pdfs.ensureTcPdf(ctx, tcId);
     } catch (error) {
-      this.logger.error(`PDF of issued TC ${tcId} was not rendered: ${String(error)}`);
+      this.logger.error({ err: error }, `PDF of issued TC ${tcId} was not rendered`);
     }
   }
 
@@ -373,7 +373,7 @@ export class CertificateService {
     try {
       await this.pdfs.ensureCertificatePdf(ctx, certId);
     } catch (error) {
-      this.logger.error(`PDF of issued certificate ${certId} was not rendered: ${String(error)}`);
+      this.logger.error({ err: error }, `PDF of issued certificate ${certId} was not rendered`);
     }
 
     const template = await this.certificates.findTemplate(ctx, issued.templateId);

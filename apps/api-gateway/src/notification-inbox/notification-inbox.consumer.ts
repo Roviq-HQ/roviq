@@ -96,7 +96,7 @@ export class NotificationInboxConsumer implements OnModuleInit, OnModuleDestroy 
       for await (const msg of this.messages) this.handle(msg);
     } catch (err) {
       if (!(err instanceof Error && err.message.includes('closed'))) {
-        this.logger.error('Notification feed consumer stopped', err);
+        this.logger.error({ err }, 'Notification feed consumer stopped');
       }
     }
   }

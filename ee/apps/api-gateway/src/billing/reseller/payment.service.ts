@@ -275,7 +275,7 @@ export class PaymentService {
       return await call();
     } catch (error) {
       if (error instanceof PaymentGatewayError) {
-        this.logger.error(`Payment gateway ${error.provider} failed: ${error.message}`);
+        this.logger.error({ err: error }, `Payment gateway ${error.provider} failed`);
         billingError('GATEWAY_ERROR', 'The payment gateway could not be reached');
       }
       throw error;

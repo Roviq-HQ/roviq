@@ -61,7 +61,7 @@ export class InvoicePdfService {
 
       return await QRCode.toBuffer(uri, { width: 150, margin: 1 });
     } catch (err) {
-      this.logger.warn('Failed to build UPI QR', (err as Error).message);
+      this.logger.warn({ err }, 'Failed to build UPI QR');
       return null;
     }
   }

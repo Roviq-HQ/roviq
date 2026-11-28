@@ -377,7 +377,7 @@ export class GuardianService {
       );
 
     this.logger.log(
-      `Guardian access revoked: guardian=${input.guardianProfileId}, student=${input.studentProfileId}, reason=${input.reason ?? 'not specified'}`,
+      `Guardian access revoked: guardian=${input.guardianProfileId}, student=${input.studentProfileId}`,
     );
 
     return updated;

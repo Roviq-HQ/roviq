@@ -46,7 +46,7 @@ export class BillingService {
 
   private rethrowGatewayError(error: unknown): never {
     if (error instanceof PaymentGatewayError) {
-      this.logger.error(`Payment gateway error: ${error.message}`, error.providerError);
+      this.logger.error({ err: error }, 'Payment gateway error');
       throw new BadGatewayException(error.message);
     }
     throw error;

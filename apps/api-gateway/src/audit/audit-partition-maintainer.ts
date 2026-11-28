@@ -21,7 +21,7 @@ export class AuditPartitionMaintainer implements OnModuleInit, OnModuleDestroy {
     await this.partitions.ensureMonthsAhead(MONTHS_AHEAD);
     this.dailyTimer = setInterval(() => {
       void this.partitions.ensureMonthsAhead(MONTHS_AHEAD).catch((err) => {
-        this.logger.error('Scheduled audit partition ensure failed', err);
+        this.logger.error({ err }, 'Scheduled audit partition ensure failed');
       });
     }, DAILY_INTERVAL_MS);
     this.dailyTimer.unref?.();

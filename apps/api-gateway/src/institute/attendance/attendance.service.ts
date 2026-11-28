@@ -375,9 +375,7 @@ export class AttendanceService {
       // notification-service alerts the student's guardians (ROV-314). AT-003: the
       // names make the copy readable instead of showing a membership id.
       const display = await this.resolveAbsenceDisplay(entry.studentId).catch((err) => {
-        this.logger.warn(
-          `Failed to resolve absence display for ${entry.studentId}: ${(err as Error).message}`,
-        );
+        this.logger.warn({ err }, `Failed to resolve absence display for ${entry.studentId}`);
         return null;
       });
       this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.ATTENDANCE_ABSENT, {

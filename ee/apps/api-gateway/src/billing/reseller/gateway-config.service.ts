@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { gatewayConfigs } from '@roviq/ee-database';
 import { CryptoService } from '@roviq/ee-payments';
@@ -10,6 +10,8 @@ type GatewayConfigRow = typeof gatewayConfigs.$inferSelect;
 
 @Injectable()
 export class GatewayConfigService {
+  private readonly logger = new Logger(GatewayConfigService.name);
+
   constructor(
     private readonly repo: GatewayConfigRepository,
     private readonly crypto: CryptoService,
@@ -133,7 +135,7 @@ export class GatewayConfigService {
         const decrypted = this.crypto.decrypt<{ VPA?: string }>(config.credentials as string);
         upiVpa = decrypted.VPA ?? null;
       } catch (err) {
-        console.error('[GatewayConfigService] Failed to decrypt UPI credentials:', err);
+        this.logger.error({ err }, 'Failed to decrypt UPI credentials');
         upiVpa = null;
       }
     }

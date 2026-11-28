@@ -50,7 +50,7 @@ export class DeliveryCanary implements OnApplicationBootstrap {
       const rows = await this.canaries.latestSentPerChannel();
       latest = new Map(rows.map((row) => [row.channel, row.sentAt]));
     } catch (err) {
-      this.logger.error('Could not read the last canary successes; counting from now', err);
+      this.logger.error({ err }, 'Could not read the last canary successes; counting from now');
     }
     for (const channel of settings.channels) {
       this.metrics.canarySucceeded(channel, latest.get(channel) ?? startedAt);

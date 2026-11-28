@@ -147,9 +147,7 @@ export class FileSweeper {
       this.logger.warn(`File sweeper (${action}): row of file ${file.id} changed; kept it`);
       return 'failed';
     } catch (err) {
-      this.logger.warn(
-        `File sweeper (${action}): could not remove file ${file.id}: ${errorMessage(err)}`,
-      );
+      this.logger.warn({ err }, `File sweeper (${action}): could not remove file ${file.id}`);
       return 'failed';
     }
   }
@@ -165,8 +163,4 @@ function emptyCounts(): SweepCounts {
 
 function formatCounts(counts: SweepCounts): string {
   return `removed ${counts.removed}, failed ${counts.failed}, skipped ${counts.skipped}`;
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

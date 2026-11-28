@@ -107,7 +107,7 @@ export async function shutdownGracefully(
     exit(0);
   } catch (err) {
     clearTimeout(deadline);
-    logger.error(`Shutdown failed while closing ${stage}`, err instanceof Error ? err.stack : err);
+    logger.error({ err }, `Shutdown failed while closing ${stage}`);
     exit(1);
   }
 }
@@ -123,7 +123,7 @@ async function flushTelemetryWithin({
     flushTelemetry().then(
       () => true,
       (err: unknown) => {
-        logger.error('Telemetry flush failed', err instanceof Error ? err.message : err);
+        logger.error({ err }, 'Telemetry flush failed');
         return true;
       },
     ),

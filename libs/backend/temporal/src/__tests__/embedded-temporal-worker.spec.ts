@@ -118,8 +118,8 @@ describe('EmbeddedTemporalWorker', () => {
 
     expect(error).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledWith(
+      { err: new Error('temporal unreachable') },
       'Test worker failed to start',
-      expect.stringContaining('temporal unreachable'),
     );
     expect(poolEnd).toHaveBeenCalledTimes(1);
     expect(service.afterStartFn).not.toHaveBeenCalled();
@@ -134,8 +134,8 @@ describe('EmbeddedTemporalWorker', () => {
     await service.onModuleDestroy();
 
     expect(error).toHaveBeenCalledWith(
+      { err: new Error('bundle failed') },
       'Test worker failed to start',
-      expect.stringContaining('bundle failed'),
     );
     expect(nativeClose).toHaveBeenCalledTimes(1);
     expect(poolEnd).toHaveBeenCalledTimes(1);
@@ -167,8 +167,8 @@ describe('EmbeddedTemporalWorker', () => {
     service.onModuleInit();
     await vi.waitFor(() =>
       expect(error).toHaveBeenCalledWith(
+        { err: new Error('schedule rejected') },
         'Test worker post-start step failed',
-        expect.stringContaining('schedule rejected'),
       ),
     );
 
@@ -295,8 +295,8 @@ describe('EmbeddedTemporalWorker', () => {
       service.onModuleInit();
       await vi.waitFor(() =>
         expect(error).toHaveBeenCalledWith(
+          { err: new Error('worker crashed') },
           'Test worker stopped with an error',
-          expect.stringContaining('worker crashed'),
         ),
       );
       await vi.waitFor(() => expect(service.workerStatus).toBe('stopped'));
@@ -348,8 +348,8 @@ describe('EmbeddedTemporalWorker', () => {
     service.onModuleInit();
     await vi.waitFor(() =>
       expect(error).toHaveBeenCalledWith(
+        { err: new Error('worker crashed') },
         'Test worker stopped with an error',
-        expect.stringContaining('worker crashed'),
       ),
     );
     await vi.waitFor(() => expect(poolEnd).toHaveBeenCalledTimes(1));

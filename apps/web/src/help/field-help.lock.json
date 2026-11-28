@@ -124,17 +124,17 @@
     }
   },
   "certificates.tc.rejectReason": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
     "targets": {
       "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.rejectTC": "8e9b6ba7ef56b347",
-      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC": "b3c5aff810240284"
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC": "9bc973bb20c071c4"
     }
   },
   "certificates.tc.requestAcademicYear": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
     "targets": {
       "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts#TC_FIELDS": "4a93f2c1934ca571",
-      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC": "b3c5aff810240284",
+      "apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestTC": "9bc973bb20c071c4",
       "apps/api-gateway/src/institute/certificate/exports/tc-register.export.ts": "efc64565ea30a055"
     }
   },
@@ -213,16 +213,16 @@
     }
   },
   "instituteSettings.config.attendanceType": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
     "targets": {
-      "apps/api-gateway/src/institute/attendance/attendance.service.ts": "a7facc1ee717268b",
+      "apps/api-gateway/src/institute/attendance/attendance.service.ts": "56b47cbfc21bd9c0",
       "apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/config-display.tsx": "0d2100322767a143"
     }
   },
   "instituteSettings.config.exemptionAllowed": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
     "targets": {
-      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity": "dbb5877bc751e14e"
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity": "591415a2a344f503"
     }
   },
   "instituteSettings.config.gradingSystem": {
@@ -232,10 +232,10 @@
     }
   },
   "instituteSettings.config.hardMax": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
     "targets": {
       "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.previewRollover": "f39ab29dea991fca",
-      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity": "dbb5877bc751e14e"
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity": "591415a2a344f503"
     }
   },
   "instituteSettings.config.optimalStrength": {
@@ -273,10 +273,10 @@
     }
   },
   "institutes.new.board": {
-    "reviewedReason": "board seeds subjects for School, filters states, prints on certificates, gates BSEH export",
+    "reviewedReason": "only log calls changed in the service (the error is passed as a field, no typed reason in the message); what the field does is unchanged",
     "targets": {
       "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
-      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts": "078b8062666cedf2",
+      "apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts": "2b888ab09d1c614d",
       "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts": "71cc76155e2b82b2",
       "apps/api-gateway/src/institute/management/seed/institute-setup.service.ts#InstituteSetupService.seedAcademicStructure": "2e5846c3e3429e45",
       "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",

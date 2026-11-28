@@ -110,8 +110,8 @@ describe('FileSweeperWorkerService', () => {
 
     expect(error).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledWith(
+      { err: new Error('temporal unreachable') },
       'File sweeper worker failed to start',
-      expect.stringContaining('temporal unreachable'),
     );
     expect(ensureSchedule).not.toHaveBeenCalled();
     expect(poolEnd).toHaveBeenCalledTimes(1);
@@ -126,8 +126,8 @@ describe('FileSweeperWorkerService', () => {
     await vi.waitFor(() => expect(ensureSchedule).toHaveBeenCalledTimes(1));
     await vi.waitFor(() =>
       expect(error).toHaveBeenCalledWith(
+        { err: new Error('schedule rejected') },
         `File sweeper schedule ${FILE_SWEEPER_SCHEDULE_ID} could not be created or updated`,
-        expect.stringContaining('schedule rejected'),
       ),
     );
 
@@ -162,8 +162,8 @@ describe('FileSweeperWorkerService', () => {
     service.onModuleInit();
     await vi.waitFor(() =>
       expect(error).toHaveBeenCalledWith(
+        { err: new Error('worker crashed') },
         'File sweeper worker stopped with an error',
-        expect.stringContaining('worker crashed'),
       ),
     );
     await vi.waitFor(() => expect(poolEnd).toHaveBeenCalledTimes(1));

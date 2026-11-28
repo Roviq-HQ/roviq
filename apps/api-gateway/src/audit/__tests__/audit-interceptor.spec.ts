@@ -723,8 +723,8 @@ describe('AuditInterceptor', () => {
       await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
         expect(mockEmit).toHaveBeenCalledOnce();
         expect(errorSpy).toHaveBeenCalledWith(
+          { err: new Error('NATS down') },
           expect.stringContaining('Failed to emit audit event'),
-          expect.stringContaining('NATS down'),
         );
       });
     } finally {

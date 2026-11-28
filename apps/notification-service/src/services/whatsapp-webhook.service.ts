@@ -69,17 +69,25 @@ export class WhatsAppWebhookService {
   async handleTemplateEvents(events: readonly TemplateEvent[]): Promise<void> {
     const names = new Set(registeredTemplates().map((t) => t.name));
     const resync = new Set<string>();
-    for (const e of events) {
-      const changes = Object.keys(e.change).length > 0;
+    for (const event of events) {
+      const changes = Object.keys(event.change).length > 0;
       const applied =
         changes &&
-        (await this.templates.applyEvent(e.providerAccountId, e.name, e.language, e.change));
-      this.sendability.forget(e.providerAccountId, e.name, e.language);
+        (await this.templates.applyEvent(
+          event.providerAccountId,
+          event.name,
+          event.language,
+          event.change,
+        ));
+      this.sendability.forget(event.providerAccountId, event.name, event.language);
       // The code's own template without a row yet (the event overtook the sync that submitted
       // it), or an event that does not say where the template stands: read the account's list.
-      if (names.has(e.name) && (e.resync || (changes && !applied))) resync.add(e.providerAccountId);
+      if (names.has(event.name) && (event.resync || (changes && !applied)))
+        resync.add(event.providerAccountId);
       else if (changes && !applied)
-        this.logger.warn(`Template event ${e.field} for a template not registered here; ignored`);
+        this.logger.warn(
+          `Template event ${event.field} for a template not registered here; ignored`,
+        );
     }
     // A failure here answers 500, so the provider sends the events again.
     for (const account of resync) await this.starter.start(account);

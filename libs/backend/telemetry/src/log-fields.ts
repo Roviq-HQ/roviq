@@ -47,6 +47,25 @@ export const LOG_FIELDS: ReadonlySet<string> = new Set([
   'dlq.origin_stream',
   'dlq.error',
   'dlq.retry_count',
+  // An event that could not be published: the subject is a name from the code.
+  'event_bus.emit.failed',
+  'event_bus.subject',
+  'event_bus.subject_prefix',
+  // A result refused by the response-scope check: the operation, which kind of id it was,
+  // the caller's own id and the one found. Ids only.
+  'operation',
+  'scope',
+  'kind',
+  'expected',
+  'found',
+  'refused',
+  // A notification that was not sent: channel and type are names from the code.
+  'notification.skip',
+  'channel',
+  'type',
+  'recipientUserId',
+  'studentMembershipId',
+  'passkeyId',
 ]);
 
 export const DROPPED_FIELDS_KEY = 'dropped_fields';

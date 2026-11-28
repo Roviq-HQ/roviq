@@ -329,7 +329,7 @@ export class AdminInstituteService {
         await connection.close();
         this.logger.log(`Temporal workflow started for institute ${instituteId}`);
       } catch (err) {
-        this.logger.warn(`Failed to trigger Temporal workflow for ${instituteId}: ${err}`);
+        this.logger.warn({ err }, `Failed to trigger Temporal workflow for ${instituteId}`);
       }
     })();
   }

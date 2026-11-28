@@ -27,7 +27,7 @@ export class ImpersonationExpirySweeper implements OnModuleInit, OnModuleDestroy
     try {
       await this.impersonationService.expireOverdueSessions();
     } catch (err) {
-      this.logger.error('Impersonation expiry sweep failed', err);
+      this.logger.error({ err }, 'Impersonation expiry sweep failed');
     }
   }
 }

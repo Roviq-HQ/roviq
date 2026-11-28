@@ -226,8 +226,8 @@ wrong refusal is being fixed, and never `off` in production. Load the alert
     process command line and the operating-system user.
 - **What remains personal data in OpenObserve**: client IP addresses and user agents on
   request spans, institute and record ids in metric labels and log messages, and whatever a
-  log message or a database error message itself quotes (PostgreSQL repeats a rejected value
-  in some messages, for example an invalid UUID). Treat the OpenObserve volume and its
+  database or provider error message itself quotes (PostgreSQL repeats a rejected value in
+  some messages, for example an invalid UUID). Treat the OpenObserve volume and its
   backups as personal data, and keep its retention period no longer than the application's
   own log retention.
 - **Adding a log field or a span attribute** is a change to the list in the same pull request.
@@ -236,6 +236,20 @@ wrong refusal is being fixed, and never `off` in production. Load the alert
   `log-fields.integration.spec.ts` sends requests with marker values in a header, a cookie,
   a query string, GraphQL variables and a webhook body and fails when one reaches a log line
   or when a line holds an unlisted field.
+- **A log message is free text, so the code keeps personal data out of it.** A message quotes
+  ids, counts, codes and names from the code; never a person's name, phone, e-mail or
+  username, a password, token or one-time code, the values of a query, or text a user typed
+  (a reason, a remark). An error is passed as the first argument, `logger.error({ err },
+  'what failed')`, so the listed serializer writes its type, message, stack and code; an error
+  passed after the message is dropped by the logger, and one interpolated into the message
+  skips the serializer. Nothing logs through `console`. `pnpm check:log-messages`
+  (`scripts/check-log-messages.ts`, in the push gate) fails on an interpolated value whose
+  name is on its list of personal names, on an error in or after the message, and on a
+  `console` call; a call that is right as it is goes in its allowlist with the reason. The
+  query log (`LOG_LEVEL=debug`) writes each statement with its placeholders and the number
+  of values. `log-fields.integration.spec.ts` also drives a wrong password, a staff create
+  and an impersonation with marker values, and `sms-delivery.integration.spec.ts` a refused
+  and a failed-over send.
 - On SIGTERM the gateway and the notification service stop accepting connections, finish
   in-flight requests, stop their consumers and Temporal workers, close NATS, Temporal, database
   pools and Redis, flush telemetry (at most 2 s) and exit 0. Past 10 s they exit 1 and log what
