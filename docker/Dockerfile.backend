@@ -161,4 +161,4 @@ COPY . .
 
 WORKDIR /app/libs/database
 # The role check first: it names a missing right before anything is changed.
-CMD ["sh", "-c", "pnpx tsx ../../scripts/check-migration-role.ts && pnpm drizzle-kit migrate --config=drizzle.config.ts"]
+CMD ["sh", "-c", "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON ../../scripts/check-migration-role.ts && pnpm drizzle-kit migrate --config=drizzle.config.ts"]

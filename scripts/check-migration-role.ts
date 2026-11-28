@@ -2,6 +2,7 @@
 // policies, and a role that lacks one of these rights fails part-way through the chain with a
 // message that does not say what to change. Rule in words: docs/deployment.md → "Database
 // migrations".
+// Run with plain `node` (it strips the types): the migrator image downloads nothing at run time.
 import 'dotenv/config';
 import pg from 'pg';
 
