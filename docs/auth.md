@@ -283,6 +283,53 @@ Behaviour:
 
 - Username matching is case-insensitive (`usernameLower`) so attackers cannot defeat the counter by toggling case.
 
+## Request limits (ROV-400)
+
+Two things bound what one client can ask of the API gateway: a count of requests, and the size of one GraphQL operation. The per-account lockout above is separate and unchanged.
+
+### Request counts
+
+`RateLimitGuard` (`apps/api-gateway/src/common/rate-limit/`) is the first global guard. It counts every handler call in Redis (`REDIS_KEYS.RATE_LIMIT`, one counter per bucket, subject and one-minute window) and refuses a call over a limit with `TOO_MANY_REQUESTS` (HTTP 429 on a REST route) and the message "Too many requests. Try again in N seconds."
+
+- **What is one call.** Each GraphQL root field is one call, so a request with ten aliased fields counts ten. A subscription counts once, when it starts, against its user; the events it then receives count nothing. Handlers of NATS events are not requests and are not counted.
+- **Who is counted.** The client address (`req.ip`, see "Client address" below) and, when the request carries a valid access token, the user. A WebSocket connection has no address of its own, so a subscription counts against the user only.
+- **Buckets** (`rate-limit.buckets.ts`), each per minute:
+
+| Bucket | Limit | Applies to |
+|---|---|---|
+| `general` | 3000 per address | every call |
+| `user` | 600 per user | every call with a valid access token |
+| `signIn` | 60 | `adminLogin`, `resellerLogin`, `instituteLogin`, `selectInstitute`, `switchInstitute` |
+| `refresh` | 120 | `refreshToken` |
+| `password` | 10 | `changePassword` |
+| `oneTimeCode` | 10 | `requestEmailVerification`, `verifyEmail`, `adminVerifyImpersonationOtp`, `resellerVerifyImpersonationOtp` |
+| `passkey` | 30 | the four passkey challenge and verification operations |
+| `impersonation` | 20 | `adminStartImpersonation`, `resellerStartImpersonation`, `impersonateUser`, `exchangeImpersonationCode` |
+| `publicLookup` | 30 | `verifyTC` |
+| `webhook` | 600 | every route under `/api/webhooks/` |
+
+  A named bucket is counted for the address and, when signed in, for the user as well, each against the same limit. A handler joins a bucket with `@RateLimit('<bucket>')`; a new sign-in, password, code or impersonation operation needs the decorator.
+- **Why these numbers.** A whole institute office reaches the API from one address, so the address limits are loose and the user limit does the work. Measured on the dev app: loading the institute dashboard sends 14 root fields, so 600 a minute is about 40 dashboard loads a minute for one person. A sign-in is one call, or two with the institute choice; 60 a minute for one address is thirty people signing in within the same minute, which covers the start of a working day in one office.
+- **Left out:** the health routes (`@NoRateLimit()`), which must keep answering a probe and reuse their answer for 5 seconds.
+- **When Redis cannot be reached** the call goes through and a warning is logged. The limit protects the service and must not be what stops it.
+- **`RATE_LIMIT_MULTIPLIER`** multiplies every limit. Production leaves it unset (1). The e2e stack (`docker/compose.e2e.yaml`) and the integration project (`setupTestEnv`) set 1000, because every test sends its requests from the one address of the test runner; `rate-limit.integration.spec.ts` sets its own small limits. An e2e API spec run against the **dev** gateway meets the production limits: 60 sign-ins a minute.
+
+### Operation size
+
+A validation rule (`apps/api-gateway/src/common/query-limits/query-limits.ts`) refuses an operation before any resolver runs when it is over a limit, and the message names the limit ("Query is 13 levels deep; the limit is 12").
+
+| Limit | Default | Variable | Largest the web app sends |
+|---|---|---|---|
+| Depth (a root field is 1) | 12 | `GRAPHQL_MAX_DEPTH` | 6 |
+| Fields in the operation, fragments expanded | 400 | `GRAPHQL_MAX_FIELDS` | 106 |
+| Root fields, aliases counted | 10 | `GRAPHQL_MAX_ROOT_FIELDS` | 2 |
+
+The last column was measured over the 381 operations in `apps/web` and `libs/frontend` and the 611 in the e2e suites (largest there: depth 5, 29 fields, 1 root field). An operation that only introspects is not measured: introspection is off in production, and the schema download in development is deeper than any operation of the app. In production the server also leaves "Did you mean …?" out of its validation messages (`hideSchemaDetailsFromClientErrors`).
+
+### Client address
+
+`req.ip` is what sessions (`refresh_tokens.ip_address`, shown on the Sessions page), `auth_events`, audit rows and impersonation records store, and what the request limits count. Behind a reverse proxy it is the proxy's address unless the API is told how many proxies stand in front of it: `TRUST_PROXY_HOPS` (`apps/api-gateway/src/common/http/trust-proxy.ts`). With a count of n, Express takes the address n hops from the right of `X-Forwarded-For`, which is the one the outermost trusted proxy saw; an address the client writes into the header itself is to the left of it and is not believed. The value is a count, never "trust all". Unset or 0 keeps the connection's own address (local development). `docker/compose.staging.yaml` sets 1.
+
 ## Impersonation
 
 ### Mutations (ROV-93)

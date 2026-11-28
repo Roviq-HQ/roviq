@@ -114,6 +114,8 @@ export async function createIntegrationApp(
       get: async () => null,
       set: async () => 'OK',
       del: async () => 0,
+      incr: async () => 1,
+      expire: async () => 1,
     }),
   );
 

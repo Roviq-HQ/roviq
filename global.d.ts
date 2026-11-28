@@ -70,6 +70,11 @@ declare global {
       DEV_NATS_TEST_PORT?: string;
       /** Host port of this instance's dev API gateway (slot 0: 3005). */
       API_GATEWAY_PORT?: string;
+      RATE_LIMIT_MULTIPLIER?: string;
+      GRAPHQL_MAX_DEPTH?: string;
+      GRAPHQL_MAX_FIELDS?: string;
+      GRAPHQL_MAX_ROOT_FIELDS?: string;
+      TRUST_PROXY_HOPS?: string;
       E2E_API_PORT?: string;
       E2E_WEB_PORT?: string;
       E2E_POSTGRES_PORT?: string;

@@ -1,5 +1,6 @@
 import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
+import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import { ImpersonationAuthPayload } from './dto/impersonation.dto';
 import { extractMeta, type GqlContext } from './gql-context';
 import { ImpersonationService } from './impersonation.service';
@@ -17,6 +18,7 @@ export class ImpersonationResolver {
 
   @NoAudit()
   @Mutation(() => ImpersonationAuthPayload)
+  @RateLimit('impersonation')
   async exchangeImpersonationCode(
     @Args('code') code: string,
     @Context() ctx: GqlContext,

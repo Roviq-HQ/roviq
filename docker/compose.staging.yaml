@@ -124,6 +124,8 @@ services:
       NATS_URL: nats://nats:4222
       TEMPORAL_ADDRESS: temporal:7233
       API_GATEWAY_PORT: "3000"
+      # One reverse proxy stands in front of the API: its X-Forwarded-For names the client.
+      TRUST_PROXY_HOPS: "${TRUST_PROXY_HOPS:-1}"
       ROVIQ_EE: "true"
       S3_ENDPOINT: http://object-storage:9000
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?}

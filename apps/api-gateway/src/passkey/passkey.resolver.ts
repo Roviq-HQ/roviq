@@ -6,6 +6,7 @@ import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/ser
 import { GraphQLJSON } from 'graphql-type-json';
 import { InstituteLoginResult } from '../auth/dto/auth-payload';
 import { extractMeta, type GqlContext } from '../auth/gql-context';
+import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import {
   GeneratePasskeyRegistrationInput,
   VerifyPasskeyAuthInput,
@@ -22,6 +23,7 @@ export class PasskeyResolver {
    *  blob that the client passes directly to navigator.credentials.create() without inspecting fields. */
   @Mutation(() => GraphQLJSON)
   @UseGuards(GqlAuthGuard)
+  @RateLimit('passkey')
   async generatePasskeyRegistrationOptions(
     @Args('input') input: GeneratePasskeyRegistrationInput,
     @CurrentUser() user: AuthUser,
@@ -31,6 +33,7 @@ export class PasskeyResolver {
 
   @Mutation(() => PasskeyInfo)
   @UseGuards(GqlAuthGuard)
+  @RateLimit('passkey')
   async verifyPasskeyRegistration(
     @Args('input') input: VerifyPasskeyRegistrationInput,
     @CurrentUser() user: AuthUser,
@@ -39,6 +42,7 @@ export class PasskeyResolver {
   }
 
   @Mutation(() => PasskeyAuthOptions)
+  @RateLimit('passkey')
   async generatePasskeyAuthOptions(
     @Args('username', { nullable: true }) username?: string,
   ): Promise<PasskeyAuthOptions> {
@@ -46,6 +50,7 @@ export class PasskeyResolver {
   }
 
   @Mutation(() => InstituteLoginResult)
+  @RateLimit('passkey')
   async verifyPasskeyAuth(
     @Args('input') input: VerifyPasskeyAuthInput,
     @Context() ctx: GqlContext,

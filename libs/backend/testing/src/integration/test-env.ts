@@ -68,6 +68,10 @@ export function setupTestEnv(): void {
   setIfMissing('WEBAUTHN_RP_NAME', 'Roviq Test');
   setIfMissing('ALLOWED_ORIGINS', 'http://localhost:4200');
 
+  // Every spec file sends its requests from one address; the request limits have a spec of
+  // their own, which sets its limits itself.
+  process.env.RATE_LIMIT_MULTIPLIER = '1000';
+
   // Force NODE_ENV=test so GraphQL playground/introspection are enabled.
   setIfMissing('NODE_ENV', 'test');
 }

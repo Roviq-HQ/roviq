@@ -13,6 +13,7 @@ import { StartImpersonationResult } from '../../auth/dto/impersonation.dto';
 import { ImpersonationSessionModel } from '../../auth/dto/impersonation-session.model';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ImpersonationService } from '../../auth/impersonation.service';
+import { RateLimit } from '../../common/rate-limit/rate-limit.decorator';
 
 @UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver()
@@ -40,6 +41,7 @@ export class ResellerImpersonationResolver {
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
   @CheckAbility({ action: 'impersonate', subject: 'User' })
+  @RateLimit('impersonation')
   async resellerStartImpersonation(
     @Args('targetUserId') targetUserId: string,
     @Args('targetTenantId') targetTenantId: string,
@@ -59,6 +61,7 @@ export class ResellerImpersonationResolver {
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
   @CheckAbility({ action: 'impersonate', subject: 'User' })
+  @RateLimit('oneTimeCode')
   async resellerVerifyImpersonationOtp(
     @Args('sessionId') sessionId: string,
     @Args('otp') otp: string,

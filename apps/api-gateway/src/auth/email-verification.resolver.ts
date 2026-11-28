@@ -4,6 +4,7 @@ import { NoAudit } from '@roviq/audit';
 import { CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
 import type { AuthUser } from '@roviq/common-types';
 import { assertOwnSession } from '@roviq/common-types';
+import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import { EmailVerificationService } from './email-verification.service';
 
 @ObjectType({
@@ -36,6 +37,7 @@ export class EmailVerificationResolver {
     description:
       'Send a 6-digit code to the account email. Valid for 10 minutes; a new one can be requested after 60 seconds.',
   })
+  @RateLimit('oneTimeCode')
   async requestEmailVerification(@CurrentUser() user: AuthUser): Promise<boolean> {
     assertOwnSession(user);
     await this.verifications.request(user);
@@ -46,6 +48,7 @@ export class EmailVerificationResolver {
   @Mutation(() => Boolean, {
     description: 'Confirm the code sent by `requestEmailVerification`.',
   })
+  @RateLimit('oneTimeCode')
   async verifyEmail(@CurrentUser() user: AuthUser, @Args('code') code: string): Promise<boolean> {
     assertOwnSession(user);
     await this.verifications.verify(user, code);

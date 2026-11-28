@@ -7,6 +7,8 @@ export const REDIS_KEYS = {
   IMPERSONATION_SESSION: 'impersonation-session:',
   IMPERSONATION_OTP: 'impersonation-otp:',
   WS_TICKET: 'ws-ticket:',
+  /** Request counter of one bucket, subject and window: `<bucket>:<address|user>:<id>:<window>`. EX = the window. */
+  RATE_LIMIT: 'rate-limit:',
   /** A user's pending passkey registration challenge, keyed by user id. EX = challenge lifetime. */
   WEBAUTHN_REGISTRATION: 'webauthn:reg:',
   /** A pending passkey sign-in challenge, keyed by a random challenge id. EX = challenge lifetime. */
