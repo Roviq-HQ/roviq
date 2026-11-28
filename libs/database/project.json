@@ -31,7 +31,7 @@
     "db:migrate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "drizzle-kit migrate --config=drizzle.config.ts",
+        "command": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON ../../scripts/check-migration-role.ts && drizzle-kit migrate --config=drizzle.config.ts",
         "cwd": "libs/database"
       }
     },
