@@ -12,7 +12,7 @@ The single web app serves all three portals and picks the portal from the host n
 | Reseller | `reseller.roviq.com` |
 | Institute | `app.roviq.com` |
 
-Any host whose first label is not `admin` or `reseller` is served as the institute portal.
+Any host whose first label is not `admin` or `reseller` is served as the institute portal. Each host serves its own portal only; another portal's path answers 404 there.
 
 ## Web app environment
 
@@ -22,6 +22,15 @@ Any host whose first label is not `admin` or `reseller` is served as the institu
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | the public API origin | Every browser request goes here. |
 | `NEXT_PUBLIC_INSTITUTE_URL` | `https://app.roviq.com` | ROV-101. Admin and reseller impersonation opens the institute portal in a new tab at this origin. When unset, the origin is derived by dropping `admin.`/`reseller.` from the current host, which gives `roviq.com`, not `app.roviq.com`, so impersonation would open the wrong site. |
+
+The web server also reads two values when it starts, for the content security policy it sends (`docs/frontend.md` → "Content security policy"):
+
+| Variable | Production value | Why |
+|---|---|---|
+| `S3_PUBLIC_ENDPOINT` | the origin presigned file links are signed for | The browser may load from and upload to this origin only. Same value as the API gateway's. |
+| `S3_PUBLIC_BASE_URL` | the public bucket's base URL (a CDN in production) | Branding images are loaded from here. Same value as the API gateway's. |
+
+Without them the pages load, but an uploaded image or a file upload is blocked by the browser. The web app sends `Strict-Transport-Security` in production, so its hosts must be served over HTTPS only.
 
 ## Database migrations
 
@@ -183,10 +192,10 @@ wrong refusal is being fixed, and never `off` in production. Load the alert
   `authorization=Basic <base64 of user:password>,organization=default,stream-name=default`
   (`printf '%s' "$OPENOBSERVE_USER:$OPENOBSERVE_PASSWORD" | base64 -w0`).
 - **One account for everything.** The open-source OpenObserve has only full-access roles, so
-  the exporters, the gateway's queries, the admin portal's proxy routes and the loader all use
-  `OPENOBSERVE_USER`. Anyone who can read the gateway's or the web app's environment can read
-  and delete all telemetry. The password never reaches a browser: the proxy routes build every
-  query on the server and require a platform-admin token.
+  the exporters, the gateway's queries and the loader all use `OPENOBSERVE_USER`. Anyone who
+  can read the gateway's environment can read and delete all telemetry. The web app does not
+  hold the account: the admin portal's observability pages ask the gateway
+  (`adminObservability…` queries, platform scope), which builds every query itself.
 - **Alert emails** need a mail server: set `OPENOBSERVE_SMTP_ENABLED=true`,
   `OPENOBSERVE_SMTP_HOST`, `OPENOBSERVE_SMTP_PORT`, `OPENOBSERVE_SMTP_USER`,
   `OPENOBSERVE_SMTP_PASSWORD`, `OPENOBSERVE_SMTP_FROM` and, if not STARTTLS,

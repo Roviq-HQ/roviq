@@ -400,6 +400,8 @@ export const ErrorCode = {
   FILE_INFECTED: 'FILE_INFECTED',
   /** The malware scanner could not be reached; the upload is kept and the request can be retried */
   FILE_SCAN_UNAVAILABLE: 'FILE_SCAN_UNAVAILABLE',
+  /** The telemetry store did not answer, or is not configured; the observability pages show no data until it does */
+  OBSERVABILITY_UNAVAILABLE: 'OBSERVABILITY_UNAVAILABLE',
   /** The institute has used the storage its plan allows; delete files or upgrade the plan */
   STORAGE_QUOTA_EXCEEDED: 'STORAGE_QUOTA_EXCEEDED',
   /** Too many uploads started and not yet attached to anything */
@@ -671,6 +673,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   FILE_IMAGE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_INFECTED: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_SCAN_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  OBSERVABILITY_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   STORAGE_QUOTA_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_UPLOAD_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   EXPORT_REPORT_NOT_FOUND: HttpStatus.NOT_FOUND,

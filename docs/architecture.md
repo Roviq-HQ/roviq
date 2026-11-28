@@ -81,7 +81,7 @@ apps/web/src/
 │   ├── reseller/    # reseller portal
 │   └── institute/   # institute portal
 ├── components/      # components shared by the portals (docs/frontend.md → "Common components")
-└── middleware.ts    # host name → scope (admin.* → /admin, reseller.* → /reseller, else /institute)
+└── middleware.ts    # host name → scope (admin.* → /admin, reseller.* → /reseller, else /institute); content security policy
 ```
 
 ### Libraries

@@ -2,10 +2,7 @@
 
 import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useState } from 'react';
-import type {
-  ObservabilityAlert,
-  ObservabilityAlertsResponse,
-} from '../../../../../api/_lib/alert-model';
+import type { ObservabilityAlert, ObservabilityAlertsResponse } from '../_lib/alert-model';
 import { authFetch } from '../_lib/auth-fetch';
 import { usePollingEffect } from '../_lib/polling';
 

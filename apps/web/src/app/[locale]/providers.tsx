@@ -106,10 +106,12 @@ function GraphQLBridge({
 
 interface ProvidersProps {
   scope?: AuthScope;
+  /** The page's content security policy nonce, for the theme's inline script. */
+  nonce?: string;
   children: React.ReactNode;
 }
 
-export function Providers({ scope = 'institute', children }: ProvidersProps) {
+export function Providers({ scope = 'institute', nonce, children }: ProvidersProps) {
   const t = useTranslations('auth');
   const errorLabels = useAuthErrorLabels();
   const scopedStorage = React.useMemo(() => createScopedTokenStorage(scope), [scope]);
@@ -155,7 +157,7 @@ export function Providers({ scope = 'institute', children }: ProvidersProps) {
         <RefetchAfterReLogin />
         <AccountLocaleSync />
         <NuqsAdapter>
-          <ThemeProvider>
+          <ThemeProvider nonce={nonce}>
             <TooltipProvider>{children}</TooltipProvider>
             <Toaster />
           </ThemeProvider>
