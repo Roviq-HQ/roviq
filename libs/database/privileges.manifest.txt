@@ -336,6 +336,10 @@ grant  | roviq_user | user_profiles | SELECT | *
 grant  | roviq_user | user_profiles | UPDATE | mother_tongue, nationality, religion, updated_at, updated_by
 grant  | roviq_user | users | SELECT | avatar_url, created_at, created_by, deleted_at, deleted_by, email, email_verified_at, form_help_mode, id, must_change_password, password_changed_at, password_hash, preferred_locale, status, token_version, updated_at, updated_by, username, version
 grant  | roviq_user | users | UPDATE | email_verified_at, form_help_mode, must_change_password, password_changed_at, password_hash, preferred_locale, token_version, updated_at, updated_by
+member | roviq_admin | roviq_pooler | inherit false, set true, admin false
+member | roviq_app | roviq_pooler | inherit false, set true, admin false
+member | roviq_reseller | roviq_pooler | inherit false, set true, admin false
+member | roviq_user | roviq_pooler | inherit false, set true, admin false
 policy | academic_years | academic_years_admin_all | roviq_admin | ALL | using: true | check: true
 policy | academic_years | academic_years_app_delete | roviq_app | DELETE | using: false | check: 
 policy | academic_years | academic_years_app_insert | roviq_app | INSERT | using:  | check: (tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)

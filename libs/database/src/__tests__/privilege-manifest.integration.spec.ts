@@ -89,6 +89,16 @@ describe('privilege manifest', () => {
     });
   });
 
+  it('should notice a role that is allowed to act as another', async () => {
+    await asOwnerRolledBack(async (client) => {
+      await client.query('GRANT roviq_admin TO roviq_app WITH INHERIT FALSE, SET TRUE');
+      const diff = diffManifest(await collectPrivileges(client), readManifest());
+      expect(diff.onlyInDatabase).toEqual([
+        'member | roviq_admin | roviq_app | inherit false, set true, admin false',
+      ]);
+    });
+  });
+
   it('should notice a privilege the file promises and the database lacks', async () => {
     await asOwnerRolledBack(async (client) => {
       await client.query('REVOKE SELECT ON institutes FROM roviq_app');

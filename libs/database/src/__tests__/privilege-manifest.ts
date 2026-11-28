@@ -6,6 +6,7 @@
  * - `grant  | role | table | COMMAND | col, col`     a privilege on those columns only
  * - `view   | role | view  | COMMAND`                a privilege on a view
  * - `policy | table | name | roles | COMMAND | using: … | check: …`
+ * - `member | role | member | inherit, set, admin`       who may act as, or inherit from, a role
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -95,6 +96,27 @@ export async function collectPrivileges(client: pg.ClientBase): Promise<string[]
   for (const row of policies.rows) {
     lines.push(
       `policy | ${row.tablename} | ${row.policyname} | ${row.roles} | ${row.cmd} | using: ${oneLine(row.qual)} | check: ${oneLine(row.with_check)}`,
+    );
+  }
+
+  // Role membership is what lets one role act as another: a stray grant here undoes every
+  // table privilege above, so each one is written down too.
+  const memberships = await client.query<{
+    role: string;
+    member: string;
+    inherit_option: boolean;
+    set_option: boolean;
+    admin_option: boolean;
+  }>(
+    `SELECT r.rolname AS role, m.rolname AS member, a.inherit_option, a.set_option, a.admin_option
+       FROM pg_auth_members a
+       JOIN pg_roles r ON r.oid = a.roleid
+       JOIN pg_roles m ON m.oid = a.member
+      WHERE r.rolname LIKE 'roviq%' OR m.rolname LIKE 'roviq%'`,
+  );
+  for (const row of memberships.rows) {
+    lines.push(
+      `member | ${row.role} | ${row.member} | inherit ${row.inherit_option}, set ${row.set_option}, admin ${row.admin_option}`,
     );
   }
 
