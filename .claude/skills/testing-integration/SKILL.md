@@ -44,6 +44,8 @@ expect(res.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
 - Insert what the code under test really reads. A student, staff member or guardian needs the institute's own profile copy (`tenant_user_profiles`) as well as the account profile, or the lists return nothing. An academic year's label must match `YYYY-YY`. When a fixture breaks a CHECK or a foreign key, fix the fixture; the constraint is right.
 - Tests in one file share the database: do not borrow "any" row with `LIMIT 1`, and do not assume a table is empty. A test that changes a shared fixture runs after the tests that read it, or creates its own.
 - No `TRUNCATE`, no `DELETE` of rows you did not create.
+- A test that must remove or change a seeded row (to prove the seed repairs it) does so in a transaction it rolls back, and seeds inside that transaction before the change (`seed/__tests__/idempotency.integration.spec.ts`).
+- A spec that creates the platform's messaging sender, also in a transaction it rolls back, holds `holdPlatformSenderLock` from `beforeAll` to `afterAll`: only one live platform sender may exist.
 
 ## What every new or changed operation needs
 

@@ -132,6 +132,9 @@ export default defineConfig({
             ...(process.env.INTEGRATION_EXCLUDE ?? '').split(/\s+/).filter(Boolean),
           ],
           testTimeout: 30000,
+          // A beforeAll boots the whole application: 2 s on a quiet machine, measured at up to
+          // 9 s while other checkouts run their suites. The 10 s default left no margin.
+          hookTimeout: 30000,
         },
       },
       {

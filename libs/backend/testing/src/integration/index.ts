@@ -8,6 +8,8 @@
 
 // Re-export createMock for convenience.
 export { createMock } from '@golevelup/ts-vitest';
+// Serializes specs that create the one platform messaging sender
+export { holdPlatformSenderLock, PLATFORM_SENDER_LOCK_WAIT_MS } from '@roviq/database';
 // Re-export token factories so integration tests only need one import.
 export {
   createImpersonationToken,
@@ -46,8 +48,6 @@ export {
   type IntegrationAppOptions,
   type IntegrationAppResult,
 } from './integration-app.js';
-// Serializes specs that create the one platform messaging sender
-export { holdPlatformSenderLock, PLATFORM_SENDER_LOCK_WAIT_MS } from './platform-sender-lock.js';
 // Async polling helpers
 export { type AuditLogQuery, waitForAuditLog, waitForCondition } from './polling.js';
 // A foreign id must answer exactly like an id of no row.
