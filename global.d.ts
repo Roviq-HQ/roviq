@@ -6,6 +6,8 @@ declare global {
       DATABASE_URL_TEST?: string;
       INTEGRATION_EXCLUDE?: string;
       DATABASE_URL_MIGRATE?: string;
+      /** On a managed PostgreSQL without superusers: the service's administrative role. */
+      MIGRATION_ADMIN_ROLE?: string;
       DATABASE_URL_TEST_MIGRATE?: string;
       DATABASE_URL_ADMIN?: string;
       JWT_SECRET?: string;
